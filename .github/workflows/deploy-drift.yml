@@ -22,15 +22,34 @@
 # project's Ignored Build Step. So this job runs the same script rather
 # than restating what it does: one source of truth, and a change to the
 # rule cannot leave this check behind believing the old one.
+#
+# 5.11.2026: a merge to main (#438) never reached Vercel, and nothing said
+# so. The schedule below asks for a run every twenty minutes, but GitHub
+# treats a schedule as best effort: over the 100 runs before that day there
+# were four to six a day, a median of 4.4 hours apart and up to 10 hours,
+# and none fell in the hours that mattered. So a push to main now starts
+# its own run, which waits up to fifteen minutes for production to reach
+# that commit (a deployment takes about three) and fails if it does not.
+# Every merge is checked once, whatever the scheduler does. The schedule
+# stays as the background check.
 name: deploy drift
 
 on:
+  push:
+    branches: [main]
   schedule:
-    # Every twenty minutes. A deployment takes about three, so a drift
-    # that lasts one interval is a deployment in progress and a drift
-    # that lasts two is a deployment that is not coming.
+    # Every twenty minutes, in principle (see above). A deployment takes
+    # about three, so a drift that lasts one interval is a deployment in
+    # progress and a drift that lasts two is a deployment that is not
+    # coming.
     - cron: "*/20 * * * *"
   workflow_dispatch:
+
+# A newer push to main supersedes the wait for an older one: production is
+# expected to reach the newest commit, and that run checks it.
+concurrency:
+  group: deploy-drift-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 permissions:
   contents: read
@@ -38,6 +57,7 @@ permissions:
 jobs:
   compare:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,69 +68,120 @@ jobs:
       - name: Compare main with what production serves
         env:
           SITE: https://www.ankora.co.il
+          EVENT: ${{ github.event_name }}
+          # How long a push run waits for production to reach its commit.
+          WAIT_SECONDS: "900"
         run: |
           set -uo pipefail
 
           HEAD_SHA=$(git rev-parse HEAD)
-          BODY=$(curl -fsS --max-time 20 "$SITE/api/health") || {
-            echo "::warning::Could not reach $SITE/api/health. This job says nothing about drift; the uptime monitor is the thing that should be complaining."
-            exit 0
+
+          # One look at production. Prints what it saw and sets STATE to:
+          #   sync      production serves main, or nothing since needs a build
+          #   pending   a commit that changes what is served is not live yet
+          #   unknown   cannot tell (site unreachable, odd answer); warned
+          #   diverged  production is not on main's line at all; an error
+          check_once() {
+            STATE=unknown
+            BODY=$(curl -fsS --max-time 20 "$SITE/api/health") || {
+              WARN="Could not reach $SITE/api/health. This job says nothing about drift; the uptime monitor is the thing that should be complaining."
+              return
+            }
+            LIVE=$(printf '%s' "$BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("commit") or "")')
+            if [ -z "$LIVE" ]; then
+              WARN="Production did not report a commit. Either it is serving a build from before this check existed, or the health endpoint changed shape."
+              return
+            fi
+            echo "main:       ${HEAD_SHA:0:7}"
+            echo "production: $LIVE"
+            if [ "${HEAD_SHA:0:7}" = "$LIVE" ]; then
+              echo "In sync."
+              STATE=sync
+              return
+            fi
+
+            # The live commit has to be findable. A push run checked out its
+            # own commit, so production may already be on a newer one: fetch
+            # main and accept anything that contains this commit.
+            FULL_LIVE=$(git rev-parse --verify --quiet "${LIVE}^{commit}") || {
+              git fetch -q --depth=100 origin main || true
+              FULL_LIVE=$(git rev-parse --verify --quiet "${LIVE}^{commit}") || {
+                WARN="Production reports commit $LIVE, which is not in the last 100 commits of main. It may be very old, or from another branch."
+                return
+              }
+            }
+            if git merge-base --is-ancestor "$HEAD_SHA" "$FULL_LIVE"; then
+              echo "Production is already on a newer commit of main. In sync."
+              STATE=sync
+              return
+            fi
+            # It has to be an ancestor. If it is not, something stranger than
+            # a failed build has happened and a human should look rather than
+            # be told a number.
+            if ! git merge-base --is-ancestor "$FULL_LIVE" "$HEAD_SHA"; then
+              ERR="Production is serving $LIVE, which is not an ancestor of main. Production and main have diverged, which no failed build can cause."
+              STATE=diverged
+              return
+            fi
+
+            # Which of the commits since then were ever going to be built.
+            #
+            # Newest first, so the first hit is the one production should be
+            # on. Each is tested by the project's own Ignored Build Step
+            # script, run against that commit exactly as Vercel runs it.
+            NEWEST_DEPLOYABLE=""
+            for SHA in $(git rev-list "${FULL_LIVE}..${HEAD_SHA}"); do
+              git checkout -q --detach "$SHA"
+              if VERCEL_GIT_COMMIT_REF=main bash scripts/vercel-ignore-build.sh >/dev/null 2>&1; then
+                : # exit 0 from that script means SKIP, so this commit changed nothing served
+              else
+                NEWEST_DEPLOYABLE="$SHA"
+                break
+              fi
+            done
+            git checkout -q --detach "$HEAD_SHA"
+
+            if [ -z "$NEWEST_DEPLOYABLE" ]; then
+              echo "Behind main by $(git rev-list --count ${FULL_LIVE}..${HEAD_SHA}) commit(s), all of which change nothing production serves. In sync."
+              STATE=sync
+              return
+            fi
+            AGE=$(( $(date +%s) - $(git log -1 --format=%ct "$NEWEST_DEPLOYABLE") ))
+            SHORT=${NEWEST_DEPLOYABLE:0:7}
+            STATE=pending
           }
-          LIVE=$(printf '%s' "$BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("commit") or "")')
 
-          if [ -z "$LIVE" ]; then
-            echo "::warning::Production did not report a commit. Either it is serving a build from before this check existed, or the health endpoint changed shape."
-            exit 0
+          # A scheduled or manual run looks once. A push run keeps looking
+          # until production reaches its commit or the wait runs out.
+          DEADLINE=$(date +%s)
+          if [ "$EVENT" = "push" ]; then
+            DEADLINE=$(( $(date +%s) + WAIT_SECONDS ))
           fi
 
-          echo "main:       ${HEAD_SHA:0:7}"
-          echo "production: $LIVE"
-
-          if [ "${HEAD_SHA:0:7}" = "$LIVE" ]; then
-            echo "In sync."
-            exit 0
-          fi
-
-          # The live commit has to be findable, and has to be an ancestor.
-          # If it is neither, something stranger than a failed build has
-          # happened and a human should look rather than be told a number.
-          FULL_LIVE=$(git rev-parse --verify --quiet "${LIVE}^{commit}") || {
-            echo "::warning::Production reports commit $LIVE, which is not in the last 100 commits of this branch. It may be very old, or from another branch."
-            exit 0
-          }
-          if ! git merge-base --is-ancestor "$FULL_LIVE" "$HEAD_SHA"; then
-            echo "::error::Production is serving $LIVE, which is not an ancestor of main. Production and main have diverged, which no failed build can cause."
-            exit 1
-          fi
-
-          # Which of the commits since then were ever going to be built.
-          #
-          # Newest first, so the first hit is the one production should be
-          # on. Each is tested by the project's own Ignored Build Step
-          # script, run against that commit exactly as Vercel runs it.
-          NEWEST_DEPLOYABLE=""
-          for SHA in $(git rev-list "${FULL_LIVE}..${HEAD_SHA}"); do
-            git checkout -q --detach "$SHA"
-            if VERCEL_GIT_COMMIT_REF=main bash scripts/vercel-ignore-build.sh >/dev/null 2>&1; then
-              : # exit 0 from that script means SKIP, so this commit changed nothing served
-            else
-              NEWEST_DEPLOYABLE="$SHA"
+          while :; do
+            WARN=""; ERR=""
+            check_once
+            case "$STATE" in
+              sync) exit 0 ;;
+              diverged) echo "::error::$ERR"; exit 1 ;;
+            esac
+            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
               break
             fi
+            echo "Production is not on this commit yet ($STATE). Looking again in 30 seconds."
+            sleep 30
           done
-          git checkout -q --detach "$HEAD_SHA"
 
-          if [ -z "$NEWEST_DEPLOYABLE" ]; then
-            echo "Behind main by $(git rev-list --count ${FULL_LIVE}..${HEAD_SHA}) commit(s), all of which change nothing production serves. In sync."
+          if [ "$STATE" = "unknown" ]; then
+            echo "::warning::$WARN"
             exit 0
           fi
 
-          AGE=$(( $(date +%s) - $(git log -1 --format=%ct "$NEWEST_DEPLOYABLE") ))
-          SHORT=${NEWEST_DEPLOYABLE:0:7}
-
-          # Under ten minutes old, a difference is the deployment still
-          # building. Failing here would page somebody for every merge.
-          if [ "$AGE" -lt 600 ]; then
+          # pending. Under ten minutes old, on a single look, a difference is
+          # the deployment still building: failing here would page somebody
+          # for every merge. A push run has already waited, so it does not
+          # get that allowance.
+          if [ "$EVENT" != "push" ] && [ "$AGE" -lt 600 ]; then
             echo "::notice::Production is on $LIVE and $SHORT is waiting, but that commit is only ${AGE}s old. Treating this as a deployment in progress."
             exit 0
           fi
