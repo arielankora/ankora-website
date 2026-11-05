@@ -12,10 +12,14 @@ import { ResendInviteForm } from "./ResendInviteForm";
 import { ExposureReport } from "./ExposureReport";
 import { logoutAllSessionsAction, resetPasskeysAction, revokeClaudeGrantsAction } from "../actions";
 import { countClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
-import { listAgreementsForUser } from "@/lib/app-domain/agreements";
-import { AGREEMENT_CHANNEL_LABEL, AGREEMENT_KIND_LABEL } from "@/lib/agreements";
+import { listAgreementsForUser, pendingPdfUploads } from "@/lib/app-domain/agreements";
+import { AGREEMENT_CHANNEL_LABEL, AGREEMENT_KIND_LABEL, CURRENT_AGREEMENTS, agreementCode } from "@/lib/agreements";
+import { localDateKey } from "@/lib/timezone";
+import { PendingPdfReview, type PendingPdf } from "./PendingPdfReview";
 import { PersonalEmailForm } from "./PersonalEmailForm";
 import { DeletionDeclarationForm } from "./DeletionDeclarationForm";
+
+const UPLOADED_ON = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", day: "numeric", month: "numeric" });
 
 const SIGNED_AT = new Intl.DateTimeFormat("he-IL", {
   timeZone: "Asia/Jerusalem",
@@ -72,11 +76,35 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
   ]);
   if (!targetUser) notFound();
 
-  const [claudeGrantCount, agreements, passkeyCount] = await Promise.all([
+  const isStaff = targetUser.role !== "CLIENT_USER";
+  const [claudeGrantCount, agreements, passkeyCount, pending] = await Promise.all([
     countClaudeGrantsForUser(user, targetUser.id),
-    targetUser.role === "CLIENT_USER" ? Promise.resolve([]) : listAgreementsForUser(targetUser.id),
+    isStaff ? listAgreementsForUser(targetUser.id) : Promise.resolve([]),
     prisma.passkey.count({ where: { userId: targetUser.id } }),
+    isStaff ? pendingPdfUploads(targetUser.id) : Promise.resolve(null),
   ]);
+
+  // Signed PDFs the person uploaded and nobody has checked yet: the reason
+  // the approvals screen links here. Shown first, with the file to open.
+  const pendingIds = pending ? Object.values(pending).flat().map((p) => p.documentId) : [];
+  const pendingDocs = pendingIds.length
+    ? await prisma.clientDocument.findMany({ where: { id: { in: pendingIds } }, select: { id: true, driveFileId: true } })
+    : [];
+  const pendingItems: PendingPdf[] = pending
+    ? (Object.keys(pending) as (keyof typeof pending)[]).flatMap((kind) =>
+        pending[kind].map((p) => {
+          const driveFileId = pendingDocs.find((d) => d.id === p.documentId)?.driveFileId;
+          return {
+            documentId: p.documentId,
+            kindLabel: AGREEMENT_KIND_LABEL[kind],
+            code: agreementCode(kind, CURRENT_AGREEMENTS[kind]),
+            uploadedOn: localDateKey(p.uploadedAt),
+            uploadedLabel: UPLOADED_ON.format(p.uploadedAt),
+            fileUrl: driveFileId ? `https://drive.google.com/file/d/${encodeURIComponent(driveFileId)}/view` : null,
+          };
+        })
+      )
+    : [];
 
   const isSelf = targetUser.id === user.id;
 
@@ -88,6 +116,8 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
           <h1 className="mt-3 text-xl font-medium text-app-text-primary">{targetUser.name}</h1>
           <p className="mt-1 text-sm text-app-text-secondary">{targetUser.email}</p>
         </div>
+
+        {pendingItems.length > 0 && <PendingPdfReview userId={targetUser.id} userName={targetUser.name} items={pendingItems} />}
 
         <div className="rounded-2xl border border-app-border bg-white p-6">
           <h2 className="mb-4 text-sm font-medium text-app-text-primary">תפקיד וסטטוס</h2>

@@ -468,7 +468,7 @@ async function checks(s: Scope): Promise<ApprovalItem[]> {
     by: x.user.name,
     href: `/app/users/${x.userId}`,
     actions: { approve: null, reject: null },
-    recommend: { text: "לבדוק עם Claude", why: "Claude קורא את הקובץ, ורושם את החתימה או מחזיר אותו עם סיבה." },
+    recommend: { text: "לבדוק ולרשום", why: "בראש דף המשתמש: הקובץ, מה לבדוק בו, ורישום או החזרה עם סיבה. אפשר גם לבקש מ-Claude לבדוק." },
     go: { label: "לבדיקה", href: `/app/users/${x.userId}` },
   }));
 }
