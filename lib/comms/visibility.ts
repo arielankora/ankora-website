@@ -37,6 +37,16 @@ export function canSeeConversation(input: {
   return input.clients.some((c) => c.accountManagerId === viewer.id);
 }
 
+/// The list "לא רואים שיחות מהמספר" after an edit (5.11.2026): what was
+/// picked, never the owner, and never with the editor taken off it unless the
+/// editor owns the number. A manager the owner kept out stays out.
+export function nextExcludedViewers(input: { channel: ChannelLike; editorId: string; picked: string[] }): string[] {
+  const { channel, editorId } = input;
+  const next = new Set(input.picked.filter((id) => id && id !== channel.ownerUserId));
+  if (editorId !== channel.ownerUserId && channel.excludedViewerIds.includes(editorId)) next.add(editorId);
+  return [...next];
+}
+
 export type BlockLike = { kind: "PHONE" | "CHAT"; value: string; status: "PENDING" | "APPROVED" | "REJECTED" | "REVOKED" };
 
 /// What the block list says about one conversation of a number.

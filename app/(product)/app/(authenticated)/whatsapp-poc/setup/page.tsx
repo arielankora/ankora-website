@@ -7,7 +7,7 @@ import { UnipileError, listWhatsappAccounts, loadMergedChats, type PocChat } fro
 import { blockStateFor } from "@/lib/comms/visibility";
 import { commsAccess } from "@/lib/comms/access";
 import { prisma } from "@/lib/prisma";
-import { BlockManyForm, ConnectForm, DecideForm, LoadHistoryForm, ManualRecordingsForm, RevokeForm, StartForm, type SetupRow } from "./SetupForms";
+import { BlockManyForm, ConnectForm, DecideForm, ExcludedViewersForm, LoadHistoryForm, ManualRecordingsForm, RevokeForm, StartForm, type SetupRow } from "./SetupForms";
 
 // Communications storage (1.11.2026): the WhatsApp numbers connected for
 // storing, each with its "לא לשמור" list before anything is kept, "התחל
@@ -92,7 +92,16 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
         <div className="space-y-1 text-sm text-app-text-primary">
           <h2 className="text-base font-medium">המספר של {channel.owner.name}</h2>
           <p>מצב: {channel.storeEnabled ? "נשמר" : "עוד לא נשמר"}.</p>
-          {excludedNames.length ? <p className="text-app-text-secondary">לא רואים שיחות מהמספר: {excludedNames.join(", ")}.</p> : null}
+          {isOwnerOrManager ? (
+            <ExcludedViewersForm
+              channelId={channel.id}
+              people={people.filter((p) => p.id !== channel.ownerUserId).map((p) => ({ id: p.id, name: p.name ?? p.email }))}
+              excluded={channel.excludedViewerIds}
+              locked={channel.ownerUserId !== user.id && channel.excludedViewerIds.includes(user.id) ? [user.id] : []}
+            />
+          ) : excludedNames.length ? (
+            <p className="text-app-text-secondary">לא רואים שיחות מהמספר: {excludedNames.join(", ")}.</p>
+          ) : null}
           {channel.storeEnabled ? <p className="text-app-text-secondary">היסטוריה: נטענו {loaded} שיחות. ההמשך נטען בריצה הלילית, או עכשיו:</p> : null}
         </div>
         {channel.storeEnabled && isOwnerOrManager ? <LoadHistoryForm channelId={channel.id} /> : null}

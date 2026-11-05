@@ -9,6 +9,7 @@ import {
   importManualRecordingsAction,
   revokeBlockAction,
   startStoringAction,
+  updateExcludedViewersAction,
   type SetupState,
 } from "./actions";
 
@@ -121,7 +122,66 @@ export function ConnectForm(props: {
   );
 }
 
-export type SetupRow = { key: string; value: string; name: string; detail: string; blocked: boolean };
+/// "לא רואים שיחות מהמספר" of a connected number: the names, and for the
+/// owner or a manager a "עריכה" that opens the same checkboxes as on connect.
+/// `locked`: people the editor cannot take off (themselves, when on it).
+export function ExcludedViewersForm(props: {
+  channelId: string;
+  people: Array<{ id: string; name: string }>;
+  excluded: string[];
+  locked: string[];
+}) {
+  const [state, action, pending] = useActionState(updateExcludedViewersAction, undefined);
+  const [editing, setEditing] = useState(false);
+  const nameOf = new Map(props.people.map((p) => [p.id, p.name]));
+  const names = props.excluded.map((id) => nameOf.get(id) ?? id);
+  if (!editing) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-app-text-secondary">לא רואים שיחות מהמספר: {names.length ? `${names.join(", ")}.` : "אין אף אחד."}</p>
+        <button type="button" onClick={() => setEditing(true)} className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
+          עריכה
+        </button>
+        <Result state={state} />
+      </div>
+    );
+  }
+  return (
+    <form
+      action={async (fd) => {
+        await action(fd);
+        setEditing(false);
+      }}
+      className="space-y-2 rounded-lg bg-app-surface-sunken p-3"
+    >
+      <input type="hidden" name="channelId" value={props.channelId} />
+      <fieldset className="space-y-1">
+        <legend className="text-sm font-medium text-app-text-primary">מי לא יראה אף שיחה מהמספר הזה, גם לא עם לקוחות שלו</legend>
+        {props.people.map((p) => {
+          const locked = props.locked.includes(p.id);
+          return (
+            <label key={p.id} className="flex min-h-11 items-center gap-2 text-sm text-app-text-primary">
+              <input type="checkbox" name="excluded" value={p.id} defaultChecked={props.excluded.includes(p.id)} disabled={locked} className="size-5" />
+              {locked ? <input type="hidden" name="excluded" value={p.id} /> : null}
+              {p.name}
+              {locked ? <span className="text-xs text-app-text-secondary">(רק בעל המספר יכול להסיר)</span> : null}
+            </label>
+          );
+        })}
+      </fieldset>
+      <div className="flex flex-wrap gap-2">
+        <button type="submit" disabled={pending} className={primary}>
+          {pending ? "שומר..." : "שמירת הרשימה"}
+        </button>
+        <button type="button" onClick={() => setEditing(false)} disabled={pending} className={secondary}>
+          ביטול
+        </button>
+      </div>
+    </form>
+  );
+}
+
+export type SetupRow ={ key: string; value: string; name: string; detail: string; blocked: boolean };
 
 export function BlockManyForm({ channelId, rows }: { channelId: string; rows: SetupRow[] }) {
   const [state, action, pending] = useActionState(blockManyAction, undefined);
