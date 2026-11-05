@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "./setup";
-import { createTestClient, createTestUser } from "./factories";
+import { createTestClient, createTestClientUser, createTestUser } from "./factories";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import {
   DriveNotConfiguredError,
@@ -8,6 +8,7 @@ import {
   addClientDocumentForLink,
   listClientDocuments,
   removeClientDocument,
+  resolveStaffDocument,
   setClientDocumentKind,
   setClientDocumentVisibility,
 } from "@/lib/app-domain/client-documents";
@@ -154,6 +155,47 @@ describe("visibility and removal", () => {
 
     await expect(setClientDocumentVisibility(employee, doc.id, false)).rejects.toBeInstanceOf(ForbiddenError);
     await expect(removeClientDocument(employee, doc.id)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+});
+
+// 5.11.2026: the download behind the file line on the task screen
+// (app/api/documents/[documentId]). The rule is the task screen's own:
+// whoever is on the client may open its documents, the internal ones
+// too, and nobody else may learn the document exists.
+describe("resolveStaffDocument() - a staff member downloading from the task screen", () => {
+  it("hands an internal document to someone on the client, and records who opened it", async () => {
+    const client = await createTestClient({ name: "Client Staff Download" });
+    const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await prisma.userClientAccess.create({ data: { userId: employee.id, clientId: client.id } });
+    const doc = await seedDocument(client.id, { title: "DPA לחתימה", clientVisible: false });
+
+    const found = await resolveStaffDocument(employee, doc.id);
+    expect(found).toMatchObject({ id: doc.id, driveFileId: doc.driveFileId, mimeType: "application/pdf" });
+
+    const audit = await prisma.auditEvent.findFirst({
+      where: { action: "client_document.read", entityId: doc.id, actorId: employee.id },
+    });
+    expect(audit?.afterJson).toMatchObject({ via: "staff-download" });
+  });
+
+  it("refuses an employee who is not on the client, a portal user, and a removed document", async () => {
+    const client = await createTestClient({ name: "Client Staff Download Refusals" });
+    const doc = await seedDocument(client.id, { clientVisible: true });
+
+    const { user: outsider } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await expect(resolveStaffDocument(outsider, doc.id)).rejects.toBeInstanceOf(ForbiddenError);
+
+    // A client's own person has the portal route, which checks visibility.
+    // This one would hand them internal documents, so it must not open.
+    const { user: portalUser } = await createTestClientUser({ clientId: client.id });
+    await expect(resolveStaffDocument(portalUser, doc.id)).rejects.toBeInstanceOf(ForbiddenError);
+
+    const { user: admin } = await createTestUser({ role: "SUPER_ADMIN" });
+    await removeClientDocument(admin, doc.id);
+    await expect(resolveStaffDocument(admin, doc.id)).rejects.toBeInstanceOf(ForbiddenError);
+
+    // None of the refusals left a trace as a read.
+    expect(await prisma.auditEvent.count({ where: { action: "client_document.read", entityId: doc.id } })).toBe(0);
   });
 });
 

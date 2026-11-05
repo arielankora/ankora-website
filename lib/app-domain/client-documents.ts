@@ -152,6 +152,41 @@ async function storeClientDocument(input: AddClientDocumentInput, uploadedById: 
   return doc;
 }
 
+/// 5.11.2026: a staff member downloading a document from the task screen.
+///
+/// The rule is the one the task screen itself uses: a person who can see
+/// the client can see its documents, internal ones included, because an
+/// internal document is internal to Ankora and not to the people working
+/// on the client. Unlike findDocumentForMcp, "בלי AI" does not refuse
+/// here: that mark keeps a document away from Claude, and this is a
+/// person opening it.
+///
+/// Recorded like a read through Claude, so the audit log answers "who
+/// opened this contract" the same way whichever door they used.
+export async function resolveStaffDocument(actor: User, documentId: string) {
+  assertCan(actor.role, "time_entry.create_self");
+
+  const doc = await prisma.clientDocument.findFirst({
+    where: { id: documentId, deletedAt: null },
+    select: { id: true, clientId: true, title: true, mimeType: true, driveFileId: true },
+  });
+  if (!doc) throw new ForbiddenError("No such document");
+  // A document of a client the person is not on reads as not found, not
+  // as forbidden: its existence is itself something they may not know.
+  await assertClientAccess(actor, doc.clientId);
+
+  await recordAudit({
+    actorId: actor.id,
+    action: "client_document.read",
+    entityType: "ClientDocument",
+    entityId: doc.id,
+    clientId: doc.clientId,
+    after: { via: "staff-download" },
+  });
+
+  return doc;
+}
+
 export async function setClientDocumentVisibility(actor: User, documentId: string, clientVisible: boolean) {
   assertCan(actor.role, "time_entry.create_self");
 

@@ -109,6 +109,21 @@ export function mimeTypeFor(fileName: string, declared?: string | null): string 
   return MIME_BY_EXTENSION[ext] ?? "application/octet-stream";
 }
 
+/// The name a downloaded document is saved under: its title, with the
+/// extension its type implies when the title does not already end in one.
+/// Titles are written for people ("DPA של Unipile, ממולא לחתימה") and
+/// mostly carry no extension, and a file saved without one is a file the
+/// computer does not know how to open.
+export function downloadFileName(title: string, mimeType: string): string {
+  const name = cleanFileName(title) || "document";
+  const type = mimeType.split(";")[0].trim().toLowerCase();
+  const ext = Object.keys(MIME_BY_EXTENSION).find((e) => MIME_BY_EXTENSION[e] === type);
+  if (!ext) return name;
+  const current = name.includes(".") ? name.toLowerCase().split(".").pop() : null;
+  if (current && MIME_BY_EXTENSION[current] === type) return name;
+  return `${name}.${ext}`;
+}
+
 export type DecodedInline = { ok: true; content: Buffer } | { ok: false; message: string };
 
 /// Decodes base64 from a tool argument, strictly.

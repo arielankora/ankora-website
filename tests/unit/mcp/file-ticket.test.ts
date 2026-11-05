@@ -4,6 +4,7 @@ import {
   MAX_INLINE_UPLOAD_BYTES,
   cleanFileName,
   decodeInlineFile,
+  downloadFileName,
   fileTicketExpiry,
   fileTicketUrl,
   generateFileTicket,
@@ -98,5 +99,31 @@ describe("file names and types", () => {
     expect(mimeTypeFor("scan.jpg", null)).toBe("image/jpeg");
     expect(mimeTypeFor("a.pdf", "application/x-www-form-urlencoded")).toBe("application/pdf");
     expect(mimeTypeFor("unknown.xyz")).toBe("application/octet-stream");
+  });
+});
+
+describe("downloadFileName", () => {
+  it("adds the extension a title without one needs", () => {
+    expect(downloadFileName("DPA של Unipile, ממולא לחתימה (עוד לא חתום)", "application/pdf")).toBe(
+      "DPA של Unipile, ממולא לחתימה (עוד לא חתום).pdf"
+    );
+  });
+
+  it("leaves a title that already ends in the right extension alone", () => {
+    expect(downloadFileName("טופס 101.PDF", "application/pdf")).toBe("טופס 101.PDF");
+    expect(downloadFileName("הסכם.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")).toBe("הסכם.docx");
+  });
+
+  it("adds the extension when a dot in the title is not one", () => {
+    expect(downloadFileName("גרסה 1.1, 5.11.2026", "application/zip")).toBe("גרסה 1.1, 5.11.2026.zip");
+  });
+
+  it("keeps the title as is for a type it has no extension for", () => {
+    expect(downloadFileName("restore-check.sh", "application/octet-stream")).toBe("restore-check.sh");
+  });
+
+  it("never hands out a path or an empty name", () => {
+    expect(downloadFileName("../../etc/passwd", "text/plain")).toBe("passwd.txt");
+    expect(downloadFileName("   ", "application/pdf")).toBe("document.pdf");
   });
 });
