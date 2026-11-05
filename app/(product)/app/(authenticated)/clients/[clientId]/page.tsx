@@ -689,6 +689,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 noAccess: p.noAccess,
                 dateCandidate: candidates.get(p.id)?.date ?? null,
                 latestVersion: p.latestVersion,
+                isFlow: p.isFlow,
                 current: p.current
                   ? {
                       version: p.current.version,

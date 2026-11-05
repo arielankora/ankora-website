@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
 import { addClientSource } from "@/lib/app-domain/client-sources";
-import { addProcess, saveAndActivateProcessVersion, saveProcessVersion } from "@/lib/app-domain/processes";
+import { addProcess, FLOW_ONLY_MESSAGE, listProcesses, saveAndActivateProcessVersion, saveProcessVersion } from "@/lib/app-domain/processes";
 import { readFlow, type FlowNode } from "@/lib/process-flow";
 
 // 4.11.2026 (task cmvtivumj000pjs08q9qj4t67): a procedure built as a flow
@@ -94,5 +94,16 @@ describe("a procedure as a flow", () => {
     const sep = await setup({ separation: true });
     const res2 = await saveAndActivateProcessVersion(sep.manager, sep.process.id, { steps: [], flow: flow("DRAFT"), baseVersion: 0 });
     expect(res2.live === false && res2.reason).toContain("עין שנייה");
+  });
+
+  it("once built as a flow, is not saved as a list, so its branches are never dropped", async () => {
+    const { client, manager, process } = await setup();
+    await saveProcessVersion(manager, process.id, { steps: [], flow: flow("DRAFT"), baseVersion: 0 });
+    await expect(saveProcessVersion(manager, process.id, { steps: [{ title: "רשימה" }], baseVersion: 1 })).rejects.toThrow(FLOW_ONLY_MESSAGE);
+    const [listed] = await listProcesses(manager, client.id);
+    expect(listed.isFlow).toBe(true);
+    // As a flow it saves as before.
+    const v2 = await saveProcessVersion(manager, process.id, { steps: [], flow: flow("DRAFT"), baseVersion: 1 });
+    expect(v2.version).toBe(2);
   });
 });

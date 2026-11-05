@@ -415,6 +415,9 @@ export function holdsApproval(checks: ProcessCheckResult[]): ProcessCheckResult[
   return checks.filter((c) => c.severity === "BLOCK" || !c.excepted);
 }
 
+/// Why a procedure built as a flow is not saved as a list.
+export const FLOW_ONLY_MESSAGE = "הנוהל הזה נבנה כזרימה עם תנאים. עורכים אותו ב\"עורך זרימה\", כדי שהענפים לא ילכו לאיבוד.";
+
 export async function saveProcessVersion(actor: User, processId: string, input: VersionInput) {
   assertCan(actor.role, "time_entry.create_self");
   const process = await findProcess(actor, processId);
@@ -439,9 +442,13 @@ export async function saveProcessVersion(actor: User, processId: string, input: 
   const secret = blockingChecks(version, []).find((c) => c.code === "R4");
   if (secret) throw new Error(secret.message);
 
-  const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" }, select: { version: true } });
+  const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" }, select: { version: true, flow: true } });
   const latestVersion = latest?.version ?? 0;
   if (latestVersion !== input.baseVersion) throw new ProcessVersionConflictError(latestVersion);
+  // 5.11.2026: a procedure built as a flow is edited as a flow. Saving it
+  // as a list (the list editor, a proposal from Claude) would drop its
+  // conditions and branches without a word, so it is refused instead.
+  if (!flow && latest && readFlow(latest.flow)) throw new Error(FLOW_ONLY_MESSAGE);
   try {
     const row = await prisma.processVersion.create({
       data: {
@@ -740,6 +747,9 @@ export async function listProcesses(actor: User, clientId: string, options: { in
         current: current ? { ...current, steps: steps(current), checks: processChecks({ steps: steps(current), highlights: current.highlights, outputs: current.outputs }, r, ctx) } : null,
         draft: draft ? { ...draft, steps: steps(draft), checks: processChecks({ steps: steps(draft), highlights: draft.highlights, outputs: draft.outputs }, r, ctx) } : null,
         latestVersion: latest?.version ?? 0,
+        /// The newest version was built as a flow: it is edited in the flow
+        /// editor only (FLOW_ONLY_MESSAGE).
+        isFlow: !!(latest && readFlow(latest.flow)),
         nextDate,
         completeness: completeness(input),
         documentation: documentation(input),
