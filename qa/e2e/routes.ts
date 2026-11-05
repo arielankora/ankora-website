@@ -249,6 +249,14 @@ export const DYNAMIC_SWEEP: { route: string; optional?: string }[] = [
     route: "/app/clients/[clientId]/processes/[processId]/document",
     optional: "needs a process with an approved version on the first client; the approval flow creates one, and spec order is not guaranteed",
   },
+  {
+    route: "/app/clients/[clientId]/processes/[processId]/flow",
+    optional: "needs a process on the first client; the seed's client may have none, and the specs that add one run in no guaranteed order",
+  },
+  // The client's connections (ADR 0001 section 24): the screen next to the
+  // vault, so it is swept on purpose. Linked from the processes panel of
+  // every client screen, so it always resolves.
+  { route: "/app/clients/[clientId]/connections" },
   { route: "/app/categories/[categoryId]" },
   { route: "/app/tasks/[id]" },
   { route: "/app/users/[userId]" },

@@ -982,6 +982,9 @@ export function ProcessesPanel({
               הנהלים כמסמכים
             </Link>
           )}
+          <Link href={`/app/clients/${clientId}/connections`} className="text-xs font-medium text-app-text-accent hover:underline" data-testid="connections-link">
+            חיבורים
+          </Link>
           <Drawer triggerLabel="+ תהליך" title="תהליך" variant="link">
             <ProcessForm clientId={clientId} {...form} />
           </Drawer>
