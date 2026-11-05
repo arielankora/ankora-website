@@ -175,10 +175,23 @@ describe("propose_knowledge payloads, as tools/list publishes them", () => {
     const res = await POST(
       rpc("tools/call", {
         name: "propose_knowledge",
-        arguments: { client: "RIMED", sourceCode: "S15", items: [{ target: "FACT", payload: { kind: "PREFERENCE", body: "x", topic: "NOT_A_TOPIC" }, reason: "r" }] },
+        arguments: { client: "RIMED", sourceCode: "S15", items: [{ target: "FACT", payload: { kind: "PREFERENCE", body: "x", topic: "NOT_A_TOPIC" }, reason: "r", confidence: "HIGH" }] },
       })
     );
     const text = await new Response(res.body).text();
     expect(text).toContain("REACHED_THE_TOOL");
+  });
+
+  it("5.11.2026: refuses an item without confidence before the tool, unlike a bad payload value", async () => {
+    const { POST } = await import("@/app/api/mcp/route");
+    const res = await POST(
+      rpc("tools/call", {
+        name: "propose_knowledge",
+        arguments: { client: "RIMED", sourceCode: "S15", items: [{ target: "FACT", payload: { kind: "PREFERENCE", body: "x" }, reason: "r" }] },
+      })
+    );
+    const text = await new Response(res.body).text();
+    expect(text).not.toContain("REACHED_THE_TOOL");
+    expect(text).toContain("confidence");
   });
 });
