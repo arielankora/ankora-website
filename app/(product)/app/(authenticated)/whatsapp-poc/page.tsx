@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { ArrowRight, ChevronDown, MessageCircle, MoreHorizontal, Phone, Search } from "lucide-react";
-import { ContactRail, ReadToggle, RememberFilters, TimelineScroller } from "./CommsControls";
+import { ContactRail, ReadToggle, RememberFilters, RowPending, TimelineScroller } from "./CommsControls";
 import { ScrollToActive } from "./ScrollToActive";
 import { BlockButton } from "./setup/SetupForms";
 import { searchStoredMessages, type MessageHit, type StoredTranscript } from "@/lib/comms/stored-chats";
@@ -402,7 +402,17 @@ export default async function CommunicationsPage(props: {
   const mailConfig = config.apiKey && config.mailAccountId ? { apiKey: config.apiKey, mailAccountId: config.mailAccountId } : null;
 
   // WhatsApp: every connected number the person may see (lib/comms/inbox-loader.ts).
-  const wa = await loadWhatsapp(user, access);
+  // 5.11.2026: the WhatsApp lists and the stored calls are read side by side.
+  const [wa, stored] = await Promise.all([
+    loadWhatsapp(user, access),
+    // The transcripts' text is read below, only for the calls on screen:
+    // reading all 300 on every click was a large part of each load.
+    prisma.callRecording.findMany({
+      orderBy: { callAt: "desc" },
+      take: 300,
+      include: { transcript: { select: { id: true, status: true } } },
+    }),
+  ]);
   const chats = wa.chats;
   let waError: string | null = wa.error;
   const waReady = Boolean(config.apiKey);
@@ -414,11 +424,6 @@ export default async function CommunicationsPage(props: {
   let calls: PageCall[] = [];
   let callsError: string | null = null;
   let callsStale = false;
-  const stored = await prisma.callRecording.findMany({
-    orderBy: { callAt: "desc" },
-    take: 300,
-    include: { transcript: { select: { status: true, text: true } } },
-  });
   if (stored.length > 0) {
     calls = stored.map((r) => ({
       emailId: r.emailId,
@@ -428,7 +433,7 @@ export default async function CommunicationsPage(props: {
       line: storedCallLine(r),
       sizeBytes: r.sizeBytes,
       durationSec: r.durationSec,
-      transcript: r.transcript,
+      transcript: r.transcript ? { status: r.transcript.status, text: null } : null,
       audioRemoved: r.audioDeletedAt !== null,
     }));
   } else if (mailConfig) {
@@ -589,6 +594,17 @@ export default async function CommunicationsPage(props: {
   const openRow: InboxRow | undefined = rows.find((r) => r.key === openKey);
   const owner: PhoneMatch | undefined = selectedPhone ? owners.get(selectedPhone) : undefined;
   const contactCalls = selectedPhone ? calls.filter((c) => c.other === selectedPhone) : [];
+  // The transcripts' text, for the calls this screen shows: the open
+  // contact's, or every call on the calls table.
+  const onScreen = (filter === "call" && !isOpen ? calls : contactCalls).filter((c) => c.transcript?.status === "DONE");
+  if (onScreen.length > 0) {
+    const texts = await prisma.transcript.findMany({
+      where: { status: "DONE", recording: { emailId: { in: onScreen.map((c) => c.emailId) } } },
+      select: { text: true, recording: { select: { emailId: true } } },
+    });
+    const textOf = new Map(texts.map((t) => [t.recording?.emailId ?? "", t.text]));
+    for (const c of onScreen) if (c.transcript) c.transcript = { ...c.transcript, text: textOf.get(c.emailId) ?? null };
+  }
   const timeline = buildTimeline(messages, contactCalls);
   const messageById = new Map(messages.map((m) => [m.id, m]));
   const callById = new Map(contactCalls.map((c) => [c.emailId, c]));
@@ -831,7 +847,7 @@ export default async function CommunicationsPage(props: {
           </ul>
         </section>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[20rem_minmax(0,1fr)_auto]">
+        <div className="comms-grid grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[20rem_minmax(0,1fr)_auto]">
           {/* The list. On a phone it gives way to the open conversation. */}
           <nav
             aria-label="אנשי קשר"
@@ -894,7 +910,10 @@ export default async function CommunicationsPage(props: {
                       >
                         <span className="flex items-baseline justify-between gap-2">
                           <span className="truncate text-[15px] font-medium text-app-text-primary"><bdi>{name}</bdi></span>
-                          <span className="flex-none text-xs text-app-text-secondary">{formatListTime(h.at, now)}</span>
+                          <span className="flex flex-none items-center gap-1.5">
+                            <RowPending />
+                            <span className="text-xs text-app-text-secondary">{formatListTime(h.at, now)}</span>
+                          </span>
                         </span>
                         <span className="line-clamp-2 text-[13px] text-app-text-primary">
                           {h.isSender ? "אנחנו: " : ""}
@@ -925,7 +944,10 @@ export default async function CommunicationsPage(props: {
                       <span className="flex min-w-0 flex-1 flex-col gap-1">
                         <span className="flex items-baseline justify-between gap-2">
                           <span className={`truncate text-[15px] text-app-text-primary ${unread ? "font-semibold" : "font-medium"}`}><bdi>{row.name}</bdi></span>
-                          <span className={`flex-none text-xs ${unread ? "font-medium text-app-text-accent" : "text-app-text-secondary"}`}>{formatListTime(row.at, now)}</span>
+                          <span className="flex flex-none items-center gap-1.5">
+                            <RowPending />
+                            <span className={`text-xs ${unread ? "font-medium text-app-text-accent" : "text-app-text-secondary"}`}>{formatListTime(row.at, now)}</span>
+                          </span>
                         </span>
                         <span className="flex items-center justify-between gap-2">
                           <span className={`truncate text-[13px] ${unread ? "text-app-text-primary" : "text-app-text-secondary"}`}>{row.preview}</span>
@@ -965,8 +987,18 @@ export default async function CommunicationsPage(props: {
           {/* The timeline of the open contact. */}
           <section
             aria-label="ציר זמן"
-            className={`${isOpen ? "flex" : "hidden lg:flex"} h-[78vh] min-h-[24rem] flex-col overflow-hidden rounded-2xl border border-app-border bg-app-surface-page`}
+            className={`${isOpen ? "flex" : "hidden lg:flex"} relative h-[78vh] min-h-[24rem] flex-col overflow-hidden rounded-2xl border border-app-border bg-app-surface-page`}
           >
+            {/* While a row's conversation loads (RowPending in that row). */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-30 hidden items-center justify-center bg-app-surface-page/70 [.comms-grid:has([data-nav-pending])_&]:flex"
+            >
+              <span className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-app-text-secondary shadow">
+                <span className="size-4 animate-spin rounded-full border-2 border-app-border-strong border-t-navy" />
+                טוען את השיחה...
+              </span>
+            </div>
             {isOpen ? (
               <MessageSelectionProvider
                 key={`select-${openKey}`}

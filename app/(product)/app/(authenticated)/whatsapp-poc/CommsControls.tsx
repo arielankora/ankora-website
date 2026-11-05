@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, BarChart3, Link2, Mail, MailOpen, User, X } from "lucide-react";
+import { useLinkStatus } from "next/link";
+import { ArrowDown, BarChart3, Link2, Loader2, Mail, MailOpen, User, X } from "lucide-react";
 import { markChatsReadAction } from "./actions";
 
 // The communications screen's small client pieces (5.11.2026, Ariel's
@@ -167,6 +168,20 @@ export function ReadToggle(props: { chats: Array<{ chatId: string; numberKey: st
           {error}
         </span>
       ) : null}
+    </span>
+  );
+}
+
+/// Inside a list row's link (5.11.2026, Ariel: a click showed nothing for
+/// seconds and felt stuck). While the conversation loads, the row shows a
+/// spinner, and `data-nav-pending` lets the timeline beside it show that it
+/// is loading (the `comms-grid` rule in page.tsx).
+export function RowPending() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return (
+    <span data-nav-pending="" role="status" aria-label="טוען את השיחה" className="flex flex-none items-center">
+      <Loader2 className="size-4 animate-spin text-app-text-secondary" aria-hidden="true" />
     </span>
   );
 }

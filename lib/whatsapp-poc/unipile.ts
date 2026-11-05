@@ -312,13 +312,18 @@ export const CHAT_LIST_MAX_AGE_MS = 6 * 60 * 60_000;
 
 type Config = { apiKey: string; accountId: string };
 type CachedList = { accountId: string; at: number; chats: PocChat[] };
-let cachedList: CachedList | null = null;
-let refreshing: Promise<void> | null = null;
+// One remembered list per WhatsApp account (5.11.2026). Until then there was
+// a single slot: with several connected numbers, each page load replaced one
+// number's list with the next, so every number but the last was read from
+// Unipile again on every click. That was most of the 2 to 4 seconds Ariel saw
+// opening a conversation, and a request against the quota each time.
+const cachedLists = new Map<string, CachedList>();
+const refreshing = new Map<string, Promise<void>>();
 
-/// For tests: forget the remembered list.
+/// For tests: forget the remembered lists.
 export function resetChatListCache(): void {
-  cachedList = null;
-  refreshing = null;
+  cachedLists.clear();
+  refreshing.clear();
 }
 
 type Schedule = (work: () => Promise<void>) => void | Promise<void>;
@@ -326,7 +331,7 @@ const scheduleAfterResponse: Schedule = (work) => afterResponse("whatsapp-poc ch
 
 async function readAndRemember(config: Config, fetchAll: (config: Config) => Promise<PocChat[]>, now: () => number) {
   const chats = mergeChats(await fetchAll(config));
-  cachedList = { accountId: config.accountId, at: now(), chats };
+  cachedLists.set(config.accountId, { accountId: config.accountId, at: now(), chats });
   return chats;
 }
 
@@ -336,21 +341,21 @@ export async function loadMergedChats(
   now: () => number = Date.now,
   schedule: Schedule = scheduleAfterResponse,
 ): Promise<{ chats: PocChat[]; refreshing: boolean }> {
-  const cached = cachedList && cachedList.accountId === config.accountId ? cachedList : null;
+  const cached = cachedLists.get(config.accountId) ?? null;
   const age = cached ? now() - cached.at : Infinity;
 
   if (cached && age < CHAT_LIST_FRESH_MS) return { chats: cached.chats, refreshing: false };
 
   if (cached && age < CHAT_LIST_MAX_AGE_MS) {
-    if (!refreshing) {
+    if (!refreshing.has(config.accountId)) {
       const run = async () => {
         try {
           await readAndRemember(config, fetchAll, now);
         } finally {
-          refreshing = null;
+          refreshing.delete(config.accountId);
         }
       };
-      refreshing = Promise.resolve(schedule(run)).then(() => undefined);
+      refreshing.set(config.accountId, Promise.resolve(schedule(run)).then(() => undefined));
     }
     return { chats: cached.chats, refreshing: true };
   }
@@ -429,8 +434,9 @@ export async function sendText(config: { apiKey: string; accountId: string }, ch
 /// next read of the list to show it.
 export async function setReadStatus(config: Config, chatId: string, read: boolean): Promise<void> {
   await call(config, `/chats/${encodeURIComponent(chatId)}`, { method: "PATCH", body: { read_status: read } });
-  if (cachedList && cachedList.accountId === config.accountId) {
-    for (const chat of cachedList.chats) {
+  const cached = cachedLists.get(config.accountId);
+  if (cached) {
+    for (const chat of cached.chats) {
       if (chat.id === chatId) chat.unreadCount = read ? 0 : chat.unreadCount > 0 ? chat.unreadCount : -1;
     }
   }

@@ -222,6 +222,24 @@ describe("WhatsApp POC: remembering the chat list", () => {
     expect(calls).toBe(1);
   });
 
+  it("keeps each number's list: reading a second number does not drop the first (5.11.2026)", async () => {
+    resetChatListCache();
+    const other = { apiKey: "k", accountId: "acc_other" };
+    let calls = 0;
+    const counting = (list: PocChat[]) => async () => {
+      calls += 1;
+      return list;
+    };
+    const t = 5_000_000;
+    await loadMergedChats(config, counting(first), () => t, inline);
+    await loadMergedChats(other, counting(second), () => t, inline);
+    const again = await loadMergedChats(config, counting(second), () => t, inline);
+    const otherAgain = await loadMergedChats(other, counting(first), () => t, inline);
+    expect(calls).toBe(2);
+    expect(again.chats).toEqual(first);
+    expect(otherAgain.chats).toEqual(second);
+  });
+
   it("after a minute shows the old list at once and refreshes it for the next load", async () => {
     resetChatListCache();
     let t = 2_000_000;
