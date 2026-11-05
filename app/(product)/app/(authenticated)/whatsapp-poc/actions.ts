@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canSendTo, checkMessageText, maskPhone } from "@/lib/whatsapp-poc/access";
 import { commsAccess } from "@/lib/comms/access";
-import { UnipileError, getChat, readPocConfig, sendText } from "@/lib/whatsapp-poc/unipile";
+import { UnipileError, getChat, readPocConfig, sendText, setReadStatus } from "@/lib/whatsapp-poc/unipile";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { addClientContact, updateClientContact } from "@/lib/app-domain/client-contacts";
 import { addClientSource } from "@/lib/app-domain/client-sources";
@@ -195,6 +195,49 @@ export async function assignGroupToClientAction(_prev: ContactState | undefined,
     before: { groupClientId: conversation.groupClientId },
     after: { groupClientId: clientId },
   });
+  revalidatePath("/app/whatsapp-poc");
+  return { ok: true };
+}
+
+export type ReadState = { error?: string; ok?: boolean };
+
+/// "סמן כנקראה" / "סמן כלא נקראה" (5.11.2026, Ariel): on a person's click
+/// only; opening a chat never marks it. A row may stand for chats on two
+/// numbers; each is marked on its own number, and only where this person
+/// may read that number live (its owner, or the full viewers). The number is
+/// checked here, never trusted from the screen.
+export async function markChatsReadAction(input: { chats: Array<{ chatId: string; numberKey: string }>; read: boolean }): Promise<ReadState> {
+  const user = await requireUser();
+  const config = readPocConfig();
+  const access = await commsAccess(user);
+  if (!access.allowed || !config.apiKey) return { error: "אין הרשאה." };
+  const chats = Array.isArray(input?.chats) ? input.chats.slice(0, 5) : [];
+  if (chats.length === 0) return { error: "אין שיחה לסמן." };
+  const read = input.read === true;
+
+  let done = 0;
+  try {
+    for (const { chatId, numberKey } of chats) {
+      if (typeof chatId !== "string" || !chatId || chatId.length > 200 || typeof numberKey !== "string") continue;
+      let accountId: string | null = null;
+      if (numberKey === "-") {
+        const connected = config.accountId ? await prisma.commsChannel.findUnique({ where: { accountId: config.accountId }, select: { id: true } }) : null;
+        if (access.full && config.accountId && !connected) accountId = config.accountId;
+      } else {
+        const channel = await prisma.commsChannel.findUnique({ where: { id: numberKey } });
+        if (channel && !channel.excludedViewerIds.includes(user.id) && (channel.ownerUserId === user.id || access.full)) {
+          accountId = channel.accountId;
+        }
+      }
+      if (!accountId) continue;
+      await setReadStatus({ apiKey: config.apiKey, accountId }, chatId, read);
+      done++;
+    }
+  } catch (err) {
+    if (err instanceof UnipileError) return { error: err.message };
+    throw err;
+  }
+  if (done === 0) return { error: "אפשר לסמן רק שיחות במספר שלך." };
   revalidatePath("/app/whatsapp-poc");
   return { ok: true };
 }

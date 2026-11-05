@@ -127,7 +127,7 @@ export class UnipileError extends Error {
 async function call(
   config: { apiKey: string; accountId: string },
   path: string,
-  init?: { method?: "GET" | "POST"; query?: Record<string, string>; body?: unknown },
+  init?: { method?: "GET" | "POST" | "PATCH"; query?: Record<string, string>; body?: unknown },
 ): Promise<unknown> {
   const url = new URL(`${BASE_URL}/${config.accountId}${path}`);
   for (const [k, v] of Object.entries(init?.query ?? {})) url.searchParams.set(k, v);
@@ -413,6 +413,19 @@ export async function listMessages(
 
 export async function sendText(config: { apiKey: string; accountId: string }, chatId: string, text: string): Promise<void> {
   await call(config, `/chats/${encodeURIComponent(chatId)}/messages/send`, { method: "POST", body: { text } });
+}
+
+/// "סמן כנקראה" / "סמן כלא נקראה" (5.11.2026, Ariel): only on a person's
+/// click. WhatsApp keeps the mark, so the phone shows it too. The list kept
+/// in memory is corrected at once, so the screen does not wait for the
+/// next read of the list to show it.
+export async function setReadStatus(config: Config, chatId: string, read: boolean): Promise<void> {
+  await call(config, `/chats/${encodeURIComponent(chatId)}`, { method: "PATCH", body: { read_status: read } });
+  if (cachedList && cachedList.accountId === config.accountId) {
+    for (const chat of cachedList.chats) {
+      if (chat.id === chatId) chat.unreadCount = read ? 0 : chat.unreadCount > 0 ? chat.unreadCount : -1;
+    }
+  }
 }
 
 /// The WhatsApp accounts this API key reaches (1.11.2026, several numbers),

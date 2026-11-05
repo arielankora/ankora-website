@@ -1,14 +1,16 @@
 import Link from "next/link";
-import { ArrowRight, MessageCircle, Phone, Search } from "lucide-react";
+import { cookies } from "next/headers";
+import { ArrowRight, ChevronDown, MessageCircle, MoreHorizontal, Phone, Search } from "lucide-react";
+import { ContactRail, ReadToggle, RememberFilters, TimelineScroller } from "./CommsControls";
 import { ScrollToActive } from "./ScrollToActive";
 import { BlockButton } from "./setup/SetupForms";
-import type { StoredTranscript } from "@/lib/comms/stored-chats";
+import { searchStoredMessages, type MessageHit, type StoredTranscript } from "@/lib/comms/stored-chats";
 import { requireUser } from "@/lib/app-auth/session";
 import { Forbidden } from "@/components/app/Forbidden";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { canSendTo } from "@/lib/whatsapp-poc/access";
 import { canSeeCall, commsAccess } from "@/lib/comms/access";
-import { storedCallLine } from "@/lib/comms/call-lines";
+import { parseLineOwners, storedCallLine } from "@/lib/comms/call-lines";
 import { chatsWithPhone, findChat, loadMessages, loadWhatsapp, lookupAccounts, type ChannelInfo, type PageMessage } from "@/lib/comms/inbox-loader";
 import { matchPhones, type PhoneMatch } from "@/lib/whatsapp-poc/clients-by-phone";
 import { normalizePhone } from "@/lib/contact-normalize";
@@ -26,6 +28,8 @@ import {
   phoneKey,
   displayPhone,
   isPlausiblePhone,
+  isUnread,
+  snippetAround,
   chatKey,
   proposeTask,
   type InboxCall,
@@ -56,6 +60,11 @@ import type { TranscriptStatus } from "@prisma/client";
 // The recordings used to be a separate page behind a link
 // (/app/whatsapp-poc/calls, which now redirects here).
 //
+// 5.11.2026 (Ariel, designs on Claude Design): the contact card is a
+// narrow column, a "צוות" filter, the block action in "עוד", the timeline
+// oldest first inside its own scroll, text search in stored messages, and
+// "סמן כנקראה" on a click.
+//
 // Still a POC: everything is read live from Unipile and nothing from the
 // conversations is stored, except what a person chooses to save (a task,
 // or a number in a client's file). Sending stays limited to the test
@@ -68,10 +77,27 @@ export const dynamic = "force-dynamic";
 const BASE = "/app/whatsapp-poc";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function href(params: { c?: string | null; filter?: InboxFilter; q?: string; wa?: boolean; assign?: boolean; before?: string }) {
+type Href = {
+  c?: string | null;
+  filter?: InboxFilter;
+  team?: string;
+  q?: string;
+  inMessages?: boolean;
+  m?: string;
+  wa?: boolean;
+  assign?: boolean;
+  before?: string;
+};
+
+/// Links inside the screen always carry the filters, so a bare visit (from
+/// the menu) is how the screen knows to restore the last ones (5.11.2026).
+function href(params: Href) {
   const q = new URLSearchParams();
-  if (params.filter && params.filter !== "all") q.set("filter", params.filter);
+  if (params.filter) q.set("filter", params.filter);
+  if (params.team) q.set("team", params.team);
   if (params.q) q.set("q", params.q);
+  if (params.inMessages) q.set("in", "msg");
+  if (params.m) q.set("m", params.m);
   if (params.c) q.set("c", params.c);
   if (params.wa) q.set("wa", "1");
   if (params.assign) q.set("assign", "1");
@@ -186,10 +212,10 @@ function selectable(m: PageMessage, transcript?: StoredTranscript): SelectedMess
   };
 }
 
-function MessageBubble({ m, chat, transcript }: { m: PageMessage; chat: PocChat; transcript?: StoredTranscript }) {
+function MessageBubble({ m, chat, transcript, hit }: { m: PageMessage; chat: PocChat; transcript?: StoredTranscript; hit?: boolean }) {
   const mine = m.isSender;
   return (
-    <li className={`flex items-center gap-1 ${mine ? "justify-end" : "justify-start"}`}>
+    <li data-hit={hit ? "" : undefined} className={`flex items-center gap-1 ${mine ? "justify-end" : "justify-start"} ${hit ? "rounded-2xl ring-2 ring-gold ring-offset-4" : ""}`}>
       {m.isDeleted ? null : <SelectToggle message={selectable(m, transcript)} />}
       <div
         className={`max-w-[85%] space-y-1 px-3.5 py-2.5 text-[15px] sm:max-w-[65%] ${
@@ -336,7 +362,19 @@ function CallCard({ call, transcribe, task }: { call: PageCall; transcribe: bool
 const DIRECTION_FROM_DB = { IN: "in", OUT: "out", UNKNOWN: "unknown" } as const;
 
 export default async function CommunicationsPage(props: {
-  searchParams: Promise<{ c?: string; filter?: string; q?: string; phone?: string; wa?: string; chat?: string; assign?: string; before?: string }>;
+  searchParams: Promise<{
+    c?: string;
+    filter?: string;
+    team?: string;
+    q?: string;
+    in?: string;
+    m?: string;
+    phone?: string;
+    wa?: string;
+    chat?: string;
+    assign?: string;
+    before?: string;
+  }>;
 }) {
   const searchParams = await props.searchParams;
   const user = await requireUser();
@@ -344,8 +382,21 @@ export default async function CommunicationsPage(props: {
   const access = await commsAccess(user);
   if (!access.allowed) return <Forbidden />;
 
-  const filter = parseFilter(searchParams.filter);
+  // The last filters come back on a bare visit (5.11.2026, Ariel).
+  let remembered: { filter?: string; team?: string } = {};
+  if (searchParams.filter === undefined && searchParams.team === undefined) {
+    try {
+      const raw = (await cookies()).get("comms_filters")?.value;
+      if (raw) remembered = JSON.parse(decodeURIComponent(raw)) as typeof remembered;
+    } catch {
+      remembered = {};
+    }
+  }
+  const filter = parseFilter(searchParams.filter ?? remembered.filter);
+  const teamParam = String(searchParams.team ?? remembered.team ?? "all").slice(0, 40);
   const query = (searchParams.q ?? "").slice(0, 80);
+  const inMessages = searchParams.in === "msg";
+  const hitId = searchParams.m && searchParams.m.length <= 200 ? searchParams.m : null;
   const now = new Date();
 
   const mailConfig = config.apiKey && config.mailAccountId ? { apiKey: config.apiKey, mailAccountId: config.mailAccountId } : null;
@@ -494,8 +545,44 @@ export default async function CommunicationsPage(props: {
       owners.set(line, { personName: "הקלטות בלי מספר הצד השני", clients: [], phones: [line], contacts: [] });
     }
   }
-  const rows = buildInbox(chats, calls, owners);
-  const visible = filterInbox(rows, filter, query);
+  // "צוות" (5.11.2026, Ariel): a chat belongs to its number's owner, a
+  // call to its line's owner (ALOHA_LINE_OWNERS).
+  const lineOwnerEmails = parseLineOwners(process.env.ALOHA_LINE_OWNERS);
+  const lineOwnerUsers = lineOwnerEmails.size
+    ? await prisma.user.findMany({ where: { email: { in: [...new Set(lineOwnerEmails.values())] } }, select: { id: true, email: true, name: true } })
+    : [];
+  const userByEmail = new Map(lineOwnerUsers.map((u) => [u.email.toLowerCase(), u]));
+  const lineOwnerOf = (line: string | null) => (line ? (userByEmail.get(lineOwnerEmails.get(line) ?? "")?.id ?? null) : null);
+  const rows = buildInbox(chats, calls, owners, {
+    chat: (id) => wa.channelOf.get(id)?.ownerUserId,
+    call: (c) => lineOwnerOf((c as PageCall).line),
+  });
+  const teamNames = new Map<string, string>();
+  for (const ch of wa.channels) if ([...wa.channelOf.values()].some((i) => i.id === ch.id)) teamNames.set(ch.ownerUserId, ch.owner.name ?? "");
+  for (const u of lineOwnerUsers) if (calls.some((c) => lineOwnerOf(c.line) === u.id)) teamNames.set(u.id, u.name ?? u.email);
+  const team = teamParam === "me" ? user.id : teamNames.has(teamParam) ? teamParam : null;
+  const teamValue = teamParam === "me" ? "me" : team ?? "all";
+  const teamMembers = [...teamNames]
+    .map(([id, name]) => ({ id, name: name || "ללא שם", count: rows.filter((r) => r.teamIds.includes(id)).length }))
+    .sort((a, b) => a.name.localeCompare(b.name, "he"));
+  const teamLabel = teamValue === "me" ? "שלי" : team ? (teamNames.get(team) || "ללא שם") : "כל הצוות";
+  const visible = filterInbox(rows, filter, inMessages ? "" : query, team);
+
+  // "חיפוש בתוך ההודעות" (5.11.2026): stored conversations only.
+  const storedChannelIds = wa.channels.filter((c) => c.storeEnabled).map((c) => c.id);
+  const hits: MessageHit[] = inMessages && query ? await searchStoredMessages(storedChannelIds, wa.stored, query) : [];
+  const keyOfChat = (chatId: string) => {
+    const c = chats.find((x) => x.id === chatId);
+    const p = c ? chatPhone(c) : null;
+    return p ? phoneKey(p) : chatKey(chatId);
+  };
+  // Who may mark a chat read: its number's owner, or the full viewers.
+  const readTarget = (chatId: string) => {
+    const info = wa.channelOf.get(chatId);
+    if (!info || !(info.ownerUserId === user.id || access.full)) return null;
+    return { chatId, numberKey: info.id ?? "-" };
+  };
+  const readTargets = (ids: string[]) => ids.map(readTarget).filter((t): t is { chatId: string; numberKey: string } => t !== null);
 
   const isOpen = Boolean(selectedKey) && (Boolean(chat) || Boolean(selectedPhone));
   const openKey = selectedPhone ? phoneKey(selectedPhone) : chat ? chatKey(chat.id) : null;
@@ -525,13 +612,15 @@ export default async function CommunicationsPage(props: {
   });
 
   const callsTable = filter === "call" && !isOpen;
+  const openTargets = readTargets(openChats.length > 0 ? openChats.map((c) => c.id) : chat ? [chat.id] : []);
+  const openUnread = openRow ? isUnread(openRow) : (chat?.unreadCount ?? 0) !== 0;
 
   const chips = (
     <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible" role="group" aria-label="סינון">
       {INBOX_FILTERS.map((f) => (
         <Link prefetch={false}
           key={f.id}
-          href={href({ filter: f.id, q: query, c: callsTable || f.id === "call" ? null : openKey })}
+          href={href({ filter: f.id, team: teamValue, q: query, inMessages, c: callsTable || f.id === "call" ? null : openKey })}
           aria-current={filter === f.id ? "page" : undefined}
           className={`inline-flex min-h-9 flex-none items-center whitespace-nowrap rounded-full border px-3 text-[13px] ${
             filter === f.id ? "border-navy bg-navy font-medium text-white" : "border-app-border-strong bg-white text-app-text-secondary"
@@ -543,8 +632,68 @@ export default async function CommunicationsPage(props: {
     </div>
   );
 
+  // "צוות" (design 2א): a menu beside the search box. A <details>, so it
+  // works without script; each choice is a link that keeps the rest.
+  const teamMenu =
+    teamMembers.length > 0 ? (
+      <details className="relative flex-none">
+        <summary
+          className={`flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-lg border px-3 text-[13px] ${
+            teamValue !== "all" ? "border-navy bg-navy font-medium text-white" : "border-app-border-strong bg-white text-app-text-secondary"
+          }`}
+        >
+          צוות: {teamLabel}
+          <ChevronDown className="size-3.5" aria-hidden="true" />
+        </summary>
+        <ul className="absolute end-0 z-20 mt-1 w-52 rounded-xl border border-app-border bg-white py-1 shadow-lg">
+          {[
+            { id: "all", name: "כל הצוות", count: rows.length },
+            ...(teamNames.has(user.id) ? [{ id: "me", name: "רק השיחות שלי", count: rows.filter((r) => r.teamIds.includes(user.id)).length }] : []),
+            ...teamMembers.filter((m) => m.id !== user.id || !teamNames.has(user.id)),
+          ].map((m) => (
+            <li key={m.id}>
+              <Link
+                prefetch={false}
+                href={href({ filter, team: m.id, q: query, inMessages, c: callsTable ? null : openKey })}
+                aria-current={teamValue === m.id ? "page" : undefined}
+                className={`flex min-h-11 items-center justify-between gap-2 px-3 text-sm text-app-text-primary hover:bg-app-surface-sunken ${
+                  teamValue === m.id ? "bg-app-accent-soft font-medium" : ""
+                }`}
+              >
+                <bdi>{m.name}</bdi>
+                <span className="text-xs text-app-text-secondary">{m.count}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </details>
+    ) : null;
+
+  // "אנשי קשר / תוכן הודעות" (design 6א).
+  const searchScope = (
+    <div role="group" aria-label="איפה לחפש" className="flex rounded-lg bg-app-surface-sunken p-0.5">
+      {[
+        { on: !inMessages, label: "אנשי קשר", to: false },
+        { on: inMessages, label: "תוכן הודעות", to: true },
+      ].map((o) => (
+        <Link
+          key={o.label}
+          prefetch={false}
+          href={href({ filter, team: teamValue, q: query, inMessages: o.to, c: openKey })}
+          aria-current={o.on ? "page" : undefined}
+          className={`flex min-h-9 flex-1 items-center justify-center rounded-md text-[13px] ${
+            o.on ? "bg-white font-medium text-app-text-primary shadow-sm" : "text-app-text-secondary"
+          }`}
+        >
+          {o.label}
+        </Link>
+      ))}
+    </div>
+  );
+
   return (
     <div className="space-y-4">
+      <RememberFilters filter={filter} team={teamValue} />
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div>
           <h1 className="text-xl font-medium text-app-text-primary">תקשורת עם לקוחות</h1>
@@ -605,12 +754,15 @@ export default async function CommunicationsPage(props: {
       {callsTable ? (
         <section aria-label="שיחות טלפון" className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            {chips}
+            <div className="flex flex-wrap items-center gap-2">
+              {chips}
+              {teamMenu}
+            </div>
             <p className="text-sm text-app-text-secondary">ההקלטות מגיעות אוטומטית מ-Aloha. שם איש הקשר פותח את ציר הזמן שלו.</p>
           </div>
           {!config.hasOpenAiKey ? <Banner tone="info">התמלול עוד לא מוגדר בסביבה הזו. ההאזנה עובדת.</Banner> : null}
           <ul className="space-y-3">
-            {calls.map((call) => {
+            {calls.filter((call) => !team || lineOwnerOf(call.line) === team).map((call) => {
               const o = owners.get(call.other);
               const name = o?.personName ?? call.other;
               return (
@@ -619,7 +771,7 @@ export default async function CommunicationsPage(props: {
                     <div className="flex min-w-0 items-center gap-3">
                       <ChannelIcon channel="call" />
                       <div className="min-w-0">
-                        <Link prefetch={false} href={href({ c: phoneKey(call.other), filter: "call" })} className="font-medium text-app-text-primary underline-offset-2 hover:underline">
+                        <Link prefetch={false} href={href({ c: phoneKey(call.other), filter: "call", team: teamValue })} className="font-medium text-app-text-primary underline-offset-2 hover:underline">
                           <bdi>{name === call.other ? displayPhone(call.other) : name}</bdi>
                         </Link>
                         <p className="text-xs text-app-text-secondary">
@@ -639,7 +791,7 @@ export default async function CommunicationsPage(props: {
                         <ClientTag clients={o.clients} />
                       ) : (
                         <Link prefetch={false}
-                          href={href({ c: phoneKey(call.other), filter: "call", assign: true })}
+                          href={href({ c: phoneKey(call.other), filter: "call", team: teamValue, assign: true })}
                           className="inline-flex min-h-11 items-center rounded-full border border-dashed border-app-warning px-3 text-xs text-app-warning"
                         >
                           שיוך ללקוח
@@ -669,7 +821,7 @@ export default async function CommunicationsPage(props: {
           </ul>
         </section>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[20rem_minmax(0,1fr)_17rem]">
+        <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[20rem_minmax(0,1fr)_auto]">
           {/* The list. On a phone it gives way to the open conversation. */}
           <nav
             aria-label="אנשי קשר"
@@ -677,7 +829,9 @@ export default async function CommunicationsPage(props: {
           >
             <div className="space-y-3 border-b border-app-border p-3">
               <form method="get" action={BASE} className="flex gap-2">
-                {filter !== "all" ? <input type="hidden" name="filter" value={filter} /> : null}
+                <input type="hidden" name="filter" value={filter} />
+                <input type="hidden" name="team" value={teamValue} />
+                {inMessages ? <input type="hidden" name="in" value="msg" /> : null}
                 <label htmlFor="inbox-q" className="sr-only">
                   חיפוש
                 </label>
@@ -686,41 +840,101 @@ export default async function CommunicationsPage(props: {
                   name="q"
                   type="search"
                   defaultValue={query}
-                  placeholder="חיפוש לפי שם, מספר או לקוח"
+                  placeholder={inMessages ? "חיפוש מילה בתוך ההודעות" : "חיפוש לפי שם, מספר או לקוח"}
                   className="min-w-0 flex-1 rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
                 />
                 <button type="submit" aria-label="חיפוש" className="flex size-11 flex-none items-center justify-center rounded-lg border border-app-border-strong text-app-text-primary">
                   <Search className="size-4" aria-hidden="true" />
                 </button>
               </form>
-              {chips}
+              {searchScope}
+              <div className="flex flex-wrap items-start gap-2">
+                {chips}
+                {teamMenu}
+              </div>
             </div>
+            {inMessages ? (
+              <ul className="flex-1 divide-y divide-app-border overflow-y-auto">
+                <li className="px-3 py-2 text-xs text-app-text-secondary">
+                  {query.trim().length < 2
+                    ? "כתבו לפחות שתי אותיות."
+                    : `${hits.length >= 40 ? "40 התוצאות האחרונות" : `${hits.length} הודעות`}. החיפוש כולל רק מספרים ששומרים את השיחות.`}
+                </li>
+                {hits.map((h) => {
+                  const part = snippetAround(h.text, query);
+                  const key = keyOfChat(h.chatId);
+                  const name = rows.find((r) => r.key === key)?.name ?? h.name;
+                  return (
+                    <li key={`${h.channelId}-${h.messageId}`}>
+                      <Link
+                        prefetch={false}
+                        href={href({
+                          c: key,
+                          filter,
+                          team: teamValue,
+                          q: query,
+                          inMessages: true,
+                          m: h.messageId,
+                          // The found message is the newest one loaded, so it is in view.
+                          before: new Date(Date.parse(h.at) + 1000).toISOString(),
+                        })}
+                        aria-current={hitId === h.messageId ? "page" : undefined}
+                        data-inbox-row=""
+                        className={`flex flex-col gap-1 px-3 py-3 ${hitId === h.messageId ? "bg-app-accent-soft" : "hover:bg-app-surface-sunken"}`}
+                      >
+                        <span className="flex items-baseline justify-between gap-2">
+                          <span className="truncate text-[15px] font-medium text-app-text-primary"><bdi>{name}</bdi></span>
+                          <span className="flex-none text-xs text-app-text-secondary">{formatListTime(h.at, now)}</span>
+                        </span>
+                        <span className="line-clamp-2 text-[13px] text-app-text-primary">
+                          {h.isSender ? "אנחנו: " : ""}
+                          {part.before}
+                          <mark className="rounded bg-gold/30 px-0.5 text-inherit">{part.match}</mark>
+                          {part.after}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
             <ul className="flex-1 divide-y divide-app-border overflow-y-auto">
               {visible.map((row) => {
                 const active = row.key === openKey;
+                const unread = isUnread(row);
+                const targets = readTargets(row.chatIds);
                 return (
-                  <li key={row.key}>
+                  <li key={row.key} className="group relative">
                     <Link prefetch={false}
-                      href={href({ c: row.key, filter, q: query })}
+                      href={href({ c: row.key, filter, team: teamValue, q: query })}
                       aria-current={active ? "page" : undefined}
                       data-inbox-row=""
-                      className={`flex gap-3 px-3 py-3 ${active ? "bg-app-accent-soft" : "hover:bg-app-surface-sunken"}`}
+                      className={`flex gap-3 px-3 py-3 ${targets.length > 0 ? "pe-16" : ""} ${active ? "bg-app-accent-soft" : "hover:bg-app-surface-sunken"}`}
                     >
                       <ChannelIcon channel={row.channel} />
                       <span className="flex min-w-0 flex-1 flex-col gap-1">
                         <span className="flex items-baseline justify-between gap-2">
-                          <span className="truncate text-[15px] font-medium text-app-text-primary"><bdi>{row.name}</bdi></span>
-                          <span className="flex-none text-xs text-app-text-secondary">{formatListTime(row.at, now)}</span>
+                          <span className={`truncate text-[15px] text-app-text-primary ${unread ? "font-semibold" : "font-medium"}`}><bdi>{row.name}</bdi></span>
+                          <span className={`flex-none text-xs ${unread ? "font-medium text-app-text-accent" : "text-app-text-secondary"}`}>{formatListTime(row.at, now)}</span>
                         </span>
                         <span className="flex items-center justify-between gap-2">
-                          <span className="truncate text-[13px] text-app-text-secondary">{row.preview}</span>
+                          <span className={`truncate text-[13px] ${unread ? "text-app-text-primary" : "text-app-text-secondary"}`}>{row.preview}</span>
                           {row.unreadCount > 0 ? (
                             <span className="flex-none rounded-full bg-gold px-2 text-xs text-white">{row.unreadCount}</span>
+                          ) : unread ? (
+                            <span role="img" aria-label="סומנה כלא נקראה" className="size-2.5 flex-none rounded-full bg-gold" />
                           ) : null}
                         </span>
                         {row.phone ? <ClientTag clients={row.clients} /> : null}
                       </span>
                     </Link>
+                    {/* "סמן כנקראה / כלא נקראה" on the row (design 7): shown on hover or focus
+                        with a mouse, always on a touch screen. */}
+                    {targets.length > 0 ? (
+                      <div className="absolute end-2 top-1/2 -translate-y-1/2 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100">
+                        <ReadToggle compact chats={targets} unread={unread} />
+                      </div>
+                    ) : null}
                   </li>
                 );
               })}
@@ -734,13 +948,14 @@ export default async function CommunicationsPage(props: {
                 </li>
               ) : null}
             </ul>
+            )}
             <ScrollToActive />
           </nav>
 
           {/* The timeline of the open contact. */}
           <section
             aria-label="ציר זמן"
-            className={`${isOpen ? "flex" : "hidden lg:flex"} min-h-[24rem] flex-col overflow-hidden rounded-2xl border border-app-border bg-app-surface-page`}
+            className={`${isOpen ? "flex" : "hidden lg:flex"} h-[78vh] min-h-[24rem] flex-col overflow-hidden rounded-2xl border border-app-border bg-app-surface-page`}
           >
             {isOpen ? (
               <MessageSelectionProvider
@@ -756,7 +971,7 @@ export default async function CommunicationsPage(props: {
                 <header className="flex flex-wrap items-center justify-between gap-3 border-b border-app-border bg-white px-4 py-3">
                   <div className="flex min-w-0 items-center gap-2">
                     <Link prefetch={false}
-                      href={href({ filter, q: query })}
+                      href={href({ filter, team: teamValue, q: query, inMessages })}
                       aria-label="חזרה לרשימה"
                       className="flex size-11 flex-none items-center justify-center rounded-lg text-app-text-primary lg:hidden"
                     >
@@ -783,15 +998,9 @@ export default async function CommunicationsPage(props: {
                         לקוח: {c.name}
                       </Link>
                     ))}
-                    {chatInfo?.id && chat ? (
-                      <BlockButton
-                        key={`block-${openKey}`}
-                        channelId={chatInfo.id}
-                        kind={selectedPhone ? "PHONE" : "CHAT"}
-                        value={selectedPhone ?? chat.id}
-                        label={contactName}
-                        manager={access.manager}
-                      />
+                    {/* "סמן כנקראה" (design 7): only on a click, never on opening. */}
+                    {openTargets.length > 0 ? (
+                      <ReadToggle key={`read-${openKey}-${openUnread}`} chats={openTargets} unread={openUnread} />
                     ) : null}
                     {/* "סמן הודעות" (4.11.2026): several messages into one task. */}
                     {chat && messages.length > 0 ? <SelectModeButton /> : null}
@@ -808,17 +1017,46 @@ export default async function CommunicationsPage(props: {
                         description={proposal.description}
                       />
                     </HideWhileSelecting>
+                    {/* "לא לשמור שיחות עם המספר" (design 3א): rare, so in "עוד", last, in red. */}
+                    {chatInfo?.id && chat ? (
+                      <details className="relative">
+                        <summary
+                          aria-label="עוד פעולות"
+                          className="flex size-11 cursor-pointer list-none items-center justify-center rounded-lg border border-app-border-strong bg-white text-app-text-primary"
+                        >
+                          <MoreHorizontal className="size-5" aria-hidden="true" />
+                        </summary>
+                        <div className="absolute end-0 z-20 mt-1 w-72 rounded-xl border border-app-border bg-white py-1 shadow-lg">
+                          <BlockButton
+                            key={`block-${openKey}`}
+                            channelId={chatInfo.id}
+                            kind={selectedPhone ? "PHONE" : "CHAT"}
+                            value={selectedPhone ?? chat.id}
+                            label={contactName}
+                            manager={access.manager}
+                            asMenuItem
+                          />
+                        </div>
+                      </details>
+                    ) : null}
                   </div>
                 </header>
 
-                <ol className="flex-1 space-y-3 overflow-y-auto p-4 sm:px-6">
-                  {beforeParam ? (
+                <div className="relative flex min-h-0 flex-1 flex-col">
+                <ol id="comms-timeline" className="flex-1 space-y-3 overflow-y-auto p-4 sm:px-6">
+                  {/* Oldest first (5.11.2026), so the way back to older messages sits at the top. */}
+                  {loaded.hasOlder && messages[0] ? (
                     <li className="flex justify-center">
-                      <Link prefetch={false} href={href({ c: openKey, filter, q: query })} className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
-                        חזרה להודעות האחרונות
+                      <Link
+                        prefetch={false}
+                        href={href({ c: openKey, filter, team: teamValue, q: query, inMessages, before: messages[0].timestamp })}
+                        className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline"
+                      >
+                        הודעות קודמות
                       </Link>
                     </li>
                   ) : null}
+
                   {timeline.map((item, i) => {
                     const prev = timeline[i - 1];
                     const newDay = !prev || dayKey(prev.at) !== dayKey(item.at);
@@ -829,7 +1067,7 @@ export default async function CommunicationsPage(props: {
                     ) : null;
                     if (item.kind === "message") {
                       const m = messageById.get(item.id);
-                      return m && chat ? [day, <MessageBubble key={`m-${m.id}`} m={m} chat={chat} transcript={voiceTranscripts.get(m.id)} />] : day;
+                      return m && chat ? [day, <MessageBubble key={`m-${m.id}`} m={m} chat={chat} transcript={voiceTranscripts.get(m.id)} hit={m.id === hitId} />] : day;
                     }
                     const call = callById.get(item.id);
                     return call ? [day, <CallCard
@@ -845,19 +1083,16 @@ export default async function CommunicationsPage(props: {
                         />] : day;
                   })}
                   {timeline.length === 0 ? <li className="text-sm text-app-text-secondary">אין הודעות או שיחות להצגה.</li> : null}
-                  {/* Newest first, so the way back to older messages sits at the bottom. */}
-                  {loaded.hasOlder && messages[0] ? (
+                  {beforeParam ? (
                     <li className="flex justify-center">
-                      <Link
-                        prefetch={false}
-                        href={href({ c: openKey, filter, q: query, before: messages[0].timestamp })}
-                        className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline"
-                      >
-                        הודעות קודמות
+                      <Link prefetch={false} href={href({ c: openKey, filter, team: teamValue, q: query, inMessages })} className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
+                        חזרה להודעות האחרונות
                       </Link>
                     </li>
                   ) : null}
                 </ol>
+                <TimelineScroller key={`scroll-${openKey}-${hitId ?? ""}-${beforeParam?.toISOString() ?? ""}-${timeline.length}`} targetId="comms-timeline" />
+                </div>
 
                 {chat ? (
                   mayReply ? (
@@ -876,7 +1111,7 @@ export default async function CommunicationsPage(props: {
                     ) : lookedUp ? (
                       "לא נמצאה שיחת WhatsApp עם המספר הזה."
                     ) : (
-                      <Link prefetch={false} href={href({ c: phoneKey(selectedPhone), filter, q: query, wa: true })} className="inline-flex min-h-11 items-center text-app-text-primary underline">
+                      <Link prefetch={false} href={href({ c: phoneKey(selectedPhone), filter, team: teamValue, q: query, wa: true })} className="inline-flex min-h-11 items-center text-app-text-primary underline">
                         חיפוש שיחת WhatsApp עם המספר הזה
                       </Link>
                     )}
@@ -890,7 +1125,7 @@ export default async function CommunicationsPage(props: {
 
           {/* The contact, from the client files. */}
           {isOpen ? (
-            <aside aria-label="איש קשר" className="space-y-5 rounded-2xl border border-app-border bg-white p-4 lg:col-span-2 xl:col-span-1">
+            <ContactRail unassigned={Boolean(selectedPhone) && !(owner && owner.clients.length > 0)} messages={countSince(messages, (m) => m.timestamp, since30)}>
               <section className="space-y-1.5">
                 <h3 className="text-xs font-medium text-app-text-secondary">איש קשר</h3>
                 <p className="font-medium text-app-text-primary">
@@ -969,7 +1204,7 @@ export default async function CommunicationsPage(props: {
                   )}
                 </section>
               ) : null}
-            </aside>
+            </ContactRail>
           ) : null}
         </div>
       )}
