@@ -14,6 +14,7 @@ vi.mock("@/app/(product)/app/(authenticated)/whatsapp-poc/select-actions", () =>
 }));
 
 import {
+  HideWhileSelecting,
   MessageSelectionProvider,
   SelectModeButton,
   SelectToggle,
@@ -40,6 +41,9 @@ function Screen() {
       proposedTitle="מעקב: שיחה עם רותם כהן"
     >
       <SelectModeButton />
+      <HideWhileSelecting>
+        <button type="button">צור משימה מהשיחה</button>
+      </HideWhileSelecting>
       <ul>
         <li>
           <SelectToggle message={m("m1", "אפשר לקבוע פגישה?")} />
@@ -79,6 +83,23 @@ describe("message selection", () => {
     fireEvent.click(screen.getByRole("button", { name: "סיום סימון" }));
     fireEvent.click(screen.getByRole("button", { name: "סמן הודעות" }));
     expect(screen.getByRole("region", { name: "הודעות שסומנו" }).textContent).toContain("0 הודעות נבחרו");
+  });
+
+  it("hides the older task form while marking and offers two ways out (4.11.2026)", () => {
+    render(<Screen />);
+    expect(screen.getByRole("button", { name: "צור משימה מהשיחה" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "סמן הודעות" }));
+    expect(screen.queryByRole("button", { name: "צור משימה מהשיחה" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "יציאה מסימון" }));
+    expect(screen.queryByRole("region", { name: "הודעות שסומנו" })).toBeNull();
+    expect(screen.getByRole("button", { name: "צור משימה מהשיחה" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "סמן הודעות" }));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "הודעות שסומנו" })).toBeNull();
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
   });
 
   it("offers the portal line only for a task the client can see", async () => {

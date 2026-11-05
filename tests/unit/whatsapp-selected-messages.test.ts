@@ -71,6 +71,21 @@ describe("formatSelectedMessages", () => {
     expect(notFiled).not.toContain("תויקה");
   });
 
+  it("puts a voice message's transcript into the comment, and says when it has none (4.11.2026)", () => {
+    const voice = { id: "a1", type: "audio", label: "הודעה קולית" };
+    const body = formatSelectedMessages({
+      contactName: "רותם",
+      phone: null,
+      messages: parseSelectedMessages([
+        msg({ id: "v1", text: "", files: [voice], transcript: "אני בגב לגב,\nאחזור בשש" }),
+        msg({ id: "v2", at: "2026-11-04T08:40:00.000Z", text: "", files: [voice] }),
+      ]),
+      maxLength: 4000,
+    });
+    expect(body).toContain("- 10:31 רותם: [הודעה קולית] תמלול: אני בגב לגב, אחזור בשש");
+    expect(body).toContain("- 10:40 רותם: [הודעה קולית, לא תומללה]");
+  });
+
   it("never runs past the comment limit", () => {
     const long = parseSelectedMessages(Array.from({ length: 10 }, (_, i) => msg({ id: `m${i}`, text: "א".repeat(1500) })));
     const body = formatSelectedMessages({ contactName: "רותם", phone: null, messages: long, maxLength: 4000 });

@@ -42,7 +42,7 @@ import {
 import { SendForm } from "./SendForm";
 import { AddNumberForm, AssignToClientForm, GroupClientForm } from "./ContactForms";
 import { TaskFromConversation } from "./TaskFromConversation";
-import { MessageSelectionProvider, SelectModeButton, SelectToggle } from "./MessageSelection";
+import { HideWhileSelecting, MessageSelectionProvider, SelectModeButton, SelectToggle } from "./MessageSelection";
 import { proposeSelectedTitle, type SelectedMessage } from "@/lib/whatsapp-poc/selected-messages";
 import { RecordingPlayer } from "./calls/RecordingPlayer";
 import { TranscribeButton, TranscriptText } from "./calls/TranscribeButton";
@@ -172,7 +172,7 @@ function Banner({ tone, children }: { tone: "error" | "warning" | "info"; childr
 }
 
 /// What the mark mode needs to know about one message (MessageSelection.tsx).
-function selectable(m: PageMessage): SelectedMessage {
+function selectable(m: PageMessage, transcript?: StoredTranscript): SelectedMessage {
   return {
     id: m.id,
     at: m.timestamp,
@@ -180,6 +180,9 @@ function selectable(m: PageMessage): SelectedMessage {
     mine: m.isSender,
     senderName: m.senderName,
     files: m.attachments.flatMap((a) => (a.id ? [{ id: a.id, type: a.type, label: attachmentLabel(a) }] : [])),
+    // 4.11.2026 (Ariel): a voice message goes into the task with its
+    // transcript, when there is one.
+    transcript: transcript?.status === "DONE" && transcript.text ? transcript.text : null,
   };
 }
 
@@ -187,7 +190,7 @@ function MessageBubble({ m, chat, transcript }: { m: PageMessage; chat: PocChat;
   const mine = m.isSender;
   return (
     <li className={`flex items-center gap-1 ${mine ? "justify-end" : "justify-start"}`}>
-      {m.isDeleted ? null : <SelectToggle message={selectable(m)} />}
+      {m.isDeleted ? null : <SelectToggle message={selectable(m, transcript)} />}
       <div
         className={`max-w-[85%] space-y-1 px-3.5 py-2.5 text-[15px] sm:max-w-[65%] ${
           mine ? "rounded-2xl rounded-ee-md bg-navy text-white" : "rounded-2xl rounded-es-md border border-app-border bg-white text-app-text-primary"
@@ -280,17 +283,45 @@ function callMeta(call: PageCall) {
   return parts.length ? ` · ${parts.join(" · ")}` : "";
 }
 
-function CallCard({ call, transcribe }: { call: PageCall; transcribe: boolean }) {
+type CallTaskContext = { contactName: string; phone: string | null; clients: Array<{ id: string; name: string }>; defaultClientId: string | null };
+
+/// "משימה מהשיחה הזו" (4.11.2026, Ariel): a task from one phone call, its
+/// transcript in the details. The header's "צור משימה מהשיחה" proposes only
+/// the latest call, and the calls list had no way to start a task at all.
+function CallTaskButton({ call, ctx }: { call: PageCall; ctx: CallTaskContext }) {
+  const proposal = proposeTask({
+    name: ctx.contactName,
+    phone: ctx.phone,
+    lastMessages: [],
+    lastCall: { at: call.callAt, direction: call.direction },
+    transcript: call.transcript?.status === "DONE" ? call.transcript.text : null,
+  });
+  return (
+    <TaskFromConversation
+      key={`call-task-${call.emailId}`}
+      label="משימה מהשיחה הזו"
+      clients={ctx.clients}
+      defaultClientId={ctx.defaultClientId}
+      title={proposal.title}
+      description={proposal.description}
+    />
+  );
+}
+
+function CallCard({ call, transcribe, task }: { call: PageCall; transcribe: boolean; task?: CallTaskContext }) {
   return (
     <li className="space-y-3 rounded-xl border border-app-info-soft bg-white p-4 ring-1 ring-app-border">
-      <div className="flex items-center gap-3">
-        <ChannelIcon channel="call" />
-        <div>
-          <p className="text-[15px] font-medium text-app-text-primary">{DIRECTION_LABEL[call.direction]}</p>
-          <p className="text-xs text-app-text-secondary">
-            {formatTime(call.callAt)} · הקו של אנקורה{callMeta(call)}
-          </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <ChannelIcon channel="call" />
+          <div>
+            <p className="text-[15px] font-medium text-app-text-primary">{DIRECTION_LABEL[call.direction]}</p>
+            <p className="text-xs text-app-text-secondary">
+              {formatTime(call.callAt)} · הקו של אנקורה{callMeta(call)}
+            </p>
+          </div>
         </div>
+        {task ? <CallTaskButton call={call} ctx={task} /> : null}
       </div>
       {call.audioRemoved ? (
         <p className="text-sm text-app-text-secondary">קובץ השמע נמחק אחרי 12 חודשים. התמלול נשמר.</p>
@@ -603,16 +634,27 @@ export default async function CommunicationsPage(props: {
                         ) : null}
                       </div>
                     </div>
-                    {o && o.clients.length > 0 ? (
-                      <ClientTag clients={o.clients} />
-                    ) : (
-                      <Link prefetch={false}
-                        href={href({ c: phoneKey(call.other), filter: "call", assign: true })}
-                        className="inline-flex min-h-11 items-center rounded-full border border-dashed border-app-warning px-3 text-xs text-app-warning"
-                      >
-                        שיוך ללקוח
-                      </Link>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {o && o.clients.length > 0 ? (
+                        <ClientTag clients={o.clients} />
+                      ) : (
+                        <Link prefetch={false}
+                          href={href({ c: phoneKey(call.other), filter: "call", assign: true })}
+                          className="inline-flex min-h-11 items-center rounded-full border border-dashed border-app-warning px-3 text-xs text-app-warning"
+                        >
+                          שיוך ללקוח
+                        </Link>
+                      )}
+                      <CallTaskButton
+                        call={call}
+                        ctx={{
+                          contactName: o?.personName ?? "",
+                          phone: call.other,
+                          clients: clientOptions,
+                          defaultClientId: o?.clients.length === 1 ? o.clients[0].id : null,
+                        }}
+                      />
+                    </div>
                   </div>
                   {call.audioRemoved ? (
                     <p className="text-sm text-app-text-secondary">קובץ השמע נמחק אחרי 12 חודשים. התמלול נשמר.</p>
@@ -755,13 +797,17 @@ export default async function CommunicationsPage(props: {
                     {chat && messages.length > 0 ? <SelectModeButton /> : null}
                     {/* Keyed by the open contact: a form that stayed mounted kept the
                         previous contact's title and details (Ariel, 1.11.2026). */}
-                    <TaskFromConversation
-                      key={`task-${openKey}`}
-                      clients={clientOptions}
-                      defaultClientId={owner?.clients.length === 1 ? owner.clients[0].id : null}
-                      title={proposal.title}
-                      description={proposal.description}
-                    />
+                    {/* Hidden while marking: two task forms side by side read as one, and
+                        this one proposes the latest messages, not the marked ones (Ariel, 4.11.2026). */}
+                    <HideWhileSelecting>
+                      <TaskFromConversation
+                        key={`task-${openKey}`}
+                        clients={clientOptions}
+                        defaultClientId={owner?.clients.length === 1 ? owner.clients[0].id : null}
+                        title={proposal.title}
+                        description={proposal.description}
+                      />
+                    </HideWhileSelecting>
                   </div>
                 </header>
 
@@ -786,7 +832,17 @@ export default async function CommunicationsPage(props: {
                       return m && chat ? [day, <MessageBubble key={`m-${m.id}`} m={m} chat={chat} transcript={voiceTranscripts.get(m.id)} />] : day;
                     }
                     const call = callById.get(item.id);
-                    return call ? [day, <CallCard key={`c-${call.emailId}`} call={call} transcribe={config.hasOpenAiKey} />] : day;
+                    return call ? [day, <CallCard
+                          key={`c-${call.emailId}`}
+                          call={call}
+                          transcribe={config.hasOpenAiKey}
+                          task={{
+                            contactName,
+                            phone: selectedPhone,
+                            clients: clientOptions,
+                            defaultClientId: owner?.clients.length === 1 ? owner.clients[0].id : null,
+                          }}
+                        />] : day;
                   })}
                   {timeline.length === 0 ? <li className="text-sm text-app-text-secondary">אין הודעות או שיחות להצגה.</li> : null}
                   {/* Newest first, so the way back to older messages sits at the bottom. */}

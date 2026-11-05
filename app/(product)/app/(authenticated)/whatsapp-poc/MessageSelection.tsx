@@ -62,6 +62,17 @@ export function MessageSelectionProvider(props: {
     [on, selected],
   );
 
+  // 4.11.2026 (Ariel): Escape leaves the mark mode, like the dialog's own
+  // Escape closes the dialog. Only while no dialog is open.
+  useEffect(() => {
+    if (!on || dialog) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") ctx.setOn(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [on, dialog, ctx]);
+
   const list = [...selected.values()];
   const images = list.reduce((n, m) => n + m.files.filter((f) => f.type === "img" || f.type === "image").length, 0);
 
@@ -69,7 +80,14 @@ export function MessageSelectionProvider(props: {
     <SelectionContext.Provider value={ctx}>
       {props.children}
       {on ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-app-border bg-navy px-4 py-3 text-white" role="region" aria-label="הודעות שסומנו">
+        // Fixed to the bottom of the window: inside the conversation it sat
+        // under the reply box and could be scrolled out of sight, leaving no
+        // visible way out (Ariel, 4.11.2026).
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center justify-between gap-3 border-t border-app-border bg-navy px-4 py-3 text-white shadow-lg sm:px-6"
+          role="region"
+          aria-label="הודעות שסומנו"
+        >
           <p className="text-sm" aria-live="polite">
             <strong>{list.length === 1 ? "הודעה אחת נבחרה" : `${list.length} הודעות נבחרו`}</strong>
             {images > 0 ? ` · ${images === 1 ? "תמונה אחת" : `${images} תמונות`}` : ""}
@@ -92,8 +110,11 @@ export function MessageSelectionProvider(props: {
             >
               משימה חדשה
             </button>
-            <button type="button" onClick={ctx.clear} className="min-h-11 px-3 text-sm text-white underline">
+            <button type="button" onClick={ctx.clear} disabled={list.length === 0} className="min-h-11 px-3 text-sm text-white underline disabled:opacity-50">
               ניקוי
+            </button>
+            <button type="button" onClick={() => ctx.setOn(false)} className="min-h-11 rounded-lg border border-white/60 px-4 text-sm text-white">
+              יציאה מסימון
             </button>
           </div>
         </div>
@@ -110,6 +131,15 @@ export function MessageSelectionProvider(props: {
       ) : null}
     </SelectionContext.Provider>
   );
+}
+
+/// Renders its children only outside the mark mode: the older "צור משימה
+/// מהשיחה" proposes the latest messages, and beside the marked ones it read
+/// as if it had kept an earlier selection (Ariel, 4.11.2026).
+export function HideWhileSelecting({ children }: { children: ReactNode }) {
+  const ctx = useSelection();
+  if (ctx?.on) return null;
+  return <>{children}</>;
 }
 
 /// The header button that turns the mark mode on and off.
@@ -322,7 +352,13 @@ function AttachDialog(props: {
               .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
               .map((m) => (
                 <li key={m.id} className="truncate">
-                  {m.mine ? "אנחנו" : m.senderName || props.contactName}: {m.text || (m.files[0]?.label ? `[${m.files[0].label}]` : "[הודעה שאינה טקסט]")}
+                  {m.mine ? "אנחנו" : m.senderName || props.contactName}:{" "}
+                  {m.text ||
+                    (m.transcript
+                      ? `[${m.files[0]?.label || "הודעה קולית"}] ${m.transcript}`
+                      : m.files[0]?.label
+                        ? `[${m.files[0].label}${m.files[0].type === "audio" ? ", לא תומללה" : ""}]`
+                        : "[הודעה שאינה טקסט]")}
                 </li>
               ))}
           </ul>

@@ -29,7 +29,13 @@ export type SelectedMessage = {
   mine: boolean;
   senderName: string | null;
   files: SelectedFile[];
+  /// A voice message's transcript, when it has one (4.11.2026, Ariel: the
+  /// marked voice message reached the task without it).
+  transcript?: string | null;
 };
+
+/// Per message. The comment as a whole is capped by MAX_COMMENT_LENGTH.
+export const MAX_TRANSCRIPT_IN_COMMENT = 3000;
 
 const IMAGE_TYPES = new Set(["img", "image"]);
 
@@ -74,6 +80,7 @@ export function parseSelectedMessages(raw: unknown): SelectedMessage[] {
       mine: r.mine === true,
       senderName: str(r.senderName, 80) || null,
       files,
+      transcript: str(r.transcript, MAX_TRANSCRIPT_IN_COMMENT).trim() || null,
     });
   }
   // The order they happened in, whatever order they were clicked in.
@@ -105,6 +112,10 @@ export function formatSelectedMessages(input: {
     const parts: string[] = [];
     if (m.text.trim()) parts.push(m.text.replace(/\s+/g, " ").trim());
     for (const f of m.files) {
+      if (f.type === "audio") {
+        parts.push(m.transcript ? `[${f.label || "הודעה קולית"}] תמלול: ${m.transcript.replace(/\s+/g, " ").trim()}` : `[${f.label || "הודעה קולית"}, לא תומללה]`);
+        continue;
+      }
       parts.push(
         isImageFile(f) && input.filedImages?.has(`${m.id}:${f.id}`) ? `[${f.label || "תמונה"}, תויקה במשימה]` : `[${f.label || "קובץ"}]`,
       );
