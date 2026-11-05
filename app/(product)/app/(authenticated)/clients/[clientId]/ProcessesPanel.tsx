@@ -128,6 +128,8 @@ export type PanelProcess = {
   nextDate: string | null;
   dateIds: string[];
   latestVersion: number;
+  /// Built as a flow: edited in the flow editor, not here.
+  isFlow?: boolean;
   current: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; approvedByName: string | null; checks: PanelCheck[]; approvedAt?: string | null; atApproval?: PanelCheck[] | null } | null;
   /// `mayApprove`: whether the viewer may approve it (lib/procedure-approval.ts).
   draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: PanelCheck[]; mayApprove?: boolean } | null;
@@ -980,6 +982,9 @@ export function ProcessesPanel({
               הנהלים כמסמכים
             </Link>
           )}
+          <Link href={`/app/clients/${clientId}/connections`} className="text-xs font-medium text-app-text-accent hover:underline" data-testid="connections-link">
+            חיבורים
+          </Link>
           <Drawer triggerLabel="+ תהליך" title="תהליך" variant="link">
             <ProcessForm clientId={clientId} {...form} />
           </Drawer>
@@ -1282,8 +1287,21 @@ function ProcessCard({
             <ProcessForm clientId={clientId} existing={p} {...form} />
           </Drawer>
           <Drawer triggerLabel={p.draft ? "עריכת הטיוטה" : p.current ? "גרסה חדשה לנוהל" : "כתיבת נוהל"} title={`נוהל: ${p.code} ${p.title}`} variant="link">
-            <ProcedureEditor clientId={clientId} process={p} systems={systems} />
+            {p.isFlow ? (
+              <p className="text-sm text-app-text-secondary" data-testid="procedure-is-flow">
+                הנוהל הזה נבנה כזרימה עם תנאים, ולכן עורכים אותו ב
+                <Link href={`/app/clients/${clientId}/processes/${p.id}/flow`} className="font-medium text-app-text-accent hover:underline">
+                  עורך הזרימה
+                </Link>
+                , כדי שהענפים לא ילכו לאיבוד.
+              </p>
+            ) : (
+              <ProcedureEditor clientId={clientId} process={p} systems={systems} />
+            )}
           </Drawer>
+          <Link href={`/app/clients/${clientId}/processes/${p.id}/flow`} className="font-medium text-app-text-accent hover:underline" data-testid="procedure-flow-link">
+            עורך זרימה
+          </Link>
           {p.triggerKinds.includes("SCHEDULED") && (
             <Drawer triggerLabel="מועדים" title={`מועדים: ${p.code} ${p.title}`} variant="link">
               <DatesForm clientId={clientId} process={p} dates={dates} />

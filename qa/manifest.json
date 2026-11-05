@@ -2222,6 +2222,48 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-05",
       "riskReason": "client documents, isolation: staff download from the task screen; resolveStaffDocument refuses a client the person is not on"
+    },
+    "action:(product)/app/(authenticated)/clients/[clientId]/connections/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-05"
+    },
+    "api:/api/connections/google/callback": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-05"
+    },
+    "api:/api/connections/google/start": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-05"
+    },
+    "domain:connections": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-05"
+    },
+    "screen:/app/clients/[clientId]/connections": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-05"
+    },
+    "screen:/app/clients/[clientId]/processes/[processId]/flow": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-05"
     }
   },
   "waivers": {},

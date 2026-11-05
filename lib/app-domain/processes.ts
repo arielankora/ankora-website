@@ -34,6 +34,7 @@ import { readControlRefs } from "@/lib/procedure-document";
 import { buildSnapshot } from "@/lib/app-domain/procedure-documents";
 import { runReadiness } from "@/lib/process-readiness";
 import { mentionedIn, processTexts, type Named } from "@/lib/process-mentions";
+import { flowFromSteps, flowIssues, flowSteps, readFlow, secondEyeNodes, type ProcessFlow } from "@/lib/process-flow";
 
 // Org brain, phase 1: processes and their procedures
 // (claude/org-brain-spec-2026-10-12.md, 3.8, 3.9; Hadas's review approved
@@ -312,6 +313,9 @@ export async function linkProcessDates(actor: User, processId: string, dateIds: 
 
 export type VersionInput = {
   steps: unknown;
+  /// A procedure built as a flow (lib/process-flow.ts). When given, the
+  /// steps are derived from it and `steps` is ignored.
+  flow?: unknown;
   highlights?: string | null;
   outputs?: string | null;
   changeNote?: string | null;
@@ -411,10 +415,20 @@ export function holdsApproval(checks: ProcessCheckResult[]): ProcessCheckResult[
   return checks.filter((c) => c.severity === "BLOCK" || !c.excepted);
 }
 
+/// Why a procedure built as a flow is not saved as a list.
+export const FLOW_ONLY_MESSAGE = "הנוהל הזה נבנה כזרימה עם תנאים. עורכים אותו ב\"עורך זרימה\", כדי שהענפים לא ילכו לאיבוד.";
+
 export async function saveProcessVersion(actor: User, processId: string, input: VersionInput) {
   assertCan(actor.role, "time_entry.create_self");
   const process = await findProcess(actor, processId);
-  const steps = readSteps(input.steps);
+  let flow: ProcessFlow | null = null;
+  if (input.flow !== undefined && input.flow !== null) {
+    flow = readFlow(input.flow);
+    if (!flow) throw new Error("הזרימה לא נקראה. רעננו ונסו שוב.");
+    const issues = flowIssues(flow);
+    if (issues.length) throw new Error(issues.map((i) => i.message).join(" "));
+  }
+  const steps = flow ? flowSteps(flow) : readSteps(input.steps);
   if (steps.length === 0) throw new Error("נוהל צריך לפחות שלב אחד.");
   if (steps.length > MAX_PROCESS_STEPS) throw new Error(`עד ${MAX_PROCESS_STEPS} שלבים. נוהל ארוך מזה הוא כמה תהליכים.`);
   const systemIds = [...new Set(steps.flatMap((s) => s.systemIds))];
@@ -428,15 +442,20 @@ export async function saveProcessVersion(actor: User, processId: string, input: 
   const secret = blockingChecks(version, []).find((c) => c.code === "R4");
   if (secret) throw new Error(secret.message);
 
-  const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" }, select: { version: true } });
+  const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" }, select: { version: true, flow: true } });
   const latestVersion = latest?.version ?? 0;
   if (latestVersion !== input.baseVersion) throw new ProcessVersionConflictError(latestVersion);
+  // 5.11.2026: a procedure built as a flow is edited as a flow. Saving it
+  // as a list (the list editor, a proposal from Claude) would drop its
+  // conditions and branches without a word, so it is refused instead.
+  if (!flow && latest && readFlow(latest.flow)) throw new Error(FLOW_ONLY_MESSAGE);
   try {
     const row = await prisma.processVersion.create({
       data: {
         processId,
         version: latestVersion + 1,
         steps: steps as unknown as Prisma.InputJsonValue,
+        flow: flow ? (flow as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
         highlights: version.highlights,
         outputs: version.outputs,
         changeNote: clean(input.changeNote),
@@ -449,6 +468,90 @@ export async function saveProcessVersion(actor: User, processId: string, input: 
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") throw new ProcessVersionConflictError(latestVersion + 1);
     throw err;
   }
+}
+
+/// What the flow editor opens with (task cmvtivumj000pjs08q9qj4t67): the
+/// newest version as a flow, a list turned into one when it was saved as a
+/// list, and what the editor shows around it.
+export type FlowEditorData = {
+  processId: string;
+  clientId: string;
+  code: string;
+  title: string;
+  triggerText: string | null;
+  latestVersion: number;
+  latestStatus: "DRAFT" | "APPROVED" | "SUPERSEDED" | null;
+  flow: ProcessFlow;
+  /// The flow was built from a list just now, not saved as a flow.
+  fromList: boolean;
+  highlights: string | null;
+  outputs: string | null;
+  contacts: { id: string; name: string }[];
+  /// The client's live connections a branch can check through.
+  connections: { id: string; kind: "GOOGLE_OAUTH" | "MAIL_APP_PASSWORD" | "MANAGER_SEND"; account: string }[];
+};
+
+export async function flowForEditor(actor: User, processId: string): Promise<FlowEditorData> {
+  const process = await findProcess(actor, processId);
+  const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" } });
+  const saved = latest ? readFlow(latest.flow) : null;
+  const rows = await prisma.clientContact.findMany({ where: { clientId: process.clientId, deletedAt: null }, select: { id: true, role: true, person: { select: { name: true } } }, take: 200 });
+  const contacts = rows
+    .map((r) => ({ id: r.id, name: [r.person.name, r.role].filter(Boolean).join(", ") || "איש קשר בלי שם" }))
+    .sort((a, b) => a.name.localeCompare(b.name, "he"));
+  return {
+    processId,
+    clientId: process.clientId,
+    code: process.code,
+    title: process.title,
+    triggerText: process.triggerText,
+    latestVersion: latest?.version ?? 0,
+    latestStatus: latest?.status ?? null,
+    flow: saved ?? (latest ? flowFromSteps(readSteps(latest.steps)) : { v: 1, start: null, nodes: [] }),
+    fromList: !saved,
+    highlights: latest?.highlights ?? null,
+    outputs: latest?.outputs ?? null,
+    contacts,
+    connections: await prisma.clientConnection.findMany({ where: { clientId: process.clientId, revokedAt: null }, select: { id: true, kind: true, account: true }, orderBy: { connectedAt: "asc" } }),
+  };
+}
+
+/// "שמור והפעל" (task cmvtivumj000pjs08q9qj4t67, step 3 decisions, Ariel
+/// 4.11.2026): the account manager saves and the version goes live at once,
+/// through the same approval, checks, snapshot and audit as any approval.
+/// It waits as a draft for a second pair of eyes when it sends mail to the
+/// client on its own or moves money, when the client keeps authors from
+/// approving their own procedures, or when the person saving does not
+/// approve procedures of this client. The live version keeps running until
+/// then. Never called for what Claude proposes: that stays a draft.
+export type SaveAndActivateResult =
+  | { live: true; version: number }
+  | { live: false; version: number; reason: string; secondEye: string[] };
+
+export async function saveAndActivateProcessVersion(actor: User, processId: string, input: VersionInput): Promise<SaveAndActivateResult> {
+  const row = await saveProcessVersion(actor, processId, input);
+  const process = await findProcess(actor, processId);
+  const flow = readFlow(row.flow);
+  const waiting = flow ? secondEyeNodes(flow).map((n) => n.title) : [];
+  if (waiting.length) {
+    return { live: false, version: row.version, secondEye: waiting, reason: `ממתין לעין שנייה: ${waiting.map((t) => `"${t}"`).join(", ")}. עד האישור, הגרסה הקודמת ממשיכה לרוץ.` };
+  }
+  const client = await prisma.client.findUnique({ where: { id: process.clientId }, select: { accountManagerId: true, procedureApprovalSeparation: true } });
+  const approver = { userId: actor.id, isManager: canManageClients(actor.role), accountManagerId: client?.accountManagerId ?? null };
+  if (!approvesProceduresOf(approver)) {
+    return { live: false, version: row.version, secondEye: [], reason: "נשמר כטיוטה: רק מנהל או מנהל התיק של הלקוח מפעילים נוהל." };
+  }
+  if (procedureApprovalBlocker({ ...approver, separation: client?.procedureApprovalSeparation ?? false, authorId: row.createdById })) {
+    return { live: false, version: row.version, secondEye: [], reason: "נשמר כטיוטה: אצל הלקוח הזה מי שכתב את הנוהל לא מאשר אותו, ולכן הוא ממתין לעין שנייה." };
+  }
+  try {
+    await approveProcessVersion(actor, processId, row.version);
+  } catch (err) {
+    // Saved, not live: the client's rules hold it (an approval threshold
+    // with no approval step, say). The editor shows why.
+    return { live: false, version: row.version, secondEye: [], reason: err instanceof Error ? err.message : "הנוהל נשמר כטיוטה ולא הופעל." };
+  }
+  return { live: true, version: row.version };
 }
 
 /// The checks a version would face if approved now.
@@ -644,6 +747,9 @@ export async function listProcesses(actor: User, clientId: string, options: { in
         current: current ? { ...current, steps: steps(current), checks: processChecks({ steps: steps(current), highlights: current.highlights, outputs: current.outputs }, r, ctx) } : null,
         draft: draft ? { ...draft, steps: steps(draft), checks: processChecks({ steps: steps(draft), highlights: draft.highlights, outputs: draft.outputs }, r, ctx) } : null,
         latestVersion: latest?.version ?? 0,
+        /// The newest version was built as a flow: it is edited in the flow
+        /// editor only (FLOW_ONLY_MESSAGE).
+        isFlow: !!(latest && readFlow(latest.flow)),
         nextDate,
         completeness: completeness(input),
         documentation: documentation(input),

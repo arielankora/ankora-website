@@ -109,6 +109,12 @@ export type ProcessStep = {
   currency: string | null;
   /// How a message in this step goes out (R10).
   channel: Channel | null;
+  /// A client message whose wording a person wrote in the procedure editor,
+  /// with only fixed parameters filled in at send time (Ariel, 4.11.2026,
+  /// task cmvtivumj000pjs08q9qj4t67). Such a message may go out on its own:
+  /// a person checked what leaves, which is what R1 asks. Text Claude writes
+  /// during a run is never this, and stays a draft.
+  fixedMessage?: boolean;
 };
 
 const s = (v: unknown, max: number): string | null => {
@@ -137,6 +143,7 @@ export function readSteps(value: unknown): ProcessStep[] {
         typeof v.amountMaxMinor === "number" && Number.isInteger(v.amountMaxMinor) && v.amountMaxMinor >= 0 && v.amountMaxMinor <= 1e13 ? v.amountMaxMinor : null,
       currency: typeof v.currency === "string" && /^[A-Za-z]{3}$/.test(v.currency.trim()) ? v.currency.trim().toUpperCase() : null,
       channel: CHANNELS.includes(v.channel as Channel) ? (v.channel as Channel) : null,
+      ...(v.fixedMessage === true ? { fixedMessage: true } : {}),
     }))
     .filter((st) => st.title);
 }
@@ -159,7 +166,7 @@ export function blockingChecks(
     } else if (humanOnly.length && st.mode === "ASSISTED" && !st.requiresApproval) {
       out.push({ code: "R1", step: n, message: `שלב ${n}: כש-Claude מכין ${humanOnly.map((t) => ACTION_TAG_LABELS[t]).join(", ")}, אדם מאשר לפני הביצוע. צריך לסמן "דורש אישור".` });
     }
-    if (st.mode === "AUTOMATED" && st.actionTags.some((t) => HUMAN_REVIEWED_TAGS.includes(t))) {
+    if (st.mode === "AUTOMATED" && !st.fixedMessage && st.actionTags.some((t) => HUMAN_REVIEWED_TAGS.includes(t))) {
       out.push({ code: "R1", step: n, message: `שלב ${n}: הודעה ללקוח עוברת בדיקה של אדם לפני שהיא יוצאת, ולכן לא נשלחת אוטומטית.` });
     }
     if (st.mode === "AUTOMATED" && !st.verification) {

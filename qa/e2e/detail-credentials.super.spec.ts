@@ -37,6 +37,8 @@ import {
 // @covers screen:/app/clients/[clientId]/handover
 // @covers screen:/app/clients/[clientId]/procedures
 // @covers screen:/app/clients/[clientId]/processes/[processId]/document
+// @covers screen:/app/clients/[clientId]/processes/[processId]/flow
+// @covers screen:/app/clients/[clientId]/connections
 // @covers screen:/app/tasks/[id]
 //
 // Declared for the same reason the detail-screens files declare: these

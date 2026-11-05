@@ -3584,3 +3584,103 @@ reason documented in every prior phase's migration header.
 (section 20's PR/Preview/self-merge process for changes within Ariel's
 merge policy - additive, backward-compatible, easily-revertible schema
 change, same shape as every prior phase's own schema addition).
+
+## 24. Addendum: client connections for procedures (Gmail, Drive) (2026-11-04)
+
+Status: approved by Ariel, 2026-11-04 (task cmvtivumj000pjs08q9qj4t67, step 4). Built in the prototype on branch ops/procedure-flow-editor; nothing connects a real client until Google verification (24.6).
+
+### 24.1 Context
+
+The visual procedure editor lets an account manager build a procedure with
+conditions ("if the client replied, do B; if a file arrived, do D") that runs
+as soon as it is saved. Conditions and actions need to reach the client's own
+systems: read the client's mailbox, read and write the client's Drive, and
+send mail from the account manager's Ankora mailbox (Ariel, 2026-11-04;
+example: Grantor, Nadav's mailbox and Drive).
+
+Until now the app reached Google only through one service account, for
+Ankora's own Drive (22.7, 22.8), and never held access to a mailbox. That was
+deliberate (22.2). This addendum changes it, and says how the risk is bounded.
+
+### 24.2 Decision
+
+A connection belongs to a client, not to the app. A procedure node picks one
+of its client's connections. There is no organisation-wide grant.
+
+Three kinds of connection:
+
+1. **Client Google account, by OAuth.** The client signs in on Google's own
+   screen and approves the scopes; Ankora never sees the password. The
+   approval (who, when, which scopes) is recorded and is the client's
+   consent. Scopes, the narrowest that work:
+   - Mail: `gmail.metadata` when a condition only asks "did a reply arrive in
+     this thread"; `gmail.readonly` only for a node that must read the body.
+   - Drive: `drive.file` for the files a procedure writes, and
+     `drive.metadata.readonly` to know that a file arrived in a folder.
+     Found while building (2026-11-04): `drive.file` alone cannot see
+     files the client adds to a folder, Picker or not, so "a file arrived"
+     needs the metadata scope (names and dates, never content). Full
+     `drive` is not requested.
+2. **Client mailbox, by app password (IMAP).** For a client who prefers to
+   hand over access (Ariel, 2026-11-04). Works for mail only, needs 2-step
+   verification on the client's account, and grants the whole mailbox. Drive
+   has no password access; a Drive connection is OAuth only.
+3. **Account manager's Ankora mailbox, for sending.** Each account manager
+   connects their own mailbox once, by OAuth, scope `gmail.send` only.
+   Ankora's Workspace is the OAuth app's own organisation, so this needs no
+   Google verification. A send node is set per node to send on its own or to
+   leave a draft for a person; sending on its own needs a second pair of
+   eyes before the procedure version goes live (step 3 decision).
+
+**The OAuth client (2026-11-05).** It lives in its own Google Cloud project,
+`ankora-app-513817`, not in `ankora-backups`, which holds the backup service
+account and the vault's KMS key: a client-facing OAuth app should not share a
+project with them, and Google's app verification is per project. Consent
+screen External, status Testing. `GOOGLE_OAUTH_CLIENT_ID` and
+`GOOGLE_OAUTH_CLIENT_SECRET` are set in Vercel for Preview on the prototype
+branch only. Verified end to end on the preview that day: a client account
+(mail metadata and one Drive folder) and the account manager's mailbox
+(a test mail sent and received).
+
+### 24.3 Where secrets live
+
+OAuth refresh tokens and app passwords are stored in the existing vault
+(`ClientCredential`, envelope encryption, KMS key reference), never in
+`Process`, steps, task comments or logs. A connection row holds only the
+account address, kind, scopes, who connected it, when, and a pointer to the
+vault row.
+
+### 24.4 Guards
+
+- Every use of a connection writes an audit record: node, run, what was read
+  or written (thread id, file id), never the content.
+- A node reads only what it names: one thread, one folder. No search across
+  the mailbox.
+- Disconnect is one click, revokes the token at Google, and deletes the
+  vault row. Procedures that used it show "חיבור חסר" and stop at that node.
+- "בלי AI" (`lib/ai-exclusion.ts`): a deterministic check (reply arrived,
+  file exists) may run on a marked client; a node executed by Claude may
+  not read anything through a marked client's connection.
+- Only a manager or the client's account manager adds or removes a
+  connection.
+
+### 24.5 Polling or push
+
+Mail: Gmail `watch` with a Pub/Sub push to a webhook, so a reply is seen
+within minutes without polling; polling once a day through the existing
+cron is the fallback. Drive: polling the one folder, on the existing cron,
+until a shorter interval is needed. The Vercel cron limits in 22.3 apply;
+this adds no new cron.
+
+### 24.6 What it costs
+
+- Google verification: client accounts are outside Ankora's Workspace, so
+  restricted scopes (`gmail.readonly`, `gmail.metadata`) need app
+  verification with an external security assessment. Until then: at most 100
+  test users and an "unverified app" warning. The prototype runs on a test
+  account and on Ankora פנימי; the first real client waits for verification.
+- SOC 2: client system access is now in scope for access reviews (P10
+  should list connections per client) and change management (procedures go
+  live without approval; the step 3 rules and the audit log are the control).
+- Not a new sub-processor: data stays in the client's Google and Ankora's
+  Google. No P8 run.
