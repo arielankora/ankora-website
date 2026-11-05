@@ -3,6 +3,7 @@ import type { User } from "@prisma/client";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
 import { addClientSource } from "@/lib/app-domain/client-sources";
+import { addSystemAccess } from "@/lib/app-domain/system-map";
 
 // 31.10.2026, RIMED: the reproduction from the bug report, through the
 // tool as a client calls it. The arguments are parsed by the schema the
@@ -89,7 +90,7 @@ describe("propose_knowledge, the RIMED reproduction", () => {
 
   it("a newSource whose items are all dropped is not registered", async () => {
     const { client, user } = await setup();
-    const r = await propose(user, { client: "RIMED", newSource: { kind: "PERSON", title: "שיחה ריקה" }, items: [{ target: "FACT", payload: { kind: "NOTE", body: "x" } }] });
+    const r = await propose(user, { client: "RIMED", newSource: { kind: "PERSON", title: "שיחה ריקה" }, items: [{ target: "FACT", payload: { kind: "NOTE", body: "x" }, confidence: "LOW" }] });
     expect(r).toMatchObject({ proposed: 0, sourceCode: null, dropped: [{ index: 0, reason: expect.stringContaining("items[0].reason") }] });
     expect(await prisma.clientSource.count({ where: { clientId: client.id } })).toBe(1);
   });
@@ -104,5 +105,39 @@ describe("propose_knowledge, the RIMED reproduction", () => {
     expect(r.next).toContain("1 entered the client's file automatically");
     const p = await prisma.knowledgeProposal.findUniqueOrThrow({ where: { id: r.enteredFile[0].proposalId } });
     expect(p).toMatchObject({ state: "APPROVED", autoApplied: true, decidedById: user.id });
+  });
+
+  it("5.11.2026: an item without confidence is refused before the handler, with its path", async () => {
+    const { user, source } = await setup();
+    const { confidence: _c, ...noConfidence } = PREFERENCE;
+    await expect(propose(user, { client: "RIMED", sourceCode: source.code, items: [noConfidence] })).rejects.toThrow(/items[\s\S]*0[\s\S]*confidence/);
+  });
+
+  it("5.11.2026: a process's system that is not in the map comes back in missingSystems, with a look-alike", async () => {
+    const { client, user, source } = await setup();
+    await addSystemAccess(user, { clientId: client.id, systemName: "Claude, חשבון התפעול", accessStatus: "HAS_ACCESS", sources: [{ code: source.code }] });
+    await addSystemAccess(user, { clientId: client.id, systemName: "Gusto", accessStatus: "HAS_ACCESS", sources: [{ code: source.code }] });
+    const process = {
+      target: "PROCESS",
+      payload: { title: "קמפיין פניות", systemNames: ["Gusto", "Claude"], steps: [{ title: "העשרה", systemNames: ["Apollo", "unipile"] }] },
+      reason: "נאמר בשיחה",
+      confidence: "HIGH",
+    };
+    const unipile = { target: "SYSTEM", payload: { systemName: "Unipile", purpose: "שליחה" }, reason: "נאמר בשיחה", confidence: "HIGH" };
+    const r = await propose(user, { client: "RIMED", sourceCode: source.code, items: [process, unipile] });
+    // Gusto is in the map, Unipile is in the batch (case aside): neither is missing.
+    expect(r.missingSystems).toEqual([
+      { index: 0, name: "Claude", similar: [expect.objectContaining({ name: "Claude, חשבון התפעול" })] },
+      { index: 0, name: "Apollo", similar: [] },
+    ]);
+    expect(r.next).toContain("2 system name(s) a process uses are not in the client's system map");
+  });
+
+  it("5.11.2026: a batch with every system in place says nothing about systems", async () => {
+    const { user, source } = await setup();
+    const process = { target: "PROCESS", payload: { title: "שכר חודשי" }, reason: "נאמר בשיחה", confidence: "MEDIUM" };
+    const r = await propose(user, { client: "RIMED", sourceCode: source.code, items: [process] });
+    expect(r.missingSystems).toEqual([]);
+    expect(r.next).not.toContain("system map");
   });
 });

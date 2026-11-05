@@ -33,6 +33,7 @@ exports[`propose_knowledge payloads, as tools/list publishes them > matches the 
             "type": "string",
           },
           "confidence": {
+            "description": "How sure you are of this item. Required on every item, a TASK or DATE too: the review screen orders by it, lowest first.",
             "enum": [
               "HIGH",
               "MEDIUM",
@@ -1489,6 +1490,7 @@ exports[`propose_knowledge payloads, as tools/list publishes them > matches the 
         "required": [
           "target",
           "payload",
+          "confidence",
         ],
         "type": "object",
       },

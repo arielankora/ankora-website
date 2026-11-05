@@ -197,6 +197,15 @@ describe("propose_knowledge", () => {
   it("there is no tool that approves", () => {
     expect([...tools.keys()].some((n) => /approve/.test(n))).toBe(false);
   });
+
+  it("5.11.2026: asks for the missing systems in `next`, only when there are some", async () => {
+    proposals.proposeKnowledge.mockResolvedValueOnce({ batchId: "b1", sourceCode: "S4", proposed: 1, dropped: [], secretTaskId: null, possibleMatches: [], missingSystems: [{ index: 0, name: "Apollo", similar: [] }] });
+    const body = JSON.parse((await call({ client: "nux", sourceCode: "S4", items: [ITEM] })).content[0].text!);
+    expect(body.missingSystems).toEqual([{ index: 0, name: "Apollo", similar: [] }]);
+    expect(body.next).toContain("1 system name(s) a process uses are not in the client's system map");
+    const plain = JSON.parse((await call({ client: "nux", sourceCode: "S4", items: [ITEM] })).content[0].text!);
+    expect(plain.next).not.toContain("system map");
+  });
 });
 
 describe("lookup_contact", () => {

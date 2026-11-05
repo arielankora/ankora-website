@@ -127,7 +127,12 @@ const PROPOSE_INPUT = z.object({
           alsoSources: z.array(z.string()).max(MAX_ALSO_SOURCES).optional(),
           reason: z.string().optional(),
           quote: z.string().optional(),
-          confidence: z.enum(["HIGH", "MEDIUM", "LOW"]).optional(),
+          // 5.11.2026: required. Left out, the review screen showed every
+          // such item as medium with "Claude did not say", which said
+          // nothing about the item.
+          confidence: z
+            .enum(["HIGH", "MEDIUM", "LOW"])
+            .describe("How sure you are of this item. Required on every item, a TASK or DATE too: the review screen orders by it, lowest first."),
           status: z
             .enum(["CONFIRMED", "UNCERTAIN", "MISSING"])
             .optional()
@@ -150,7 +155,7 @@ export const PROPOSE_KNOWLEDGE_DESCRIPTION = [
   "Sends proposed items for a client's file, from ONE source (a meeting, a document, an email thread). Nothing enters the file until a person approves it on Ankora's review screen, except AUTO.",
   "STATUS, on each item as `status`: CONFIRMED (the client or their supplier said or showed it explicitly), UNCERTAIN (said unclearly, or only by Ankora) or MISSING (needed, and we do not have it). With UNCERTAIN or MISSING add payload.toResolve: what would close it. Left out, HIGH confidence is CONFIRMED and anything else UNCERTAIN. Not used on NARRATIVE, DOMAIN, TASK, DATE or a QUESTION fact.",
   "FIELDS: each item's `payload` is described in the schema per target (payload.anyOf, titled by target), with every closed list. For example FACT.kind (SCOPE_IN, SCOPE_OUT, PREFERENCE, REQUIREMENT, LOCATION, FINANCE, TEMPORARY, ONE_OFF_DECISION, QUESTION, NOTE) and FACT.topic (COMMUNICATION, REPORTING, DOCUMENTS, AUTOMATION, ADMINS, PAYMENTS, SUPPLIERS, OTHER). A value outside a list drops that item, and the reply says where (items[0].payload.topic).",
-  "Each item needs `reason` (one sentence: why it is true and where it was said), and should have `confidence` (the review screen orders by it, lowest first) and `at` (minute in the recording, \"08:13\"). `quote` is optional and short, never from a topics-only source.",
+  "Each item needs `reason` (one sentence: why it is true and where it was said) and `confidence` (the review screen orders by it), and should have `at` (minute in the recording, \"08:13\"). `quote` is optional and short, never from a topics-only source.",
   "SOURCE: `sourceCode` (\"S3\") for a source in the client's register (get_client_file lists it), or `newSource` to register one; it is registered only when at least one item is kept. A recording is found again by firefliesId and an email thread (kind EMAIL) by gmailThreadId, so sending it twice makes no second source. An email thread is a source only when it is this client's; quote only what the client or their supplier wrote.",
   "CHANGES: to change an item already in the file, action SUPERSEDE with `targetId` (the id after the item in get_client_file) and only the fields that change. When someone said otherwise and it is not clear who is right, CONTRADICT with its targetId: nothing is overwritten. Never propose a second item for something in the file: names vary between meetings (\"Washington DOR\" and \"Washington Department of Revenue\"), so look for one first. The reply's `possibleMatches` lists new items that may already exist; resend them as SUPERSEDE or leave them to the reviewer.",
   "NAMES (entityName, routeToNames, systemNames and the like) link to the item in the file with that name on approval; name only what is in the file or in the same batch. Every payload except NARRATIVE, DOMAIN, TASK and DATE may carry externalRefs, ownerName (the person at Ankora who keeps it right) and clientVisible (true only when it is the client's to see; never with sensitivity SENSITIVE or doNotDisclose).",
@@ -443,12 +448,16 @@ export function registerClientFileTools(server: McpServer): void {
         const proposed = batches.reduce((n, b) => n + b.proposed, 0) - entered;
         const matched = batches.reduce((n, b) => n + b.possibleMatches.length, 0);
         const incomplete = batches.reduce((n, b) => n + (b.incomplete?.length ?? 0), 0);
+        const unmapped = batches.reduce((n, b) => n + (b.missingSystems?.length ?? 0), 0);
         const next =
           (proposed > 0
             ? `${proposed} proposals are waiting for a person to approve them: \`reviewUrl\` opens them on Ankora's approvals screen, and list_approvals with decide_knowledge_proposals decides them from here once the user says so. ${entered > 0 ? "These are not in the file yet." : "Nothing is in the file yet."}`
             : entered > 0
               ? "Nothing else waits for approval."
               : "Nothing was proposed.") +
+          (unmapped > 0
+            ? ` ${unmapped} system name(s) a process uses are not in the client's system map (missingSystems), so the process would enter without linking them. Before telling the user you are done, call propose_knowledge again with the same source and a SYSTEM item for each (systemName exactly as the process wrote it, purpose, accessStatus, confidence). Where \`similar\` lists a system already in the map that is the same one, do not add it: tell the user, so the name is corrected on the process's card before it is approved. The process links when its systems are approved before it.`
+            : "") +
           (entered > 0
             ? ` ${entered} entered the client's file automatically (\`enteredFile\`): tell the user which, with each \`result\` link. A person may still look at them on the approvals screen, and "ביטול" there takes one out again.`
             : "") +

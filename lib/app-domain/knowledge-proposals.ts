@@ -10,6 +10,8 @@ import { defaultWeight, readSourceRefs, sourceCode, type SourceRef } from "@/lib
 import {
   PAYLOADS,
   normalizeForMatch,
+  missingSystems,
+  type MissingSystem,
   payloadText,
   proposalHeadline,
   proposalProblems,
@@ -152,6 +154,10 @@ export type ProposeResult = {
   /// Every note the card shows as blocking, or as holding the procedure
   /// back (proposalProblems), in the card's own words, with why it matters.
   incomplete: { index: number; missing: string; why: string | null; suggested: string | null }[];
+  /// 5.11.2026: systems a process in the batch names that are not in the
+  /// client's system map and not proposed in the batch, with look-alikes
+  /// from the map. Send them as SYSTEM, or use the name in the map.
+  missingSystems: MissingSystem[];
 };
 
 export type AutoAppliedItem = { proposalId: string; target: ProposalTargetLike; headline: string; resultId: string | null };
@@ -337,7 +343,7 @@ export async function proposeKnowledge(
   const weight = (await isInternalClient(input.clientId)) ? "PRIMARY" : source.weight;
   const codes = [...(await registerCodes(input.clientId)), ...(source.existing ? [] : [source.code])];
   const dropped: ProposeResult["dropped"] = [...(options.dropped ?? [])];
-  const accepted: { item: ProposalItemInput & { action: ProposalActionLike }; payload: Record<string, unknown>; flags: ProposalFlag[] }[] = [];
+  const accepted: { index: number; item: ProposalItemInput & { action: ProposalActionLike }; payload: Record<string, unknown>; flags: ProposalFlag[] }[] = [];
   const possibleMatches: ProposeResult["possibleMatches"] = [];
   const incomplete: ProposeResult["incomplete"] = [];
 
@@ -417,8 +423,15 @@ export async function proposeKnowledge(
     if (existing.length && isNamedTarget(item.target)) possibleMatches.push({ index, target: item.target, name: String(payload[nameFieldOf(item.target)] ?? ""), existing });
     else if (existing.length && item.target === "DATE") possibleMatches.push({ index, target: item.target, name: String(payload.title ?? ""), existing });
     for (const f of flags) if (PROBLEM_CODES.includes(f.code)) incomplete.push({ index, missing: f.message, why: f.why ?? null, suggested: f.fix?.label ?? null });
-    accepted.push({ item, payload, flags });
+    accepted.push({ index, item, payload, flags });
   }
+
+  const unmapped = accepted.some((a) => a.item.target === "PROCESS")
+    ? missingSystems(
+        accepted.map((a) => ({ index: a.index, target: a.item.target, action: a.item.action, payload: a.payload })),
+        (await prisma.systemAccess.findMany({ where: { clientId: input.clientId, deletedAt: null }, select: { id: true, systemName: true } })).map((s) => ({ id: s.id, name: s.systemName }))
+      )
+    : [];
 
   let secretTaskId: string | null = null;
   // A secret dropped before the batch waited for its client already has its task.
@@ -436,7 +449,7 @@ export async function proposeKnowledge(
 
   // Nothing kept: a new source is not registered (31.10.2026).
   if (accepted.length === 0) {
-    return { batchId: null, sourceCode: source.existing ? source.code : null, proposed: 0, dropped, secretTaskId, possibleMatches, autoApplied: [], incomplete: [] };
+    return { batchId: null, sourceCode: source.existing ? source.code : null, proposed: 0, dropped, secretTaskId, possibleMatches, autoApplied: [], incomplete: [], missingSystems: [] };
   }
 
   // The source and the batch go in together: a new source is registered
@@ -500,7 +513,7 @@ export async function proposeKnowledge(
   // Only what Claude sent (propose_knowledge): a batch typed on a screen,
   // or one a person assigned to its client, waits as it always did.
   const autoApplied = options.autoApply ? await autoApplyBatch(actor, batch.id, input.clientId) : [];
-  return { batchId: batch.id, sourceCode: registered.code, proposed: accepted.length, dropped, secretTaskId, possibleMatches, autoApplied, incomplete };
+  return { batchId: batch.id, sourceCode: registered.code, proposed: accepted.length, dropped, secretTaskId, possibleMatches, autoApplied, incomplete, missingSystems: unmapped };
 }
 
 /// The AUTO tier on arrival (3.11.2026, approval tiers part 2): each
