@@ -10,7 +10,14 @@ import {
   logoutAllSessions,
   setUserPersonalEmail,
 } from "@/lib/app-domain/users";
-import { issueDeletionDeclarationLink } from "@/lib/app-domain/agreements";
+import {
+  dismissPdfUpload,
+  issueDeletionDeclarationLink,
+  pendingPdfUploads,
+  recordPdfSignatureFromDocument,
+} from "@/lib/app-domain/agreements";
+import { CURRENT_AGREEMENTS } from "@/lib/agreements";
+import { localDateTimeToUtc } from "@/lib/timezone";
 import { revokeClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 import { setUserCanApproveExceptions } from "@/lib/app-domain/rule-approvals";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
@@ -290,4 +297,64 @@ export async function issueDeletionDeclarationAction(
   } catch (err) {
     return { error: friendlyError(err) };
   }
+}
+
+/// A signed PDF the employee uploaded, checked by a person on the user's
+/// page (5.11.2026). Before this, the approvals screen sent the admin to
+/// this page with nothing on it to act on, and the only way to record the
+/// upload was to ask Claude. Same domain calls as the MCP tools, so the
+/// same rules hold: only the current version, only a document on the
+/// internal client, and the lifecycle task hears about it.
+async function pendingUploadOf(userId: string, documentId: string) {
+  const pending = await pendingPdfUploads(userId);
+  for (const kind of Object.keys(pending) as (keyof typeof pending)[]) {
+    if (pending[kind].some((p) => p.documentId === documentId)) return kind;
+  }
+  return null;
+}
+
+export async function recordPdfUploadAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const actor = await requireUser();
+  const userId = String(formData.get("userId") || "");
+  const documentId = String(formData.get("documentId") || "");
+  if (!userId || !documentId) return { error: "הקובץ לא נמצא." };
+  const checked = formData.get("checked") === "on";
+  if (!checked) return { error: "יש לסמן שבדקת את הקובץ לפני הרישום." };
+  const date = String(formData.get("signedAt") || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "יש לבחור את תאריך החתימה." };
+  try {
+    const kind = await pendingUploadOf(userId, documentId);
+    if (!kind) return { error: "הקובץ כבר טופל, או שאינו של המשתמש הזה." };
+    await recordPdfSignatureFromDocument(actor, {
+      userId,
+      kind,
+      version: CURRENT_AGREEMENTS[kind],
+      signedName: String(formData.get("signedName") || ""),
+      signedAt: localDateTimeToUtc(date, "00:00"),
+      documentId,
+    });
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  revalidatePath(`/app/users/${userId}`);
+  revalidatePath("/app/approvals");
+  return { ok: true };
+}
+
+export async function dismissPdfUploadAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const actor = await requireUser();
+  const userId = String(formData.get("userId") || "");
+  const documentId = String(formData.get("documentId") || "");
+  if (!userId || !documentId) return { error: "הקובץ לא נמצא." };
+  const reason = String(formData.get("reason") || "").trim();
+  if (!reason) return { error: "יש לכתוב למה הקובץ מוחזר." };
+  try {
+    if (!(await pendingUploadOf(userId, documentId))) return { error: "הקובץ כבר טופל, או שאינו של המשתמש הזה." };
+    await dismissPdfUpload(actor, documentId, reason);
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  revalidatePath(`/app/users/${userId}`);
+  revalidatePath("/app/approvals");
+  return { ok: true };
 }

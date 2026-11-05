@@ -8,9 +8,11 @@ import {
   countSince,
   filterInbox,
   formatDuration,
+  isUnread,
   parseFilter,
   parseKey,
   proposeTask,
+  snippetAround,
   type InboxCall,
   type InboxChat,
   type PhoneOwner,
@@ -63,6 +65,63 @@ describe("buildInbox", () => {
   });
 });
 
+describe("team and read state (5.11.2026)", () => {
+  const owners = new Map<string, PhoneOwner>();
+  const teamOf = {
+    chat: (id: string) => (id === "a1@lid" ? "u-ariel" : id === "a2@lid" ? "u-hadas" : null),
+    call: (c: InboxCall) => (c.emailId === "e-h" ? "u-hadas" : null),
+  };
+
+  it("puts the owners of both numbers on a person's row, and filters by one of them", () => {
+    const rows = buildInbox(
+      [
+        chat({ id: "a1@lid", phone: A, lastMessageAt: "2026-11-01T07:00:00Z" }),
+        chat({ id: "a2@lid", phone: A, lastMessageAt: "2026-11-01T09:00:00Z" }),
+      ],
+      [call({ emailId: "e-h", other: B })],
+      owners,
+      teamOf,
+    );
+    const a = rows.find((r) => r.key === `p:${A}`)!;
+    expect(a.teamIds.sort()).toEqual(["u-ariel", "u-hadas"]);
+    expect(a.chatIds.sort()).toEqual(["a1@lid", "a2@lid"]);
+    expect(filterInbox(rows, "all", "", "u-ariel").map((r) => r.key)).toEqual([`p:${A}`]);
+    expect(filterInbox(rows, "all", "", "u-hadas").map((r) => r.key).sort()).toEqual([`p:${A}`, `p:${B}`].sort());
+    expect(filterInbox(rows, "all", "", null)).toHaveLength(2);
+  });
+
+  it("keeps a row unread when a chat was marked unread by hand (-1)", () => {
+    const rows = buildInbox(
+      [
+        chat({ id: "a1@lid", phone: A, unreadCount: -1, lastMessageAt: "2026-11-01T09:00:00Z" }),
+        chat({ id: "a2@lid", phone: A, unreadCount: 0, lastMessageAt: "2026-11-01T07:00:00Z" }),
+      ],
+      [],
+      owners,
+    );
+    expect(isUnread(rows[0])).toBe(true);
+    const counted = buildInbox(
+      [
+        chat({ id: "a1@lid", phone: A, unreadCount: -1, lastMessageAt: "2026-11-01T09:00:00Z" }),
+        chat({ id: "a2@lid", phone: A, unreadCount: 3, lastMessageAt: "2026-11-01T07:00:00Z" }),
+      ],
+      [],
+      owners,
+    );
+    expect(counted[0].unreadCount).toBe(3);
+    expect(isUnread({ unreadCount: 0 })).toBe(false);
+  });
+
+  it("cuts a message around the word that was searched for", () => {
+    const part = snippetAround("שלחתי לכם את חוזה השכירות החתום, תאשרו", "חוזה", 6);
+    expect(part.match).toBe("חוזה");
+    expect(part.before.endsWith("את ")).toBe(true);
+    expect(part.before.startsWith("…")).toBe(true);
+    expect(part.after.startsWith(" השכי")).toBe(true);
+    expect(snippetAround("בלי התאמה", "xyz").match).toBe("");
+  });
+});
+
 describe("filterInbox", () => {
   const owners = new Map<string, PhoneOwner>([[A, { personName: "דנה", clients: [{ id: "c1", name: "משרד לוי" }] }]]);
   const rows = buildInbox(
@@ -95,7 +154,7 @@ describe("keys and small helpers", () => {
     expect(formatDuration(378)).toBe("6:18");
   });
 
-  it("orders messages and calls in one timeline, newest first", () => {
+  it("orders messages and calls in one timeline, oldest first", () => {
     const t = buildTimeline(
       [
         { id: "m2", timestamp: "2026-11-01T09:00:00Z" },
@@ -103,7 +162,7 @@ describe("keys and small helpers", () => {
       ],
       [call({ emailId: "e1", callAt: "2026-11-01T08:00:00Z" })],
     );
-    expect(t.map((i) => i.id)).toEqual(["m2", "e1", "m1"]);
+    expect(t.map((i) => i.id)).toEqual(["m1", "e1", "m2"]);
     expect(countSince(t, (i) => i.at, new Date("2026-11-01T07:30:00Z"))).toBe(2);
   });
 

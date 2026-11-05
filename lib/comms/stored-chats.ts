@@ -137,6 +137,10 @@ export async function withLiveChats(
   const email = viewer.email.trim().toLowerCase();
   if (channel.excludedViewerIds.includes(viewer.id)) return stored;
   if (channel.ownerUserId !== viewer.id && !fullViewers.includes(email)) return stored;
+  // The stored list has no read state; WhatsApp's own (5.11.2026, "סמן
+  // כנקראה") comes from the live list.
+  const unread = new Map(live.map((c) => [c.id, c.unreadCount]));
+  stored = stored.map((c) => ({ ...c, unreadCount: unread.get(c.id) ?? c.unreadCount }));
   const blocks = await prisma.commsBlock.findMany({ where: { channelId: channel.id }, select: { kind: true, value: true, status: true } });
   const have = new Set(stored.map((c) => c.id));
   const extra = live.filter((c) => !have.has(c.id) && blockStateFor(blocks, { phone: phoneOf(c), chatId: c.id }) === "none");
@@ -147,3 +151,47 @@ export async function withLiveChats(
 function phoneOf(c: PocChat): string | null {
   return chatPhone(c);
 }
+
+export type MessageHit = { chatId: string; channelId: string; messageId: string; at: string; text: string; isSender: boolean; name: string };
+
+/// "חיפוש בתוך ההודעות" (5.11.2026, Ariel): the text of stored messages,
+/// newest first. Only in the conversations the caller already found this
+/// person may see (`visible`, chat ids from listStoredChats), and never a
+/// message held by a block request or deleted. Conversations read live
+/// from Unipile cannot be searched: Unipile has no text search for them.
+export async function searchStoredMessages(
+  channelIds: string[],
+  visible: Set<string>,
+  query: string,
+  take = 40,
+): Promise<MessageHit[]> {
+  const q = query.trim();
+  if (q.length < 2 || channelIds.length === 0 || visible.size === 0) return [];
+  const rows = await prisma.commsMessage.findMany({
+    where: {
+      held: false,
+      isDeleted: false,
+      text: { contains: q, mode: "insensitive" },
+      conversation: { channelId: { in: channelIds }, externalChatId: { in: [...visible] } },
+    },
+    orderBy: { at: "desc" },
+    take,
+    select: {
+      externalId: true,
+      at: true,
+      text: true,
+      isSender: true,
+      conversation: { select: { externalChatId: true, channelId: true, name: true } },
+    },
+  });
+  return rows.map((r) => ({
+    chatId: r.conversation.externalChatId,
+    channelId: r.conversation.channelId,
+    messageId: r.externalId,
+    at: r.at.toISOString(),
+    text: r.text,
+    isSender: r.isSender,
+    name: r.conversation.name,
+  }));
+}
+
