@@ -3,7 +3,7 @@ import type { CommsChannel, TranscriptStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { matchPhones } from "@/lib/whatsapp-poc/clients-by-phone";
 import type { PocChat, PocMessage } from "@/lib/whatsapp-poc/unipile";
-import { blockStateFor, canSeeConversation, parseViewerEmails } from "./visibility";
+import { blockStateFor, canSeeConversation, isExcludedViewer, parseViewerEmails } from "./visibility";
 import { chatPhone } from "@/lib/whatsapp-poc/inbox";
 
 // Stage 3: the communications screen reads a stored number's WhatsApp
@@ -135,7 +135,7 @@ export async function withLiveChats(
 ): Promise<PocChat[]> {
   const fullViewers = parseViewerEmails(process.env.COMMS_FULL_VIEWERS);
   const email = viewer.email.trim().toLowerCase();
-  if (channel.excludedViewerIds.includes(viewer.id)) return stored;
+  if (isExcludedViewer(channel, viewer.id)) return stored;
   if (channel.ownerUserId !== viewer.id && !fullViewers.includes(email)) return stored;
   // The stored list has no read state; WhatsApp's own (5.11.2026, "סמן
   // כנקראה") comes from the live list.

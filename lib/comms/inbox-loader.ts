@@ -14,6 +14,7 @@ import {
   type PocMessage,
 } from "@/lib/whatsapp-poc/unipile";
 import type { CommsAccess } from "./access";
+import { isExcludedViewer } from "./visibility";
 import { listStoredChats, listStoredMessages, withLiveChats, type StoredTranscript } from "./stored-chats";
 
 // The communications screen with several WhatsApp numbers (1.11.2026). Each
@@ -44,8 +45,8 @@ function unipile(accountId: string): Unipile | null {
   return apiKey ? { apiKey, accountId } : null;
 }
 
-function mayReadLive(channel: Pick<CommsChannel, "ownerUserId" | "excludedViewerIds">, user: Pick<User, "id">, access: CommsAccess) {
-  if (channel.excludedViewerIds.includes(user.id)) return false;
+function mayReadLive(channel: Pick<CommsChannel, "ownerUserId" | "excludedViewerIds" | "excludeAllViewers">, user: Pick<User, "id">, access: CommsAccess) {
+  if (isExcludedViewer(channel, user.id)) return false;
   return channel.ownerUserId === user.id || access.full;
 }
 

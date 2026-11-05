@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canReplyTo, checkMessageText, maskPhone } from "@/lib/whatsapp-poc/access";
-import { blockStateFor } from "@/lib/comms/visibility";
+import { blockStateFor, isExcludedViewer } from "@/lib/comms/visibility";
 import { chatPhone } from "@/lib/whatsapp-poc/inbox";
 import { commsAccess } from "@/lib/comms/access";
 import { UnipileError, getChat, readPocConfig, sendText, setReadStatus } from "@/lib/whatsapp-poc/unipile";
@@ -279,7 +279,7 @@ export async function markChatsReadAction(input: { chats: Array<{ chatId: string
         if (access.full && config.accountId && !connected) accountId = config.accountId;
       } else {
         const channel = await prisma.commsChannel.findUnique({ where: { id: numberKey } });
-        if (channel && !channel.excludedViewerIds.includes(user.id) && (channel.ownerUserId === user.id || access.full)) {
+        if (channel && !isExcludedViewer(channel, user.id) && (channel.ownerUserId === user.id || access.full)) {
           accountId = channel.accountId;
         }
       }
