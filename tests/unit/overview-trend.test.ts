@@ -96,6 +96,55 @@ describe("computeTrendWindows() - date ranges under each bar", () => {
   });
 });
 
+describe("computeTrendWindows() - month windows", () => {
+  it("builds 6 complete calendar months and this month so far, marked partial", () => {
+    // Friday 6.11.2026, Israel.
+    const { monthWindows } = computeTrendWindows(new Date("2026-11-06T09:00:00Z"));
+    expect(monthWindows).toHaveLength(7);
+    expect(monthWindows.map((w) => w.label)).toEqual([
+      "מאי",
+      "יוני",
+      "יולי",
+      "אוגוסט",
+      "ספטמבר",
+      "אוקטובר",
+      "נובמבר (החודש)",
+    ]);
+    expect(localDateKey(monthWindows[0].from)).toBe("2026-05-01");
+    expect(localDateKey(monthWindows[6].from)).toBe("2026-11-01");
+    expect(localDateKey(monthWindows[6].to)).toBe("2026-12-01");
+    expect(monthWindows[6].range).toBe("1.11 - 6.11");
+    expect(monthWindows[5].range).toBe("1.10 - 31.10");
+    expect(monthWindows[1].range).toBe("1.6 - 30.6");
+    expect(monthWindows.filter((w) => w.partial)).toHaveLength(1);
+    expect(monthWindows[6].partial).toBe(true);
+    // Contiguous: each month starts where the one before it ends.
+    for (let i = 1; i < 7; i++) expect(monthWindows[i].from.getTime()).toBe(monthWindows[i - 1].to.getTime());
+  });
+
+  it("crosses the year boundary", () => {
+    // 15.2.2027: the oldest month is August 2026.
+    const { monthWindows } = computeTrendWindows(new Date("2027-02-15T09:00:00Z"));
+    expect(localDateKey(monthWindows[0].from)).toBe("2026-08-01");
+    expect(monthWindows[4].label).toBe("דצמבר");
+    expect(monthWindows[5].label).toBe("ינואר");
+    expect(localDateKey(monthWindows[5].from)).toBe("2027-01-01");
+    expect(monthWindows[5].range).toBe("1.1 - 31.1");
+    expect(monthWindows[6].range).toBe("1.2 - 15.2");
+  });
+
+  it("shows a single date on the first of the month", () => {
+    const { monthWindows } = computeTrendWindows(new Date("2026-12-01T08:00:00Z"));
+    expect(monthWindows[6].range).toBe("1.12");
+    expect(monthWindows[5].range).toBe("1.11 - 30.11");
+  });
+
+  it("starts further back than the week windows, so one fetch covers both", () => {
+    const { weekWindows, monthWindows } = computeTrendWindows(new Date("2026-11-06T09:00:00Z"));
+    expect(monthWindows[0].from.getTime()).toBeLessThan(weekWindows[0].from.getTime());
+  });
+});
+
 describe("topLegend() / buildSeries() - every hour is on the chart", () => {
   const window = {
     from: new Date("2026-09-27T00:00:00Z"),
