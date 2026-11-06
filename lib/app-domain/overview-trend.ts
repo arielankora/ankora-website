@@ -11,7 +11,10 @@ import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 // fixed-length time series, both units precomputed together so the client
 // toggle never needs a network round trip) and no export/filter surface.
 
-export type TrendUnit = "day" | "week";
+/// "month" (6.11.2026, Ariel): the six complete calendar months before
+/// this one and this month so far, for the longer view that 7 weeks
+/// cannot give.
+export type TrendUnit = "day" | "week" | "month";
 // App redesign (design_handoff_ankora_app_redesign/README.md, screen 1
 // "בית"): "מתג פילוח: לפי עובד / לפי לקוח / לפי קטגוריה... זו יכולת
 // מחייבת - לא להחליף בגרף חד־צבעי." Added "category" alongside the
@@ -31,6 +34,7 @@ const OTHER_KEY = "__other__";
 const OTHER_LABEL = "אחר";
 
 const WEEKDAY_LABELS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+const MONTH_LABELS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
 
 export interface TrendSegment {
   /// Stable key so the client can assign the same color/legend slot to the
@@ -184,7 +188,11 @@ function shortDate(dateKey: string): string {
 /// caveat, as report-schedules.ts's `computeReportingPeriod` - see
 /// tests/unit/overview-trend.test.ts). Takes `now` as a parameter (instead
 /// of reading `new Date()` internally) specifically so tests can pin it.
-export function computeTrendWindows(now: Date): { dayWindows: TrendWindow[]; weekWindows: TrendWindow[] } {
+export function computeTrendWindows(now: Date): {
+  dayWindows: TrendWindow[];
+  weekWindows: TrendWindow[];
+  monthWindows: TrendWindow[];
+} {
   const todayKey = localDateKey(now);
 
   // --- Day windows: last 14 calendar days, including today-so-far. ---
@@ -228,12 +236,35 @@ export function computeTrendWindows(now: Date): { dayWindows: TrendWindow[]; wee
     };
   });
 
-  return { dayWindows, weekWindows };
+  // --- Month windows: the 6 complete calendar months before this one,
+  // and this month so far (marked partial, like this week). Each bar is
+  // labeled with the month's name and its dates underneath. ---
+  const [thisYear, thisMonth] = todayKey.split("-").map(Number);
+  const monthStartKey = (monthsAgo: number) =>
+    new Date(Date.UTC(thisYear, thisMonth - 1 - monthsAgo, 1)).toISOString().slice(0, 10);
+  const monthWindows = Array.from({ length: 7 }, (_, i) => {
+    const monthsAgo = 6 - i; // 6,5,4,3,2,1,0
+    const startKey = monthStartKey(monthsAgo);
+    const endKey = monthStartKey(monthsAgo - 1);
+    const isCurrent = monthsAgo === 0;
+    const lastDayKey = isCurrent ? todayKey : addDaysToDateKey(endKey, -1);
+    const monthIndex = Number(startKey.slice(5, 7)) - 1;
+    return {
+      from: localDateTimeToUtc(startKey, "00:00", TIMEZONE),
+      to: localDateTimeToUtc(endKey, "00:00", TIMEZONE),
+      label: isCurrent ? `${MONTH_LABELS[monthIndex]} (החודש)` : MONTH_LABELS[monthIndex],
+      range: startKey === lastDayKey ? shortDate(startKey) : `${shortDate(startKey)} - ${shortDate(lastDayKey)}`,
+      partial: isCurrent,
+    };
+  });
+
+  return { dayWindows, weekWindows, monthWindows };
 }
 
 export async function getHoursTrend(): Promise<HoursTrendData> {
-  const { dayWindows, weekWindows } = computeTrendWindows(new Date());
-  const overallFrom = weekWindows[0].from;
+  const { dayWindows, weekWindows, monthWindows } = computeTrendWindows(new Date());
+  // Six months back reaches further than seven weeks back, always.
+  const overallFrom = monthWindows[0].from;
   const overallTo = dayWindows[dayWindows.length - 1].to;
 
   type RawRow = {
@@ -280,12 +311,17 @@ export async function getHoursTrend(): Promise<HoursTrendData> {
     categoryName: e.category.name,
   }));
 
-  // Legend/ranking uses the full fetched window (superset of both unit
-  // ranges) so "who's in the top 5" reflects overall recent activity, not
-  // just whichever toggle happens to be selected.
-  const employeeLegend = topLegend(entries, "employee");
-  const clientLegend = topLegend(entries, "client");
-  const categoryLegend = topLegend(entries, "category");
+  // Legend/ranking uses the 7-week window (superset of the day range) so
+  // "who's in the top 5" reflects recent activity, not whichever toggle
+  // happens to be selected. The month view shares the same legend so a
+  // person keeps their color across all three units; anyone outside it
+  // in an older month is counted under "אחר". Ranking on all 7 months
+  // instead would let someone who stopped working in May push a current
+  // person out of the day and week views.
+  const recentEntries = entries.filter((e) => e.startAt >= weekWindows[0].from);
+  const employeeLegend = topLegend(recentEntries, "employee");
+  const clientLegend = topLegend(recentEntries, "client");
+  const categoryLegend = topLegend(recentEntries, "category");
 
   // Legend order comes from actual hours for both bases, so switching
   // between "בפועל" and "לחיוב" never reshuffles colors.
@@ -302,7 +338,15 @@ export async function getHoursTrend(): Promise<HoursTrendData> {
     >;
 
   return {
-    actual: { day: forUnit(dayWindows, "actual"), week: forUnit(weekWindows, "actual") },
-    billable: { day: forUnit(dayWindows, "billable"), week: forUnit(weekWindows, "billable") },
+    actual: {
+      day: forUnit(dayWindows, "actual"),
+      week: forUnit(weekWindows, "actual"),
+      month: forUnit(monthWindows, "actual"),
+    },
+    billable: {
+      day: forUnit(dayWindows, "billable"),
+      week: forUnit(weekWindows, "billable"),
+      month: forUnit(monthWindows, "billable"),
+    },
   };
 }

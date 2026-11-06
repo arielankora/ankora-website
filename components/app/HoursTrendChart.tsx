@@ -8,7 +8,7 @@ import type { HoursTrendData, TrendBasis, TrendDimension, TrendUnit } from "@/li
 /// Ariel: "מינימלי אדיטוריאלי" - thin rounded-top bars, a muted
 /// navy/slate palette (gold reserved for the "אחר" bucket only), and
 /// a plain text-chip legend under the chart rather than a busy built-in
-/// legend widget. Both unit x dimension combinations are precomputed
+/// legend widget. Every unit x dimension combination is precomputed
 /// server-side (see getHoursTrend) and passed in as `data`, so toggling
 /// here is instant local state - no client fetch, no loading flicker.
 ///
@@ -88,7 +88,11 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
         <div>
           <p className="text-sm text-app-text-secondary">
             {basis === "actual" ? "שעות בפועל" : "שעות לחיוב"} ·{" "}
-            {unit === "day" ? "14 הימים האחרונים" : "7 השבועות האחרונים, כולל השבוע"}
+            {unit === "day"
+              ? "14 הימים האחרונים"
+              : unit === "week"
+                ? "7 השבועות האחרונים, כולל השבוע"
+                : "7 החודשים האחרונים, כולל החודש"}
           </p>
           <p className="mt-1 text-3xl font-medium text-app-text-primary">
             {formatHours(grandTotal)} <span className="text-base font-normal text-app-text-tertiary">שעות</span>
@@ -109,6 +113,7 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
             options={[
               { value: "day", label: "ימים" },
               { value: "week", label: "שבועות" },
+              { value: "month", label: "חודשים" },
             ]}
           />
           <SegToggle
