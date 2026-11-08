@@ -12,6 +12,7 @@ import {
   deleteImportantDate,
   setHolidayCalendarSubscription,
   ConflictError,
+  openWorkTaskForImportantDate,
 } from "@/lib/app-domain/important-dates";
 import type { ImportantDateCategory, ImportantDateSensitivity, ImportantDateStatus, CalendarType, RecurrenceType } from "@prisma/client";
 
@@ -250,4 +251,18 @@ export async function toggleHolidayCalendarSubscriptionAction(
   await setHolidayCalendarSubscription(user, clientId, calendarKey, { enabled });
   revalidatePath(`/app/clients/${clientId}`);
   revalidatePath("/app/important-dates");
+}
+
+/// "התחלת עבודה" (8.11.2026): opens the task this date's work lives on,
+/// when it has none yet, and comes back to the date, where the card now
+/// offers "קדם עם קלוד" and the timer. See openWorkTaskForImportantDate.
+export async function startWorkOnImportantDateAction(formData: FormData) {
+  const user = await requireUser();
+  const id = String(formData.get("importantDateId") || "");
+  const from = String(formData.get("from") || "");
+  const { taskId } = await openWorkTaskForImportantDate(user, id);
+  revalidatePath(`/app/important-dates/${id}`);
+  revalidatePath(`/app/tasks/${taskId}`);
+  revalidatePath("/app/tasks");
+  redirect(`/app/important-dates/${id}${from ? `?from=${encodeURIComponent(from)}` : ""}`);
 }
