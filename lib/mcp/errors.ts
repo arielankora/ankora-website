@@ -76,7 +76,7 @@ const KNOWN: Record<string, McpToolError> = {
   },
   OverlapError: {
     message:
-      "The time range overlaps an existing entry for this user. Call list_my_time_entries for that day to see what is already recorded, then pick a range that does not collide.",
+      "The time range overlaps an existing entry for this user. Call list_my_time_entries for that day to see what is already recorded. If the other entry is for a different client, create_time_entry can record both in parallel: ask the user, and only if they agree call it again with confirmParallel: true. Two entries on the same client cannot overlap; ask the user which times they meant.",
     recoverable: true,
   },
   BackdateReasonRequiredError: {

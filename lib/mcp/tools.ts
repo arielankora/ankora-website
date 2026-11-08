@@ -157,6 +157,60 @@ function closedBankToolText(err: ClosedBankError): string {
   return lines.join(" ");
 }
 
+/// 8.11.2026: create_time_entry and time that overlaps another client.
+///
+/// The app's manual-entry form has let a person record time that overlaps
+/// an entry on a DIFFERENT client since Phase 12, once they confirm past
+/// the warning (resolveOverlapDecision in time-entry-overlap.ts), and
+/// start_timer has asked the same question since the parallel timers
+/// (5.10.2026). create_time_entry never passed the confirmation through,
+/// so through Claude every such entry was refused with no way forward.
+///
+/// Matched by name, not instanceof, for the reason lib/mcp/errors.ts gives.
+type OverlapLike = {
+  sameClient: boolean;
+  conflicting: {
+    startAt: Date | string;
+    endAt: Date | string | null;
+    client?: { name: string } | null;
+    category?: { name: string } | null;
+  };
+};
+
+function overlapOf(err: unknown): OverlapLike | null {
+  if (!(err instanceof Error) || err.name !== "OverlapError") return null;
+  const o = err as unknown as Partial<OverlapLike>;
+  if (typeof o.sameClient !== "boolean" || !o.conflicting) return null;
+  return o as OverlapLike;
+}
+
+function israelClock(at: Date | string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Jerusalem",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(at));
+}
+
+function overlapConflictFields(o: OverlapLike) {
+  return {
+    client: o.conflicting.client?.name ?? null,
+    category: o.conflicting.category?.name ?? null,
+    start: israelClock(o.conflicting.startAt),
+    end: o.conflicting.endAt ? israelClock(o.conflicting.endAt) : null,
+  };
+}
+
+function overlapToolText(o: OverlapLike, clientName: string): string {
+  const c = overlapConflictFields(o);
+  const range = c.end ? `${c.start}-${c.end}` : `${c.start} (a timer that is still running)`;
+  if (o.sameClient) {
+    return `Nothing was recorded. This time overlaps an entry the user already has for ${clientName} at ${range}, and one client cannot have two entries at the same time. Tell the user, and ask which times they meant. Do not retry with confirmParallel: it does not apply to the same client.`;
+  }
+  return `Nothing was recorded. This time overlaps an entry the user already has for ${c.client ?? "another client"} at ${range}. Recording both bills each client the full time, which Ankora allows once the user agrees, as in the app's manual-entry form. Ask the user whether to record it in parallel. Only if they agree, call create_time_entry again with the same values and confirmParallel: true.`;
+}
+
 function actorOf(ctx: ServerContext): User {
   const actor = actorFromAuthInfo(ctx.http?.authInfo);
   // A portal user on the staff connector gets pointed at their own one
@@ -688,7 +742,7 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Record time already spent",
       description:
-        "Creates a completed Ankora time entry for the signed-in employee - time they already spent, rather than a running timer. Times are the wall clock in Ankora's own timezone (Asia/Jerusalem), matching what the app's manual-entry form does. Calling this twice creates two entries, so confirm with the user before retrying. Entries more than a couple of days old need `backdateReason`. For time against a task the category can be left out: it comes from the task, or is chosen for a task that has none (and saved on it). Tell the user which category was recorded.",
+        "Creates a completed Ankora time entry for the signed-in employee - time they already spent, rather than a running timer. Times are the wall clock in Ankora's own timezone (Asia/Jerusalem), matching what the app's manual-entry form does. Calling this twice creates two entries, so confirm with the user before retrying. Entries more than a couple of days old need `backdateReason`. Time that overlaps an entry on another client is not recorded on the first call: Ankora says what it overlaps, and you must ask the user whether to record both in parallel (each client is billed the full time) and only then call again with confirmParallel: true. Two entries on the same client never overlap. For time against a task the category can be left out: it comes from the task, or is chosen for a task that has none (and saved on it). Tell the user which category was recorded.",
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it. Ankora matches it and says so if it is unrecognised or ambiguous."),
         category: z
@@ -724,6 +778,12 @@ export function registerAnkoraTools(server: McpServer): void {
           .describe(
             "Only for SUPER_ADMIN or ANKORA_ADMIN, and only after the user saw Ankora's warning about changing a closed hour bank and confirmed it: why the time must be recorded in the closed bank anyway. Recorded in the audit log."
           ),
+        confirmParallel: z
+          .boolean()
+          .optional()
+          .describe(
+            "Set to true only after Ankora refused the entry because it overlaps an entry on another client, and the user explicitly agreed to record both in parallel. Never set it on a first attempt. It never lets two entries on the same client overlap."
+          ),
       }),
       annotations: WRITES,
     },
@@ -739,6 +799,7 @@ export function registerAnkoraTools(server: McpServer): void {
         backdateReason?: string;
         intoOpenBank?: boolean;
         closedBankOverrideReason?: string;
+        confirmParallel?: boolean;
       },
       ctx: ServerContext
     ) => {
@@ -773,7 +834,7 @@ export function registerAnkoraTools(server: McpServer): void {
         const category = await resolveEntryCategory(actor, client.value.id, args.category, taskId ? { id: taskId } : null);
         if (!category.ok) return toolText(category.message);
 
-        const entry = await createManualEntry(actor, actor.id, {
+        const input = {
           clientId: client.value.id,
           categoryId: category.id,
           startAt,
@@ -781,12 +842,33 @@ export function registerAnkoraTools(server: McpServer): void {
           note: args.note ?? null,
           taskId,
           backdateReason: args.backdateReason ?? null,
-          createdVia: "MCP",
+          createdVia: "MCP" as const,
           intoOpenBank: !!args.intoOpenBank,
           closedBankOverride: args.closedBankOverrideReason?.trim() ? { reason: args.closedBankOverrideReason.trim() } : null,
-        });
+        };
+
+        // Always tried WITHOUT the override first, even when confirmParallel
+        // is already true. The domain's override is wider than this tool's
+        // promise: for a manager it also pushes a same-client overlap
+        // through (rule 4 in time-entry-overlap.ts). Here the user agreed to
+        // one specific thing, another client in parallel, so the override
+        // is used only once the refusal shows that is what the conflict is.
+        let entry: Awaited<ReturnType<typeof createManualEntry>>;
+        let parallelWith: ReturnType<typeof overlapConflictFields> | null = null;
+        try {
+          entry = await createManualEntry(actor, actor.id, { ...input, allowOverlapOverride: false });
+        } catch (err) {
+          const overlap = overlapOf(err);
+          if (!overlap) throw err;
+          if (overlap.sameClient || args.confirmParallel !== true) {
+            return toolText(overlapToolText(overlap, client.value.name));
+          }
+          entry = await createManualEntry(actor, actor.id, { ...input, allowOverlapOverride: true });
+          parallelWith = overlapConflictFields(overlap);
+        }
         return toolJson({
           created: true,
+          ...(parallelWith ? { parallel: true, parallelWith } : {}),
           ...(args.intoOpenBank && entry.startAt.getTime() !== startAt.getTime()
             ? { movedIntoOpenBank: true, note: entry.note }
             : {}),
