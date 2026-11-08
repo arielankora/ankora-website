@@ -896,6 +896,10 @@ export async function createTask(
     /// a description carrying the handover's "שלב: מיפוי וצפייה" line
     /// marks it, so a handover plan written as text still gets the check.
     mappingTask?: boolean;
+    /// 8.11.2026: the important date this task is the work of, opened by
+    /// "התחלת עבודה" on the date's page. Server only, like `subject`; the
+    /// occurrence key is null when this occurrence already had a task.
+    importantDate?: { id: string; occurrenceKey: string | null } | null;
   }
 ) {
   // permissions.ts requires every server-side entry point to assert, and
@@ -935,6 +939,8 @@ export async function createTask(
       clientTitle: input.clientTitle?.trim() || null,
       subjectUserId: input.subject?.userId ?? null,
       lifecycleKind: input.subject?.kind ?? null,
+      importantDateId: input.importantDate?.id ?? null,
+      importantDateOccurrenceKey: input.importantDate?.occurrenceKey ?? null,
       // Steps are checklist lines; only the task above them is filed.
       mappingTask: input.parentId ? false : (input.mappingTask ?? isMappingTask(input.description)),
     },

@@ -16,7 +16,12 @@ import { StatusBadge } from "@/components/app/StatusBadge";
 import { Drawer } from "@/components/app/Drawer";
 import { ImportantDateForm } from "../ImportantDateForm";
 import { ImportantDateStatusSelect } from "../ImportantDateStatusSelect";
-import { snoozeImportantDateAction, deleteImportantDateAction } from "../actions";
+import { snoozeImportantDateAction, deleteImportantDateAction, startWorkOnImportantDateAction } from "../actions";
+import Link from "next/link";
+import { AdvanceWithClaude } from "../../tasks/[id]/AdvanceWithClaude";
+import { getTaskDetail, TASK_STATUS_LABELS } from "@/lib/app-domain/tasks";
+import { getTaskPlans } from "@/lib/app-domain/task-plans";
+import { advancePromptFor } from "@/lib/app-domain/advance-prompt-input";
 import type { ImportantDateStatus } from "@prisma/client";
 import { lockedCalendarFor } from "@/lib/app-domain/date-calendars";
 import { calendarBackHref } from "@/lib/calendar-keys";
@@ -69,6 +74,20 @@ export default async function ImportantDateDetailPage(props: {
   // Decision 6: a date that starts a process is on the process's calendar.
   const lock = await lockedCalendarFor(date.processId);
   const calendarLine = lock ? calendarSourceLine(lock.code, lock.title, lock) : null;
+
+  // "התחלת עבודה" (8.11.2026): work with Claude and the timer live on a
+  // task, so the date shows them for its open task. The prompt is built
+  // here, while the page renders, for the same reason as on the task page:
+  // the copy has to happen inside the click.
+  const ownTasks = date.tasks.filter((t) => t.parentId === null && t.deletedAt === null);
+  const workTask =
+    ownTasks
+      .filter((t) => t.status !== "DONE" && t.status !== "ARCHIVED")
+      .sort((x, y) => (y.dueDate?.getTime() ?? 0) - (x.dueDate?.getTime() ?? 0) || y.createdAt.getTime() - x.createdAt.getTime())[0] ?? null;
+  const workDetail = workTask ? await getTaskDetail(user, workTask.id).catch(() => null) : null;
+  const workPlan = workDetail ? ((await getTaskPlans(user, workDetail.task.id))?.current ?? null) : null;
+  const workPrompt = workDetail ? await advancePromptFor(user, workDetail, workPlan, "plan") : null;
+  const fromParam = typeof rawFrom === "string" ? rawFrom : "";
 
   const clientIds = new Set(clients.map((c) => c.id));
   const categoriesForAutoTask = allCategories.filter(
@@ -220,13 +239,16 @@ export default async function ImportantDateDetailPage(props: {
               )}
             </div>
 
-            {date.tasks.length > 0 && (
+            {ownTasks.length > 0 && (
               <div className="rounded-2xl border border-app-border bg-white p-6">
-                <h2 className="text-sm font-medium text-app-text-primary">משימות שנוצרו אוטומטית</h2>
+                <h2 className="text-sm font-medium text-app-text-primary">משימות של המועד</h2>
                 <ul className="mt-3 space-y-1.5">
-                  {date.tasks.map((task) => (
-                    <li key={task.id} className="text-sm text-app-text-secondary">
-                      {task.title}
+                  {ownTasks.map((task) => (
+                    <li key={task.id} className="flex items-center justify-between gap-3 text-sm">
+                      <Link href={`/app/tasks/${task.id}`} className="text-app-text-primary underline-offset-4 hover:underline">
+                        {task.title}
+                      </Link>
+                      <span className="whitespace-nowrap text-xs text-app-text-tertiary">{TASK_STATUS_LABELS[task.status]}</span>
                     </li>
                   ))}
                 </ul>
@@ -235,6 +257,41 @@ export default async function ImportantDateDetailPage(props: {
           </div>
 
           <div className="space-y-6">
+            <div className="rounded-2xl border border-app-border bg-white p-6" data-testid="date-start-work">
+              <h2 className="text-sm font-medium text-app-text-primary">התחלת עבודה</h2>
+              {workTask ? (
+                <>
+                  <p className="mt-1 text-xs text-app-text-tertiary">
+                    העבודה מתנהלת במשימה{" "}
+                    <Link href={`/app/tasks/${workTask.id}`} className="text-app-text-secondary underline underline-offset-4">
+                      {workTask.title}
+                    </Link>
+                    . הטיימר ירוץ עליה.
+                  </p>
+                  <div className="mt-3">
+                    {workPrompt ? (
+                      <AdvanceWithClaude taskId={workTask.id} prompt={workPrompt} hasPlan={workPlan !== null} />
+                    ) : (
+                      <p className="text-xs text-app-text-secondary">
+                        {workDetail ? "בלי AI: המשימה הזו מטופלת בידי אדם בלבד." : "אין לך גישה למשימה הזו."}
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="mt-1 text-xs text-app-text-tertiary">פותח משימה למופע הזה, ומשם קדם עם קלוד והפעלת טיימר.</p>
+                  <form action={startWorkOnImportantDateAction} className="mt-3">
+                    <input type="hidden" name="importantDateId" value={date.id} />
+                    <input type="hidden" name="from" value={fromParam} />
+                    <button type="submit" className="inline-flex items-center rounded-full bg-app-accent px-4 py-2.5 text-sm font-medium text-app-text-primary">
+                      התחלת עבודה
+                    </button>
+                  </form>
+                </>
+              )}
+            </div>
+
             <div className="rounded-2xl border border-app-border bg-white p-6">
               <h2 className="text-sm font-medium text-app-text-primary">סטטוס</h2>
               <div className="mt-3">

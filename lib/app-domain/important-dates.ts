@@ -13,7 +13,15 @@ import {
   type DatePrecisionLike,
 } from "@/lib/app-domain/important-dates-recurrence";
 import { isBusinessCalendarKey } from "@/lib/business-calendar";
-import { DEFAULT_REMINDER_OFFSETS_BY_CATEGORY } from "@/lib/app-domain/important-dates-reminders";
+import {
+  DEFAULT_REMINDER_OFFSETS_BY_CATEGORY,
+  buildAutoTaskOccurrenceKey,
+  occurrenceKeyFor,
+} from "@/lib/app-domain/important-dates-reminders";
+import { openProcessRun } from "@/lib/app-domain/process-runs";
+import { autoTaskTitle } from "@/lib/date-receipt";
+import { createTask } from "@/lib/app-domain/tasks";
+import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { HOLIDAY_CATALOG, HOLIDAY_CALENDAR_LABELS, type HolidayCalendarKey } from "@/lib/app-domain/important-dates-holidays";
 import { seedHolidayOccurrences } from "@/lib/app-domain/important-dates-job";
 import type {
@@ -273,6 +281,67 @@ export async function getImportantDate(actor: User, id: string) {
     include: { client: true, responsibleUser: true, createdBy: true, reminderRules: true, tasks: true },
   });
   return canViewSensitiveDetails(actor, full) ? full : { ...full, notes: null };
+}
+
+/// "התחלת עבודה" on a date (8.11.2026). Work with Claude and the timer
+/// live on a task, so a date that has no open task gets one here, the
+/// same task the daily job would have opened for this occurrence: same
+/// title, assignee, category and due day, and a process run when the date
+/// starts an active process. An open task already linked to the date is
+/// returned as is, so pressing twice never makes two.
+export async function openWorkTaskForImportantDate(actor: User, id: string): Promise<{ taskId: string; created: boolean }> {
+  const date = await requireDate(id);
+  await assertClientAccess(actor, date.clientId);
+
+  const open = await prisma.task.findFirst({
+    where: { importantDateId: id, parentId: null, deletedAt: null, status: { notIn: ["DONE", "ARCHIVED"] } },
+    orderBy: [{ dueDate: "desc" }, { createdAt: "desc" }],
+    select: { id: true },
+  });
+  if (open) return { taskId: open.id, created: false };
+
+  const full = await prisma.importantDate.findUniqueOrThrow({ where: { id } });
+  const occurrence = full.nextOccurrenceAt;
+  const occurrenceKey = occurrence
+    ? buildAutoTaskOccurrenceKey(occurrenceKeyFor(full.recurrence, occurrence.getUTCFullYear(), localDateKey(occurrence, TIMEZONE)))
+    : null;
+
+  if (full.processId && occurrence) {
+    try {
+      const run = await openProcessRun({
+        processId: full.processId,
+        occurrence,
+        importantDateId: id,
+        occurrenceKey,
+        dateCalendar: full.businessCalendar,
+        fallbackAssigneeId: full.responsibleUserId,
+        fallbackCategoryId: full.autoTaskCategoryId,
+        actorId: actor.id,
+      });
+      if (run) return { taskId: run.id, created: true };
+    } catch {
+      // This occurrence already had a run, and it is closed. A plain task
+      // below lets the work start again.
+    }
+  }
+
+  const input = {
+    clientId: full.clientId,
+    categoryId: full.autoTaskCategoryId,
+    title: autoTaskTitle(full),
+    assignedToId: full.responsibleUserId,
+    dueDate: occurrence,
+  };
+  let task;
+  try {
+    task = await createTask(actor, { ...input, importantDate: { id, occurrenceKey } });
+  } catch (err) {
+    // The occurrence's task exists and is closed: the key is taken. A
+    // second task for the same occurrence carries no key.
+    if ((err as { code?: string })?.code !== "P2002") throw err;
+    task = await createTask(actor, { ...input, importantDate: { id, occurrenceKey: null } });
+  }
+  return { taskId: task.id, created: true };
 }
 
 export async function createImportantDate(actor: User, input: ImportantDateInput) {
