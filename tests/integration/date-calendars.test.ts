@@ -7,7 +7,7 @@ import { addProcess, linkProcessDates, updateProcess } from "@/lib/app-domain/pr
 import { updateImportantDate } from "@/lib/app-domain/important-dates";
 import { syncDateCalendars } from "@/lib/app-domain/date-calendars";
 import { mcpGetProcess } from "@/lib/app-domain/mcp-processes";
-import { addDaysToKey } from "@/lib/business-calendar";
+import { addDaysToKey, isBusinessDay } from "@/lib/business-calendar";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
 
 // Org-brain decision 6: a date that starts a process is on the process's
@@ -20,9 +20,18 @@ import { localDateKey, TIMEZONE } from "@/lib/timezone";
 const S1 = [{ code: "S1" }];
 
 /// A Friday more than a month away: a business day in the US, not in Israel.
+/// Skips a Friday that is a US holiday (25.12.2026 is one, and 9.11 to 15.11
+/// landed on it, so the weekly run of 9.11.2026 failed on the calendar, not
+/// on the code), and one whose Thursday is not a business day in Israel.
 function nextFriday(): { month: number; day: number; key: string } {
   let key = addDaysToKey(localDateKey(new Date(), TIMEZONE), 40);
-  while (new Date(`${key}T12:00:00Z`).getUTCDay() !== 5) key = addDaysToKey(key, 1);
+  while (
+    new Date(`${key}T12:00:00Z`).getUTCDay() !== 5 ||
+    !isBusinessDay(key, "US") ||
+    !isBusinessDay(addDaysToKey(key, -1), "IL")
+  ) {
+    key = addDaysToKey(key, 1);
+  }
   const [, m, d] = key.split("-").map(Number);
   return { month: m, day: d, key };
 }

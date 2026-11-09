@@ -62,7 +62,10 @@ describe("client entities", () => {
 
   it("refuses bad codes and a parent that would make a cycle", async () => {
     const { client, user } = await setup();
-    await expect(addClientEntity(user, { clientId: client.id, name: "X", country: "Israel", sources: S1 })).rejects.toThrow("קוד המדינה");
+    await expect(addClientEntity(user, { clientId: client.id, name: "X", country: "Atlantis", sources: S1 })).rejects.toThrow("קוד המדינה");
+    // A country or currency by name, as a questionnaire writes it, is stored as its code.
+    const named = await addClientEntity(user, { clientId: client.id, name: "Named", country: "ישראל", currency: "ש\"ח", sources: S1 });
+    expect([named.country, named.currency]).toEqual(["IL", "ILS"]);
     const a = await addClientEntity(user, { clientId: client.id, name: "A", sources: S1 });
     const b = await addClientEntity(user, { clientId: client.id, name: "B", parentId: a.id, sources: S1 });
     await expect(updateClientEntity(user, a.id, { parentId: b.id })).rejects.toThrow("מעגל");
