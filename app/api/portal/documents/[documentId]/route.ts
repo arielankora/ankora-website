@@ -4,6 +4,7 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { resolvePortalDocument } from "@/lib/app-domain/client-file";
 import { downloadFileFromDrive } from "@/lib/google-drive";
 import { attachmentDisposition } from "@/lib/http-headers";
+import { downloadFileName } from "@/lib/mcp/file-ticket";
 
 // Portal phase 3: the only way a document reaches a client.
 //
@@ -39,8 +40,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ doc
       "Content-Type": doc.mimeType,
       // RFC 6266 via the shared helper. This route already did the right
       // thing by hand; the helper adds the ASCII fallback and makes the
-      // rule enforceable (qa/checks/static.mjs).
-      "Content-Disposition": attachmentDisposition(doc.title),
+      // rule enforceable (qa/checks/static.mjs). The title is written for
+      // people and mostly has no extension, so downloadFileName adds the
+      // one the type implies; without it a PDF saved on a Mac does not open
+      // (9.11.2026, same rule as /api/documents and the MCP download).
+      "Content-Disposition": attachmentDisposition(downloadFileName(doc.title, doc.mimeType)),
       "Cache-Control": "private, no-store",
     },
   });
