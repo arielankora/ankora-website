@@ -6,6 +6,7 @@ import { saveTaskPlan } from "@/lib/app-domain/task-plans";
 import {
   VENDOR_DECIDED_MESSAGE,
   decideVendorCheck,
+  decidedVendorCheck,
   openOverdueVendorRuns,
   pendingVendorCheck,
 } from "@/lib/app-domain/vendor-detections";
@@ -106,6 +107,22 @@ describe("deciding", () => {
 
     await expect(decideVendorCheck(ops, check.detectionId, "NOT_A_VENDOR")).rejects.toThrow(VENDOR_DECIDED_MESSAGE);
     expect(await pendingVendorCheck(t.id)).toBeNull();
+  });
+
+  // 9.11.2026: answering a check already answered in the app reached the
+  // connector as an unexpected server error. decide_vendor_check now reads
+  // decidedVendorCheck first and says how it was closed.
+  it("describes a check that was already answered, and nothing while it waits", async () => {
+    const { internal, ops, product } = await setup();
+    const t = await createTask(ops, { clientId: internal.id, categoryId: product.id, title: "לחבר את Pipedrive" });
+    const check = (await pendingVendorCheck(t.id))!;
+    expect(await decidedVendorCheck(check.detectionId)).toBeNull();
+    expect(await decidedVendorCheck("no-such-id")).toBeNull();
+
+    await decideVendorCheck(ops, check.detectionId, "NOT_A_VENDOR");
+    const done = await decidedVendorCheck(check.detectionId);
+    expect(done).toMatchObject({ status: "NOT_A_VENDOR", vendor: "Pipedrive", decidedBy: ops.name, autoOpened: false, runUrl: null });
+    expect(done!.decidedAt).toBeInstanceOf(Date);
   });
 
   it("notes the same vendor on its run instead of opening a second", async () => {

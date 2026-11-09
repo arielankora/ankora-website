@@ -15,7 +15,7 @@ import { taskUrl } from "@/lib/mcp/serialize";
 import { clientDecisionUrl } from "@/lib/approval-links";
 import { appBaseUrl } from "@/lib/email-templates";
 import { PlanVersionConflictError, applyPlanSteps, getTaskPlans, saveTaskPlan, type TaskPlanRow } from "@/lib/app-domain/task-plans";
-import { decideVendorCheck } from "@/lib/app-domain/vendor-detections";
+import { VENDOR_NAME_REQUIRED_MESSAGE, decideVendorCheck, decidedVendorCheck } from "@/lib/app-domain/vendor-detections";
 import { VENDOR_CHECK_NEXT } from "@/lib/mcp/vendor-check";
 import { prisma } from "@/lib/prisma";
 import { AI_EXCLUDED_TOOL_MESSAGE } from "@/lib/ai-exclusion";
@@ -573,6 +573,25 @@ export function registerTaskExtraTools(server: McpServer): void {
         const row = await prisma.vendorDetection.findUnique({ where: { id: args.detectionId }, select: { sourceTaskId: true } });
         if (!row) return toolText("No vendor check with that id. Use the detectionId exactly as the tool returned it.");
         if ((await aiExcludedTaskIds([row.sourceTaskId])).size > 0) return toolText(AI_EXCLUDED_TOOL_MESSAGE);
+        // Already answered (in the app, by someone else, or by the daily
+        // job): say so, rather than letting decideVendorCheck throw into
+        // the "unexpected server error" fallback.
+        const already = await decidedVendorCheck(args.detectionId);
+        if (already) {
+          return toolJson({
+            decided: false,
+            alreadyDecided: true,
+            status: already.status,
+            vendor: already.vendor,
+            decidedBy: already.decidedBy ?? (already.autoOpened ? "opened automatically: nobody answered for a business day" : null),
+            decidedAt: already.decidedAt ? localDateKey(already.decidedAt, actor.timezone) : null,
+            runUrl: already.runUrl,
+            next:
+              already.status === "NOT_A_VENDOR"
+                ? "This check was already closed as not a new vendor. Nothing more to do; tell the user in one line. Do not call again."
+                : "This check was already answered and a P8 run is linked to it. Tell the user, give runUrl, and if it should not have been opened, say so: closing that run is the user's decision. Do not call again.",
+          });
+        }
         const out = await decideVendorCheck(actor, args.detectionId, args.decision, args.vendor ?? null);
         return toolJson({
           decided: true,
@@ -587,6 +606,9 @@ export function registerTaskExtraTools(server: McpServer): void {
                 : "Recorded as not a new vendor. Nothing was opened.",
         });
       } catch (err) {
+        if (err instanceof Error && err.message === VENDOR_NAME_REQUIRED_MESSAGE) {
+          return toolText("The check named no vendor, so a P8 run cannot be opened without one. Ask the user for the vendor's name and call again with `vendor`.");
+        }
         console.error("[mcp] decide_vendor_check failed", err);
         return toolFailure(err);
       }

@@ -156,6 +156,28 @@ describe("open tasks an approved process covers", () => {
     expect(await coveredTasksForClient(anna, client.id)).toEqual([]);
     await expect(closeTaskCoveredByProcess(ariel, old.id, p.id)).rejects.toThrow("כבר לא פתוחה");
   });
+
+  // 9.11.2026: the task that proposed P22 was offered for closing as
+  // covered by it. The task a process was proposed from is the work of
+  // making it, so it is left out; another task with the same words is not.
+  it("leave out the task the process was proposed from", async () => {
+    const { client, anna, ariel } = await setup();
+    const origin = await prisma.task.create({ data: { clientId: client.id, title: "מעקב חופשות ושינויים בהעסקה", status: "IN_PROGRESS", assignedToId: anna.id } });
+    const old = await prisma.task.create({ data: { clientId: client.id, title: "מעקב חופשות, Leave ושינויים בהעסקה", status: "OPEN" } });
+    const r = await proposeKnowledge(anna, {
+      clientId: client.id,
+      source: { kind: "TASK", title: "משימה: מעקב חופשות", externalIds: [origin.id] },
+      items: [{ target: "PROCESS", reason: "נבנה במשימה", payload: { title: "מעקב חופשות, מחלות ושינויים בהעסקה ודיווח חודשי לשכר", triggerKinds: ["ON_DEMAND"], knowledgeStatus: "CONFIRMED" } }],
+    });
+    const [batch] = (await listOpenBatches(ariel)).filter((x) => x.id === r.batchId);
+    const processId = (await approveProposal(ariel, batch.proposals[0].id)).resultId!;
+    await prisma.process.update({ where: { id: processId }, data: { status: "ACTIVE" } });
+
+    const covered = await coveredTasksForClient(anna, client.id);
+    expect(covered.map((c) => [c.process.id, c.task.id])).toEqual([[processId, old.id]]);
+    await expect(closeTaskCoveredByProcess(ariel, origin.id, processId)).rejects.toThrow("הוצע מהמשימה הזו");
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: origin.id } })).status).toBe("IN_PROGRESS");
+  });
 });
 
 describe("a task from a proposal says what to do, by when, under what", () => {

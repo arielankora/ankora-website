@@ -206,6 +206,35 @@ export const VENDOR_DECIDED_MESSAGE = "כבר הוחלט על הזיהוי הז�
 export const VENDOR_NAME_REQUIRED_MESSAGE = "כדי לפתוח ריצת P8 צריך את שם הספק.";
 export const NO_P8_MESSAGE = "לא נמצא תהליך P8 בתיק הפנימי, או שאין לו נוהל מאושר.";
 
+/// How a check that is no longer pending was decided, or null while it
+/// still waits (or does not exist). 9.11.2026: decide_vendor_check on a
+/// check someone had already answered in the app threw
+/// VENDOR_DECIDED_MESSAGE, and the connector reported it as an unexpected
+/// server error, twice (3.11 and 9.11) on the same check. The tool now
+/// reads this first and says the check is already closed, and how.
+export async function decidedVendorCheck(detectionId: string): Promise<{
+  status: Exclude<VendorDetection["status"], "PENDING">;
+  vendor: string | null;
+  decidedAt: Date | null;
+  decidedBy: string | null;
+  autoOpened: boolean;
+  runUrl: string | null;
+} | null> {
+  const row = await prisma.vendorDetection.findUnique({
+    where: { id: detectionId },
+    select: { status: true, vendorName: true, decidedAt: true, autoOpened: true, runTaskId: true, decidedBy: { select: { name: true } } },
+  });
+  if (!row || row.status === "PENDING") return null;
+  return {
+    status: row.status,
+    vendor: row.vendorName,
+    decidedAt: row.decidedAt,
+    decidedBy: row.decidedBy?.name ?? null,
+    autoOpened: row.autoOpened,
+    runUrl: row.runTaskId ? `${appBaseUrl()}/app/tasks/${row.runTaskId}` : null,
+  };
+}
+
 async function openRunFor(detection: VendorDetection, vendor: string, actorId: string | null) {
   const p8 = await p8Process();
   if (!p8) throw new Error(NO_P8_MESSAGE);
