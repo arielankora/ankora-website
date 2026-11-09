@@ -5,6 +5,7 @@ import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canSeeKnowledgeItem, type FieldStatusMap } from "@/lib/knowledge";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
+import { toCountryCode, toCurrencyCode } from "@/lib/iso-codes";
 import { assertResolvable, knowledgeData, sourcedFields, type KnowledgeInput } from "@/lib/app-domain/knowledge-items";
 import type { User } from "@prisma/client";
 
@@ -77,8 +78,8 @@ function entityData(input: Partial<ClientEntityInput>) {
     name: has("name") ? clean(input.name) ?? undefined : undefined,
     legalName: has("legalName") ? value("legalName", clean(input.legalName)) : undefined,
     registrationNumber: has("registrationNumber") ? value("registrationNumber", clean(input.registrationNumber)) : undefined,
-    country: has("country") ? value("country", code(input.country, 2, "קוד המדינה")) : undefined,
-    currency: has("currency") ? value("currency", code(input.currency, 3, "קוד המטבע")) : undefined,
+    country: has("country") ? value("country", code(toCountryCode(input.country), 2, "קוד המדינה")) : undefined,
+    currency: has("currency") ? value("currency", code(toCurrencyCode(input.currency), 3, "קוד המטבע")) : undefined,
     billingAddress: has("billingAddress") ? value("billingAddress", clean(input.billingAddress)) : undefined,
   };
 }
