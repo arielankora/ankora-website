@@ -98,6 +98,11 @@ erDiagram
         string conversationsDocId "nullable, the running conversations document"
         bool aiExcluded "nothing of this client passes through AI: its tasks, documents and file"
         bool procedureApprovalSeparation "whoever wrote a version of a procedure does not approve it, default false"
+        SubprocessorNotice subprocessorNotice "the commitment to notify the client of a new sub-processor, default UNCHECKED"
+        string subprocessorNoticeSource "nullable, where the answer came from"
+        string subprocessorNoticeDocumentId FK "nullable, the document that holds the commitment"
+        datetime subprocessorNoticeCheckedAt "nullable"
+        string subprocessorNoticeCheckedById FK "nullable"
         datetime deletedAt
     }
 
@@ -223,6 +228,8 @@ erDiagram
         datetime triggeredAt
         int value
         datetime resolvedAt "nullable, set once back under threshold"
+        AlertCloseKind closeKind "nullable, how it was closed: MANUAL, BELOW_THRESHOLD, NEW_CYCLE, HOURS_LOADED or SUPERSEDED"
+        string closeReason "nullable"
     }
 
     EmailDelivery {
@@ -296,7 +303,7 @@ erDiagram
         CalendarType calendarType "GREGORIAN or HEBREW"
         int month
         int day
-        RecurrenceType recurrence
+        RecurrenceType recurrence "ONCE, ANNUAL, MONTHLY, CUSTOM_INTERVAL, WEEKLY or BUSINESS_DAILY"
         string responsibleUserId FK
         ImportantDateStatus status
         ImportantDateSensitivity sensitivity
@@ -539,6 +546,31 @@ erDiagram
 erDiagram
     Decision ||--o{ DecisionOption : "has"
     DecisionOption ||--o{ DecisionResponse : "has"
+
+    TaskPortalNote {
+        string id PK
+        string taskId FK
+        string body "one line the client sees in the portal for this task, not the internal thread"
+        string createdById "nullable, plain id of a User"
+        datetime createdAt
+        datetime deletedAt "nullable"
+    }
+
+    VendorDetection {
+        string id PK
+        string sourceTaskId FK "unique, the task that mentioned the vendor"
+        string clientId "plain id of a Client"
+        string vendorName "nullable"
+        string vendorSlug "nullable"
+        string matched "the text that matched"
+        VendorDetectionStatus status "default PENDING"
+        string runTaskId FK "nullable, the sub-processor run opened for it"
+        boolean autoOpened "the run was opened by the server, not by a person"
+        string decidedById FK "nullable"
+        datetime decidedAt "nullable"
+        datetime createdAt
+        datetime updatedAt
+    }
 
     TaskComment {
         string id PK
@@ -977,6 +1009,7 @@ erDiagram
         datetime decidedAt "nullable"
         string rejectReason "nullable"
         boolean edited
+        string_array editedFields "which fields the reviewer changed before approving"
         string confidence "nullable, HIGH / MEDIUM / LOW, as Claude reported it"
         boolean attached "it was already in the file, so approving only added its sources"
         string resultId "nullable"
@@ -1202,6 +1235,7 @@ erDiagram
         int version
         string status "enum ProcessVersionStatus"
         json steps
+        json flow "nullable, the procedure as a flow with conditions and branches, steps is derived from it on every save"
         string highlights "nullable"
         string outputs "nullable"
         string changeNote "nullable"
@@ -1320,10 +1354,12 @@ erDiagram
 | `AgreementChannel` | `APP`, `EMAIL_PDF` |
 | `AgreementKind` | `CONFIDENTIALITY`, `DELETION_DECLARATION` |
 | `AgreementLinkPurpose` | `APP_SIGN`, `PDF_UPLOAD` |
+| `AlertCloseKind` | `MANUAL`, `BELOW_THRESHOLD`, `NEW_CYCLE`, `HOURS_LOADED`, `SUPERSEDED` |
 | `BillingCycle` | `MONTHLY`, `ANNUAL`, `OTHER` |
 | `ClientDocumentKind` | `POLICY`, `PROCEDURE`, `CERTIFICATE`, `CONTRACT`, `INVOICE`, `OTHER` |
 | `ClientDomainKind` | `CLIENT`, `PARTNER` |
 | `ClientKind` | `BUSINESS`, `PRIVATE` |
+| `ConnectionKind` | `GOOGLE_OAUTH`, `MAIL_APP_PASSWORD`, `MANAGER_SEND` |
 | `ContactRelationship` | `CLIENT_STAFF`, `PROVIDER`, `ADVISOR`, `INVESTOR`, `SUPPLIER`, `ANKORA` |
 | `DatePrecision` | `EXACT`, `APPROXIMATE`, `UNKNOWN` |
 | `DecisionStatus` | `OPEN`, `ANSWERED`, `CANCELLED` |
@@ -1363,11 +1399,13 @@ erDiagram
 | `StrangerAskWho` | `ANKORA`, `CLIENT` |
 | `StrangerQuestionStatus` | `OPEN`, `ANSWERED`, `NOT_RELEVANT`, `REPLACED` |
 | `StrangerSeverity` | `BLOCKER`, `SLOWS`, `IMPROVES` |
+| `SubprocessorNotice` | `UNCHECKED`, `COMMITTED`, `NOT_COMMITTED` |
 | `SupplierExperience` | `GOOD`, `OK`, `AVOID` |
 | `SystemAccessStatus` | `HAS_ACCESS`, `PENDING`, `NO_ACCESS`, `NOT_NEEDED` |
 | `SystemPermission` | `NONE`, `VIEWER`, `USER`, `BILLING`, `ADMIN`, `OWNER` |
 | `TaskBlocker` | `CLIENT`, `SUPPLIER`, `INTERNAL`, `OTHER` |
 | `TaskPriority` | `LOW`, `NORMAL`, `HIGH`, `URGENT` |
+| `VendorDetectionStatus` | `PENDING`, `OPENED`, `NOT_A_VENDOR`, `EXISTING` |
 
 ### Communications: call recordings, transcripts and WhatsApp (November 2026)
 
@@ -1428,6 +1466,7 @@ erDiagram
         string phone "nullable"
         string ownerUserId FK
         string excludedViewerIds "string[], never see this number"
+        boolean excludeAllViewers "nobody but the owner sees this number, also people added later"
         boolean storeEnabled
         datetime storeStartedAt "nullable"
         datetime createdAt
@@ -1444,6 +1483,7 @@ erDiagram
         datetime lastMessageAt "nullable"
         string groupClientId "nullable, plain id of a Client"
         datetime backfilledAt "nullable"
+        datetime reviewedAt "nullable, an owner or manager decided to keep this new conversation"
         datetime createdAt
         datetime updatedAt
     }
@@ -1501,6 +1541,31 @@ A `Transcript` belongs to exactly one of `recordingId` and `attachmentId`;
 this is an application-level invariant, not a database constraint.
 `CommsConversation.groupClientId`, `CommsBlock.requestedById` and
 `CommsBlock.decidedById` are plain string columns, not formal foreign keys.
+
+### Client connections (November 2026)
+
+The accounts a client has connected so Ankora can act in them (Google through OAuth, a mail account through an app password, or a manager sending on the client's behalf), managed from `/app/clients/[clientId]/connections`. The secret itself lives in the credentials vault (`credentialId`), not in this table.
+
+```mermaid
+erDiagram
+    Client ||--o{ ClientConnection : "has"
+
+    ClientConnection {
+        string id PK
+        string clientId FK
+        ConnectionKind kind "GOOGLE_OAUTH, MAIL_APP_PASSWORD or MANAGER_SEND"
+        string account "the connected address"
+        string_array scopes
+        string credentialId UK "nullable, the vault entry that holds the secret"
+        string ownerUserId "nullable, plain id of a User"
+        string consentText "nullable, what the client agreed to"
+        string connectedById "plain id of a User"
+        datetime connectedAt
+        datetime lastUsedAt "nullable"
+        datetime revokedAt "nullable"
+        string revokedById "nullable"
+    }
+```
 
 ## Notes on relationships not enforced by a Prisma `@relation`
 
