@@ -291,6 +291,70 @@ describe("create_time_entry", () => {
     expect(domain.createManualEntry).not.toHaveBeenCalled();
   });
 
+  // 8.11.2026: time that overlaps another client, as the manual-entry form
+  // has allowed since Phase 12. The domain decides the rule; what is under
+  // test is that the tool asks first and never widens what the user agreed to.
+  function overlapError(sameClient: boolean) {
+    return Object.assign(new Error("This time range overlaps an existing entry."), {
+      name: "OverlapError",
+      sameClient,
+      conflicting: {
+        startAt: new Date("2026-09-20T05:59:00Z"),
+        endAt: new Date("2026-09-20T07:51:00Z"),
+        client: { name: sameClient ? "Globex" : "Initech" },
+        category: { name: "Support" },
+      },
+    });
+  }
+
+  it("asks before recording time that overlaps another client, and writes nothing", async () => {
+    domain.createManualEntry.mockRejectedValueOnce(overlapError(false));
+
+    const out = payload(await tools.get("create_time_entry")!.handler(ARGS, CTX));
+
+    expect(domain.createManualEntry).toHaveBeenCalledTimes(1);
+    expect(domain.createManualEntry.mock.calls[0][2]).toMatchObject({ allowOverlapOverride: false });
+    expect(out.text).toContain("Initech");
+    expect(out.text).toContain("08:59-10:51");
+    expect(out.text).toContain("confirmParallel: true");
+  });
+
+  it("records it in parallel once the user agreed", async () => {
+    domain.createManualEntry.mockRejectedValueOnce(overlapError(false));
+
+    const out = payload(
+      await tools.get("create_time_entry")!.handler({ ...ARGS, confirmParallel: true }, CTX),
+    );
+
+    expect(domain.createManualEntry).toHaveBeenCalledTimes(2);
+    expect(domain.createManualEntry.mock.calls[1][2]).toMatchObject({ allowOverlapOverride: true, createdVia: "MCP" });
+    expect(out.created).toBe(true);
+    expect(out.parallel).toBe(true);
+    expect(out.parallelWith).toMatchObject({ client: "Initech", start: "08:59", end: "10:51" });
+  });
+
+  it("never overrides a same-client overlap, even with confirmParallel", async () => {
+    domain.createManualEntry.mockRejectedValueOnce(overlapError(true));
+
+    const out = payload(
+      await tools.get("create_time_entry")!.handler({ ...ARGS, confirmParallel: true }, CTX),
+    );
+
+    expect(domain.createManualEntry).toHaveBeenCalledTimes(1);
+    expect(out.text).toContain("Do not retry with confirmParallel");
+  });
+
+  it("tries without the override first even when confirmParallel is already set", async () => {
+    const out = payload(
+      await tools.get("create_time_entry")!.handler({ ...ARGS, confirmParallel: true }, CTX),
+    );
+
+    expect(domain.createManualEntry).toHaveBeenCalledTimes(1);
+    expect(domain.createManualEntry.mock.calls[0][2]).toMatchObject({ allowOverlapOverride: false });
+    expect(out.created).toBe(true);
+    expect(out.parallel).toBeUndefined();
+  });
+
   it("requires a date and a clock shape the model cannot improvise around", () => {
     const schema = tools.get("create_time_entry")!.config.inputSchema as {
       safeParse: (v: unknown) => { success: boolean };
