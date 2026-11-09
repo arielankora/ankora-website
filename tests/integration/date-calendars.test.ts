@@ -19,14 +19,19 @@ import { localDateKey, TIMEZONE } from "@/lib/timezone";
 
 const S1 = [{ code: "S1" }];
 
-/// A Friday more than a month away: a business day in the US, not in Israel,
-/// whose Thursday is a business day in Israel. Holidays are skipped: run on
-/// 9.11.2026, the first Friday 40 days out was 25.12, Christmas, which the
-/// US calendar rolls back to the Thursday.
+/// A Friday more than a month away: a business day in the US, not in Israel.
+/// Skips a Friday that is a US holiday (25.12.2026 is one, and 9.11 to 15.11
+/// landed on it, so the weekly run of 9.11.2026 failed on the calendar, not
+/// on the code), and one whose Thursday is not a business day in Israel.
 function nextFriday(): { month: number; day: number; key: string } {
   let key = addDaysToKey(localDateKey(new Date(), TIMEZONE), 40);
-  const fits = (k: string) => new Date(`${k}T12:00:00Z`).getUTCDay() === 5 && isBusinessDay(k, "US") && isBusinessDay(addDaysToKey(k, -1), "IL");
-  while (!fits(key)) key = addDaysToKey(key, 1);
+  while (
+    new Date(`${key}T12:00:00Z`).getUTCDay() !== 5 ||
+    !isBusinessDay(key, "US") ||
+    !isBusinessDay(addDaysToKey(key, -1), "IL")
+  ) {
+    key = addDaysToKey(key, 1);
+  }
   const [, m, d] = key.split("-").map(Number);
   return { month: m, day: d, key };
 }
