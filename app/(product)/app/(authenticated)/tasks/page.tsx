@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { OPEN_STATUSES, listTasks, supervisionCounts } from "@/lib/app-domain/tasks";
@@ -14,6 +15,8 @@ import { TaskRow } from "./TaskRow";
 import { TaskFilters } from "./TaskFilters";
 import { TaskListProvider, type ListRow } from "./TaskListProvider";
 import { TaskListView } from "./TaskListView";
+import { TasksViewSwitch } from "./TasksViewSwitch";
+import { TASKS_VIEW_COOKIE, resolveTasksView } from "@/lib/tasks-view";
 import { listQueryOf } from "./list-query";
 import { MINE_OPTIONS, mineFilters, mineParam, parseMineScope, type MineScope } from "./mine-scope";
 import { ListChecks } from "lucide-react";
@@ -137,7 +140,11 @@ export default async function TasksPage(props: {
   /// board that could not be narrowed to one client would be a wall of
   /// cards, and a second route would mean two places to keep the filter
   /// bar working.
-  const board = searchParams.view === "board";
+  ///
+  /// The default since 10.11.2026, with the last choice remembered: see
+  /// lib/tasks-view.ts.
+  const view = resolveTasksView(searchParams.view, (await cookies()).get(TASKS_VIEW_COOKIE)?.value);
+  const board = view === "board";
 
   // A status filter on the board would empty three of its four columns,
   // which is not a filtered board, it is a broken one. The pills are
@@ -219,8 +226,10 @@ export default async function TasksPage(props: {
     // not silently throw away what somebody searched for.
     if (q) params.set("q", q);
     if (next.group ?? grouped) params.set("group", "client");
-    const nextView = next.view ?? (board ? "board" : "list");
-    if (nextView === "board") params.set("view", "board");
+    // Always said, never left to the default: a pill or toggle on the
+    // list must keep showing the list even for someone whose remembered
+    // choice is the board.
+    params.set("view", next.view ?? view);
     const query = params.toString();
     return query ? `/app/tasks?${query}` : "/app/tasks";
   }
@@ -283,24 +292,7 @@ export default async function TasksPage(props: {
               the grouping toggle are not hidden to simplify the screen,
               they are hidden because the board already answers both
               questions: its columns ARE the statuses. */}
-            <div className="flex rounded-full border border-app-border bg-white p-[3px]">
-              {[
-                { href: listHref, label: "רשימה", active: !board },
-                { href: boardHref, label: "לוח", active: board },
-              ].map((view) => (
-                <Link
-                  key={view.label}
-                  href={view.href}
-                  className={`rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
-                    view.active
-                      ? "bg-app-surface-nav text-cream"
-                      : "text-app-text-secondary hover:text-app-text-primary"
-                  }`}
-                >
-                  {view.label}
-                </Link>
-              ))}
-            </div>
+            <TasksViewSwitch current={view} listHref={listHref} boardHref={boardHref} />
 
             {/* Scrolls sideways on a phone rather than running off the
               edge: five pills are wider than a 360px screen, and before

@@ -317,7 +317,7 @@ test.describe("tasks/actions - create and complete", () => {
 
     // mine=0: the task this creates has no assignee, and "שלי" is on by
     // default since 26.9.2026.
-    await page.goto("/app/tasks?mine=0");
+    await page.goto("/app/tasks?mine=0&view=list");
     // On a desk the create-task entry point is the top bar's "משימה
     // חדשה" (26.9.2026); the in-page button is for phones only.
     await page.getByRole("link", { name: "משימה חדשה" }).click();
@@ -365,7 +365,7 @@ test.describe("tasks/actions - create and complete", () => {
     }, "the task is still open after marking it done").toPass({ timeout: 15_000 });
     expect((await closed).status(), "marking done was not accepted").toBe(200);
 
-    await page.goto("/app/tasks?status=DONE&mine=0");
+    await page.goto("/app/tasks?status=DONE&mine=0&view=list");
     const doneRow = page.locator("[data-task]").filter({ hasText: title });
     await expect(doneRow, "marking the task done did not stick").toBeVisible({ timeout: 15_000 });
     await expect(doneRow.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");

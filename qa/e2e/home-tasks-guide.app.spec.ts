@@ -44,7 +44,7 @@ test("\"משימה חדשה\" in the top bar opens the new task form from any sc
 });
 
 test("a finished task is not struck through", async ({ page }) => {
-  await page.goto("/app/tasks?status=DONE&mine=0&closed=all", { waitUntil: "domcontentloaded" });
+  await page.goto("/app/tasks?status=DONE&mine=0&closed=all&view=list", { waitUntil: "domcontentloaded" });
   const titles = page.locator('[data-task] [data-cell="title"] a');
   if ((await titles.count()) === 0) test.skip(true, "no finished task in this database");
   const decoration = await titles.first().evaluate((el) => getComputedStyle(el).textDecorationLine);
@@ -52,7 +52,7 @@ test("a finished task is not struck through", async ({ page }) => {
 });
 
 test("\"הושלמו\" shows the last thirty days and says how to see the rest", async ({ page }) => {
-  await page.goto("/app/tasks?status=DONE&mine=0", { waitUntil: "domcontentloaded" });
+  await page.goto("/app/tasks?status=DONE&mine=0&view=list", { waitUntil: "domcontentloaded" });
   const note = page.getByText(/מוצגות משימות שהושלמו ב-30 הימים האחרונים/);
   await expect(note).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("link", { name: "להצגת כל ההיסטוריה" })).toHaveAttribute("href", /closed=all/);

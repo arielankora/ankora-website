@@ -48,7 +48,7 @@ test("the timer and the week are one screen, and the week stays on its tab", asy
 });
 
 test("a task opened from a narrowed list says which list it returns to", async ({ page }) => {
-  const list = "/app/tasks?mine=0&q=%D7%95%D7%A2%D7%93";
+  const list = "/app/tasks?mine=0&q=%D7%95%D7%A2%D7%93&view=list";
   await page.goto(list, { waitUntil: "domcontentloaded" });
   await page.getByRole("link", { name: /תיאום מול ועד הבית/ }).first().click();
   const back = page.getByTestId("task-back");

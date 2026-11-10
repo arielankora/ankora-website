@@ -53,7 +53,7 @@ test("the home screen says what is on this person", async ({ page }) => {
 test("the tasks screen opens on this person's active work, and can show everyone's", async ({ page }) => {
   // Ariel, 26.9.2026: "שלי" is on by default, and the first pill is
   // "פעילות" (open, in progress and waiting for approval).
-  await page.goto(TASKS, { waitUntil: "domcontentloaded" });
+  await page.goto(`${TASKS}?view=list`, { waitUntil: "domcontentloaded" });
   await expect(page.getByText(MY_PROMISE).first()).toBeVisible({ timeout: 30_000 });
 
   // Asserted on where the controls POINT rather than by clicking through
@@ -64,35 +64,35 @@ test("the tasks screen opens on this person's active work, and can show everyone
   // on its own, and everyone's work.
   const scope = page.getByTestId("mine-scope");
   await expect(scope.getByRole("link", { name: "שלי", exact: true })).toHaveAttribute("aria-current", "true");
-  await expect(scope.getByRole("link", { name: "לביצוע", exact: true })).toHaveAttribute("href", "/app/tasks?mine=assigned");
+  await expect(scope.getByRole("link", { name: "לביצוע", exact: true })).toHaveAttribute("href", "/app/tasks?mine=assigned&view=list");
   await expect(// Not exact: with work waiting on this person the link also reads
   // its count ("בפיקוח, 2 ממתינות לאישורך").
-  scope.getByRole("link", { name: /^בפיקוח/ })).toHaveAttribute("href", "/app/tasks?mine=supervising");
-  await expect(scope.getByRole("link", { name: "כולם", exact: true })).toHaveAttribute("href", "/app/tasks?mine=0");
-  await expect(page.getByRole("link", { name: "פעילות", exact: true })).toHaveAttribute("href", "/app/tasks");
+  scope.getByRole("link", { name: /^בפיקוח/ })).toHaveAttribute("href", "/app/tasks?mine=supervising&view=list");
+  await expect(scope.getByRole("link", { name: "כולם", exact: true })).toHaveAttribute("href", "/app/tasks?mine=0&view=list");
+  await expect(page.getByRole("link", { name: "פעילות", exact: true })).toHaveAttribute("href", "/app/tasks?view=list");
   // "הכל" is gone: a list that grows with every closed task is not a
   // working view.
   await expect(page.getByRole("link", { name: "הכל", exact: true })).toHaveCount(0);
 
   // Everyone's work, including work assigned to nobody.
-  await page.goto("/app/tasks?mine=0", { waitUntil: "domcontentloaded" });
+  await page.goto("/app/tasks?mine=0&view=list", { waitUntil: "domcontentloaded" });
   await expect(page.getByText(MY_PROMISE).first()).toBeVisible({ timeout: 30_000 });
 
   // The pills keep "off" once it is off, and the toggle points back to
   // the default.
   await expect(page.getByRole("link", { name: "בטיפול", exact: true })).toHaveAttribute(
     "href",
-    "/app/tasks?status=IN_PROGRESS&mine=0"
+    "/app/tasks?status=IN_PROGRESS&mine=0&view=list"
   );
   await expect(page.getByTestId("mine-scope").getByRole("link", { name: "שלי", exact: true })).toHaveAttribute(
     "href",
-    "/app/tasks"
+    "/app/tasks?view=list"
   );
 });
 
 test("a promise the client can see cannot be closed without a sentence for them", async ({ page }) => {
   // mine=0: the task this creates has no assignee.
-  await page.goto(`${TASKS}?mine=0`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${TASKS}?mine=0&view=list`, { waitUntil: "domcontentloaded" });
 
   // Its own task, created through the screen, so this test does not
   // consume a fixture anything else depends on.
@@ -214,7 +214,7 @@ test("a promise the client can see cannot be closed without a sentence for them"
   }, "the row is still open after closing it").toPass({ timeout: 15_000 });
   expect((await closed).status(), "the close was not accepted").toBe(200);
 
-  await page.goto(`${TASKS}?status=DONE&mine=0`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${TASKS}?status=DONE&mine=0&view=list`, { waitUntil: "domcontentloaded" });
   const doneRow = page.locator("[data-task]").filter({ hasText: title });
   await expect(doneRow, "the closed task is not under הושלמו").toBeVisible({ timeout: 15_000 });
   await expect(doneRow.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
@@ -247,7 +247,7 @@ test("stopping the timer asks what stage the promise is at", async ({ page }) =>
   await expect(page.getByText("הלקוח מעודכן")).toBeVisible({ timeout: 30_000 });
 
   // And it reached the promise itself.
-  await page.goto(`${TASKS}?mine=0`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${TASKS}?mine=0&view=list`, { waitUntil: "domcontentloaded" });
   const row = page.locator("[data-task]").filter({ hasText: MY_PROMISE });
   // The waiting state is an icon, and its label is the only text that
   // says which way it is pointing.
