@@ -29,7 +29,7 @@ import { test, expect } from "./fixtures";
 test.describe.configure({ timeout: 90_000 });
 
 const OLD_SUPERVISING = "/app/supervising";
-const WAITING = "/app/tasks?mine=supervising&status=PENDING_APPROVAL";
+const WAITING = "/app/tasks?mine=supervising&status=PENDING_APPROVAL&view=list";
 
 // This file's own task, seeded with a fixed id and supervised by the
 // person this project signs in as. Read by nothing else, so its status
@@ -71,7 +71,7 @@ test.describe.serial("one task, from sending it for approval to signing it", () 
     // The old address, from a bookmark or an old message, still lands on
     // the work waiting for this person.
     await page.goto(OLD_SUPERVISING, { waitUntil: "domcontentloaded" });
-    await expect(page).toHaveURL(/\/app\/tasks\?mine=supervising&status=PENDING_APPROVAL$/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/app\/tasks\?mine=supervising&status=PENDING_APPROVAL&view=list$/, { timeout: 30_000 });
 
     // If the task is not here at all, the list is showing the wrong
     // person's work or none - which is what happens when the fixture

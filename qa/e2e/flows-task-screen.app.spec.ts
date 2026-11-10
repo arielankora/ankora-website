@@ -35,7 +35,7 @@ test.describe.configure({ timeout: 90_000 });
 
 // Everybody's tasks, not only mine: "שלי" is on by default since
 // 26.9.2026, and the fixtures this file reads are nobody's in particular.
-const TASKS = "/app/tasks?mine=0";
+const TASKS = "/app/tasks?mine=0&view=list";
 
 // This file's own task. Matched loosely: every seeded name carries a
 // "[DEMO]" prefix, and an exact string would bake that into the test.
@@ -64,7 +64,7 @@ test.describe.serial("one task, from opening it to closing it", () => {
     // the way back leads to that list, not to its defaults. `mine=0` is
     // the filter here, so landing on the bare /app/tasks would be "שלי"
     // again and this task out of view.
-    await expect(page).toHaveURL(new RegExp(`${FIXTURE_URL}\\?from=mine%3D0$`));
+    await expect(page).toHaveURL(new RegExp(`${FIXTURE_URL}\\?from=mine%3D0%26view%3Dlist$`));
     await expect(page.getByTestId("task-back")).toHaveAttribute("href", TASKS);
 
     // Rendered, not raw. The asterisks that produced this are not on the

@@ -7,6 +7,8 @@ import { redirect } from "next/navigation";
 // The address stays, as a redirect, because it was in the nav for three
 // weeks and lives on in bookmarks and old messages. It lands on what was
 // the top of the old screen: the work waiting on this person's sign-off.
+// On the list, said out loud: the board is the default since 10.11.2026
+// and ignores a status filter (lib/tasks-view.ts).
 export default function SupervisingPage(): never {
-  redirect("/app/tasks?mine=supervising&status=PENDING_APPROVAL");
+  redirect("/app/tasks?mine=supervising&status=PENDING_APPROVAL&view=list");
 }

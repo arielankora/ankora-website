@@ -67,6 +67,27 @@ test("the board shows the four live statuses as columns", async ({ page }) => {
   await expect(page.locator('[data-column="ARCHIVED"]')).toHaveCount(0);
 });
 
+test("the screen opens on the board, and remembers the list once somebody picks it", async ({ page }) => {
+  // Ariel, 10.11.2026: the board is the default. A fresh visit, with
+  // nothing remembered and nothing in the address, lands on it.
+  await page.context().clearCookies({ name: "ankora-tasks-view" });
+  await page.goto("/app/tasks?mine=0", { waitUntil: "domcontentloaded" });
+  await expect(page.locator('[data-column="OPEN"]')).toBeVisible({ timeout: 30_000 });
+
+  // Picking the list is remembered: the same bare address now opens it.
+  await page.getByRole("link", { name: "רשימה", exact: true }).click();
+  await expect(page).toHaveURL(/view=list/, { timeout: 30_000 });
+  await page.goto("/app/tasks?mine=0", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("link", { name: "רשימה", exact: true })).toHaveAttribute("aria-current", "page", { timeout: 30_000 });
+  await expect(page.locator('[data-column="OPEN"]')).toHaveCount(0);
+
+  // And the board again, the same way.
+  await page.getByRole("link", { name: "לוח", exact: true }).click();
+  await expect(page).toHaveURL(/view=board/, { timeout: 30_000 });
+  await page.goto("/app/tasks?mine=0", { waitUntil: "domcontentloaded" });
+  await expect(page.locator('[data-column="OPEN"]')).toBeVisible({ timeout: 30_000 });
+});
+
 test("dragging a card moves the task, and it stays moved", async ({ page }) => {
   await page.goto(BOARD, { waitUntil: "domcontentloaded" });
   await expect(page.locator(`[data-task-card="${CARD}"]`)).toBeVisible({ timeout: 30_000 });
