@@ -264,14 +264,14 @@ existed.
 ### Claude Desktop (MCP)
 
 `/api/mcp` exposes the Time Tracking app to a staff member's Claude over
-the Model Context Protocol. 56 tools, by family:
+the Model Context Protocol. 60 tools, by family:
 
 | | |
 | --- | --- |
 | Time (`lib/mcp/tools.ts`, 15) | `list_my_clients`, `list_categories`, `get_active_timer`, `list_my_time_entries`, `start_timer`, `stop_timer`, `move_time_entry_to_open_bank`, `update_timer_note`, `create_time_entry`, `list_tasks`, `create_task`, `update_task`, `list_assignable_people`, and the two team reads below |
 | Read (team) | `list_team_members`, `list_team_time_entries` — needs `time_entry.edit_others`, the same permission the admin screen and the CSV export already use |
-| Tasks (`task-extra-tools.ts`, 10) | `get_task`, task steps (`add_task_steps`, `replace_task_steps`, `set_task_step`), the work plan (`get_task_plan`, `save_task_plan`, `apply_task_plan_steps`), `add_task_comment`, `create_decision`, `list_decisions` |
-| Client file (`client-file-tools.ts`, 17) | `get_client_file`, `get_client_brief`, `get_client_changes`, `propose_knowledge`, `lookup_contact`, `list_processes`, `get_process`, `get_procedure_for_translation`, `save_procedure_translation`, `list_policies`, `start_process`, `record_run_lesson`, `record_stranger_test`, `answer_stranger_question`, `list_my_routines`, `record_process_check`, `get_extraction_brief` |
+| Tasks (`task-extra-tools.ts`, 11) | `get_task`, task steps (`add_task_steps`, `replace_task_steps`, `set_task_step`), the work plan (`get_task_plan`, `save_task_plan`, `apply_task_plan_steps`), `add_task_comment`, `decide_vendor_check` (a detected new vendor: open the sub-processor run or dismiss it), `create_decision`, `list_decisions` |
+| Client file (`client-file-tools.ts`, 19) | `get_client_file`, `get_client_brief`, `list_subprocessor_notice_recipients`, `set_client_subprocessor_notice`, `get_client_changes`, `propose_knowledge`, `lookup_contact`, `list_processes`, `get_process`, `get_procedure_for_translation`, `save_procedure_translation`, `list_policies`, `start_process`, `record_run_lesson`, `record_stranger_test`, `answer_stranger_question`, `list_my_routines`, `record_process_check`, `get_extraction_brief` |
 | Documents (`document-tools.ts`, 5) | `list_documents`, `read_document`, `set_document_kind`, `start_document_upload`, `upload_document` |
 | Hour bank (`hour-bank-tools.ts`, 1) | `get_hours_bank`: the Hour Banks screen's figures for one client, optionally as of a date, in whole minutes. Adjustments go to managers only, flagged as internal |
 | Approvals (`approval-tools.ts`, 4) | `list_approvals`, `decide_approval`, `decide_knowledge_proposals`: the decisions waiting on the person, and approving or rejecting them from Claude. `get_proposal_stats` (managers only): how proposals to client files ended, by kind, metadata only |
