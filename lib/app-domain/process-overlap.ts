@@ -20,6 +20,38 @@ export type CoveredTask = {
 
 const OPEN = ["OPEN", "IN_PROGRESS"] as const;
 
+/// For each process, the tasks its own proposals came from: an approved
+/// PROCESS proposal (resultId is the process) whose batch's source is a
+/// task. 9.11.2026: the task that built and tested P22 on the internal
+/// file was offered for closing as "covered" by P22, because the process
+/// was named in the task's words. A task that proposed the process is the
+/// work of making it, not the work it does, and closing it from the
+/// process's card would close unfinished work.
+async function sourceTasksByProcess(processIds: string[]): Promise<Map<string, Set<string>>> {
+  const out = new Map<string, Set<string>>();
+  if (processIds.length === 0) return out;
+  const proposals = await prisma.knowledgeProposal.findMany({
+    where: { target: "PROCESS", state: "APPROVED", resultId: { in: processIds } },
+    select: { resultId: true, batch: { select: { sourceId: true } } },
+  });
+  const sourceIds = [...new Set(proposals.map((p) => p.batch.sourceId).filter((id): id is string => !!id))];
+  if (sourceIds.length === 0) return out;
+  const rows = await prisma.clientSource.findMany({ where: { id: { in: sourceIds } }, select: { id: true, externalRefs: true } });
+  const tasksOf = new Map<string, string[]>();
+  for (const r of rows) {
+    const refs = Array.isArray(r.externalRefs) ? (r.externalRefs as { system?: unknown; id?: unknown }[]) : [];
+    tasksOf.set(r.id, refs.filter((x) => x?.system === "TASK" && typeof x.id === "string").map((x) => x.id as string));
+  }
+  for (const p of proposals) {
+    const ids = p.batch.sourceId ? tasksOf.get(p.batch.sourceId) : undefined;
+    if (!p.resultId || !ids?.length) continue;
+    const set = out.get(p.resultId) ?? new Set<string>();
+    for (const id of ids) set.add(id);
+    out.set(p.resultId, set);
+  }
+  return out;
+}
+
 async function readFor(clientIds: string[]): Promise<CoveredTask[]> {
   if (clientIds.length === 0) return [];
   const [processes, tasks] = await Promise.all([
@@ -33,11 +65,13 @@ async function readFor(clientIds: string[]): Promise<CoveredTask[]> {
       select: { id: true, clientId: true, title: true, status: true, processId: true, parentId: true, createdAt: true, assignedTo: { select: { name: true } } },
     }),
   ]);
+  const sources = await sourceTasksByProcess(processes.map((p) => p.id));
   const out: CoveredTask[] = [];
   for (const clientId of clientIds) {
     const ps = processes.filter((p) => p.clientId === clientId);
     const ts = tasks.filter((t) => t.clientId === clientId);
     for (const m of coveredTasks(ps, ts)) {
+      if (sources.get(m.processId)?.has(m.taskId)) continue;
       const p = ps.find((x) => x.id === m.processId)!;
       const t = ts.find((x) => x.id === m.taskId)!;
       out.push({
@@ -78,6 +112,7 @@ export async function closeTaskCoveredByProcess(actor: User, taskId: string, pro
   if (process.status !== "ACTIVE") throw new Error("רק תהליך עם נוהל מאושר מכסה משימות.");
   if (task.processId) throw new Error("זו ריצה של תהליך, לא משימה נפרדת.");
   if (!(OPEN as readonly string[]).includes(task.status)) throw new Error("המשימה כבר לא פתוחה.");
+  if ((await sourceTasksByProcess([process.id])).get(process.id)?.has(taskId)) throw new Error("התהליך הוצע מהמשימה הזו, והיא לא כפולה לו.");
   await updateTask(actor, taskId, { status: "ARCHIVED" });
   await addTaskComment(actor, taskId, `נסגרה: התהליך ${process.code} ${process.title} מכסה את העבודה הזו, וכל ריצה שלו פותחת משימה משלה. /app/clients/${process.clientId}?tab=file#item-${process.id}`);
   await recordAudit({
