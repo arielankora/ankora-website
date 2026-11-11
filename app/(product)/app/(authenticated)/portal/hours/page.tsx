@@ -1,12 +1,16 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalDashboard, getCategorySummary, getWeeklyActivity } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { ViewTabs } from "@/components/app/ViewTabs";
-import { HOURS_TABS } from "./tabs";
-import { MonthlyView } from "../monthly/MonthlyView";
+import { HOURS_TABS, MONTHLY_REPORT_ANCHOR } from "./tabs";
+import { MonthlyReportSection } from "../monthly/MonthlyView";
 import { WeeklyView } from "../weekly/WeeklyView";
+import { TasksView } from "../tasks/TasksView";
+import { carryQuery } from "@/components/app/ViewTabs";
+import { parsePeriodOffset, MAX_MONTH_OFFSET } from "@/lib/period-offset";
 import { bankFigures, formatDecimalHours, packageFigures } from "@/lib/hours-format";
 import { describeForecast } from "@/lib/prepaid-format";
 import { cycleElapsedShare } from "@/lib/app-domain/hour-banks";
@@ -49,11 +53,20 @@ const CATEGORY_BAR_COLORS = ["bg-app-surface-nav", "bg-app-info", "bg-app-accent
 // page would find a banner describing them in the third person
 // nonsensical. Isolation is still structural exactly as the README
 // requires, just silent rather than announced.
-export default async function PortalHoursPage(props: { searchParams: Promise<{ view?: string; monthOffset?: string; weekOffset?: string }> }) {
+export default async function PortalHoursPage(props: {
+  searchParams: Promise<{ view?: string; monthOffset?: string; weekOffset?: string; day?: string }>;
+}) {
   // 19.10.2026: hours and the monthly report, one screen (canvas "Ankora App UI Round").
   const sp = await props.searchParams;
-  if (sp.view === "monthly") return <MonthlyView searchParams={{ monthOffset: sp.monthOffset }} />;
-  if (sp.view === "weekly") return <WeeklyView searchParams={{ weekOffset: sp.weekOffset }} />;
+  if (sp.view === "monthly") {
+    // 11.11.2026: the monthly tab is gone (./tabs.ts); its address, in
+    // bookmarks and in the e-mails, lands on the month's section below.
+    const query = carryQuery(sp, ["monthOffset"], {});
+    redirect(`/app/portal/hours${query ? `?${query}` : ""}#${MONTHLY_REPORT_ANCHOR}`);
+  }
+  if (sp.view === "weekly") return <WeeklyView searchParams={{ weekOffset: sp.weekOffset, day: sp.day }} />;
+  if (sp.view === "tasks") return <TasksView searchParams={{ monthOffset: sp.monthOffset }} />;
+  const monthOffset = parsePeriodOffset(sp.monthOffset, MAX_MONTH_OFFSET);
   const user = await requireUser();
 
   let dashboard;
@@ -189,7 +202,7 @@ export default async function PortalHoursPage(props: { searchParams: Promise<{ v
 
         <div className="overflow-hidden rounded-2xl border border-app-border bg-white">
           <div className="flex items-center justify-between border-b border-app-border px-[18px] py-3.5">
-            <span className="text-[13.5px] font-medium text-app-text-primary">פעילות השבוע</span>
+            <span className="text-[13.5px] font-medium text-app-text-primary">מה נעשה השבוע</span>
             <Link href="/app/portal/hours?view=weekly" className="text-xs text-app-text-accent hover:underline">
               לפי ימים
             </Link>
@@ -211,6 +224,8 @@ export default async function PortalHoursPage(props: { searchParams: Promise<{ v
           )}
         </div>
       </div>
+
+      <MonthlyReportSection user={user} monthOffset={monthOffset} />
     </div>
   );
 }
