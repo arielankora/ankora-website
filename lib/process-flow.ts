@@ -281,7 +281,31 @@ export function flowSteps(flow: ProcessFlow): ProcessStep[] {
     });
 }
 
-export type FlowIssue = { code: string; message: string; node?: string };
+/// ADR 0006: an issue as a key a screen words in the reader's language
+/// (clients.processes.flow.issues.<key>). `message` stays the Hebrew the
+/// server and its refusals have always used. `title` is the node's own
+/// title, empty when it has none: the screen names it "צומת בלי שם" in its
+/// own words, and puts it in quotes otherwise, as the message does.
+export type FlowIssueKey =
+  | "duplicateId"
+  | "noStart"
+  | "missingTarget"
+  | "autoNoBody"
+  | "unknownParams"
+  | "deadEnd"
+  | "noQuestion"
+  | "noBranches"
+  | "noElseDays"
+  | "elseDeadEnd"
+  | "branchDeadEnd"
+  | "branchNoMailConnection"
+  | "branchNoDriveConnection"
+  | "branchNoFolder"
+  | "branchReplyNotMail"
+  | "loop"
+  | "unreachable"
+  | "tooLong";
+export type FlowIssue = { code: string; message: string; node?: string; keyed?: { key: FlowIssueKey; title?: string; values?: Record<string, string | number> } };
 
 const nodeName = (n: FlowNode) => (n.title ? `"${n.title}"` : "צומת בלי שם");
 
@@ -292,49 +316,53 @@ export function flowIssues(flow: ProcessFlow): FlowIssue[] {
   const out: FlowIssue[] = [];
   const byId = new Map<string, FlowNode>();
   for (const n of flow.nodes) {
-    if (byId.has(n.id)) out.push({ code: "F1", node: n.id, message: `שני צמתים עם אותו מזהה (${n.id}).` });
+    if (byId.has(n.id)) out.push({ code: "F1", node: n.id, message: `שני צמתים עם אותו מזהה (${n.id}).`, keyed: { key: "duplicateId", values: { id: n.id } } });
     byId.set(n.id, n);
   }
   if (!flow.start || !byId.has(flow.start)) {
-    out.push({ code: "F2", message: "לנוהל אין צומת התחלה." });
+    out.push({ code: "F2", message: "לנוהל אין צומת התחלה.", keyed: { key: "noStart" } });
     return out;
   }
   for (const n of flow.nodes) {
     for (const t of nextOf(n)) {
-      if (t && !byId.has(t)) out.push({ code: "F3", node: n.id, message: `${nodeName(n)} ממשיך לצומת שלא קיים.` });
+      if (t && !byId.has(t)) out.push({ code: "F3", node: n.id, message: `${nodeName(n)} ממשיך לצומת שלא קיים.`, keyed: { key: "missingTarget", title: n.title } });
     }
     if (n.send?.mode === "AUTO" && !n.send.body) {
-      out.push({ code: "F11", node: n.id, message: `${nodeName(n)} נשלח אוטומטית, ולכן צריך נוסח קבוע שאדם כתב כאן.` });
+      out.push({ code: "F11", node: n.id, message: `${nodeName(n)} נשלח אוטומטית, ולכן צריך נוסח קבוע שאדם כתב כאן.`, keyed: { key: "autoNoBody", title: n.title } });
     }
     if (n.send?.body) {
       const { unknown } = messageParams(n.send.body);
       if (unknown.length) {
-        out.push({ code: "F12", node: n.id, message: `בנוסח של ${nodeName(n)} יש פרמטר שלא קיים: ${unknown.map((u) => `{{${u}}}`).join(", ")}. אפשר: ${MESSAGE_PARAMS.join(", ")}.` });
+        out.push({ code: "F12", node: n.id, message: `בנוסח של ${nodeName(n)} יש פרמטר שלא קיים: ${unknown.map((u) => `{{${u}}}`).join(", ")}. אפשר: ${MESSAGE_PARAMS.join(", ")}.`,
+          keyed: { key: "unknownParams", title: n.title, values: { unknown: unknown.map((u) => `{{${u}}}`).join(", "), allowed: MESSAGE_PARAMS.join(", ") } },
+        });
       }
     }
     if (n.kind !== "END" && n.kind !== "CONDITION" && !n.next) {
-      out.push({ code: "F4", node: n.id, message: `${nodeName(n)} לא ממשיך לשום מקום. כל מסלול מסתיים בצומת "סיום".` });
+      out.push({ code: "F4", node: n.id, message: `${nodeName(n)} לא ממשיך לשום מקום. כל מסלול מסתיים בצומת "סיום".`, keyed: { key: "deadEnd", title: n.title } });
     }
     if (n.kind === "CONDITION") {
-      if (!n.question) out.push({ code: "F5", node: n.id, message: `לתנאי ${nodeName(n)} אין שאלה.` });
-      if (n.branches.length === 0) out.push({ code: "F5", node: n.id, message: `לתנאי ${nodeName(n)} אין ענפים.` });
-      if (n.elseAfterBusinessDays === null) out.push({ code: "F6", node: n.id, message: `לתנאי ${nodeName(n)} חסר אחרי כמה ימים עוברים ל"אחרת".` });
-      if (!n.elseNext) out.push({ code: "F4", node: n.id, message: `ה"אחרת" של ${nodeName(n)} לא ממשיך לשום מקום.` });
+      if (!n.question) out.push({ code: "F5", node: n.id, message: `לתנאי ${nodeName(n)} אין שאלה.`, keyed: { key: "noQuestion", title: n.title } });
+      if (n.branches.length === 0) out.push({ code: "F5", node: n.id, message: `לתנאי ${nodeName(n)} אין ענפים.`, keyed: { key: "noBranches", title: n.title } });
+      if (n.elseAfterBusinessDays === null) out.push({ code: "F6", node: n.id, message: `לתנאי ${nodeName(n)} חסר אחרי כמה ימים עוברים ל"אחרת".`, keyed: { key: "noElseDays", title: n.title } });
+      if (!n.elseNext) out.push({ code: "F4", node: n.id, message: `ה"אחרת" של ${nodeName(n)} לא ממשיך לשום מקום.`, keyed: { key: "elseDeadEnd", title: n.title } });
       n.branches.forEach((b, i) => {
-        if (!b.next) out.push({ code: "F4", node: n.id, message: `ענף ${i + 1} של ${nodeName(n)} לא ממשיך לשום מקום.` });
+        if (!b.next) out.push({ code: "F4", node: n.id, message: `ענף ${i + 1} של ${nodeName(n)} לא ממשיך לשום מקום.`, keyed: { key: "branchDeadEnd", title: n.title, values: { n: i + 1 } } });
         if ((b.source === "EMAIL_REPLY" || b.source === "DRIVE_FILE") && !b.connectionId) {
-          out.push({ code: "F7", node: n.id, message: `ענף ${i + 1} של ${nodeName(n)} בודק ${b.source === "EMAIL_REPLY" ? "מייל" : "דרייב"}, ולא נבחר חיבור.` });
+          out.push({ code: "F7", node: n.id, message: `ענף ${i + 1} של ${nodeName(n)} בודק ${b.source === "EMAIL_REPLY" ? "מייל" : "דרייב"}, ולא נבחר חיבור.`,
+            keyed: { key: b.source === "EMAIL_REPLY" ? "branchNoMailConnection" : "branchNoDriveConnection", title: n.title, values: { n: i + 1 } },
+          });
         }
-        if (b.source === "DRIVE_FILE" && !b.ref) out.push({ code: "F7", node: n.id, message: `ענף ${i + 1} של ${nodeName(n)}: לא נבחרה תיקייה.` });
+        if (b.source === "DRIVE_FILE" && !b.ref) out.push({ code: "F7", node: n.id, message: `ענף ${i + 1} של ${nodeName(n)}: לא נבחרה תיקייה.`, keyed: { key: "branchNoFolder", title: n.title, values: { n: i + 1 } } });
         if (b.source === "EMAIL_REPLY" && b.ref && byId.get(b.ref)?.send == null) {
-          out.push({ code: "F7", node: n.id, message: `ענף ${i + 1} של ${nodeName(n)} מחכה לתשובה לצומת שלא שולח מייל.` });
+          out.push({ code: "F7", node: n.id, message: `ענף ${i + 1} של ${nodeName(n)} מחכה לתשובה לצומת שלא שולח מייל.`, keyed: { key: "branchReplyNotMail", title: n.title, values: { n: i + 1 } } });
         }
       });
     }
   }
   const order = flowOrder(flow);
   if (!order) {
-    out.push({ code: "F8", message: "בנוהל יש לולאה: צומת שחוזר לצומת שכבר היה. ענפים יכולים להתאחד, אבל לא לחזור אחורה." });
+    out.push({ code: "F8", message: "בנוהל יש לולאה: צומת שחוזר לצומת שכבר היה. ענפים יכולים להתאחד, אבל לא לחזור אחורה.", keyed: { key: "loop" } });
     return out;
   }
   // Reachable from the start.
@@ -346,7 +374,7 @@ export function flowIssues(flow: ProcessFlow): FlowIssue[] {
     seen.add(nid);
     for (const t of nextOf(byId.get(nid)!)) if (t) stack.push(t);
   }
-  for (const n of flow.nodes) if (!seen.has(n.id)) out.push({ code: "F9", node: n.id, message: `אי אפשר להגיע ל${nodeName(n)} מההתחלה.` });
+  for (const n of flow.nodes) if (!seen.has(n.id)) out.push({ code: "F9", node: n.id, message: `אי אפשר להגיע ל${nodeName(n)} מההתחלה.`, keyed: { key: "unreachable", title: n.title } });
   // The longest path stays a procedure, not several (process-rules' limit).
   const actions = new Map<string, number>();
   for (const n of order) {
@@ -355,7 +383,7 @@ export function flowIssues(flow: ProcessFlow): FlowIssue[] {
     for (const t of nextOf(n)) if (t) actions.set(t, Math.max(actions.get(t) ?? 0, here));
   }
   if (Math.max(0, ...actions.values()) > MAX_PROCESS_STEPS) {
-    out.push({ code: "F10", message: `במסלול אחד יש יותר מ-${MAX_PROCESS_STEPS} פעולות. נוהל ארוך מזה הוא כמה תהליכים.` });
+    out.push({ code: "F10", message: `במסלול אחד יש יותר מ-${MAX_PROCESS_STEPS} פעולות. נוהל ארוך מזה הוא כמה תהליכים.`, keyed: { key: "tooLong", values: { max: MAX_PROCESS_STEPS } } });
   }
   return out;
 }
@@ -375,7 +403,17 @@ export type TreeLine =
   | { type: "node"; node: FlowNode; depth: number; branch: string | null }
   | { type: "goto"; target: FlowNode; depth: number; branch: string | null };
 
-export function flowTree(flow: ProcessFlow): TreeLine[] {
+/// ADR 0006: how a branch with no label of its own is named on the tree.
+/// The default is the Hebrew the tree has always shown; a screen passes
+/// its own words.
+export type FlowTreeLabels = { source: (s: BranchSource) => string; otherwise: (days: number | null) => string };
+
+const HEBREW_TREE_LABELS: FlowTreeLabels = {
+  source: (s) => BRANCH_SOURCE_LABELS[s],
+  otherwise: (days) => `אחרת, אחרי ${days ?? "?"} ימים`,
+};
+
+export function flowTree(flow: ProcessFlow, labels: FlowTreeLabels = HEBREW_TREE_LABELS): TreeLine[] {
   const byId = new Map(flow.nodes.map((n) => [n.id, n]));
   const rank = new Map((flowOrder(flow) ?? flow.nodes).map((n, i) => [n.id, i]));
   const reach = (from: string | null): Set<string> => {
@@ -415,8 +453,8 @@ export function flowTree(flow: ProcessFlow): TreeLine[] {
       label = null;
       if (n.kind === "CONDITION") {
         const meet = meetOf(n);
-        n.branches.forEach((b) => walk(b.next, depth + 1, b.label || BRANCH_SOURCE_LABELS[b.source], meet ?? stopAt));
-        walk(n.elseNext, depth + 1, n.elseLabel || `אחרת, אחרי ${n.elseAfterBusinessDays ?? "?"} ימים`, meet ?? stopAt);
+        n.branches.forEach((b) => walk(b.next, depth + 1, b.label || labels.source(b.source), meet ?? stopAt));
+        walk(n.elseNext, depth + 1, n.elseLabel || labels.otherwise(n.elseAfterBusinessDays), meet ?? stopAt);
         if (!meet || meet === stopAt) return;
         cur = meet;
         continue;

@@ -1,22 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { Background, Controls, Handle, MiniMap, Position, ReactFlow, type Connection, type Edge, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
   BRANCH_SOURCE_LABELS,
   MESSAGE_PARAMS,
-  SEND_MODE_LABELS,
   flowIssues,
   flowTree,
   secondEyeNodes,
   type BranchSource,
   type FlowBranch,
+  type FlowIssue,
   type FlowNode,
   type FlowNodeKind,
   type ProcessFlow,
 } from "@/lib/process-flow";
 import { STEP_MODE_LABELS, type ProcessStep, type StepModeLike } from "@/lib/process-rules";
+import { intlTag } from "@/lib/i18n/config";
 import { saveAndActivateFlowAction } from "../../../../process-actions";
 import { autoPositions, newId, NODE_W } from "./flow-layout";
 
@@ -43,7 +45,31 @@ type Props = {
 };
 
 const INPUT = "w-full rounded-[10px] border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary";
-const KIND_LABELS: Record<FlowNodeKind, string> = { ACTION: "פעולה", WAIT: "המתנה", CONDITION: "תנאי", END: "סיום" };
+
+/// ADR 0006: the editor's words come from `clients.processes`; labels are
+/// looked up by their enum value, so through this loose signature.
+type Tx = (key: string, values?: Record<string, string | number>) => string;
+
+function useTx(): Tx {
+  return useTranslations("clients.processes") as unknown as Tx;
+}
+
+/// Whether the reader reads right to left. The canvas itself stays left to
+/// right (React Flow), but a node card reads in the page's direction, and
+/// the exits of a condition follow it: the first branch where a line of
+/// text starts.
+function useRtl(): boolean {
+  return useLocale() === intlTag("he");
+}
+
+const kindLabel = (t: Tx, n: FlowNode) => (n.send ? t("labels.nodeKinds.MAIL") : t(`labels.nodeKinds.${n.kind}`));
+
+/// A flow issue (lib/process-flow) in the reader's language.
+function issueText(t: Tx, i: FlowIssue): string {
+  if (!i.keyed) return i.message;
+  const node = i.keyed.title ? `"${i.keyed.title}"` : t("flow.unnamedNode");
+  return t(`flow.issues.${i.keyed.key}`, { ...i.keyed.values, node });
+}
 
 const emptyStep = (title: string): ProcessStep => ({
   title,
@@ -59,8 +85,10 @@ const emptyStep = (title: string): ProcessStep => ({
   channel: null,
 });
 
-function blankNode(id: string, kind: FlowNodeKind, opts: { mail?: boolean } = {}): FlowNode {
-  const title = kind === "END" ? "סיום" : kind === "WAIT" ? "המתנה" : kind === "CONDITION" ? "תנאי" : opts.mail ? "שליחת מייל" : "פעולה";
+/// A new node, titled in the language of whoever adds it: the title is the
+/// author's text from then on, like any other they type.
+function blankNode(t: Tx, id: string, kind: FlowNodeKind, opts: { mail?: boolean } = {}): FlowNode {
+  const title = t(`labels.nodeKinds.${opts.mail && kind === "ACTION" ? "MAIL" : kind}`);
   return {
     id,
     kind,
@@ -72,7 +100,7 @@ function blankNode(id: string, kind: FlowNodeKind, opts: { mail?: boolean } = {}
     send: opts.mail ? { mode: "DRAFT", toContactId: null, toText: null, body: null } : null,
     next: null,
     question: kind === "CONDITION" ? "" : null,
-    branches: kind === "CONDITION" ? [{ id: "b1", label: "כן", source: "MANUAL", connectionId: null, ref: null, next: null }] : [],
+    branches: kind === "CONDITION" ? [{ id: "b1", label: t("flow.defaultBranch"), source: "MANUAL", connectionId: null, ref: null, next: null }] : [],
     elseLabel: null,
     elseAfterBusinessDays: kind === "CONDITION" ? 3 : null,
     elseNext: null,
@@ -86,34 +114,46 @@ function kindTone(n: FlowNode): string {
   return "bg-app-info-soft text-app-info";
 }
 
-function subline(n: FlowNode): string {
+function subline(t: Tx, n: FlowNode): string {
   const parts: string[] = [];
-  if (n.waitBusinessDays) parts.push(`אחרי ${n.waitBusinessDays} ימי עסקים`);
-  if (n.send) parts.push(SEND_MODE_LABELS[n.send.mode]);
-  else if (n.step) parts.push(STEP_MODE_LABELS[n.step.mode]);
-  if (n.kind === "CONDITION") parts.push(`"אחרת" אחרי ${n.elseAfterBusinessDays ?? "?"} ימים`);
-  if (n.owner?.text) parts.push(`אחראי: ${n.owner.text}`);
+  if (n.waitBusinessDays) parts.push(t("flow.afterDays", { days: String(n.waitBusinessDays) }));
+  if (n.send) parts.push(t(`labels.sendModes.${n.send.mode}`));
+  else if (n.step) parts.push(t(`labels.stepModes.${n.step.mode}`));
+  if (n.kind === "CONDITION") parts.push(t("flow.elseAfter", { days: String(n.elseAfterBusinessDays ?? "?") }));
+  if (n.owner?.text) parts.push(t("flow.owner", { name: n.owner.text }));
   return parts.join(" · ");
 }
 
 type CardData = { node: FlowNode; selected: boolean; flagged: boolean; secondEye: boolean };
 
 function NodeCard({ data }: NodeProps<Node<CardData>>) {
+  const t = useTx();
+  const rtl = useRtl();
   const n = data.node;
-  const outs = n.kind === "CONDITION" ? [...n.branches.map((b) => ({ id: b.id, label: b.label || BRANCH_SOURCE_LABELS[b.source] })), { id: "else", label: n.elseLabel || "אחרת" }] : n.kind === "END" ? [] : [{ id: "next", label: "" }];
+  const outs =
+    n.kind === "CONDITION"
+      ? [...n.branches.map((b) => ({ id: b.id, label: b.label || t(`labels.branchSources.${b.source}`) })), { id: "else", label: n.elseLabel || t("flow.otherwise") }]
+      : n.kind === "END"
+        ? []
+        : [{ id: "next", label: "" }];
+  // Where exit i sits along the bottom edge: from the right in Hebrew (as
+  // it always was), from the left in English, under its label either way.
+  const exitAt = (i: number) => ((rtl ? outs.length - 1 - i : i) + 0.5) / outs.length;
   return (
     <div
-      dir="rtl"
+      dir={rtl ? "rtl" : "ltr"}
       style={{ width: NODE_W }}
       className={`rounded-xl border bg-white px-3 py-2.5 text-start shadow-sm ${data.selected ? "border-2 border-app-accent" : data.flagged ? "border-app-error" : "border-app-border"}`}
     >
       <Handle type="target" position={Position.Top} className="!h-2.5 !w-2.5 !bg-app-border-strong" />
       <div className="flex items-center justify-between gap-2">
-        <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${kindTone(n)}`}>{n.send ? "שליחת מייל" : KIND_LABELS[n.kind]}</span>
-        {data.secondEye && <span className="rounded-md bg-app-warning-soft px-1.5 py-0.5 text-[11px] font-medium text-app-warning">עין שנייה</span>}
+        <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${kindTone(n)}`}>{kindLabel(t, n)}</span>
+        {data.secondEye && <span className="rounded-md bg-app-warning-soft px-1.5 py-0.5 text-[11px] font-medium text-app-warning">{t("flow.secondEye")}</span>}
       </div>
-      <p className="mt-1 text-[13px] font-medium text-app-text-primary">{n.kind === "CONDITION" ? n.question || n.title : n.title}</p>
-      {subline(n) && <p className="mt-0.5 text-[11.5px] text-app-text-secondary">{subline(n)}</p>}
+      <p dir="auto" className="mt-1 text-[13px] font-medium text-app-text-primary">
+        {n.kind === "CONDITION" ? n.question || n.title : n.title}
+      </p>
+      {subline(t, n) && <p className="mt-0.5 text-[11.5px] text-app-text-secondary">{subline(t, n)}</p>}
       {outs.length > 1 && (
         <div className="mt-2 flex justify-between gap-1">
           {outs.map((o) => (
@@ -129,7 +169,7 @@ function NodeCard({ data }: NodeProps<Node<CardData>>) {
           id={o.id}
           type="source"
           position={Position.Bottom}
-          style={outs.length > 1 ? { left: `${((outs.length - 1 - i + 0.5) / outs.length) * 100}%` } : undefined}
+          style={outs.length > 1 ? { left: `${exitAt(i) * 100}%` } : undefined}
           className="!h-2.5 !w-2.5 !bg-app-accent"
         />
       ))}
@@ -152,6 +192,7 @@ function useIsDesktop(): boolean {
 }
 
 export function FlowEditor(props: Props) {
+  const t = useTx();
   const [flow, setFlow] = useState<ProcessFlow>(() => {
     const pos = autoPositions(props.initial);
     return { ...props.initial, nodes: props.initial.nodes.map((n) => ({ ...n, position: n.position ?? pos.get(n.id) ?? { x: 0, y: 0 } })) };
@@ -175,7 +216,7 @@ export function FlowEditor(props: Props) {
   const addNode = (kind: FlowNodeKind, opts: { mail?: boolean } = {}) => {
     setFlow((f) => {
       const id = newId("n", f.nodes.map((n) => n.id));
-      const node = blankNode(id, kind, opts);
+      const node = blankNode(t, id, kind, opts);
       const from = f.nodes.find((n) => n.id === selected);
       // Below the selected node, moved aside while another node sits there.
       const spot = from?.position ? { x: from.position.x, y: from.position.y + 150 } : { x: 0, y: f.nodes.length * 150 };
@@ -219,8 +260,8 @@ export function FlowEditor(props: Props) {
   const rfEdges: Edge[] = flow.nodes.flatMap((n) => {
     if (n.kind === "CONDITION") {
       return [
-        ...n.branches.filter((b) => b.next).map((b) => ({ id: `${n.id}:${b.id}`, source: n.id, sourceHandle: b.id, target: b.next!, label: b.label || BRANCH_SOURCE_LABELS[b.source] })),
-        ...(n.elseNext ? [{ id: `${n.id}:else`, source: n.id, sourceHandle: "else", target: n.elseNext, label: n.elseLabel || `אחרת, ${n.elseAfterBusinessDays ?? "?"} ימים` }] : []),
+        ...n.branches.filter((b) => b.next).map((b) => ({ id: `${n.id}:${b.id}`, source: n.id, sourceHandle: b.id, target: b.next!, label: b.label || t(`labels.branchSources.${b.source}`) })),
+        ...(n.elseNext ? [{ id: `${n.id}:else`, source: n.id, sourceHandle: "else", target: n.elseNext, label: n.elseLabel || t("flow.otherwiseEdge", { days: String(n.elseAfterBusinessDays ?? "?") }) }] : []),
       ];
     }
     return n.next ? [{ id: `${n.id}:next`, source: n.id, sourceHandle: "next", target: n.next }] : [];
@@ -246,11 +287,15 @@ export function FlowEditor(props: Props) {
     start(async () => {
       const res = await saveAndActivateFlowAction({ clientId: props.clientId, processId: props.processId, flow, baseVersion: base, highlights: props.highlights, outputs: props.outputs });
       if (res.error || !res.result) {
-        setMessage({ tone: "error", text: res.error ?? "השמירה נכשלה." });
+        setMessage({ tone: "error", text: res.error ?? t("flow.saveFailed") });
         return;
       }
       setBase(res.result.version);
-      setMessage(res.result.live ? { tone: "ok", text: `הנוהל פעיל, בגרסה ${res.result.version}. ריצות שכבר התחילו ממשיכות לפי הגרסה הקודמת.` } : { tone: "wait", text: `נשמר כגרסה ${res.result.version}, עוד לא פעיל. ${res.result.reason}` });
+      setMessage(
+        res.result.live
+          ? { tone: "ok", text: t("flow.live", { version: String(res.result.version) }) }
+          : { tone: "wait", text: t("flow.waiting", { version: String(res.result.version), reason: res.result.reason }) }
+      );
     });
   };
 
@@ -259,7 +304,7 @@ export function FlowEditor(props: Props) {
     <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
       {label}
       <select value={value ?? ""} onChange={(e) => onChange(e.target.value || null)} className={INPUT}>
-        <option value="">לא נבחר</option>
+        <option value="">{t("flow.notChosen")}</option>
         {others.map((o) => (
           <option key={o.id} value={o.id}>
             {o.kind === "CONDITION" ? o.question || o.title : o.title}
@@ -274,18 +319,20 @@ export function FlowEditor(props: Props) {
       <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-app-border bg-white px-4 py-3">
         <div className="flex flex-col gap-0.5">
           <span className="text-xs text-app-text-secondary">
-            {props.code} · {props.triggerText ? `התחלה: ${props.triggerText}` : "בלי טריגר מוגדר"}
+            {props.code} · {props.triggerText ? t("flow.start", { text: props.triggerText }) : t("flow.noTrigger")}
           </span>
-          <h1 className="text-lg font-medium text-app-text-primary">{props.title}</h1>
+          <h1 dir="auto" className="text-lg font-medium text-app-text-primary">
+            {props.title}
+          </h1>
           <a href={`/app/clients/${props.clientId}/connections`} className="text-xs text-app-text-accent hover:underline" data-testid="flow-connections-link">
-            חיבורים של הלקוח ({props.connections.length})
+            {t("flow.connections", { count: props.connections.length })}
           </a>
-          {props.fromList && <span className="text-xs text-app-text-tertiary">הנוהל נשמר עד היום כרשימה, והומר לזרימה. שום דבר לא נשמר עד שלוחצים על &quot;שמור והפעל&quot;.</span>}
+          {props.fromList && <span className="text-xs text-app-text-tertiary">{t("flow.fromList")}</span>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`text-xs ${issues.length ? "text-app-error" : "text-app-success"}`}>{issues.length ? `${issues.length} בעיות חוסמות` : "כל הבדיקות עברו"}</span>
+          <span className={`text-xs ${issues.length ? "text-app-error" : "text-app-success"}`}>{issues.length ? t("flow.issuesCount", { count: issues.length }) : t("flow.allPassed")}</span>
           <button type="button" onClick={save} disabled={pending || issues.length > 0} className="h-11 rounded-[10px] bg-app-surface-nav px-5 text-sm font-medium text-app-surface-page disabled:opacity-50" data-testid="flow-save">
-            {pending ? "שומר..." : "שמור והפעל"}
+            {pending ? t("common.saving") : t("flow.saveActivate")}
           </button>
         </div>
       </header>
@@ -306,10 +353,10 @@ export function FlowEditor(props: Props) {
             <li key={k} className="text-xs text-app-error">
               {i.node ? (
                 <button type="button" onClick={() => setSelected(i.node!)} className="text-start hover:underline">
-                  {i.message}
+                  {issueText(t, i)}
                 </button>
               ) : (
-                i.message
+                issueText(t, i)
               )}
             </li>
           ))}
@@ -345,14 +392,14 @@ export function FlowEditor(props: Props) {
 
         <aside className="flex flex-[1_1_300px] flex-col gap-4 rounded-xl border border-app-border bg-white p-4">
           <div className="flex flex-col gap-2">
-            <h2 className="text-sm font-medium text-app-text-primary">{sel ? "הוספה אחרי הצומת הנבחר" : "הוספת צומת"}</h2>
+            <h2 className="text-sm font-medium text-app-text-primary">{sel ? t("flow.addAfter") : t("flow.addNode")}</h2>
             <div className="grid grid-cols-2 gap-2">
               {[
-                ["פעולה", () => addNode("ACTION")],
-                ["שליחת מייל", () => addNode("ACTION", { mail: true })],
-                ["המתנה", () => addNode("WAIT")],
-                ["תנאי", () => addNode("CONDITION")],
-                ["סיום", () => addNode("END")],
+                [t("labels.nodeKinds.ACTION"), () => addNode("ACTION")],
+                [t("labels.nodeKinds.MAIL"), () => addNode("ACTION", { mail: true })],
+                [t("labels.nodeKinds.WAIT"), () => addNode("WAIT")],
+                [t("labels.nodeKinds.CONDITION"), () => addNode("CONDITION")],
+                [t("labels.nodeKinds.END"), () => addNode("END")],
               ].map(([label, fn]) => (
                 <button key={label as string} type="button" onClick={fn as () => void} className="min-h-11 rounded-[10px] border border-app-border bg-app-surface-sunken text-sm text-app-text-primary hover:border-app-border-strong">
                   {label as string}
@@ -364,36 +411,36 @@ export function FlowEditor(props: Props) {
           {sel && (
             <div className="flex flex-col gap-3 border-t border-app-border pt-3" data-testid="flow-inspector">
               <div className="flex items-center justify-between">
-                <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${kindTone(sel)}`}>{sel.send ? "שליחת מייל" : KIND_LABELS[sel.kind]}</span>
+                <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${kindTone(sel)}`}>{kindLabel(t, sel)}</span>
                 <span className="flex gap-3 text-xs">
                   {flow.start !== sel.id && (
                     <button type="button" onClick={() => setFlow((f) => ({ ...f, start: sel.id }))} className="text-app-text-secondary hover:underline">
-                      להתחיל מכאן
+                      {t("flow.startHere")}
                     </button>
                   )}
                   <button type="button" onClick={() => removeNode(sel.id)} className="text-app-error hover:underline">
-                    מחיקה
+                    {t("flow.delete")}
                   </button>
                 </span>
               </div>
 
               {sel.kind !== "CONDITION" && (
                 <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-                  מה עושים
-                  <input value={sel.title} onChange={(e) => update(sel.id, { title: e.target.value, step: sel.step ? { ...sel.step, title: e.target.value } : null })} className={INPUT} />
+                  {t("flow.whatDone")}
+                  <input dir="auto" value={sel.title} onChange={(e) => update(sel.id, { title: e.target.value, step: sel.step ? { ...sel.step, title: e.target.value } : null })} className={INPUT} />
                 </label>
               )}
 
               {sel.kind === "CONDITION" && (
                 <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-                  השאלה
-                  <input value={sel.question ?? ""} onChange={(e) => update(sel.id, { question: e.target.value, title: e.target.value })} className={INPUT} />
+                  {t("flow.question")}
+                  <input dir="auto" value={sel.question ?? ""} onChange={(e) => update(sel.id, { question: e.target.value, title: e.target.value })} className={INPUT} />
                 </label>
               )}
 
               {sel.kind !== "END" && (
                 <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-                  ימי עסקים להמתין לפני הצומת
+                  {t("flow.waitDays")}
                   <input
                     inputMode="numeric"
                     value={sel.waitBusinessDays ?? ""}
@@ -405,11 +452,11 @@ export function FlowEditor(props: Props) {
 
               {sel.kind === "ACTION" && sel.step && !sel.send && (
                 <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-                  איך
+                  {t("flow.how")}
                   <select value={sel.step.mode} onChange={(e) => update(sel.id, { step: { ...sel.step!, mode: e.target.value as StepModeLike } })} className={INPUT}>
                     {(Object.keys(STEP_MODE_LABELS) as StepModeLike[]).map((m) => (
                       <option key={m} value={m}>
-                        {STEP_MODE_LABELS[m]}
+                        {t(`labels.stepModes.${m}`)}
                       </option>
                     ))}
                   </select>
@@ -418,8 +465,8 @@ export function FlowEditor(props: Props) {
 
               {sel.kind === "ACTION" && (
                 <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-                  אחראי, אם לא מבצע התהליך
-                  <input value={sel.owner?.text ?? ""} onChange={(e) => update(sel.id, { owner: e.target.value ? { userId: null, contactId: null, text: e.target.value } : null })} placeholder="למשל: הלקוח" className={INPUT} />
+                  {t("flow.ownerIfNot")}
+                  <input value={sel.owner?.text ?? ""} onChange={(e) => update(sel.id, { owner: e.target.value ? { userId: null, contactId: null, text: e.target.value } : null })} placeholder={t("flow.ownerPlaceholder")} className={INPUT} />
                 </label>
               )}
 
@@ -429,12 +476,12 @@ export function FlowEditor(props: Props) {
 
               {sel.kind === "CONDITION" && <ConditionFields node={sel} flow={flow} update={update} nextSelect={nextSelect} connections={props.connections} clientId={props.clientId} />}
 
-              {(sel.kind === "ACTION" || sel.kind === "WAIT") && nextSelect(sel.next, (v) => update(sel.id, { next: v }), "ממשיך ל")}
+              {(sel.kind === "ACTION" || sel.kind === "WAIT") && nextSelect(sel.next, (v) => update(sel.id, { next: v }), t("flow.continuesTo"))}
             </div>
           )}
 
           <p className="text-xs leading-relaxed text-app-text-tertiary">
-            {desktop ? "גוררים צומת כדי להזיז אותו, ומושכים קו מהנקודה התחתונה לצומת אחר כדי לחבר." : "לוחצים על צומת כדי לערוך אותו. במחשב יש קנבס עם גרירה."}
+            {desktop ? t("flow.helpDesktop") : t("flow.helpMobile")}
           </p>
         </aside>
       </div>
@@ -443,14 +490,15 @@ export function FlowEditor(props: Props) {
 }
 
 function SendFields({ node, contacts, onChange }: { node: FlowNode; contacts: { id: string; name: string }[]; onChange: (s: NonNullable<FlowNode["send"]>) => void }) {
+  const t = useTx();
   const send = node.send!;
   return (
     <div className="flex flex-col gap-3 rounded-[10px] bg-app-surface-sunken p-3">
-      <p className="text-xs text-app-text-secondary">נשלח מהתיבה של מנהל התיק.</p>
+      <p className="text-xs text-app-text-secondary">{t("flow.sentFrom")}</p>
       <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-        אל
+        {t("flow.to")}
         <select value={send.toContactId ?? ""} onChange={(e) => onChange({ ...send, toContactId: e.target.value || null })} className={INPUT}>
-          <option value="">לא נבחר איש קשר</option>
+          <option value="">{t("flow.noContact")}</option>
           {contacts.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -459,20 +507,20 @@ function SendFields({ node, contacts, onChange }: { node: FlowNode; contacts: { 
         </select>
       </label>
       <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-        נוסח
-        <textarea rows={4} value={send.body ?? ""} onChange={(e) => onChange({ ...send, body: e.target.value || null })} className={INPUT} />
+        {t("flow.wording")}
+        <textarea dir="auto" rows={4} value={send.body ?? ""} onChange={(e) => onChange({ ...send, body: e.target.value || null })} className={INPUT} />
       </label>
-      <p className="text-[11px] text-app-text-tertiary">פרמטרים: {MESSAGE_PARAMS.map((p) => `{{${p}}}`).join(" ")}</p>
+      <p className="text-[11px] text-app-text-tertiary">{t("flow.params", { params: MESSAGE_PARAMS.map((p) => `{{${p}}}`).join(" ") })}</p>
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1 text-xs text-app-text-secondary">איך נשלח</legend>
+        <legend className="mb-1 text-xs text-app-text-secondary">{t("flow.howSent")}</legend>
         {(["DRAFT", "AUTO"] as const).map((m) => (
           <label key={m} className="flex items-center gap-2 text-sm text-app-text-primary">
             <input type="radio" name={`mode-${node.id}`} checked={send.mode === m} onChange={() => onChange({ ...send, mode: m })} className="h-4 w-4 accent-gold" />
-            {SEND_MODE_LABELS[m]}
+            {t(`labels.sendModes.${m}`)}
           </label>
         ))}
       </fieldset>
-      {send.mode === "AUTO" && <p className="rounded-md bg-app-warning-soft px-2 py-1.5 text-xs text-app-warning">שליחה אוטומטית עוברת עין שנייה פעם אחת, וצריכה נוסח קבוע. עד האישור, הגרסה הקודמת ממשיכה לרוץ.</p>}
+      {send.mode === "AUTO" && <p className="rounded-md bg-app-warning-soft px-2 py-1.5 text-xs text-app-warning">{t("flow.autoWarning")}</p>}
     </div>
   );
 }
@@ -492,30 +540,31 @@ function ConditionFields({
   update: (id: string, patch: Partial<FlowNode>) => void;
   nextSelect: (value: string | null, onChange: (v: string | null) => void, label: string) => React.ReactNode;
 }) {
+  const t = useTx();
   const setBranch = (bid: string, patch: Partial<FlowBranch>) => update(node.id, { branches: node.branches.map((b) => (b.id === bid ? { ...b, ...patch } : b)) });
   const mailNodes = flow.nodes.filter((n) => n.send);
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs text-app-text-secondary">הענפים נבדקים לפי הסדר. הראשון שמתקיים זוכה.</p>
+      <p className="text-xs text-app-text-secondary">{t("flow.branchOrder")}</p>
       {node.branches.map((b, i) => (
         <div key={b.id} className="flex flex-col gap-2 rounded-[10px] bg-app-surface-sunken p-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-app-text-primary">ענף {i + 1}</span>
+            <span className="text-xs font-medium text-app-text-primary">{t("flow.branch", { n: i + 1 })}</span>
             <button type="button" onClick={() => update(node.id, { branches: node.branches.filter((x) => x.id !== b.id) })} className="text-xs text-app-error hover:underline">
-              הסרה
+              {t("flow.remove")}
             </button>
           </div>
-          <input aria-label={`ענף ${i + 1}: שם`} value={b.label} onChange={(e) => setBranch(b.id, { label: e.target.value })} placeholder="למשל: הגיע קובץ" className={INPUT} />
-          <select aria-label={`ענף ${i + 1}: מקור התשובה`} value={b.source} onChange={(e) => setBranch(b.id, { source: e.target.value as BranchSource })} className={INPUT}>
+          <input aria-label={t("flow.branchNameAria", { n: i + 1 })} dir="auto" value={b.label} onChange={(e) => setBranch(b.id, { label: e.target.value })} placeholder={t("flow.branchPlaceholder")} className={INPUT} />
+          <select aria-label={t("flow.sourceAria", { n: i + 1 })} value={b.source} onChange={(e) => setBranch(b.id, { source: e.target.value as BranchSource })} className={INPUT}>
             {(Object.keys(BRANCH_SOURCE_LABELS) as BranchSource[]).map((s) => (
               <option key={s} value={s}>
-                {BRANCH_SOURCE_LABELS[s]}
+                {t(`labels.branchSources.${s}`)}
               </option>
             ))}
           </select>
           {b.source === "EMAIL_REPLY" && (
-            <select aria-label={`ענף ${i + 1}: תשובה לאיזה מייל`} value={b.ref ?? ""} onChange={(e) => setBranch(b.id, { ref: e.target.value || null })} className={INPUT}>
-              <option value="">תשובה לאיזה מייל</option>
+            <select aria-label={t("flow.replyAria", { n: i + 1 })} value={b.ref ?? ""} onChange={(e) => setBranch(b.id, { ref: e.target.value || null })} className={INPUT}>
+              <option value="">{t("flow.replyTo")}</option>
               {mailNodes.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.title}
@@ -525,8 +574,8 @@ function ConditionFields({
           )}
           {(b.source === "EMAIL_REPLY" || b.source === "DRIVE_FILE") && (
             <>
-              <select aria-label={`ענף ${i + 1}: חיבור`} value={b.connectionId ?? ""} onChange={(e) => setBranch(b.id, { connectionId: e.target.value || null })} className={INPUT}>
-                <option value="">חיבור של הלקוח</option>
+              <select aria-label={t("flow.connectionAria", { n: i + 1 })} value={b.connectionId ?? ""} onChange={(e) => setBranch(b.id, { connectionId: e.target.value || null })} className={INPUT}>
+                <option value="">{t("flow.clientConnection")}</option>
                 {connections
                   .filter((c) => (b.source === "DRIVE_FILE" ? c.kind === "GOOGLE_OAUTH" : c.kind !== "MANAGER_SEND"))
                   .map((c) => (
@@ -536,14 +585,14 @@ function ConditionFields({
                   ))}
               </select>
               {b.source === "DRIVE_FILE" && (
-                <input aria-label={`ענף ${i + 1}: מזהה תיקייה בדרייב`} dir="ltr" value={b.ref ?? ""} onChange={(e) => setBranch(b.id, { ref: e.target.value.trim() || null })} placeholder="מזהה התיקייה בדרייב" className={INPUT} />
+                <input aria-label={t("flow.folderAria", { n: i + 1 })} dir="ltr" value={b.ref ?? ""} onChange={(e) => setBranch(b.id, { ref: e.target.value.trim() || null })} placeholder={t("flow.folderPlaceholder")} className={INPUT} />
               )}
               <a href={`/app/clients/${clientId}/connections`} className="text-[11px] text-app-text-accent hover:underline">
-                ניהול החיבורים של הלקוח
+                {t("flow.manageConnections")}
               </a>
             </>
           )}
-          {nextSelect(b.next, (v) => setBranch(b.id, { next: v }), "ממשיך ל")}
+          {nextSelect(b.next, (v) => setBranch(b.id, { next: v }), t("flow.continuesTo"))}
         </div>
       ))}
       <button
@@ -551,36 +600,37 @@ function ConditionFields({
         onClick={() => update(node.id, { branches: [...node.branches, { id: newId("b", node.branches.map((b) => b.id)), label: "", source: "MANUAL", connectionId: null, ref: null, next: null }] })}
         className="min-h-11 rounded-[10px] border border-dashed border-app-border-strong text-sm text-app-text-primary"
       >
-        + ענף נוסף
+        {t("flow.addBranch")}
       </button>
       <div className="flex flex-col gap-2 rounded-[10px] border border-dashed border-app-border-strong p-3">
-        <span className="text-xs font-medium text-app-text-primary">אחרת</span>
+        <span className="text-xs font-medium text-app-text-primary">{t("flow.otherwise")}</span>
         <label className="flex items-center gap-2 text-sm text-app-text-primary">
-          אחרי
+          {t("flow.after")}
           <input
             inputMode="numeric"
-            aria-label="ימי עסקים בלי תשובה"
+            aria-label={t("flow.elseDays")}
             value={node.elseAfterBusinessDays ?? ""}
             onChange={(e) => update(node.id, { elseAfterBusinessDays: /^\d{1,2}$/.test(e.target.value) ? Number(e.target.value) : null })}
             className="h-11 w-16 rounded-[10px] border border-app-border-strong text-center"
           />
-          ימי עסקים בלי תשובה
+          {t("flow.elseDays")}
         </label>
-        {nextSelect(node.elseNext, (v) => update(node.id, { elseNext: v }), "ממשיך ל")}
+        {nextSelect(node.elseNext, (v) => update(node.id, { elseNext: v }), t("flow.continuesTo"))}
       </div>
     </div>
   );
 }
 
 function MobileTree({ flow, selected, onSelect, eyes, flagged }: { flow: ProcessFlow; selected: string | null; onSelect: (id: string) => void; eyes: Set<string>; flagged: Set<string> }) {
-  const lines = flowTree(flow);
+  const t = useTx();
+  const lines = flowTree(flow, { source: (s) => t(`labels.branchSources.${s}`), otherwise: (days) => t("flow.otherwiseTree", { days: String(days ?? "?") }) });
   return (
     <ol className="flex flex-col gap-2" data-testid="flow-tree">
       {lines.map((l, i) => (
         <li key={i} style={{ paddingInlineStart: `${l.depth * 16}px` }}>
           {l.branch && <span className="mb-1 inline-block rounded-full bg-app-neutral-soft px-2 py-0.5 text-[11px] text-app-text-secondary">{l.branch}</span>}
           {l.type === "goto" ? (
-            <p className="text-xs text-app-text-secondary">↓ ממשיך ל: {l.target.kind === "CONDITION" ? l.target.question || l.target.title : l.target.title}</p>
+            <p className="text-xs text-app-text-secondary">↓ {t("flow.goto", { target: l.target.kind === "CONDITION" ? l.target.question || l.target.title : l.target.title })}</p>
           ) : (
             <button
               type="button"
@@ -588,16 +638,18 @@ function MobileTree({ flow, selected, onSelect, eyes, flagged }: { flow: Process
               className={`flex w-full flex-col gap-0.5 rounded-xl border bg-white px-3 py-2.5 text-start ${l.node.id === selected ? "border-2 border-app-accent" : flagged.has(l.node.id) ? "border-app-error" : "border-app-border"}`}
             >
               <span className="flex items-center justify-between gap-2">
-                <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${kindTone(l.node)}`}>{l.node.send ? "שליחת מייל" : KIND_LABELS[l.node.kind]}</span>
-                {eyes.has(l.node.id) && <span className="text-[11px] font-medium text-app-warning">עין שנייה</span>}
+                <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${kindTone(l.node)}`}>{kindLabel(t, l.node)}</span>
+                {eyes.has(l.node.id) && <span className="text-[11px] font-medium text-app-warning">{t("flow.secondEye")}</span>}
               </span>
-              <span className="text-sm font-medium text-app-text-primary">{l.node.kind === "CONDITION" ? l.node.question || l.node.title : l.node.title}</span>
-              {subline(l.node) && <span className="text-xs text-app-text-secondary">{subline(l.node)}</span>}
+              <span dir="auto" className="text-sm font-medium text-app-text-primary">
+                {l.node.kind === "CONDITION" ? l.node.question || l.node.title : l.node.title}
+              </span>
+              {subline(t, l.node) && <span className="text-xs text-app-text-secondary">{subline(t, l.node)}</span>}
             </button>
           )}
         </li>
       ))}
-      {lines.length === 0 && <li className="text-sm text-app-text-secondary">אין עדיין צמתים. מוסיפים צומת ראשון מהרשימה.</li>}
+      {lines.length === 0 && <li className="text-sm text-app-text-secondary">{t("flow.emptyTree")}</li>}
     </ol>
   );
 }

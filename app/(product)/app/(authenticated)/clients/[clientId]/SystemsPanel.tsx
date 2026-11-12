@@ -1,14 +1,14 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { formatMinor } from "@/lib/money";
-import { KNOWLEDGE_STATUS_LABELS, KNOWLEDGE_AUDIENCE_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
+import { type KnowledgeStatusLike } from "@/lib/knowledge";
 import {
-  BILLING_CYCLE_LABELS,
   SYSTEM_ACCESS_STATUS_LABELS,
   SYSTEM_ACCESS_STATUS_TONE,
   SYSTEM_PERMISSION_LABELS,
@@ -86,6 +86,8 @@ function SystemForm({
   entities: EntityOption[];
   existing?: PanelSystem;
 }) {
+  const t = useTranslations("clients.systems");
+  const tStatus = useTranslations("clients.page.knowledgeStatus");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(existing ? updateSystemAccessAction : addSystemAccessAction, close);
   const [status, setStatus] = useState<KnowledgeStatusLike>(existing?.status ?? "CONFIRMED");
@@ -95,52 +97,52 @@ function SystemForm({
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       {existing && <input type="hidden" name="id" value={existing.id} />}
-      <Field label="מערכת *">
+      <Field label={t("system")}>
         <input name="systemName" required defaultValue={existing?.systemName ?? ""} placeholder="Mercury" className={INPUT} />
       </Field>
       <EntitySelect entities={entities} defaultValue={existing?.entityId} />
-      <Field label="למה היא משמשת">
-        <input name="purpose" defaultValue={existing?.purpose ?? ""} placeholder="בנק של Inc" className={INPUT} />
+      <Field label={t("purpose")}>
+        <input name="purpose" defaultValue={existing?.purpose ?? ""} placeholder={t("purposePlaceholder")} className={INPUT} />
       </Field>
-      <Field label="כתובת">
+      <Field label={t("url")}>
         <input name="url" dir="ltr" defaultValue={existing?.url ?? ""} placeholder="app.mercury.com" className={INPUT} />
       </Field>
-      <Field label="החשבון שאנחנו עובדים איתו">
+      <Field label={t("accountUsed")}>
         <input name="accountUsed" defaultValue={existing?.accountUsed ?? ""} placeholder="office@client.com" className={INPUT} />
       </Field>
-      <p className="-mt-2 text-[11px] text-app-text-tertiary">בלי סיסמאות. סיסמה נשמרת בכספת.</p>
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">{t("noPasswords")}</p>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="מצב הגישה">
+        <Field label={t("accessStatus")}>
           <select name="accessStatus" value={access} onChange={(e) => setAccess(e.target.value as SystemAccessStatusLike)} className={INPUT}>
             {(Object.keys(SYSTEM_ACCESS_STATUS_LABELS) as SystemAccessStatusLike[]).map((s) => (
               <option key={s} value={s}>
-                {SYSTEM_ACCESS_STATUS_LABELS[s]}
+                {t(`access.${s}`)}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="ההרשאה שלנו">
+        <Field label={t("ourPermission")}>
           <select name="ourPermission" defaultValue={existing?.ourPermission ?? "USER"} className={INPUT}>
             {(Object.keys(SYSTEM_PERMISSION_LABELS) as SystemPermissionLike[]).map((p) => (
               <option key={p} value={p}>
-                {SYSTEM_PERMISSION_LABELS[p]}
+                {t(`permissions.${p}`)}
               </option>
             ))}
           </select>
         </Field>
       </div>
       {isAccessGap(access) && (
-        <Field label="מה חוסם">
-          <input name="blocker" defaultValue={existing?.blocker ?? ""} placeholder="MFA לטלפון של המנכ״ל" className={INPUT} />
+        <Field label={t("blocker")}>
+          <input name="blocker" defaultValue={existing?.blocker ?? ""} placeholder={t("blockerPlaceholder")} className={INPUT} />
         </Field>
       )}
-      <Field label="מי מנהל אותה אצל הלקוח">
-        <input name="clientAdmin" defaultValue={existing?.clientAdmin ?? ""} placeholder="המנכ״ל פותח משתמשים ידנית" className={INPUT} />
+      <Field label={t("clientAdmin")}>
+        <input name="clientAdmin" defaultValue={existing?.clientAdmin ?? ""} placeholder={t("clientAdminPlaceholder")} className={INPUT} />
       </Field>
       {vault && (
-        <Field label="רשומה בכספת">
+        <Field label={t("vaultEntry")}>
           <select name="credentialId" defaultValue={existing?.credential?.id ?? ""} className={INPUT}>
-            <option value="">אין</option>
+            <option value="">{t("none")}</option>
             {vault.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.systemName}
@@ -151,7 +153,7 @@ function SystemForm({
       )}
 
       <div className="grid grid-cols-3 gap-3">
-        <Field label="עלות">
+        <Field label={t("cost")}>
           <input
             name="billingCost"
             dir="ltr"
@@ -160,38 +162,38 @@ function SystemForm({
             className={INPUT}
           />
         </Field>
-        <Field label="מטבע">
+        <Field label={t("currency")}>
           <select name="billingCurrency" defaultValue={existing?.billingCurrency ?? "USD"} className={INPUT}>
             <option value="USD">$</option>
             <option value="ILS">₪</option>
           </select>
         </Field>
-        <Field label="מחזור">
+        <Field label={t("cycle")}>
           <select name="billingCycle" defaultValue={existing?.billingCycle ?? "MONTHLY"} className={INPUT}>
-            <option value="MONTHLY">חודשי</option>
-            <option value="ANNUAL">שנתי</option>
-            <option value="OTHER">אחר</option>
+            <option value="MONTHLY">{t("cycles.MONTHLY")}</option>
+            <option value="ANNUAL">{t("cycles.ANNUAL")}</option>
+            <option value="OTHER">{t("cycles.OTHER")}</option>
           </select>
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="4 ספרות של הכרטיס">
+        <Field label={t("cardLast4")}>
           <input name="cardLast4" dir="ltr" inputMode="numeric" maxLength={4} defaultValue={existing?.cardLast4 ?? ""} className={INPUT} />
         </Field>
-        <Field label="לאן מגיעה החשבונית">
+        <Field label={t("invoiceTo")}>
           <input name="invoiceTo" dir="ltr" defaultValue={existing?.invoiceTo ?? ""} placeholder="billing@client.com" className={INPUT} />
         </Field>
       </div>
-      <Field label="הערות">
+      <Field label={t("notes")}>
         <textarea name="notes" rows={2} defaultValue={existing?.notes ?? ""} className={INPUT} />
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="סטטוס">
+        <Field label={t("status")}>
           <select name="knowledgeStatus" value={status} onChange={(e) => setStatus(e.target.value as KnowledgeStatusLike)} className={INPUT}>
-            <option value="CONFIRMED">{KNOWLEDGE_STATUS_LABELS.CONFIRMED}</option>
-            <option value="UNCERTAIN">{KNOWLEDGE_STATUS_LABELS.UNCERTAIN}</option>
-            <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
+            <option value="CONFIRMED">{tStatus("CONFIRMED")}</option>
+            <option value="UNCERTAIN">{tStatus("UNCERTAIN")}</option>
+            <option value="MISSING">{tStatus("MISSING")}</option>
           </select>
         </Field>
         <AudienceField existing={existing} />
@@ -200,16 +202,16 @@ function SystemForm({
       <MissingFields target="SYSTEM" existing={existing} />
       <ItemExtras existing={existing} />
       {status !== "CONFIRMED" && (
-        <Field label="מה יסגור את זה *">
+        <Field label={t("toResolve")}>
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
         </Field>
       )}
-      <Field label="למי אסור לספר">
+      <Field label={t("doNotDisclose")}>
         <input name="doNotDisclose" defaultValue={existing?.doNotDisclose ?? ""} className={INPUT} />
       </Field>
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : existing ? "שמירה" : "הוספה למפה"}
+        {pending ? t("saving") : existing ? t("save") : t("add")}
       </button>
     </form>
   );
@@ -232,27 +234,28 @@ export function SystemsPanel({
   ruleWarnings?: Record<string, string[]>;
 }) {
   const { showToast } = useToast();
+  const t = useTranslations("clients.systems");
   const gaps = systems.filter((s) => isAccessGap(s.accessStatus)).length;
 
   async function remove(s: PanelSystem) {
     const result = await removeSystemAccessAction(s.id, clientId);
-    if (result.error) showToast({ tone: "error", title: "ההסרה נכשלה", description: result.error });
-    else showToast({ tone: "info", title: "הוסר מהמפה", description: s.systemName });
+    if (result.error) showToast({ tone: "error", title: t("removeFailed"), description: result.error });
+    else showToast({ tone: "info", title: t("removed"), description: s.systemName });
   }
 
   return (
     <div className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <h2 className="text-sm font-medium text-app-text-primary">
-          מפת מערכות ({systems.length})
-          {gaps > 0 && <span className="ms-2 text-xs font-normal text-app-warning">{gaps} בלי גישה עדיין</span>}
+          {t("title", { count: systems.length })}
+          {gaps > 0 && <span className="ms-2 text-xs font-normal text-app-warning">{t("gaps", { count: gaps })}</span>}
         </h2>
-        <Drawer triggerLabel="+ מערכת" title="מערכת במפה" variant="link">
+        <Drawer triggerLabel={t("addTrigger")} title={t("drawerTitle")} variant="link">
           <SystemForm clientId={clientId} sourceOptions={sourceOptions} vault={vault} entities={entities} />
         </Drawer>
       </div>
       {systems.length === 0 ? (
-        <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין מערכות במפה. גם מערכת שאין לנו אליה גישה נכנסת לכאן.</p>
+        <p className="mt-2 text-sm text-app-text-tertiary">{t("empty")}</p>
       ) : (
         <ul className="mt-4 divide-y divide-app-border">
           {systems.map((s) => (
@@ -260,57 +263,57 @@ export function SystemsPanel({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-[1_1_18rem]">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-app-text-primary">{s.systemName}</p>
-                    <StatusBadge label={SYSTEM_ACCESS_STATUS_LABELS[s.accessStatus]} tone={SYSTEM_ACCESS_STATUS_TONE[s.accessStatus]} />
+                    <p dir="auto" className="text-sm font-medium text-app-text-primary">{s.systemName}</p>
+                    <StatusBadge label={t(`access.${s.accessStatus}`)} tone={SYSTEM_ACCESS_STATUS_TONE[s.accessStatus]} />
                   </div>
                   <p className="text-xs text-app-text-secondary">
-                    {[s.purpose, s.entityName, s.ourPermission !== "NONE" ? `הרשאה: ${SYSTEM_PERMISSION_LABELS[s.ourPermission]}` : null]
+                    {[s.purpose, s.entityName, s.ourPermission !== "NONE" ? t("permissionLine", { permission: t(`permissions.${s.ourPermission}`) }) : null]
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
                   {s.accountUsed && (
                     <p className="mt-1 text-xs text-app-text-secondary">
-                      חשבון: <span dir="ltr">{s.accountUsed}</span>
+                      {t.rich("accountLine", { account: s.accountUsed, ltr: (chunks) => <span dir="ltr">{chunks}</span> })}
                     </p>
                   )}
-                  {s.blocker && <p className="mt-1 text-xs text-app-warning">חוסם: {s.blocker}</p>}
-                  {s.clientAdmin && <p className="mt-1 text-xs text-app-text-secondary">מנהל אצל הלקוח: {s.clientAdmin}</p>}
+                  {s.blocker && <p className="mt-1 text-xs text-app-warning">{t("blockerLine", { value: s.blocker })}</p>}
+                  {s.clientAdmin && <p className="mt-1 text-xs text-app-text-secondary">{t("clientAdminLine", { value: s.clientAdmin })}</p>}
                   {s.billingCostMinor !== null && (
                     <p className="mt-1 text-xs text-app-text-secondary">
-                      {money(s.billingCostMinor, s.billingCurrency)} {s.billingCycle ? BILLING_CYCLE_LABELS[s.billingCycle] : ""}
+                      {money(s.billingCostMinor, s.billingCurrency)} {s.billingCycle && s.billingCycle !== "OTHER" ? t(`per.${s.billingCycle}`) : ""}
                       {s.cardLast4 && <span dir="ltr"> · ****{s.cardLast4}</span>}
                       {s.invoiceTo && (
                         <>
                           {" "}
-                          · חשבונית ל-<span dir="ltr">{s.invoiceTo}</span>
+                          · {t.rich("invoiceLine", { to: s.invoiceTo, ltr: (chunks) => <span dir="ltr">{chunks}</span> })}
                         </>
                       )}
                     </p>
                   )}
-                  {s.notes && <p className="mt-1 text-xs text-app-text-secondary">{s.notes}</p>}
+                  {s.notes && <p dir="auto" className="mt-1 text-xs text-app-text-secondary">{s.notes}</p>}
                   {s.credential && (
                     <p className="mt-1 text-xs">
                       <Link href={`/app/credentials?clientId=${clientId}`} className="text-app-text-accent hover:underline">
-                        בכספת: {s.credential.systemName}
+                        {t("inVault", { name: s.credential.systemName })}
                       </Link>
                     </p>
                   )}
-                  {s.doNotDisclose && <p className="mt-1 text-xs text-app-error">לא לספר: {s.doNotDisclose}</p>}
+                  {s.doNotDisclose && <p className="mt-1 text-xs text-app-error">{t("doNotDiscloseLine", { value: s.doNotDisclose })}</p>}
                   {(ruleWarnings[s.id] ?? []).map((w, i) => (
                     <p key={i} className="mt-1 text-xs text-app-warning">
                       {w}
                     </p>
                   ))}
                   <StatusLine status={s.status} toResolve={s.toResolve} />
-                  <ItemTags item={s} />
+                  <ItemTags item={s} missingTarget="SYSTEM" />
                   <SourceCodes sources={s.sources} options={sourceOptions} />
                 </div>
                 <div className="flex shrink-0 items-center gap-3 text-xs">
-                  <Drawer triggerLabel="עריכה" title="עריכת מערכת" variant="link">
+                  <Drawer triggerLabel={t("edit")} title={t("editTitle")} variant="link">
                     <SystemForm clientId={clientId} sourceOptions={sourceOptions} vault={vault} entities={entities} existing={s} />
                   </Drawer>
                   <button type="button" onClick={() => remove(s)} className="text-app-text-tertiary hover:text-app-error">
-                    הסרה
+                    {t("remove")}
                   </button>
                 </div>
               </div>

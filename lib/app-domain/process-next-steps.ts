@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canManageClients } from "@/lib/app-auth/permissions";
@@ -115,7 +116,7 @@ export async function processDecisions(clientIds: string[], filter: (p: { client
 /// with the same checks. Returns what was done, in words.
 export async function runStep(actor: User, op: StepOp): Promise<string> {
   const process = await prisma.process.findFirst({ where: { id: op.processId, deletedAt: null }, select: { id: true, clientId: true, code: true } });
-  if (!process) throw new Error("התהליך לא נמצא.");
+  if (!process) throw new DomainError("processNextSteps.notFound", "התהליך לא נמצא.");
   await assertClientAccess(actor, process.clientId);
   switch (op.type) {
     case "link_date": {
@@ -124,7 +125,7 @@ export async function runStep(actor: User, op: StepOp): Promise<string> {
       return `המועד קושר ל-${process.code}`;
     }
     case "close_covered": {
-      if (!canManageClients(actor.role)) throw new Error("רק מנהל סוגר משימה בגלל שתהליך מכסה אותה.");
+      if (!canManageClients(actor.role)) throw new DomainError("processNextSteps.closeManagerOnly", "רק מנהל סוגר משימה בגלל שתהליך מכסה אותה.");
       for (const id of op.taskIds) await closeTaskCoveredByProcess(actor, id, op.processId);
       return op.taskIds.length === 1 ? "המשימה נסגרה" : `${op.taskIds.length} משימות נסגרו`;
     }
@@ -150,7 +151,7 @@ export async function runStep(actor: User, op: StepOp): Promise<string> {
 /// approveClientPolicy, so each is checked and recorded on its own, and one
 /// that fails stops nothing else. The batch itself is recorded too.
 export async function approveRulesTogether(actor: User, clientId: string, ids: string[]): Promise<{ approved: number; failed: string[] }> {
-  if (!canManageClients(actor.role)) throw new Error("רק מנהל מאשר כללים.");
+  if (!canManageClients(actor.role)) throw new DomainError("processNextSteps.rulesManagerOnly", "רק מנהל מאשר כללים.");
   await assertClientAccess(actor, clientId);
   const rules = await prisma.clientPolicy.findMany({ where: { id: { in: ids }, clientId, status: "PROPOSED", deletedAt: null }, select: { id: true, title: true } });
   let approved = 0;

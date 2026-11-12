@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -36,14 +37,14 @@ function clean(v: string | null | undefined): string | null {
 async function assertProcessBelongs(clientId: string, processId: string | null | undefined) {
   if (!processId) return;
   const found = await prisma.process.count({ where: { id: processId, clientId, deletedAt: null } });
-  if (!found) throw new Error("התהליך שנבחר לא נמצא אצל הלקוח הזה.");
+  if (!found) throw new DomainError("requestTypes.processNotFound", "התהליך שנבחר לא נמצא אצל הלקוח הזה.");
 }
 
 async function assertRoutes(clientId: string, ids: string[] | undefined) {
   const unique = [...new Set((ids ?? []).filter(Boolean))];
   if (unique.length === 0) return unique;
   const found = await prisma.clientContact.count({ where: { id: { in: unique }, clientId, deletedAt: null } });
-  if (found !== unique.length) throw new Error("איש קשר שנבחר לא נמצא בתיק של הלקוח.");
+  if (found !== unique.length) throw new DomainError("requestTypes.contactNotFound", "איש קשר שנבחר לא נמצא בתיק של הלקוח.");
   return unique;
 }
 
@@ -52,8 +53,8 @@ export async function addRequestType(actor: User, input: RequestTypeInput) {
   await assertClientAccess(actor, input.clientId);
   const title = clean(input.title);
   const handling = clean(input.handling);
-  if (!title) throw new Error("צריך שם לסוג הפנייה.");
-  if (!handling) throw new Error("צריך לכתוב איך עונים ולאן מעבירים.");
+  if (!title) throw new DomainError("requestTypes.titleRequired", "צריך שם לסוג הפנייה.");
+  if (!handling) throw new DomainError("requestTypes.handlingRequired", "צריך לכתוב איך עונים ולאן מעבירים.");
   assertResolvable(input.knowledgeStatus, input.toResolve);
   await assertEntityBelongs(input.clientId, input.entityId);
   await assertProcessBelongs(input.clientId, input.processId);
@@ -81,10 +82,10 @@ export async function addRequestType(actor: User, input: RequestTypeInput) {
 export async function updateRequestType(actor: User, id: string, input: Partial<Omit<RequestTypeInput, "clientId">>) {
   assertCan(actor.role, "time_entry.create_self");
   const before = await prisma.requestType.findUnique({ where: { id } });
-  if (!before || before.deletedAt) throw new Error("סוג הפנייה לא נמצא.");
+  if (!before || before.deletedAt) throw new DomainError("requestTypes.notFound", "סוג הפנייה לא נמצא.");
   await assertClientAccess(actor, before.clientId);
-  if (input.title !== undefined && !clean(input.title)) throw new Error("צריך שם לסוג הפנייה.");
-  if (input.handling !== undefined && !clean(input.handling)) throw new Error("צריך לכתוב איך עונים ולאן מעבירים.");
+  if (input.title !== undefined && !clean(input.title)) throw new DomainError("requestTypes.titleRequired", "צריך שם לסוג הפנייה.");
+  if (input.handling !== undefined && !clean(input.handling)) throw new DomainError("requestTypes.handlingRequired", "צריך לכתוב איך עונים ולאן מעבירים.");
   assertResolvable(input.knowledgeStatus ?? before.knowledgeStatus, input.toResolve !== undefined ? input.toResolve : before.toResolve);
   if (input.entityId !== undefined) await assertEntityBelongs(before.clientId, input.entityId);
   if (input.processId !== undefined) await assertProcessBelongs(before.clientId, input.processId);
@@ -111,7 +112,7 @@ export async function updateRequestType(actor: User, id: string, input: Partial<
 export async function removeRequestType(actor: User, id: string) {
   assertCan(actor.role, "time_entry.create_self");
   const row = await prisma.requestType.findUnique({ where: { id } });
-  if (!row || row.deletedAt) throw new Error("סוג הפנייה לא נמצא.");
+  if (!row || row.deletedAt) throw new DomainError("requestTypes.notFound", "סוג הפנייה לא נמצא.");
   await assertClientAccess(actor, row.clientId);
   const removed = await prisma.requestType.update({ where: { id }, data: { deletedAt: new Date() } });
   await recordAudit({ actorId: actor.id, action: "request_type.remove", entityType: "RequestType", entityId: id, clientId: row.clientId, before: row });

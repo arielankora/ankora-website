@@ -1,7 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { parseSourceRefs } from "@/lib/knowledge-sources";
 import { POLICY_KINDS } from "@/lib/client-policies";
 import {
@@ -16,6 +15,7 @@ import { approveException, rejectException, requestException, withdrawException 
 import { setClientRuleApprovers } from "@/lib/app-domain/rule-approvals";
 import type { KnowledgeStatus, PolicyKind } from "@prisma/client";
 import { itemExtrasFrom } from "./item-extras";
+import { knowledgeErrorT, knowledgeErrorText, type KnowledgeErrorT } from "./knowledge-errors";
 
 // Org brain, phase 3: the client's own rules on the client screen
 // (claude/org-brain-spec-2026-10-12.md, 3.11).
@@ -24,21 +24,15 @@ type FormState = { error?: string; ok?: boolean };
 
 const STATUSES: KnowledgeStatus[] = ["CONFIRMED", "UNCERTAIN", "MISSING"];
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
-  if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
-}
-
 function text(formData: FormData, name: string): string | null {
   return String(formData.get(name) ?? "").trim() || null;
 }
 
-function parsePolicy(formData: FormData, selfId?: string): { error?: string; value?: Omit<ClientPolicyInput, "clientId"> } {
+function parsePolicy(formData: FormData, t: KnowledgeErrorT, selfId?: string): { error?: string; value?: Omit<ClientPolicyInput, "clientId"> } {
   const { refs, invalid } = parseSourceRefs(String(formData.get("sources") ?? ""));
-  if (invalid.length) return { error: `מקור לא מובן: ${invalid.join(", ")}. כותבים קוד ודקה, למשל S1 08:13.` };
+  if (invalid.length) return { error: t("badSource", { entries: invalid.join(", ") }) };
   const kind = String(formData.get("kind") ?? "");
-  if (!(POLICY_KINDS as string[]).includes(kind)) return { error: "צריך לבחור את סוג הכלל." };
+  if (!(POLICY_KINDS as string[]).includes(kind)) return { error: t("policyKindRequired") };
   const status = String(formData.get("knowledgeStatus") ?? "");
   let params: unknown = {};
   let interimParams: unknown = {};
@@ -46,7 +40,7 @@ function parsePolicy(formData: FormData, selfId?: string): { error?: string; val
     params = JSON.parse(String(formData.get("params") ?? "{}"));
     interimParams = JSON.parse(String(formData.get("interimParams") ?? "{}"));
   } catch {
-    return { error: "מה שנבדק בכלל לא נקרא. רעננו ונסו שוב." };
+    return { error: t("paramsUnreadable") };
   }
   // Spec 3.11: two optional days. A form without them leaves them alone.
   const dayOf = (name: string): Date | null | undefined | "bad" => {
@@ -57,7 +51,7 @@ function parsePolicy(formData: FormData, selfId?: string): { error?: string; val
   };
   const effectiveFrom = dayOf("effectiveFrom");
   const reviewBy = dayOf("reviewBy");
-  if (effectiveFrom === "bad" || reviewBy === "bad") return { error: "תאריך לא תקין." };
+  if (effectiveFrom === "bad" || reviewBy === "bad") return { error: t("invalidDate") };
   return {
     value: {
       ...itemExtrasFrom(formData, selfId),
@@ -83,7 +77,7 @@ async function run(clientId: string, fn: () => Promise<unknown>): Promise<FormSt
   try {
     await fn();
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
@@ -92,7 +86,7 @@ async function run(clientId: string, fn: () => Promise<unknown>): Promise<FormSt
 export async function addPolicyAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parsePolicy(formData, user.id);
+  const parsed = parsePolicy(formData, await knowledgeErrorT(), user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   return run(clientId, () => addClientPolicy(user, { ...parsed.value!, clientId }));
 }
@@ -100,7 +94,7 @@ export async function addPolicyAction(_prev: FormState | undefined, formData: Fo
 export async function updatePolicyAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parsePolicy(formData, user.id);
+  const parsed = parsePolicy(formData, await knowledgeErrorT(), user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   return run(clientId, () => updateClientPolicy(user, String(formData.get("id") ?? ""), parsed.value!));
 }
@@ -129,7 +123,7 @@ export async function requestExceptionAction(_prev: FormState | undefined, formD
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
   const until = String(formData.get("validUntil") ?? "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(until)) return { error: "חריגה צריכה תאריך סיום." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(until)) return { error: (await knowledgeErrorT())("exceptionEndRequired") };
   return run(clientId, () =>
     requestException(user, {
       policyId: String(formData.get("policyId") ?? ""),

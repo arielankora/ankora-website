@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import type { ProcessCheckOutcome, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
@@ -99,14 +100,14 @@ export type CheckInput = { outcome: ProcessCheckOutcome; note?: string | null };
 export async function recordProcessCheck(actor: User, processId: string, input: CheckInput, now = new Date()) {
   assertCan(actor.role, "time_entry.create_self");
   const process = await prisma.process.findUnique({ where: { id: processId } });
-  if (!process || process.deletedAt) throw new Error("התהליך לא נמצא.");
+  if (!process || process.deletedAt) throw new DomainError("processChecks.notFound", "התהליך לא נמצא.");
   await assertClientAccess(actor, process.clientId);
-  if (!isRoutine(process)) throw new Error("בדיקה נרשמת לתהליך שוטף שלא הושהה ולא בוטל.");
-  if (input.outcome !== "OK" && input.outcome !== "ISSUE") throw new Error("מה נמצא בבדיקה?");
+  if (!isRoutine(process)) throw new DomainError("processChecks.notRoutine", "בדיקה נרשמת לתהליך שוטף שלא הושהה ולא בוטל.");
+  if (input.outcome !== "OK" && input.outcome !== "ISSUE") throw new DomainError("processChecks.outcome", "מה נמצא בבדיקה?");
   const note = input.note?.trim() || null;
-  if (input.outcome === "ISSUE" && !note) throw new Error("כשנמצאה בעיה, כותבים מה נמצא.");
-  if (note && note.length > MAX_NOTE) throw new Error(`עד ${MAX_NOTE} תווים.`);
-  if (note && findSecrets(note).length) throw new Error("יש כאן סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בתיק.");
+  if (input.outcome === "ISSUE" && !note) throw new DomainError("processChecks.issueNote", "כשנמצאה בעיה, כותבים מה נמצא.");
+  if (note && note.length > MAX_NOTE) throw new DomainError("processChecks.noteTooLong", `עד ${MAX_NOTE} תווים.`, { max: String(MAX_NOTE) });
+  if (note && findSecrets(note).length) throw new DomainError("processChecks.secrets", "יש כאן סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בתיק.");
 
   const task =
     input.outcome === "ISSUE"

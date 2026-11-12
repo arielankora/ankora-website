@@ -1305,6 +1305,2328 @@
       "noAccess": "אין לך גישה למשימה הזו.",
       "alreadyDecided": "כבר הוחלט על הזיהוי הזה.",
       "vendorNameRequired": "כדי לפתוח ריצת P8 צריך את שם הספק."
+    },
+    "processes": {
+      "contactNotInFile": "איש קשר שנבחר לא נמצא בתיק של הלקוח.",
+      "systemNotInFile": "מערכת שנבחר לא נמצא בתיק של הלקוח.",
+      "ruleNotInFile": "כלל שנבחר לא נמצא בתיק של הלקוח.",
+      "approverNotInFile": "המאשר שנבחר לא נמצא בתיק של הלקוח.",
+      "executorNotInFile": "המבצע שנבחר לא נמצא בתיק של הלקוח.",
+      "executorNotStaff": "המבצע באנקורה צריך להיות איש צוות.",
+      "ownerNotStaff": "אחראי או מחליף צריכים להיות אנשי צוות של אנקורה.",
+      "approverNotAllowed": "המאשר באנקורה צריך להיות איש צוות פעיל שמשויך ללקוח, או מנהל.",
+      "calendarUnknown": "לוח ימי העבודה לא מוכר.",
+      "slaRange": "ה-SLA בימי עסקים הוא מספר שלם בין 0 ל-60.",
+      "reviewRange": "סקירה היא כל מספר שלם של ימים, עד {max}.",
+      "checkRange": "בדיקה היא כל 1 עד {max} ימים.",
+      "checkNotContinuous": "בדיקה תקופתית היא לתהליך שוטף.",
+      "secrets": "יש כאן סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בתיק.",
+      "notFound": "התהליך לא נמצא.",
+      "titleRequired": "צריך שם לתהליך.",
+      "statusManagerOnly": "רק מנהל משהה, מחדש או מבטל תהליך.",
+      "noApprovedProcedure": "לתהליך עוד אין נוהל מאושר.",
+      "removeApproved": "תהליך שהיה לו נוהל מאושר לא נמחק. מבטלים אותו, והוא נשאר בהיסטוריה.",
+      "dateNotFound": "מועד שנבחר לא נמצא אצל הלקוח.",
+      "flowUnread": "הזרימה לא נקראה. רעננו ונסו שוב.",
+      "noSteps": "נוהל צריך לפחות שלב אחד.",
+      "tooManySteps": "עד {max} שלבים. נוהל ארוך מזה הוא כמה תהליכים.",
+      "stepSystemNotFound": "מערכת שנבחרה בשלב לא נמצאת במפת המערכות של הלקוח.",
+      "versionConflict": "מישהו שמר גרסה חדשה של הנוהל (גרסה {latest}) בזמן שערכת. רעננו, ובדקו מה השתנה לפני ששומרים.",
+      "flowOnly": "הנוהל הזה נבנה כזרימה עם תנאים. עורכים אותו ב\"עורך זרימה\", כדי שהענפים לא ילכו לאיבוד.",
+      "notApprover": "רק מנהל או מנהל התיק של הלקוח מאשרים נוהל.",
+      "separationRequired": "ללקוח הזה נדרשת הפרדה: מי שכתב את גרסת הנוהל לא מאשר אותה. מישהו אחר מאשר.",
+      "notLatestVersion": "זו לא הגרסה האחרונה של הנוהל. רעננו ונסו שוב.",
+      "alreadyApproved": "הגרסה הזו כבר מאושרת.",
+      "failsChecks": "הנוהל לא עובר את הבדיקות: {checks}",
+      "notApplicableNotAllowed": "רק מנהל או הבעלים של התהליך מסמנים שדה כלא רלוונטי.",
+      "notApplicableField": "את השדה הזה אי אפשר לסמן כלא רלוונטי."
+    },
+    "processRuns": {
+      "sameDay": "כבר יש ריצה פתוחה של {code} ליום הזה: \"{title}\" ({id}). אפשר לעבוד עליה, או לסגור אותה ואז לפתוח חדשה.",
+      "notFound": "התהליך לא נמצא.",
+      "paused": "התהליך מושהה. מנהל מחדש אותו לפני שפותחים ריצה.",
+      "noApprovedProcedure": "לתהליך עוד אין נוהל מאושר.",
+      "continuous": "תהליך שוטף לא נפתח כריצה. הוא רץ כל הזמן, ונבדק בסקירה התקופתית.",
+      "dateRequired": "צריך תאריך לריצה.",
+      "cannotOpen": "לא ניתן לפתוח ריצה לתהליך הזה."
+    },
+    "processChecks": {
+      "notFound": "התהליך לא נמצא.",
+      "notRoutine": "בדיקה נרשמת לתהליך שוטף שלא הושהה ולא בוטל.",
+      "outcome": "מה נמצא בבדיקה?",
+      "issueNote": "כשנמצאה בעיה, כותבים מה נמצא.",
+      "noteTooLong": "עד {max} תווים.",
+      "secrets": "יש כאן סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בתיק."
+    },
+    "processNextSteps": {
+      "notFound": "התהליך לא נמצא.",
+      "closeManagerOnly": "רק מנהל סוגר משימה בגלל שתהליך מכסה אותה.",
+      "rulesManagerOnly": "רק מנהל מאשר כללים."
+    },
+    "processOverlap": {
+      "managerOnly": "רק מנהל סוגר משימה בגלל שתהליך מכסה אותה.",
+      "taskNotFound": "המשימה לא נמצאה.",
+      "processNotFound": "התהליך לא נמצא.",
+      "differentClients": "המשימה והתהליך של לקוחות שונים.",
+      "notActive": "רק תהליך עם נוהל מאושר מכסה משימות.",
+      "isRun": "זו ריצה של תהליך, לא משימה נפרדת.",
+      "notOpen": "המשימה כבר לא פתוחה.",
+      "sourceTask": "התהליך הוצע מהמשימה הזו, והיא לא כפולה לו."
+    },
+    "processReview": {
+      "managerOnly": "רק מנהל מסמן נוהל כנסקר.",
+      "notFound": "התהליך לא נמצא.",
+      "noApproved": "לתהליך עוד אין נוהל מאושר לסקור.",
+      "failsRules": "הנוהל שבתוקף לא עומד בכללי הלקוח. כותבים גרסה חדשה, או מבקשים חריגה לכלל."
+    },
+    "procedureDocuments": {
+      "notFound": "התהליך לא נמצא.",
+      "noProcedure": "לתהליך הזה עוד אין נוהל.",
+      "versionNotFound": "הגרסה לא נמצאה.",
+      "noApprovedTranslation": "לגרסה הזו אין עדיין תרגום מאושר לאנגלית.",
+      "translationInvalid": "התרגום השמור לא תקין. צריך לתרגם מחדש.",
+      "noApprovedVersion": "רק נוהל מאושר מתורגם. לתהליך הזה אין עדיין גרסה מאושרת.",
+      "onlyApproved": "רק הגרסה המאושרת מתורגמת.",
+      "translationTooShort": "התרגום צריך לפחות כותרת ורשימת שלבים.",
+      "translationSecrets": "יש בתרגום סיסמה, מפתח או מספר כרטיס.",
+      "managerOnly": "רק מנהל מאשר תרגום.",
+      "nothingToApprove": "אין תרגום לאשר.",
+      "incomplete": "התרגום לא שלם: {gaps}",
+      "clientNotFound": "הלקוח לא נמצא."
+    },
+    "strangerTests": {
+      "processNotFound": "התהליך לא נמצא.",
+      "questionNotFound": "השאלה לא נמצאה.",
+      "questionClosed": "השאלה כבר נסגרה.",
+      "answerRequired": "צריך תשובה, או לסמן שהשאלה לא רלוונטית.",
+      "answerTooLong": "התשובה ארוכה מדי.",
+      "kindNotAllowed": "סוג התשובה לא מתאים לתיק.",
+      "ruleNotFound": "הכלל לא נמצא בתיק של הלקוח.",
+      "ruleRetired": "הכלל בוטל. כותבים כלל חדש.",
+      "ruleChangeNotAllowed": "רק מנהל או מנהל התיק של הלקוח משנים כלל של לקוח. רושמים את התשובה בלי שינוי הכלל, והם יחליטו."
+    },
+    "clients": {
+      "contractNotFound": "החוזה שנבחר לא נמצא בתיק של הלקוח הזה.",
+      "managerNotActive": "מנהל התיק שנבחר אינו משתמש פעיל של Ankora.",
+      "subprocessorSourceRequired": "כדי לסמן יש או אין התחייבות, צריך לכתוב את המקור: החוזה והסעיף."
+    },
+    "clientEntities": {
+      "notFoundForClient": "הישות לא נמצאה אצל הלקוח.",
+      "missingNeedsWhy": "לשדה חסר צריך לכתוב מה יסגור אותו.",
+      "selfParent": "ישות לא יכולה להיות האם של עצמה.",
+      "cycle": "זה היה יוצר מעגל בין ישויות.",
+      "nameRequired": "צריך שם לישות.",
+      "notFound": "הישות לא נמצאה.",
+      "invalidCountry": "קוד המדינה לא תקין.",
+      "invalidCurrency": "קוד המטבע לא תקין.",
+      "inUse": "{name} משויכת ל-{count} פריטים בתיק. קודם צריך לשייך אותם מחדש."
+    },
+    "systemMap": {
+      "invalidUrl": "כתובת המערכת לא תקינה.",
+      "lastFourOnly": "רק ארבע הספרות האחרונות של הכרטיס.",
+      "passwordInMap": "סיסמאות נשמרות בכספת, לא במפת המערכות.",
+      "vaultEntryNotFound": "הרשומה בכספת לא נמצאה אצל הלקוח.",
+      "invalidCost": "עלות לא תקינה.",
+      "nameRequired": "צריך שם מערכת.",
+      "notFound": "המערכת לא נמצאה.",
+      "duplicate": "{name} כבר במפת המערכות."
+    },
+    "connections": {
+      "managersOnly": "רק מנהל או מנהל התיק של הלקוח מחברים מערכות של הלקוח.",
+      "invalidEmail": "כתובת המייל לא תקינה.",
+      "appPasswordTooShort": "סיסמת האפליקציה קצרה מדי.",
+      "consentRequired": "כותבים מי אצל הלקוח מסר את הגישה, ומתי.",
+      "notFound": "החיבור לא נמצא.",
+      "sendFailed": "השליחה נכשלה. אולי ההרשאה בוטלה ב-Google.",
+      "noMailAccess": "אין גישה למייל. אולי ההרשאה בוטלה ב-Google.",
+      "invalidFolderId": "מזהה התיקייה לא תקין.",
+      "noDriveAccess": "אין גישה לתיקייה בדרייב."
+    },
+    "requestTypes": {
+      "processNotFound": "התהליך שנבחר לא נמצא אצל הלקוח הזה.",
+      "contactNotFound": "איש קשר שנבחר לא נמצא בתיק של הלקוח.",
+      "titleRequired": "צריך שם לסוג הפנייה.",
+      "handlingRequired": "צריך לכתוב איך עונים ולאן מעבירים.",
+      "notFound": "סוג הפנייה לא נמצא."
+    },
+    "decisions": {
+      "questionRequired": "יש לנסח את השאלה שהלקוח צריך להכריע בה.",
+      "minOptions": "יש להזין לפחות שתי אפשרויות.",
+      "oneRecommendation": "אפשר לסמן המלצה אחת בלבד.",
+      "taskNotForClient": "המשימה המקושרת אינה שייכת ללקוח הזה.",
+      "notFound": "ההחלטה לא נמצאה.",
+      "cannotCancelAnswered": "אי אפשר לבטל החלטה שכבר נענתה.",
+      "alreadyClosed": "ההחלטה הזו כבר נסגרה.",
+      "optionNotInDecision": "האפשרות שנבחרה אינה שייכת להחלטה הזו.",
+      "maxOptions": "אפשר עד {max} אפשרויות בהחלטה אחת."
+    },
+    "clientDocuments": {
+      "titleRequired": "יש להזין שם למסמך.",
+      "emptyFile": "הקובץ ריק.",
+      "tooLarge": "הקובץ גדול מ-4MB. אפשר לדחוס אותו או לסרוק שוב באיכות נמוכה יותר.",
+      "taskNotFound": "המשימה לא נמצאה אצל הלקוח הזה.",
+      "notFound": "המסמך לא נמצא.",
+      "driveNotConfigured": "אחסון המסמכים עדיין לא חובר. אפשר לצרף כאן ברגע שהתיקייה תיפתח.",
+      "uploadFailed": "העלאת הקובץ נכשלה: {error}",
+      "uploadFailedUnknown": "העלאת הקובץ נכשלה: שגיאה לא ידועה"
+    },
+    "clientPolicies": {
+      "managerOnly": "רק מנהל מאשר או מבטל כלל של לקוח.",
+      "params": "{interim, select, yes {בכלל הביניים: } other {}}{problem, select, threshold {סף צריך סכום ומטבע.} tags {צריך לבחור על אילו פעולות הכלל חל.} mustInclude {צריך לכתוב מה חייב להופיע בשלבים.} timing {תזמון צריך מספר ימי עסקים, ועל אילו פעולות הוא חל.} communication {צריך ערוצים מותרים, או לאן חשבוניות מגיעות.} other {הפרדה היא בין שתי ישויות לפחות.}}",
+      "entityNotInFile": "ישות שנבחרה בכלל לא נמצאת בתיק של הלקוח.",
+      "notFound": "הכלל לא נמצא.",
+      "shape": "{problem, select, title {צריך שם לכלל.} statement {צריך לכתוב את הכלל עצמו.} other {כלל מוצע מסוג זה צריך כלל ביניים: מה עושים עד שהוא מאושר (\"כל הוצאה עוברת לאורן\").}}",
+      "retiredNotEditable": "כלל שבוטל לא נערך. כותבים כלל חדש.",
+      "approverOnly": "רק מנהל או מנהל התיק של הלקוח מאשרים כלל של לקוח.",
+      "onlyProposed": "רק כלל מוצע מאשרים.",
+      "notConfirmed": "הכלל עצמו עוד לא ודאי. קודם מוודאים מול הלקוח מה הוא אמר, ורק אז מאשרים.",
+      "alreadyRetired": "הכלל כבר בוטל.",
+      "retireReasonRequired": "צריך לכתוב בשורה אחת למה הכלל מבוטל.",
+      "approvedNotRemovable": "כלל שאושר לא נמחק. מבטלים אותו, והוא נשאר בהיסטוריה."
+    },
+    "policyExceptions": {
+      "notFound": "הבקשה לא נמצאה.",
+      "policyNotFound": "הכלל לא נמצא.",
+      "policyRetired": "הכלל בוטל, ואין ממנו חריגה.",
+      "shape": "{problem, select, what {צריך לכתוב מה עושים אחרת.} reason {צריך לכתוב למה.} noEnd {חריגה צריכה תאריך סיום.} past {תאריך הסיום כבר עבר.} other {חריגה היא עד {max} יום. לתקופה ארוכה יותר משנים את הכלל עצמו.}}",
+      "secrets": "בבקשה יש סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת.",
+      "alreadyDecided": "כבר הוחלט על הבקשה הזו.",
+      "rejectReasonRequired": "צריך לכתוב בשורה אחת למה הבקשה נדחתה.",
+      "onlyUndecided": "אפשר למשוך רק בקשה שעוד לא הוחלט עליה.",
+      "requesterOnly": "רק מי שביקש מושך את הבקשה."
+    },
+    "clientFacts": {
+      "contactNotInFile": "איש הקשר לא נמצא בתיק של הלקוח.",
+      "organizationNotInFile": "הארגון לא נמצא בתיק של הלקוח.",
+      "assigneeNotStaff": "האחראי לא נמצא בצוות.",
+      "shape": "{problem, select, body {צריך לכתוב את העובדה עצמה.} temporaryValidity {מידע זמני צריך תוקף: עד תאריך, או עד אירוע (\"עד הצירוף לארגון\").} other {החלטה חד-פעמית צריכה תאריך.}}",
+      "notFound": "הפריט לא נמצא.",
+      "alreadySuperseded": "הפריט כבר הוחלף. עובדים על הגרסה החדשה שלו.",
+      "sameKindOnly": "החלפה היא של אותו סוג פריט. סוג אחר הוא פריט חדש.",
+      "questionNotConfirmed": "שאלה נסגרת בתשובה, לא באישור.",
+      "alternativeRequired": "צריך לכתוב מה נאמר אחרת.",
+      "onlyQuestionAnswered": "רק שאלה פתוחה מקבלת תשובה.",
+      "alreadyAnswered": "השאלה כבר נענתה.",
+      "answerRequired": "צריך לכתוב את התשובה.",
+      "notTaskable": "רק שאלה פתוחה או מידע זמני הופכים למשימה מכאן.",
+      "temporaryClosed": "המידע הזמני כבר נסגר.",
+      "taskExists": "{temporary, select, yes {כבר יש משימה למידע הזה.} other {כבר יש משימה לשאלה הזו.}}",
+      "onlyTemporaryClosed": "רק מידע זמני נסגר.",
+      "alreadyClosed": "כבר נסגר."
+    },
+    "clientSources": {
+      "unknownCodes": "{count, plural, one {המקור {codes} לא קיים במרשם של הלקוח.} other {המקורות {codes} לא קיימים במרשם של הלקוח.}}",
+      "sourceRequired": "צריך מקור: מאיפה זה ידוע? אם עוד לא ידוע, סמנו \"חסר\".",
+      "documentNotInFile": "מסמך שצוין כמקור לא נמצא בתיק של הלקוח.",
+      "taskNotInClient": "משימה שצוינה כמקור לא נמצאה אצל הלקוח.",
+      "titleRequired": "צריך שם למקור.",
+      "notFound": "המקור לא נמצא.",
+      "weightInUse": "{code} כבר משמש ב-{count} פריטים בתיק, ולכן אי אפשר לשנות את המשקל שלו.",
+      "inUse": "{code} משמש ב-{count} פריטים בתיק. קודם צריך להחליף להם את המקור.",
+      "invalidDomain": "דומיין לא תקין.",
+      "publicDomain": "{domain} הוא שירות מייל ציבורי, ולא מזהה לקוח.",
+      "domainOfOtherClient": "{domain} כבר רשום כדומיין של לקוח אחר.",
+      "domainListed": "{domain} כבר ברשימה.",
+      "domainNotFound": "הדומיין לא נמצא.",
+      "driveFolderUnrecognized": "תיקיית הדרייב לא מזוהה. מדביקים קישור לתיקייה או את המזהה שלה.",
+      "conversationsDocUnrecognized": "המסמך המצטבר לא מזוהה. מדביקים קישור למסמך או את המזהה שלו."
+    },
+    "clientNarratives": {
+      "tooLong": "הטקסט ארוך מדי.",
+      "conflict": "בינתיים נשמרה גרסה {current}. צריך לפתוח מחדש ולערוך את הגרסה הנוכחית."
+    },
+    "clientContacts": {
+      "organizationNameRequired": "צריך שם ארגון או דומיין.",
+      "invalidMonthlyCost": "עלות חודשית לא תקינה.",
+      "organizationInFile": "{name} כבר בתיק של הלקוח.",
+      "organizationNotFound": "הארגון לא נמצא בתיק.",
+      "domainTaken": "הדומיין כבר שייך ל-{name}.",
+      "notFound": "לא נמצא.",
+      "userNotStaff": "המשתמש שנבחר אינו איש צוות של אנקורה.",
+      "nameOrRoleRequired": "צריך שם או תפקיד.",
+      "contactInFile": "{hasName, select, yes {{name}} other {איש הקשר}} כבר בתיק של הלקוח.",
+      "contactNotFound": "איש הקשר לא נמצא.",
+      "emailTaken": "כתובת המייל כבר שייכת לאיש קשר אחר.",
+      "emailOrPhoneRequired": "צריך כתובת מייל או מספר טלפון."
+    },
+    "clientQuestions": {
+      "noneSelected": "לא נבחרו שאלות.",
+      "notInFile": "שאלה שנבחרה לא נמצאה בתיק של הלקוח.",
+      "emptyMessage": "ההודעה ריקה.",
+      "alreadyClosed": "השאלה כבר נסגרה.",
+      "itemNotInFile": "הפריט לא נמצא בתיק של הלקוח.",
+      "dismissReasonRequired": "צריך לכתוב בשורה אחת למה זה לא רלוונטי.",
+      "taskExists": "כבר יש משימה לשאלה הזו.",
+      "snooze": "{problem, select, date {צריך לבחור תאריך.} past {התאריך צריך להיות בעתיד.} other {אפשר לדחות עד שנה קדימה.}}"
+    }
+  },
+  "clients": {
+    "processes": {
+      "labels": {
+        "triggers": {
+          "SCHEDULED": "לפי מועד",
+          "EVENT": "כשמשהו קורה",
+          "ON_DEMAND": "לפי בקשה",
+          "CONTINUOUS": "שוטף"
+        },
+        "transitions": {
+          "WITH_CLIENT": "אצל הלקוח",
+          "IN_HANDOVER": "בחפיפה",
+          "WITH_ANKORA": "אצלנו",
+          "NOT_PLANNED": "לא עובר אלינו"
+        },
+        "stepModes": {
+          "MANUAL": "ידני",
+          "ASSISTED": "Claude מכין, אדם בודק",
+          "AUTOMATED": "אוטומטי"
+        },
+        "actionTags": {
+          "PAYMENT": "תשלום",
+          "PURCHASE": "רכישה",
+          "INVOICE": "חשבונית",
+          "SUPPLIER_NEW": "ספק חדש",
+          "CONTRACT": "חוזה",
+          "PRICE_CHANGE": "שינוי מחיר",
+          "REFUND": "זיכוי או החזר",
+          "CLIENT_MESSAGE": "הודעה ללקוח",
+          "CREDENTIAL_ACCESS": "גישה לסיסמאות",
+          "DATA_EXPORT": "ייצוא מידע",
+          "HR": "משאבי אנוש",
+          "LEGAL": "משפטי",
+          "BANK_SIGNATURE": "חתימה בבנק"
+        },
+        "channels": {
+          "EMAIL": "מייל",
+          "WHATSAPP": "WhatsApp",
+          "SLACK": "Slack",
+          "PHONE": "טלפון",
+          "PORTAL": "הפורטל",
+          "OTHER": "אחר"
+        },
+        "fields": {
+          "owner": "בעלים",
+          "trigger": "טריגר",
+          "sla": "SLA",
+          "systems": "מערכות",
+          "permissions": "הרשאות",
+          "approvals": "ספי אישור ומאשר",
+          "external": "גורם חיצוני",
+          "exceptions": "נוהל חריגים",
+          "next": "מועד הבא"
+        },
+        "reviewReasons": {
+          "RULES": "הנוהל שבתוקף לא עומד בכללי הלקוח",
+          "PERIODIC": "הגיע מועד הסקירה התקופתית"
+        },
+        "checkStates": {
+          "OVERDUE": "באיחור",
+          "DUE": "היום",
+          "LATER": "בהמשך"
+        },
+        "checkOutcomes": {
+          "OK": "תקין",
+          "ISSUE": "נמצאה בעיה"
+        },
+        "strangerSeverity": {
+          "BLOCKER": "חוסם",
+          "SLOWS": "יאט",
+          "IMPROVES": "שיפור"
+        },
+        "strangerAskWho": {
+          "ANKORA": "אצלנו",
+          "CLIENT": "אצל הלקוח"
+        },
+        "lessonStatus": {
+          "NOTHING": "הנוהל היה נכון",
+          "OPEN": "ממתין לגרסה הבאה",
+          "APPLIED": "נכנס לנוהל",
+          "DISMISSED": "לא נכנס לנוהל"
+        },
+        "knowledgeStatus": {
+          "CONFIRMED": "מאושר",
+          "UNCERTAIN": "לא ודאי",
+          "MISSING": "חסר"
+        },
+        "businessCalendars": {
+          "IL": "ישראל (ראשון עד חמישי)",
+          "US": "ארה\"ב (שני עד שישי)"
+        },
+        "classifications": {
+          "CONFIDENTIAL": "סודי",
+          "INTERNAL": "פנימי",
+          "PUBLIC": "ציבורי"
+        },
+        "weekdays": {
+          "d0": "ראשון",
+          "d1": "שני",
+          "d2": "שלישי",
+          "d3": "רביעי",
+          "d4": "חמישי",
+          "d5": "שישי",
+          "d6": "שבת"
+        },
+        "secrets": {
+          "PASSWORD": "סיסמה",
+          "PRIVATE_KEY": "מפתח פרטי",
+          "API_KEY": "מפתח API",
+          "TOKEN": "טוקן",
+          "CARD": "מספר כרטיס"
+        },
+        "branchSources": {
+          "MANUAL": "אדם עונה במשימה",
+          "EMAIL_REPLY": "הגיעה תשובה במייל",
+          "DRIVE_FILE": "הופיע קובץ בדרייב",
+          "CLAUDE": "קלוד בודק"
+        },
+        "sendModes": {
+          "DRAFT": "טיוטה, אדם שולח",
+          "AUTO": "שליחה אוטומטית"
+        },
+        "nodeKinds": {
+          "ACTION": "פעולה",
+          "WAIT": "המתנה",
+          "CONDITION": "תנאי",
+          "END": "סיום",
+          "MAIL": "שליחת מייל"
+        }
+      },
+      "readiness": {
+        "runs": "רץ",
+        "blockers": {
+          "retired": "לא ירוץ: התהליך בוטל",
+          "paused": "לא ירוץ: התהליך מושהה",
+          "noOwner": "לא ירוץ: אין אחראי",
+          "noTrigger": "לא ירוץ: לא כתוב מה מפעיל אותו",
+          "noProcedure": "לא ירוץ: אין נוהל מאושר",
+          "scheduledNoDate": "לא ירוץ: תהליך לפי מועד בלי מועד",
+          "continuousNoCheck": "לא ירוץ: תהליך שוטף בלי תדירות בדיקה"
+        }
+      },
+      "documentation": {
+        "full": "תיעוד מלא",
+        "partial": "תיעוד {score} מתוך {of}"
+      },
+      "nextSteps": {
+        "fix": {
+          "complete": "להשלים",
+          "writeProcedure": "לכתוב נוהל",
+          "toProcess": "לתהליך",
+          "link": "לקשר",
+          "addDate": "להוסיף מועד",
+          "fix": "לתקן",
+          "approveProcedure": "אישור הנוהל",
+          "toProcedure": "לנוהל",
+          "markReviewed": "סימון שנסקר",
+          "close": "לסגור",
+          "closeBoth": "לסגור את שתיהן",
+          "closeAll": "לסגור את כולן",
+          "toLessons": "להערות",
+          "update": "לעדכן",
+          "notApplicable": "לא רלוונטי",
+          "toSystems": "למערכות"
+        },
+        "notReady": {
+          "recommendOwner": "לקבוע מי אחראי",
+          "recommendTrigger": "לכתוב מה מפעיל את התהליך",
+          "recommendProcedure": "לכתוב את הנוהל ולשלוח לאישור",
+          "recommendRenew": "להחליט אם לחדש אותו",
+          "why": "עד אז התהליך לא פותח ריצות לבד."
+        },
+        "noNextDate": {
+          "title": "תהליך לפי מועד בלי מועדים",
+          "recommendLink": "לקשר את המועד \"{title}\"",
+          "recommendAdd": "להוסיף לתהליך את המועדים שלו",
+          "whyCandidate": "המועד כבר בתיק, ושמו מתאר את העבודה של התהליך. מקושר, הוא פותח את הריצה.",
+          "whyNone": "בלי מועד מקושר אף ריצה לא נפתחת לבד."
+        },
+        "draft": {
+          "blockedTitle": "טיוטת נוהל, גרסה {version}, לא עוברת את הבדיקות",
+          "blockedRecommend": "לתקן את הטיוטה, ואז לאשר",
+          "blockedWhy": "נוהל שלא עומד בכללים של הלקוח לא מאושר.",
+          "waitingTitle": "טיוטת נוהל, גרסה {version}, מחכה לאישור",
+          "recommendApprove": "לקרוא ולאשר",
+          "recommendAsk": "לבקש ממנהל או ממנהל התיק לאשר",
+          "whyActive": "עד האישור הריצות ממשיכות לפי הגרסה הקודמת.",
+          "whyInactive": "בלי נוהל מאושר התהליך לא פותח ריצות."
+        },
+        "review": {
+          "recommendPeriodic": "לקרוא את הנוהל ולסמן שנסקר",
+          "recommendRules": "לכתוב גרסה חדשה, או לבקש חריגה לכלל",
+          "whyPeriodic": "כך הנוהל נשאר נכון לאורך זמן.",
+          "whyRules": "הנוהל שבתוקף לא עומד היום בכלל של הלקוח."
+        },
+        "covered": {
+          "title": "{count, plural, =1 {משימה ישנה אחת כפולה} other {# משימות ישנות כפולות}} לתהליך: {titles}",
+          "recommend": "{count, plural, =1 {לסגור אותה} =2 {לסגור את שתיהן} other {לסגור את כולן}}",
+          "why": "כל ריצה של התהליך פותחת משימה משלה, אז הישנה היא אותה עבודה פעמיים."
+        },
+        "lessons": {
+          "title": "{count, plural, =1 {הערה אחת מריצות, לגרסה הבאה} other {# הערות מריצות, לגרסה הבאה}}",
+          "recommend": "להחליט על כל הערה: נכנסה לנוהל, או לא",
+          "why": "מי שהריץ את התהליך מצא משהו שכדאי לשנות."
+        },
+        "uncertain": {
+          "title": "התהליך עצמו עוד לא ודאי",
+          "recommend": "לשאול את הלקוח",
+          "whyNone": "לא כתוב מה יסגור את זה."
+        },
+        "mention": {
+          "systemTitle": "{name} מוזכרת בתהליך ולא מקושרת",
+          "systemRecommend": "לקשר את המערכת",
+          "systemWhy": "כך התהליך יודע לאיזו מערכת צריך גישה.",
+          "contactTitle": "{name} מוזכר/ת בתהליך ולא מקושר/ת כגורם חיצוני",
+          "contactRecommend": "לקשר כגורם חיצוני",
+          "contactWhy": "כך ברור מי בחוץ שותף לתהליך."
+        },
+        "docField": {
+          "title": "תיעוד: חסר {field}"
+        },
+        "missing": {
+          "title": "חסר: {fields}",
+          "recommend": "להשלים בתהליך",
+          "why": "כך כל מי שנכנס לתהליך יודע לעשות אותו בלי לשאול."
+        },
+        "noAccess": {
+          "title": "אין לנו גישה ל: {systems}",
+          "recommend": "לבקש גישה מהלקוח",
+          "why": "בלי גישה התהליך תלוי במישהו אחר."
+        }
+      },
+      "checks": {
+        "humanOnlyAutomated": "שלב {step}: {tags} לא נעשה אוטומטית. לפי ספר הנהלים זו החלטה של אדם.",
+        "humanOnlyAssisted": "שלב {step}: כש-Claude מכין {tags}, אדם מאשר לפני הביצוע. צריך לסמן \"דורש אישור\".",
+        "clientMessageAutomated": "שלב {step}: הודעה ללקוח עוברת בדיקה של אדם לפני שהיא יוצאת, ולכן לא נשלחת אוטומטית.",
+        "automatedNoVerification": "שלב {step} אוטומטי: צריך לכתוב איך אדם מוודא שזה קרה.",
+        "moneyNoApproval": "בנוהל יש תשלום או רכישה, ולכללי האישור של הלקוח ({thresholds}) אין שלב אישור.",
+        "secrets": "בנוהל יש {secrets}. סודות נשמרים בכספת, לא בנוהל.",
+        "exceptionApproved": "(יש חריגה מאושרת לכלל.)",
+        "exceptionNeeded": "אפשר לאשר רק עם חריגה מאושרת לכלל."
+      },
+      "panel": {
+        "title": "תהליכים ({count})",
+        "proceduresLink": "הנהלים כמסמכים",
+        "connectionsLink": "חיבורים",
+        "add": "+ תהליך",
+        "drawerTitle": "תהליך",
+        "allRunning": "כולם רצים",
+        "someRunning": "{running} מתוך {total} רצים",
+        "summaryRest": "{withUs} אצלנו · {handover} בחפיפה · תיעוד {doc}%",
+        "empty": "אין עדיין תהליכים. מה חוזר אצל הלקוח, מי אחראי, מה מפעיל את זה, ואיך עושים את זה.",
+        "actionFailed": "הפעולה נכשלה",
+        "done": "בוצע",
+        "markedNotApplicable": "סומן כלא רלוונטי",
+        "markRemoved": "הסימון הוסר",
+        "paused": "התהליך הושהה",
+        "resumed": "התהליך חודש",
+        "removed": "התהליך הוסר",
+        "editTitle": "עריכה: {code} {title}",
+        "procedureTitle": "נוהל: {code} {title}",
+        "datesTitle": "מועדים: {code} {title}",
+        "runTitle": "ריצה: {code} {title}",
+        "checkTitle": "בדיקה: {code} {title}",
+        "needsReview": "דורש סקירה",
+        "owner": "בעלים: {name}",
+        "backup": "מחליף: {name}",
+        "next": "הבא: {date}",
+        "lastRun": "ריצה אחרונה: {date}",
+        "nextStepLabel": "הצעד הבא:",
+        "recommendedLine": "מומלץ: {recommend}.",
+        "recommendedShort": "מומלץ: {recommend}",
+        "allClear": "תקין: אין כרגע מה לסגור בתהליך.",
+        "notApplicable": "לא רלוונטי:",
+        "undoMark": "(ביטול)",
+        "details": "פרטים",
+        "executorToday": "מבצע היום: {name}",
+        "systems": "מערכות: {list}",
+        "reviewEvery": "(כל {days} ימים)",
+        "nextReview": "סקירה הבאה: {date}",
+        "startRun": "פתיחת ריצה",
+        "recordCheck": "רישום בדיקה",
+        "edit": "עריכה",
+        "editDraft": "עריכת הטיוטה",
+        "newVersion": "גרסה חדשה לנוהל",
+        "writeProcedure": "כתיבת נוהל",
+        "isFlow": "הנוהל הזה נבנה כזרימה עם תנאים, ולכן עורכים אותו ב<link>עורך הזרימה</link>, כדי שהענפים לא ילכו לאיבוד.",
+        "flowEditor": "עורך זרימה",
+        "dates": "מועדים",
+        "document": "מסמך הנוהל",
+        "more": "עוד ▾",
+        "pause": "השהיה",
+        "resume": "חידוש",
+        "remove": "הסרה",
+        "versionLine": "נוהל, גרסה {version}",
+        "approvedBy": ", אושר על ידי {name}",
+        "approvedOn": "ב-{date}",
+        "atApprovalClean": "באישור: עמד בכל הכללים של הלקוח.",
+        "atApprovalExceptions": "באישור: {count, plural, =1 {חריגה אחת מאושרת} other {# חריגות מאושרות}}.",
+        "highlights": "דגשים: {text}",
+        "currentFails": "הנוהל שבתוקף לא עומד היום בכללים של הלקוח. כותבים גרסה חדשה, או מבקשים חריגה.",
+        "noProcedure": "עוד אין נוהל.",
+        "runs": "ריצות:",
+        "runDone": "(בוצע)",
+        "checkLine": "בדיקה {every}",
+        "checkEvery": "{days, select, 1 {כל יום} 7 {פעם בשבוע} 14 {פעם בשבועיים} 30 {פעם בחודש} 31 {פעם בחודש} other {כל {days} ימים}}",
+        "checkNext": "הבאה ב-{date}",
+        "checkOverdue": "באיחור, מ-{date}",
+        "taskLink": "המשימה",
+        "draftLine": "טיוטה, גרסה {version}"
+      },
+      "lessons": {
+        "open": "{count, plural, =1 {הערה אחת מריצות, לגרסה הבאה} other {# הערות מריצות, לגרסה הבאה}}",
+        "version": "גרסה {version}",
+        "toRun": "לריצה",
+        "decide": "החלטה",
+        "drawerTitle": "הערה על הנוהל",
+        "handled": "{count, plural, =1 {הערה אחת שטופלה} other {# הערות שטופלו}}",
+        "what": "מה קרה איתה",
+        "oneLine": "במשפט אחד *",
+        "oneLinePlaceholder": "גרסה 4, שלב 2"
+      },
+      "common": {
+        "saving": "שומר...",
+        "save": "שמירה",
+        "none": "אין",
+        "nothingInFile": "אין עדיין בתיק."
+      },
+      "form": {
+        "showMore": "הצג עוד",
+        "showMoreFilled": "הצג עוד ({filled, plural, =1 {שדה אחד מלא} other {# מלאים}})",
+        "showLess": "הצג פחות",
+        "permissionPlaceholder": "איזו הרשאה צריך",
+        "permissionAria": "הרשאה ב-{name}",
+        "groupWhat": "מה ומתי",
+        "name": "שם התהליך *",
+        "namePlaceholder": "תשלומי ספקים, LTD",
+        "purpose": "למה הוא קיים",
+        "triggers": "מה מפעיל אותו",
+        "triggerText": "הטריגר במילים",
+        "triggerPlaceholder": "פעמיים בחודש, ב-10 וב-25",
+        "groupWho": "מי",
+        "backup": "מחליף (לא חובה)",
+        "executorText": "מבצע במילים",
+        "executorTextPlaceholder": "גיא",
+        "approver": "מי מאשר שלב שדורש אישור",
+        "approverAnkoraAria": "מאשר באנקורה",
+        "noneAtAnkora": "אף אחד באנקורה",
+        "approverOption": "{name} (מאשר במערכת)",
+        "approverClientAria": "מאשר אצל הלקוח",
+        "noneAtClient": "אף אחד אצל הלקוח",
+        "approverHelp": "מאשר באנקורה חותם במערכת: השלב מחכה לו, והריצה לא נסגרת לפניו. מאשר אצל הלקוח מופיע בשם, והאישור ממנו נאסף בחוץ.",
+        "approverTextPlaceholder": "או במילים: מורשה חתימה בבנק",
+        "owner": "בעלים",
+        "notSet": "לא נקבע",
+        "executorAnkora": "מי מבצע היום באנקורה",
+        "executorAnkoraAria": "מבצע באנקורה",
+        "executorClient": "מי מבצע היום אצל הלקוח",
+        "executorClientAria": "מבצע אצל הלקוח",
+        "groupTiming": "זמנים ובקרה",
+        "calendar": "לוח ימי עבודה",
+        "calendarByEntity": "לפי המדינה של הישות",
+        "calendarHelp": "הריצות והמועדים שפותחים את התהליך נספרים לפיו.",
+        "reviewEvery": "סקירת הנוהל כל (ימים)",
+        "checkEvery": "בדיקה כל (ימים)",
+        "checkText": "מה בודקים (לתהליך שוטף)",
+        "checkTextPlaceholder": "שאין חשבוניות תקועות",
+        "sla": "SLA",
+        "slaPlaceholder": "החומר אצל איילה יומיים עסקים לפני",
+        "businessDays": "ימי עסקים",
+        "groupSystems": "מערכות וגורמים",
+        "external": "גורם חיצוני",
+        "externalPlaceholder": "Nextage, או \"אין\"",
+        "thresholds": "ספי אישור",
+        "thresholdsPlaceholder": "ספק חדש: אישור רו\"ח, או \"אין\"",
+        "systems": "מערכות",
+        "groupState": "מצב",
+        "handover": "איפה בחפיפה",
+        "knowledge": "מה ידוע על התהליך",
+        "toResolve": "מה יסגור את זה *",
+        "groupExceptions": "חריגים ומסמך הנוהל",
+        "exceptionPlaybook": "נוהל חריגים",
+        "exceptionPlaceholder": "מה עושים כשמשהו חורג",
+        "docHelp": "מה שנוהל SOC 2 צריך ואין בשדות למעלה. נכנס למסמך שמייצאים ללקוח או למבקר, וננעל עם כל גרסה מאושרת.",
+        "scope": "תחולה",
+        "scopePlaceholder": "על מי ועל מה הנוהל חל, ועל מה לא",
+        "definitions": "הגדרות (מונח: הסבר, שורה לכל מונח)",
+        "definitionsPlaceholder": "Offboarding: עזיבת עובד",
+        "controls": "בקרות (מופרדות בפסיק)",
+        "classification": "סיווג",
+        "relatedDocs": "מסמכים קשורים",
+        "relatedDocsPlaceholder": "מדיניות בקרת גישה, נוהל קליטת עובד",
+        "addToFile": "הוספה לתיק"
+      },
+      "editor": {
+        "savedAs": "נשמר כגרסה {version}, טיוטה. מנהל מאשר, והבדיקות רצות לפני האישור.",
+        "blocking": "מה חוסם את האישור ({count})",
+        "step": "שלב {n}",
+        "moveUp": "הזזת שלב {n} למעלה",
+        "moveDown": "הזזת שלב {n} למטה",
+        "removeStep": "הסרת שלב",
+        "whatAria": "שלב {n}: מה עושים",
+        "whatPlaceholder": "מה עושים",
+        "howAria": "שלב {n}: איך",
+        "daysAria": "שלב {n}: ימי עסקים מהמועד",
+        "daysPlaceholder": "ימים, -2",
+        "outputPlaceholder": "מה נוצר בסוף השלב",
+        "amountAria": "שלב {n}: סכום מרבי",
+        "amountPlaceholder": "סכום מרבי, אם ידוע",
+        "currencyAria": "שלב {n}: מטבע",
+        "currency": "מטבע",
+        "channelAria": "שלב {n}: ערוץ",
+        "channelPlaceholder": "באיזה ערוץ ההודעה יוצאת",
+        "verificationAria": "אימות של שלב {n}",
+        "verificationPlaceholder": "איך אדם מוודא שזה קרה *",
+        "requiresApproval": "דורש אישור לפני ביצוע",
+        "addStep": "+ שלב",
+        "highlights": "דגשים",
+        "highlightsPlaceholder": "רישום ותשלום הם שני ערוצים נפרדים",
+        "outputs": "מה חייב להיווצר כדי שהריצה תיחשב גמורה",
+        "changeNote": "מה השתנה ולמה",
+        "saveDraft": "שמירת טיוטה"
+      },
+      "steps": {
+        "days": "{days} ימי עסקים",
+        "removedSystem": "מערכת שהוסרה",
+        "upTo": "עד {amount}",
+        "via": "ב{channel}",
+        "needsApproval": "דורש אישור",
+        "verification": "אימות: {text}"
+      },
+      "dates": {
+        "orLink": "או לקשר מועד שכבר בתיק",
+        "linkHelp": "המועדים של הלקוח שמפעילים את התהליך. ריצה תיפתח מהם כשהנוהל מאושר.",
+        "saveLinks": "שמירת הקישורים",
+        "newTitle": "מועד חדש לתהליך",
+        "newHelp": "המועד נוצר בתיק בשם התהליך, מקושר אליו, ופותח ריצה בכל פעם שהוא מגיע.",
+        "howOften": "כל כמה זמן",
+        "BUSINESS_DAILY": "כל יום עסקים (ראשון עד חמישי, בלי חגים)",
+        "WEEKLY": "פעם בשבוע",
+        "MONTHLY": "פעם בחודש",
+        "ONCE": "פעם אחת",
+        "weekday": "באיזה יום",
+        "dayOfMonth": "יום בחודש",
+        "date": "תאריך",
+        "creating": "יוצר...",
+        "create": "יצירת המועד וקישור"
+      },
+      "run": {
+        "opens": "נפתחת משימה עם {count} השלבים של נוהל גרסה {version}, כל אחד ביום העסקים שלו.",
+        "oneRun": "ריצה אחת, ליום אחד. כדי שהתהליך ירוץ בקביעות מוסיפים לו מועד.",
+        "day": "לאיזה יום *",
+        "opening": "פותח...",
+        "open": "פתיחת הריצה"
+      },
+      "stranger": {
+        "notRun": "מבחן הזר: עוד לא הורץ",
+        "passed": "מבחן הזר: עבר · {date}",
+        "open": "מבחן הזר: {parts} · {date}",
+        "blockers": "{count, plural, =1 {חוסם אחד} other {# חוסמים}}",
+        "questions": "{count, plural, =1 {שאלה פתוחה אחת} other {# שאלות פתוחות}}",
+        "step": "שלב {step}",
+        "less": "פחות",
+        "more": "עוד {count}",
+        "copied": "הועתק. מדביקים ב-Claude",
+        "copyNew": "מבחן זר חדש: העתקת הנחיה ל-Claude",
+        "copyFirst": "מבחן הזר: העתקת הנחיה ל-Claude"
+      },
+      "visual": {
+        "viewAria": "תצוגת התהליך",
+        "visual": "תרשים",
+        "text": "טקסט",
+        "steps": "{count, plural, =1 {שלב אחד} other {# שלבים}}",
+        "slaEnd": "סוף הזמן המוגדר",
+        "late": "אחרי הזמן המוגדר",
+        "dayZeroDate": "המועד",
+        "dayZeroStart": "התחלה",
+        "bandAria": "ימי העסקים של התהליך",
+        "noDay": "בלי יום בנוהל",
+        "needsApproval": "דורש אישור",
+        "day": "יום {day}",
+        "daysBefore": "{days} ימים לפני"
+      },
+      "checkForm": {
+        "legend": "מה נמצא",
+        "ok": "נבדק, הכול תקין",
+        "issue": "נמצאה בעיה",
+        "whatFound": "מה נמצא *",
+        "note": "הערה",
+        "issuePlaceholder": "שתי חשבוניות של Notion לא הגיעו ל-billing",
+        "issueTask": "תיפתח לך משימה עם מה שנמצא, להיום.",
+        "record": "רישום הבדיקה"
+      },
+      "flow": {
+        "defaultBranch": "כן",
+        "afterDays": "אחרי {days} ימי עסקים",
+        "elseAfter": "\"אחרת\" אחרי {days} ימים",
+        "owner": "אחראי: {name}",
+        "secondEye": "עין שנייה",
+        "otherwise": "אחרת",
+        "otherwiseEdge": "אחרת, {days} ימים",
+        "otherwiseTree": "אחרת, אחרי {days} ימים",
+        "saveFailed": "השמירה נכשלה.",
+        "live": "הנוהל פעיל, בגרסה {version}. ריצות שכבר התחילו ממשיכות לפי הגרסה הקודמת.",
+        "waiting": "נשמר כגרסה {version}, עוד לא פעיל. {reason}",
+        "notChosen": "לא נבחר",
+        "start": "התחלה: {text}",
+        "noTrigger": "בלי טריגר מוגדר",
+        "connections": "חיבורים של הלקוח ({count})",
+        "fromList": "הנוהל נשמר עד היום כרשימה, והומר לזרימה. שום דבר לא נשמר עד שלוחצים על \"שמור והפעל\".",
+        "issuesCount": "{count} בעיות חוסמות",
+        "allPassed": "כל הבדיקות עברו",
+        "saveActivate": "שמור והפעל",
+        "addAfter": "הוספה אחרי הצומת הנבחר",
+        "addNode": "הוספת צומת",
+        "startHere": "להתחיל מכאן",
+        "delete": "מחיקה",
+        "whatDone": "מה עושים",
+        "question": "השאלה",
+        "waitDays": "ימי עסקים להמתין לפני הצומת",
+        "how": "איך",
+        "ownerIfNot": "אחראי, אם לא מבצע התהליך",
+        "ownerPlaceholder": "למשל: הלקוח",
+        "continuesTo": "ממשיך ל",
+        "helpDesktop": "גוררים צומת כדי להזיז אותו, ומושכים קו מהנקודה התחתונה לצומת אחר כדי לחבר.",
+        "helpMobile": "לוחצים על צומת כדי לערוך אותו. במחשב יש קנבס עם גרירה.",
+        "sentFrom": "נשלח מהתיבה של מנהל התיק.",
+        "to": "אל",
+        "noContact": "לא נבחר איש קשר",
+        "wording": "נוסח",
+        "params": "פרמטרים: {params}",
+        "howSent": "איך נשלח",
+        "autoWarning": "שליחה אוטומטית עוברת עין שנייה פעם אחת, וצריכה נוסח קבוע. עד האישור, הגרסה הקודמת ממשיכה לרוץ.",
+        "branchOrder": "הענפים נבדקים לפי הסדר. הראשון שמתקיים זוכה.",
+        "branch": "ענף {n}",
+        "remove": "הסרה",
+        "branchNameAria": "ענף {n}: שם",
+        "branchPlaceholder": "למשל: הגיע קובץ",
+        "sourceAria": "ענף {n}: מקור התשובה",
+        "replyAria": "ענף {n}: תשובה לאיזה מייל",
+        "replyTo": "תשובה לאיזה מייל",
+        "connectionAria": "ענף {n}: חיבור",
+        "clientConnection": "חיבור של הלקוח",
+        "folderAria": "ענף {n}: מזהה תיקייה בדרייב",
+        "folderPlaceholder": "מזהה התיקייה בדרייב",
+        "manageConnections": "ניהול החיבורים של הלקוח",
+        "addBranch": "+ ענף נוסף",
+        "after": "אחרי",
+        "elseDays": "ימי עסקים בלי תשובה",
+        "goto": "ממשיך ל: {target}",
+        "emptyTree": "אין עדיין צמתים. מוסיפים צומת ראשון מהרשימה.",
+        "unnamedNode": "צומת בלי שם",
+        "reasons": {
+          "waitingSecondEye": "ממתין לעין שנייה: {titles}. עד האישור, הגרסה הקודמת ממשיכה לרוץ.",
+          "notApprover": "נשמר כטיוטה: רק מנהל או מנהל התיק של הלקוח מפעילים נוהל.",
+          "separation": "נשמר כטיוטה: אצל הלקוח הזה מי שכתב את הנוהל לא מאשר אותו, ולכן הוא ממתין לעין שנייה.",
+          "notActivated": "הנוהל נשמר כטיוטה ולא הופעל."
+        },
+        "issues": {
+          "duplicateId": "שני צמתים עם אותו מזהה ({id}).",
+          "noStart": "לנוהל אין צומת התחלה.",
+          "missingTarget": "{node} ממשיך לצומת שלא קיים.",
+          "autoNoBody": "{node} נשלח אוטומטית, ולכן צריך נוסח קבוע שאדם כתב כאן.",
+          "unknownParams": "בנוסח של {node} יש פרמטר שלא קיים: {unknown}. אפשר: {allowed}.",
+          "deadEnd": "{node} לא ממשיך לשום מקום. כל מסלול מסתיים בצומת \"סיום\".",
+          "noQuestion": "לתנאי {node} אין שאלה.",
+          "noBranches": "לתנאי {node} אין ענפים.",
+          "noElseDays": "לתנאי {node} חסר אחרי כמה ימים עוברים ל\"אחרת\".",
+          "elseDeadEnd": "ה\"אחרת\" של {node} לא ממשיך לשום מקום.",
+          "branchDeadEnd": "ענף {n} של {node} לא ממשיך לשום מקום.",
+          "branchNoMailConnection": "ענף {n} של {node} בודק מייל, ולא נבחר חיבור.",
+          "branchNoDriveConnection": "ענף {n} של {node} בודק דרייב, ולא נבחר חיבור.",
+          "branchNoFolder": "ענף {n} של {node}: לא נבחרה תיקייה.",
+          "branchReplyNotMail": "ענף {n} של {node} מחכה לתשובה לצומת שלא שולח מייל.",
+          "loop": "בנוהל יש לולאה: צומת שחוזר לצומת שכבר היה. ענפים יכולים להתאחד, אבל לא לחזור אחורה.",
+          "unreachable": "אי אפשר להגיע ל{node} מההתחלה.",
+          "tooLong": "במסלול אחד יש יותר מ-{max} פעולות. נוהל ארוך מזה הוא כמה תהליכים."
+        },
+        "backToClient": "חזרה לתיק הלקוח"
+      },
+      "document": {
+        "version": "גרסה:",
+        "inForce": "בתוקף",
+        "draft": "טיוטה",
+        "language": "שפה:",
+        "hebrew": "עברית",
+        "english": "English",
+        "noApprovedTranslation": "אין עדיין תרגום מאושר",
+        "exportAfterApproval": "ייצוא באנגלית אחרי אישור התרגום",
+        "downloadPdf": "הורדה כ-PDF",
+        "downloadWord": "הורדה כ-Word",
+        "gaps": "<b>חסר במסמך: </b>{gaps}. בקבצים שמייצאים סעיף ריק לא מופיע. <link>להשלים בתהליך</link>",
+        "noTranslation": "אין עדיין גרסה באנגלית. קלוד מתרגם, ומנהל מאשר לפני שאפשר לייצא.",
+        "translate": "תרגום לאנגלית עם קלוד",
+        "draftState": "טיוטת תרגום",
+        "byName": "מאת {name}",
+        "awaitingApproval": ". ממתין לאישור מנהל.",
+        "readTranslation": "לקריאת התרגום",
+        "incomplete": "התרגום לא שלם: {gaps}. צריך להשלים לפני אישור.",
+        "retranslate": "תרגום מחדש עם קלוד",
+        "approvedState": "תרגום מאושר",
+        "approvedBy": "על ידי {name}"
+      },
+      "translation": {
+        "copied": "הפרומט הועתק. הדביקו אותו בשיחה חדשה בחשבון הארגוני של אנקורה בקלוד.",
+        "openClaude": "פתיחת קלוד",
+        "promptAria": "הפרומט להעתקה",
+        "approveFailed": "האישור נכשל",
+        "approved": "התרגום אושר",
+        "approving": "מאשר...",
+        "approve": "אישור התרגום"
+      },
+      "errors": {
+        "forbidden": "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.",
+        "generic": "אירעה שגיאה. נסו שוב.",
+        "sourceUnclear": "מקור לא מובן: {sources}. כותבים קוד ודקה, למשל S1 08:13.",
+        "slaInteger": "ה-SLA בימי עסקים הוא מספר שלם.",
+        "checkInteger": "הבדיקה היא כל מספר שלם של ימים.",
+        "reviewInteger": "הסקירה היא כל מספר שלם של ימים.",
+        "lessonChoice": "בוחרים אם זה נכנס לנוהל או לא.",
+        "stepsUnread": "השלבים לא נקראו. רעננו ונסו שוב.",
+        "runDate": "צריך תאריך לריצה.",
+        "checkOutcome": "מה נמצא בבדיקה?"
+      }
+    },
+    "procedures": {
+      "title": "נהלים: {name}",
+      "intro": "כל נוהל כמסמך, עם גרסה, בעלים, תאריך תוקף והיסטוריית אישורים. המסמך נבנה מהתהליך, ונעול לכל גרסה מאושרת. כל הורדה נרשמת ביומן.",
+      "packTitle": "כל הנהלים בקובץ אחד",
+      "packHelp": "{count} נהלים בתוקף, עמוד שער עם תוכן, וכל נוהל מעמוד חדש. מתאים לשליחה למבקר.",
+      "hebrew": "עברית:",
+      "english": "English ({english} מתוך {total}):",
+      "noApproved": "אין עדיין תרגום מאושר",
+      "empty": "לאף תהליך של הלקוח אין עדיין נוהל.",
+      "colId": "מזהה",
+      "colProcedure": "נוהל",
+      "colVersion": "גרסה בתוקף",
+      "colFrom": "בתוקף מ-",
+      "colEnglish": "אנגלית",
+      "draftWaiting": "טיוטה {version} ממתינה",
+      "none": "אין",
+      "approved": "מאושר",
+      "pending": "ממתין לאישור"
+    },
+    "handover": {
+      "title": "מוכנות לחפיפה: {name}",
+      "pctAria": "{pct}% מוכן",
+      "process": "תהליך",
+      "checks": {
+        "runs": "רץ",
+        "access": "גישה לכל המערכות",
+        "withUs": "אצלנו",
+        "complete": "תיעוד מלא"
+      },
+      "executorToday": "מבצע היום: {name}",
+      "has": "יש",
+      "missingAria": "חסר",
+      "noAccessTitle": "מערכות שתהליך צריך ואין לנו אליהן גישה",
+      "needs": "צריך: {permission}",
+      "notPlanned": "לא מתוכננים לעבור אלינו: {list}.",
+      "accessStatus": {
+        "HAS_ACCESS": "יש גישה",
+        "PENDING": "ממתין לגישה",
+        "NO_ACCESS": "אין גישה",
+        "NOT_NEEDED": "לא נדרש"
+      },
+      "missing": {
+        "blockers": {
+          "retired": "לא ירוץ: התהליך בוטל.",
+          "paused": "לא ירוץ: התהליך מושהה.",
+          "noOwner": "לא ירוץ: אין אחראי.",
+          "noTrigger": "לא ירוץ: לא כתוב מה מפעיל אותו.",
+          "noProcedure": "לא ירוץ: אין נוהל מאושר.",
+          "scheduledNoDate": "לא ירוץ: תהליך לפי מועד בלי מועד.",
+          "continuousNoCheck": "לא ירוץ: תהליך שוטף בלי תדירות בדיקה."
+        },
+        "noAccess": "אין לנו גישה ל: {systems}.",
+        "notWithUs": "עוד לא אצלנו.",
+        "notWithUsExecutor": "עוד לא אצלנו: היום מבצע {executor}."
+      },
+      "line": {
+        "none": "אין עדיין תהליכים שמתוכננים לעבור אלינו.",
+        "oneReady": "התהליך מוכן: אפשר להעביר אותו אלינו.",
+        "allReady": "כל {total} התהליכים מוכנים.",
+        "some": "{ready} מתוך {total} תהליכים מוכנים{systems, plural, =0 {} =1 {, ומערכת אחת בלי גישה} other {, ו-# מערכות בלי גישה}}."
+      }
+    },
+    "list": {
+      "title": "לקוחות",
+      "subtitle": "ניהול לקוחות Ankora, סטטוס וניצול בנק השעות.",
+      "newClient": "לקוח חדש",
+      "archived": {
+        "summary": "בארכיון ({count})",
+        "exportTitle": "השיחות וההקלטות נמחקות ב-{date}",
+        "export": "ייצוא שיחות והקלטות (עד {date})"
+      },
+      "bank": {
+        "prepaid": "חבילה מראש, בתוקף עד {date}",
+        "ended": "המחזור הסתיים ב-{date}",
+        "renews": "מחזור, מתחדש ב-{date}"
+      },
+      "history": {
+        "current": "נוכחית",
+        "title": "{month}: {used} מתוך {total}"
+      },
+      "rules": "מסומן \"דורש תשומת לב\" כשהבנק נגמר, כשהמחזור הקודם חרג, כשנשאר פחות מ-{pct}% מהבנק, כשהקצב מהיר אחרי {paceDays} ימים במחזור, או כשחבילה צפויה להיגמר תוך {endingDays} ימים.",
+      "reasons": {
+        "bankEmpty": "הבנק נגמר.",
+        "bankOverdrawn": "הבנק נגמר, חריגה של {hours} שעות.",
+        "previousOverrun": "במחזור הקודם חרג ב-{hours} שעות ({used} מתוך {total}).",
+        "lowRemaining": "נותרו {hours} שעות, {pct}% מהבנק.",
+        "lowRemainingRenews": "נותרו {hours} שעות, {pct}% מהבנק, ועוד {days, plural, =1 {יום אחד} other {# ימים}} עד החידוש.",
+        "pace": "מנצל בקצב גבוה פי {ratio} מהצפוי.",
+        "packageEnding": "בקצב של 4 השבועות האחרונים החבילה תיגמר בסביבות {date}.",
+        "rolloverIn": "כולל {hours} שעות שהועברו מהמחזור הקודם.",
+        "rolloverDebt": "כולל חוב של {hours} שעות מהחבילה הקודמת."
+      },
+      "grid": {
+        "actionFailed": "הפעולה נכשלה",
+        "archivedToast": "הלקוח הועבר לארכיון",
+        "summary": {
+          "remaining": "יתרה כוללת בבנקים",
+          "remainingHint": "שעות, ב-{count, plural, =1 {לקוח אחד} other {# לקוחות}} עם בנק",
+          "used": "נוצל במחזורים הנוכחיים",
+          "usedHint": "שעות, מתחילת כל מחזור עד היום",
+          "overran": "חרגו במחזור הקודם",
+          "noClient": "אף לקוח",
+          "ending": "חבילות שעומדות להיגמר",
+          "noPackage": "אף חבילה"
+        },
+        "search": "חיפוש לקוח",
+        "expectedLine": "הקו על הפס: כמה היה צפוי להיות מנוצל עד היום.",
+        "empty": "אין עדיין לקוחות. הוסיפו לקוח ראשון למעלה.",
+        "noMatch": "לא נמצאו לקוחות התואמים את החיפוש.",
+        "meta": {
+          "employees": "{count, plural, =0 {אין עדיין אנשי צוות מוקצים} =1 {איש צוות מוקצה} other {# אנשי צוות מוקצים}}",
+          "openTasks": "{count, plural, =1 {משימה פתוחה אחת} other {# משימות פתוחות}}"
+        },
+        "openFile": "פתיחת תיק הלקוח",
+        "noActiveBank": "אין בנק שעות פעיל",
+        "chips": {
+          "attention": "דורש תשומת לב",
+          "ok": "בקצב",
+          "none": "בלי בנק שעות",
+          "paused": "מושהה",
+          "archived": "בארכיון"
+        },
+        "usedOfTotal": "נוצל מתוך סך הכול (<ltr>{pct}%</ltr>)",
+        "ofHours": "מתוך <num>{total}</num> שעות",
+        "overdrawnBy": "חריגה של <num>{value}</num>",
+        "remaining": "נותרו <num>{value}</num>",
+        "dashedLine": "קו מקווקו: גודל המחזור",
+        "approvalsWaiting": "{count, plural, =1 {דבר אחד ממתין לאישורך} other {# ממתינים לאישורך}}",
+        "hourBank": "בנק שעות",
+        "openHourBank": "פתיחת בנק שעות",
+        "activityReport": "דוח פעילות",
+        "clientView": "תצוגת לקוח",
+        "moreActions": "פעולות נוספות ל{name}",
+        "clientFile": "תיק הלקוח",
+        "archive": "העברה לארכיון"
+      },
+      "restore": {
+        "restore": "החזרה לפעיל",
+        "pending": "מחזיר..."
+      },
+      "back": "לקוחות",
+      "backSearch": "לקוחות · \"{q}\""
+    },
+    "create": {
+      "submit": "הוספת לקוח",
+      "submitting": "נוצר...",
+      "name": "שם הלקוח *",
+      "legalName": "שם משפטי",
+      "primaryContact": "איש קשר",
+      "timezone": "אזור זמן"
+    },
+    "subprocessors": {
+      "emptyGroup": "אין לקוחות בקבוצה הזו.",
+      "paused": " (מושהה)",
+      "checkedAt": ", נבדק {date}",
+      "title": "נמענים להודעה על תת-מעבד חדש (P8 שלב 8)",
+      "intro": "לפי השדה \"התחייבות לעדכון יזום על תת-מעבד\" בכרטיס של כל לקוח. רק התחייבות מפורשת בחוזה נחשבת.",
+      "committed": {
+        "title": "מקבלים מייל",
+        "hint": "החוזה מחייב עדכון יזום."
+      },
+      "unchecked": {
+        "title": "לא נבדק: מייל ליתר ביטחון",
+        "hint": "עוד לא נבדק בחוזה. שולחים מייל, ומסמנים בכרטיס אחרי שבודקים."
+      },
+      "notCommitted": {
+        "title": "מספיק עדכון באתר",
+        "hint": "אין התחייבות בחוזה."
+      },
+      "notice": {
+        "UNCHECKED": "לא נבדק",
+        "COMMITTED": "יש התחייבות: מקבל מייל",
+        "NOT_COMMITTED": "אין התחייבות: מספיק עדכון באתר"
+      }
+    },
+    "holidays": {
+      "count": "({count} מועדים)",
+      "subscribed": "רשום",
+      "notSubscribed": "לא רשום",
+      "subscribe": "רישום",
+      "unsubscribe": "ביטול רישום"
+    },
+    "page": {
+      "errors": {
+        "forbidden": "אין לך הרשאה לבצע פעולה זו.",
+        "forbiddenNotAssigned": "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.",
+        "generic": "אירעה שגיאה. נסו שוב.",
+        "nameRequired": "יש להזין שם לקוח.",
+        "clientNotFound": "לקוח לא נמצא.",
+        "fileRequired": "יש לבחור קובץ.",
+        "summaryNotFound": "הסיכום לא נמצא.",
+        "badSources": "מקור לא מובן: {refs}. כותבים קוד ודקה, למשל S1 08:13.",
+        "unknownTextKind": "סוג טקסט לא מוכר.",
+        "noPortalUser": "אין ללקוח הזה משתמש פורטל לשלוח אליו מייל.",
+        "emailNotSent": "המייל לא נשלח. אפשר להעתיק ולשלוח ידנית."
+      },
+      "inactive": {
+        "paused": "מושהה",
+        "archived": "בארכיון",
+        "pausedBody": "הלקוח מושהה, ולכן המשימות, התיק והמסמכים שלו לא מוצגים כאן, והוא לא מופיע ברשימות העבודה. שום דבר לא נמחק: הכול חוזר כשהלקוח חוזר לפעיל.",
+        "archivedBody": "הלקוח בארכיון. שום דבר לא נמחק: המשימות, התיק והשעות חוזרים כשהלקוח חוזר לפעיל."
+      },
+      "header": {
+        "approvals": "{count, plural, =1 {דבר אחד ממתין לאישור שלך} other {# ממתינים לאישור שלך}}",
+        "proposals": "{count, plural, =1 {הצעה אחת לתיק} other {# הצעות לתיק}}",
+        "questions": "{count, plural, =1 {שאלה אחת לברר עם הלקוח} other {# שאלות לברר עם הלקוח}}",
+        "readFile": "תיק הלקוח לקריאה",
+        "handover": "מוכנות לחפיפה"
+      },
+      "contactFallback": "איש קשר",
+      "removedEntity": "ישות שהוסרה",
+      "tabs": {
+        "label": "לשוניות הלקוח",
+        "work": "עבודה שוטפת",
+        "file": "תיק הלקוח"
+      },
+      "pending": {
+        "title": "ממתין לאישור",
+        "link": "בלשונית ידע מהחילוץ, עם סינון"
+      },
+      "narrativeMeta": "גרסה {version}, {date}",
+      "narrativeMetaBy": "גרסה {version}, {date}, {name}",
+      "categories": {
+        "title": "קטגוריות ({count})",
+        "empty": "אין עדיין קטגוריות ייעודיות ללקוח זה.",
+        "inactive": "(לא פעיל)"
+      },
+      "dates": {
+        "title": "מועדים חשובים ({count})",
+        "all": "לכל המועדים של הלקוח",
+        "empty": "אין עדיין מועדים חשובים ללקוח זה.",
+        "status": {
+          "ACTIVE": "פעיל",
+          "NEEDS_ATTENTION": "דורש טיפול",
+          "IN_PROGRESS": "בטיפול",
+          "HANDLED_CURRENT": "טופל (מחזור נוכחי)",
+          "PAUSED": "מושהה",
+          "ARCHIVED": "בארכיון"
+        }
+      },
+      "holidays": {
+        "title": "לוחות חגים",
+        "defaults": "תזכורות ברירת מחדל: 30 ו-7 ימים לפני",
+        "intro": "רישום הלקוח ללוח חג יוצר אוטומטית מועד חשוב לכל חג בלוח, ומתעדכן מדי שנה."
+      },
+      "staff": {
+        "title": "משתמשים מוקצים ({count})",
+        "empty": "אין עדיין אנשי צוות מוקצים ללקוח זה.",
+        "hint": "הקצאת אנשי צוות ללקוחות מתבצעת מעמוד <link>משתמשים</link>."
+      },
+      "edit": {
+        "save": "שמירת שינויים",
+        "saving": "נשמר...",
+        "saved": "נשמר בהצלחה.",
+        "name": "שם הלקוח",
+        "legalName": "שם משפטי",
+        "primaryContact": "איש קשר",
+        "timezone": "אזור זמן",
+        "status": "סטטוס",
+        "statuses": {
+          "ACTIVE": "פעיל",
+          "PAUSED": "מושהה",
+          "ARCHIVED": "בארכיון"
+        },
+        "kind": "סוג לקוח",
+        "kinds": {
+          "BUSINESS": "עסקי",
+          "PRIVATE": "פרטי"
+        },
+        "industry": "תחום",
+        "industryPlaceholder": "חברה, סטארטאפ AI",
+        "internal": "לקוח פנימי",
+        "internalHint": "עבודה של Ankora עצמה. השעות נרשמות ומופיעות בדוחות, אבל לא בגרף השעות במסך הבית.",
+        "aiExcluded": "בלי AI",
+        "aiExcludedHint": "הלקוח ביקש ששום דבר שלו לא יעבור דרך מערכות AI: משימות, מסמכים ותיק הלקוח. הכול מטופל בידי אדם.",
+        "separation": "הפרדה באישור נהלים",
+        "separationHint": "מי שכתב גרסה של נוהל לא מאשר אותה. ללקוח שהמבקר שלו מבקש הפרדה. כבוי: מנהל התיק או מנהל מאשרים כל נוהל.",
+        "notice": {
+          "title": "התחייבות לעדכון יזום על תת-מעבד",
+          "hint": "רק התחייבות מפורשת בחוזה של הלקוח נחשבת. סעיף 6 בנספח עיבוד המידע שבאתר לא נחשב לבד. לא נבדק: הלקוח מקבל מייל ליתר ביטחון.",
+          "state": "מצב",
+          "source": "מקור: חוזה וסעיף",
+          "sourcePlaceholder": "הסכם שירות 3.2026, סעיף 9",
+          "sourceHint": "חובה כשמסמנים יש או אין.",
+          "document": "החוזה בתיק",
+          "noDocument": "לא נבחר",
+          "optional": "רשות.",
+          "updated": "עודכן ב-{date}.",
+          "updatedBy": "עודכן ב-{date} על ידי {name}."
+        },
+        "portal": {
+          "title": "פורטל הלקוח",
+          "manager": "מנהל התיק",
+          "noManager": "לא הוגדר",
+          "managerHint": "מופיע בפורטל כשם האדם שאחראי על התיק.",
+          "whatsapp": "וואטסאפ ייעודי",
+          "whatsappHint": "הקו שהלקוח כבר מתכתב איתו. ריק: הפורטל יציג שהערוץ עוד לא מחובר.",
+          "ceiling": "תקרת אישור (₪)",
+          "ceilingNow": "כרגע: {amount}. מעל הסכום הזה נדרש אישור הלקוח.",
+          "ceilingEmpty": "ריק: כל החלטה עם סכום תוצג כדורשת אישור."
+        },
+        "preferences": {
+          "title": "העדפות שירות",
+          "hint": "מופיע ללקוח במסך \"התיק שלי\", והוא יכול לערוך שם בעצמו.",
+          "contact": "איך לדבר איתו",
+          "matters": "מה חשוב לו",
+          "never": "מה אסור שיקרה"
+        }
+      },
+      "knowledgeStatus": {
+        "CONFIRMED": "מאושר",
+        "UNCERTAIN": "לא ודאי",
+        "MISSING": "חסר",
+        "SUPERSEDED": "הוחלף"
+      }
+    },
+    "decisions": {
+      "create": "יצירת ההחלטה",
+      "creating": "נוצרת...",
+      "optionRequired": "אפשרות {n} (חובה)",
+      "option": "אפשרות {n}",
+      "recommended": "מומלץ",
+      "cancelFailed": "הביטול נכשל",
+      "cancelled": "ההחלטה בוטלה",
+      "title": "החלטות ({count} פתוחות)",
+      "close": "סגירה",
+      "new": "+ החלטה חדשה",
+      "ceiling": "תקרת האישור של הלקוח: {amount}. מעליה ההחלטה מוצגת ככזו שדורשת את אישורו.",
+      "noCeiling": "לא הוגדרה תקרת אישור ללקוח הזה, ולכן כל החלטה עם סכום תוצג כדורשת אישור.",
+      "question": "מה צריך להחליט *",
+      "questionPlaceholder": "באיזה מועד לקבוע את ביקור הטכנאי?",
+      "background": "רקע קצר",
+      "backgroundPlaceholder": "עד שלושה משפטים. מה הביא לצומת הזו.",
+      "amount": "סכום כולל (₪)",
+      "amountPlaceholder": "ריק אם ההחלטה אינה כספית",
+      "dueAt": "נשמח לתשובה עד",
+      "created": "ההחלטה מחכה ללקוח בפורטל. הוא לא יודע על זה עדיין.",
+      "notify": "להודיע ללקוח",
+      "empty": "עוד לא נפתחו החלטות ללקוח הזה.",
+      "chosen": "נבחר: {option}",
+      "statusCancelled": "בוטלה",
+      "waiting": "ממתינה ללקוח",
+      "cancel": "ביטול"
+    },
+    "file": {
+      "documentKinds": {
+        "POLICY": "פוליסה",
+        "PROCEDURE": "נוהל",
+        "CERTIFICATE": "אישור",
+        "CONTRACT": "חוזה",
+        "INVOICE": "חשבונית",
+        "OTHER": "מסמך"
+      },
+      "documents": {
+        "title": "מסמכים",
+        "intro": "הלקוח מוריד אותם מהתיק שלו. אנחנו היחידים שמעלים.",
+        "kindOf": "סוג המסמך: {title}",
+        "visible": "הלקוח רואה",
+        "hidden": "מוסתר",
+        "aiExcludedByTask": "בלי AI (מהמשימה)",
+        "managerOnly": "רק מנהל יכול להסיר",
+        "aiExcluded": "בלי AI",
+        "aiAllowed": "מותר ל-AI",
+        "remove": "הסרה",
+        "storageNotReady": "אחסון המסמכים עדיין בפיתוח. הטופס למטה מוכן, ומה שנשאר הוא לפתוח את התיקייה המשותפת ולשתף אותה. עד אז אפשר לשלוח מסמך בוואטסאפ כרגיל.",
+        "name": "שם המסמך",
+        "namePlaceholder": "פוליסת רכב 2026",
+        "kind": "סוג",
+        "file": "קובץ (עד 4MB)",
+        "clientVisible": "הלקוח רואה את זה בתיק שלו",
+        "added": "המסמך נוסף לתיק.",
+        "uploading": "מעלה...",
+        "upload": "צירוף מסמך"
+      },
+      "summary": {
+        "title": "סיכום חודשי",
+        "intro": "נבנה מהרשומות. מגיע ללקוח רק אחרי שמישהו אישר.",
+        "generating": "מפיק...",
+        "generate": "הפקת טיוטה לחודש הנוכחי",
+        "approvedBy": "אושר על ידי {name}",
+        "accountManager": "מנהל התיק",
+        "discarded": "בוטל",
+        "draft": "טיוטה",
+        "discardedLong": "בוטל, לא יגיע ללקוח",
+        "draftFrom": "טיוטה, נבנתה מ-{count} רשומות",
+        "approved": "אושר. הלקוח יראה את זה בדוח החודשי.",
+        "discard": "ביטול הטיוטה",
+        "notify": "להודיע ללקוח",
+        "approving": "מאשר...",
+        "reapprove": "שמירה ואישור מחדש",
+        "approve": "אישור ופרסום בפורטל"
+      },
+      "parts": {
+        "label": "חלקי התיק",
+        "all": "הכול",
+        "pending": "ממתין לאישור",
+        "overview": "סקירה וישויות",
+        "people": "אנשים וספקים",
+        "facts": "עובדות ושאלות",
+        "processes": "תהליכים ונהלים",
+        "rules": "כללים",
+        "requests": "סוגי פניות",
+        "systems": "מערכות וגישות",
+        "sources": "מקורות"
+      },
+      "read": {
+        "title": "תיק לקוח: {name}",
+        "downloadPdf": "הורדה כ-PDF",
+        "downloadMarkdown": "הורדה כ-Markdown",
+        "howToRead": "כל שורה מסומנת לפי מה שידוע עליה. בלי סימון: מאושר, הלקוח או ספק שלו אמר או הראה במפורש. \"לא ודאי\" ו\"חסר\" מופיעים ליד הפריט, עם מה שיסגור אותו. המקורות כתובים בסוגריים, למשל [S1 08:13], ומוסברים במקרא בסוף.",
+        "aiExcluded": "בלי AI: הלקוח ביקש ששום דבר שלו לא יעבור דרך AI, ולכן אין חילוץ עם קלוד.",
+        "doNotDisclose": "לא לספר: {value}",
+        "legend": "מקרא מקורות",
+        "legendEmpty": "אין עדיין מקורות במרשם.",
+        "sections": {
+          "identity": {
+            "title": "זהות הלקוח"
+          },
+          "overview": {
+            "title": "סקירה, רקע ותפקידנו",
+            "empty": "עוד לא נכתב מה בתחום ומה מחוץ לו."
+          },
+          "people": {
+            "title": "אנשים ויחסים",
+            "empty": "אין עדיין אנשי קשר בתיק."
+          },
+          "preferences": {
+            "title": "העדפות",
+            "empty": "אין עדיין העדפות."
+          },
+          "requirements": {
+            "title": "דרישות חוזרות",
+            "empty": "אין עדיין דרישות חוזרות."
+          },
+          "rules": {
+            "title": "כללים והגבלות",
+            "empty": "הלקוח עוד לא קבע כללים."
+          },
+          "systems": {
+            "title": "מערכות וגישות",
+            "empty": "אין עדיין מערכות במפה."
+          },
+          "vendors": {
+            "title": "ספקים ונותני שירות",
+            "empty": "אין עדיין ספקים או נותני שירות קבועים."
+          },
+          "locations": {
+            "title": "מקורות ידע ומיקומים",
+            "empty": "עוד לא נכתב איפה נמצא הידע."
+          },
+          "processes": {
+            "title": "תהליכים",
+            "empty": "עוד לא נכתבו תהליכים."
+          },
+          "requestTypes": {
+            "title": "סוגי פניות ודרכי מענה",
+            "empty": "עוד לא נכתב מה מגיע, ממי ואיך עונים."
+          },
+          "finance": {
+            "title": "כספים וכללי אישור",
+            "empty": "אין עדיין עובדות כספיות או כללי אישור."
+          },
+          "communication": {
+            "title": "תקשורת",
+            "empty": "עוד לא נכתב באילו ערוצים פונים למי."
+          },
+          "dates": {
+            "title": "תאריכים ואירועים חוזרים",
+            "empty": "אין מועדים."
+          },
+          "temporary": {
+            "title": "מידע נוכחי או זמני",
+            "empty": "אין מידע זמני."
+          },
+          "oneOff": {
+            "title": "החלטות חד-פעמיות",
+            "empty": "אין החלטות חד-פעמיות."
+          },
+          "questions": {
+            "title": "שאלות פתוחות",
+            "empty": "אין שאלות פתוחות."
+          },
+          "workRules": {
+            "title": "כללי עבודה ספציפיים",
+            "empty": "אין כללי עבודה או כללי טיפול במידע."
+          },
+          "notes": {
+            "title": "הערות",
+            "empty": "אין הערות."
+          },
+          "pending": {
+            "title": "ממתין לאישור וסתירות",
+            "empty": "אין פריטים שממתינים לאישור."
+          },
+          "changes": {
+            "title": "יומן עדכונים",
+            "empty": "אין עדכונים."
+          }
+        }
+      }
+    },
+    "control": {
+      "label": "בקרה",
+      "toApprovalsAndQuestions": "לאישורים ולשאלות ללקוח",
+      "toFile": "לתיק הלקוח",
+      "toApprovals": "לאישורים",
+      "more": "ועוד {count}",
+      "access": {
+        "NO_ACCESS": "אין גישה",
+        "PENDING": "הגישה ממתינה"
+      },
+      "parts": {
+        "noProcesses": "אין עדיין תהליכים",
+        "processes": "{count, plural, =1 {תהליך אחד} other {# תהליכים}}",
+        "processesWithAnkora": "{count, plural, =1 {תהליך אחד} other {# תהליכים}}, {withAnkora} אצלנו",
+        "processesInHandover": "{count, plural, =1 {תהליך אחד} other {# תהליכים}}, {inHandover} בחפיפה",
+        "processesBoth": "{count, plural, =1 {תהליך אחד} other {# תהליכים}}, {withAnkora} אצלנו ו-{inHandover} בחפיפה",
+        "notRunning": "{count, plural, =1 {תהליך אחד לא ירוץ} other {# תהליכים לא ירוצו}}",
+        "documentation": "תיעוד {pct}%",
+        "needsReview": "{count, plural, =1 {תהליך אחד דורש סקירה} other {# תהליכים דורשים סקירה}}",
+        "exceptionsInForce": "{count, plural, =1 {חריגה אחת} other {# חריגות}} בתוקף",
+        "exceptionsRequested": "{count, plural, =1 {בקשת חריגה אחת ממתינה} other {# בקשות חריגה ממתינות}}",
+        "uncertain": "{count, plural, =1 {פריט אחד לא ודאי} other {# פריטים לא ודאיים}}",
+        "openQuestions": "{count, plural, =1 {שאלה פתוחה אחת} other {# שאלות פתוחות}}",
+        "clientVisible": "{count, plural, =1 {פריט אחד גלוי ללקוח} other {# פריטים גלויים ללקוח}}",
+        "noOwner": "{count, plural, =1 {פריט אחד} other {# פריטים}} בלי בעלים",
+        "systemsWithoutAccess": "{count, plural, =1 {מערכת אחת} other {# מערכות}} בלי גישה",
+        "noBatch": "עוד לא הגיעה אצווה מהחילוץ",
+        "lastBatch": "אצווה אחרונה: {days, plural, =0 {היום} =1 {לפני יום עבודה} other {לפני # ימי עבודה}}"
+      }
+    },
+    "tasks": {
+      "title": "משימות ({count} פתוחות)",
+      "allTasks": "לכל המשימות של הלקוח",
+      "newTrigger": "משימה",
+      "newTitle": "משימה חדשה: {name}",
+      "closedRecently": "{count} נסגרו ב-30 הימים האחרונים",
+      "untasked": "{hours} שעות החודש דווחו בלי משימה",
+      "empty": "אין משימות פתוחות ללקוח זה.",
+      "noAssignee": "ללא אחראי",
+      "due": "יעד {date}",
+      "hours": "{hours} שעות",
+      "status": {
+        "OPEN": "פתוחה",
+        "IN_PROGRESS": "בביצוע",
+        "PENDING_APPROVAL": "ממתינה לאישור",
+        "DONE": "הושלמה",
+        "ARCHIVED": "בארכיון"
+      },
+      "showing": "מוצגות {shown} מתוך {total}.",
+      "fullList": "לכל הרשימה"
+    },
+    "entities": {
+      "fields": {
+        "legalName": "שם משפטי",
+        "registrationNumber": "מספר רישום",
+        "country": "מדינה",
+        "currency": "מטבע",
+        "billingAddress": "כתובת לחיוב"
+      },
+      "missing": "חסר",
+      "shortName": "שם קצר *",
+      "parent": "ישות אם",
+      "noParent": "אין",
+      "missingToResolve": "מה יסגור את השדות החסרים *",
+      "missingToResolvePlaceholder": "לבקש מהמנכ״ל את תעודת ההתאגדות",
+      "status": "סטטוס הישות",
+      "toResolve": "מה יסגור את זה *",
+      "saving": "שומר...",
+      "save": "שמירה",
+      "add": "הוספה לתיק",
+      "removeFailed": "ההסרה נכשלה",
+      "removed": "הוסר מהתיק",
+      "title": "ישויות משפטיות ({count})",
+      "addTrigger": "+ ישות",
+      "drawerTitle": "ישות משפטית",
+      "empty": "אין עדיין ישויות. ללקוח עם יותר מישות אחת, אנשים ומערכות משויכים לישות הנכונה.",
+      "childOf": "בת של {name}",
+      "missingList": "חסר: {fields}",
+      "edit": "עריכה",
+      "editTitle": "עריכה: {name}",
+      "remove": "הסרה"
+    },
+    "requestTypes": {
+      "title": "סוג הפנייה *",
+      "titlePlaceholder": "חשבונית Inc",
+      "fromWho": "ממי",
+      "fromWhoPlaceholder": "ספק",
+      "arrivesVia": "מגיעה דרך",
+      "handling": "איך עונים ולאן מעבירים *",
+      "handlingPlaceholder": "לשני ולג'נן, לא לאיילה",
+      "routeTo": "למי מפנים",
+      "process": "מפעיל תהליך",
+      "noProcess": "לא מפעיל תהליך",
+      "status": "סטטוס",
+      "toResolve": "מה יסגור את זה *",
+      "saving": "שומר...",
+      "save": "שמירה",
+      "add": "הוספה לתיק",
+      "removeFailed": "ההסרה נכשלה",
+      "removed": "הוסר מהתיק",
+      "panelTitle": "סוגי פניות ודרכי מענה ({count})",
+      "addTrigger": "+ סוג פנייה",
+      "drawerTitle": "סוג פנייה",
+      "empty": "אין עדיין סוגי פניות. מה מגיע, ממי, ואיך עונים: מה שמנהל תפעול חדש צריך ביום הראשון.",
+      "from": "מ: {value}",
+      "via": "דרך: {value}",
+      "routedTo": "מפנים ל: {names}",
+      "triggers": "מפעיל: {name}",
+      "edit": "עריכה",
+      "editTitle": "עריכה: {name}",
+      "remove": "הסרה"
+    },
+    "systems": {
+      "system": "מערכת *",
+      "purpose": "למה היא משמשת",
+      "purposePlaceholder": "בנק של Inc",
+      "url": "כתובת",
+      "accountUsed": "החשבון שאנחנו עובדים איתו",
+      "noPasswords": "בלי סיסמאות. סיסמה נשמרת בכספת.",
+      "accessStatus": "מצב הגישה",
+      "ourPermission": "ההרשאה שלנו",
+      "blocker": "מה חוסם",
+      "blockerPlaceholder": "MFA לטלפון של המנכ״ל",
+      "clientAdmin": "מי מנהל אותה אצל הלקוח",
+      "clientAdminPlaceholder": "המנכ״ל פותח משתמשים ידנית",
+      "vaultEntry": "רשומה בכספת",
+      "none": "אין",
+      "cost": "עלות",
+      "currency": "מטבע",
+      "cycle": "מחזור",
+      "cycles": {
+        "MONTHLY": "חודשי",
+        "ANNUAL": "שנתי",
+        "OTHER": "אחר"
+      },
+      "cardLast4": "4 ספרות של הכרטיס",
+      "invoiceTo": "לאן מגיעה החשבונית",
+      "notes": "הערות",
+      "status": "סטטוס",
+      "toResolve": "מה יסגור את זה *",
+      "doNotDisclose": "למי אסור לספר",
+      "saving": "שומר...",
+      "save": "שמירה",
+      "add": "הוספה למפה",
+      "removeFailed": "ההסרה נכשלה",
+      "removed": "הוסר מהמפה",
+      "title": "מפת מערכות ({count})",
+      "gaps": "{count} בלי גישה עדיין",
+      "addTrigger": "+ מערכת",
+      "drawerTitle": "מערכת במפה",
+      "empty": "אין עדיין מערכות במפה. גם מערכת שאין לנו אליה גישה נכנסת לכאן.",
+      "access": {
+        "HAS_ACCESS": "יש גישה",
+        "PENDING": "ממתין לגישה",
+        "NO_ACCESS": "אין גישה",
+        "NOT_NEEDED": "לא נדרש"
+      },
+      "permissions": {
+        "NONE": "אין",
+        "VIEWER": "צפייה",
+        "USER": "משתמש",
+        "BILLING": "חיוב",
+        "ADMIN": "מנהל",
+        "OWNER": "בעלים"
+      },
+      "per": {
+        "MONTHLY": "בחודש",
+        "ANNUAL": "בשנה"
+      },
+      "permissionLine": "הרשאה: {permission}",
+      "accountLine": "חשבון: <ltr>{account}</ltr>",
+      "blockerLine": "חוסם: {value}",
+      "clientAdminLine": "מנהל אצל הלקוח: {value}",
+      "invoiceLine": "חשבונית ל-<ltr>{to}</ltr>",
+      "inVault": "בכספת: {name}",
+      "doNotDiscloseLine": "לא לספר: {value}",
+      "edit": "עריכה",
+      "editTitle": "עריכת מערכת",
+      "remove": "הסרה",
+      "invalidCost": "עלות לא תקינה."
+    },
+    "connections": {
+      "back": "חזרה לתיק הלקוח",
+      "notices": {
+        "connected": "החיבור נוסף.",
+        "notConfigured": "החיבור ל-Google עוד לא מוגדר בסביבה הזו (חסרים פרטי לקוח OAuth).",
+        "denied": "החיבור בוטל במסך של Google.",
+        "noToken": "Google לא החזיר הרשאה קבועה. מנתקים את האפליקציה בהגדרות החשבון ב-Google ומנסים שוב.",
+        "failed": "החיבור נכשל. נסו שוב."
+      },
+      "result": {
+        "generic": "אירעה שגיאה. נסו שוב.",
+        "saved": "החיבור נשמר. הסיסמה בכספת.",
+        "disconnected": "החיבור נותק, וההרשאה בוטלה.",
+        "appPasswordNotTestable": "חיבור בסיסמת אפליקציה נבדק בריצה הראשונה שקוראת מייל. בדיקה מכאן עוד לא בנויה.",
+        "testSent": "נשלח מייל בדיקה ל-{account}.",
+        "mailConnected": "מייל: מחובר ({threads} שרשורים, בלי קריאת תוכן)",
+        "driveFiles": "דרייב: {count} קבצים בתיקייה",
+        "mailOnly": "{mail}.",
+        "mailAndDrive": "{mail}. {drive}."
+      },
+      "kinds": {
+        "GOOGLE_OAUTH": "Google של הלקוח",
+        "MAIL_APP_PASSWORD": "מייל של הלקוח",
+        "MANAGER_SEND": "שליחה מהתיבה של מנהל התיק"
+      },
+      "scopes": {
+        "appPassword": "סיסמת אפליקציה",
+        "mailOnly": "מייל בלבד",
+        "viaGoogle": "דרך Google",
+        "sendOnly": "שליחה בלבד",
+        "mailReplies": "מייל: רק אם הגיעה תשובה",
+        "driveRead": "דרייב: רואה קבצים בתיקייה",
+        "driveWrite": "דרייב: כותב קבצים שהנוהל יוצר"
+      },
+      "confirmLabel": "אישור ניתוק",
+      "confirmYes": "כן, לנתק",
+      "cancel": "ביטול",
+      "eyebrow": "{name} · תיק הלקוח",
+      "title": "חיבורים",
+      "intro": "מערכות של הלקוח שהנהלים שלו קוראים מהן או כותבים אליהן. כל שימוש נרשם ביומן.",
+      "connected": "מחובר",
+      "noConsent": "אישור לא נרשם",
+      "connectedBy": "חיבר: {name}",
+      "usedBy": "בשימוש ב-{count} נהלים",
+      "notUsed": "עוד לא בשימוש בנוהל",
+      "folderId": "מזהה תיקייה בדרייב, לבדיקה (רשות)",
+      "test": "בדיקת חיבור",
+      "disconnect": "ניתוק",
+      "confirmInUse": "החיבור בשימוש ב-{count} נהלים, והם ייעצרו בצומת שמשתמש בו. לנתק?",
+      "confirmGoogle": "לנתק את החיבור ולבטל את ההרשאה ב-Google?",
+      "new": {
+        "title": "חיבור חדש",
+        "how": "איך הלקוח מתחבר:",
+        "google": "חיבור דרך Google (מומלץ)",
+        "googleHint": "הלקוח מאשר במסך של Google. מייל ודרייב.",
+        "googleNotReady": "חיבור דרך Google עוד לא מוגדר בסביבה הזו.",
+        "appPassword": "שם משתמש וסיסמת אפליקציה",
+        "appPasswordHint": "מייל בלבד. נשמר בכספת. סיסמת אפליקציה של Google דורשת אימות דו-שלבי בחשבון.",
+        "email": "כתובת המייל",
+        "password": "סיסמת אפליקציה",
+        "consent": "מי אצל הלקוח מסר את הגישה, ומתי",
+        "save": "שמירת החיבור"
+      },
+      "send": {
+        "title": "שליחה",
+        "intro": "מיילים שהנהלים של הלקוח הזה שולחים יוצאים מהתיבה של מנהל התיק.",
+        "mine": "התיבה שלך מחוברת: {account}",
+        "confirm": "לנתק את התיבה שלך מהשליחה ולבטל את ההרשאה ב-Google?",
+        "connect": "חיבור התיבה שלי לשליחה",
+        "notConnected": "התיבה שלך לא מחוברת."
+      },
+      "aiExcluded": "הלקוח מסומן \"בלי AI\": בדיקות פשוטות (הגיעה תשובה, יש קובץ) עדיין רצות, אבל קלוד לא קורא דרך החיבורים."
+    },
+    "knowledge": {
+      "status": {
+        "CONFIRMED": "מאושר",
+        "UNCERTAIN": "לא ודאי",
+        "MISSING": "חסר",
+        "SUPERSEDED": "הוחלף"
+      },
+      "statusLabel": "סטטוס",
+      "toResolve": "מה יסגור את זה *",
+      "doNotDisclose": "למי אסור לספר",
+      "audience": {
+        "ALL_STAFF": "כל מי שעובד על הלקוח",
+        "ACCOUNT_TEAM": "מנהל התיק ומי שנבחר",
+        "RESTRICTED": "רק מי שנבחר",
+        "label": "מי רואה",
+        "restrictedPeople": "רק האנשים האלה רואים",
+        "teamPeople": "מנהל התיק, ובנוסף"
+      },
+      "missingFields": {
+        "CONTACT": {
+          "emails": "מייל",
+          "phones": "טלפון",
+          "role": "תפקיד",
+          "clientSideAddress": "כתובת אצל הלקוח"
+        },
+        "SYSTEM": {
+          "url": "כתובת",
+          "accountUsed": "החשבון שלנו",
+          "clientAdmin": "מנהל אצל הלקוח",
+          "billing": "חיוב"
+        }
+      },
+      "missing": {
+        "title": "שדות שחסרים",
+        "toResolve": "מה יסגור את השדות החסרים *",
+        "line": "חסר: {fields}",
+        "lineWhy": "חסר: {fields} · {why}"
+      },
+      "sources": {
+        "label": "מקורות",
+        "labelRequired": "מקורות *",
+        "secondaryOnly": "{count, plural, =1 {המקור הוא מסמך של אנקורה} other {כל המקורות הם מסמכים של אנקורה}}, ולכן הפריט יישמר כ\"{status}\". אם יש מקור מהלקוח או מספק (פגישה, מייל, הודעה), עדיף להוסיף אותו.",
+        "manualConfirm": "אישור ידני: אין מקור מהלקוח, ואני מאשר/ת שזה נכון. יישמר כ\"{status}\".",
+        "emptyRegister": "אין עדיין מקורות במרשם. מוסיפים אותם ב\"מרשם מקורות\" במסך הלקוח.",
+        "optionAnkora": "{code} {title} (מסמך של אנקורה)"
+      },
+      "entity": {
+        "label": "ישות",
+        "none": "לא משויך לישות"
+      },
+      "extras": {
+        "externalRefs": "הפניות חיצוניות (RAID-002, ClickUp:86c1x)",
+        "doNotDisclose": "לא לספר (למי, ועד מתי)",
+        "doNotDisclosePlaceholder": "עובדי הלקוח, עד הודעה של המנכ״ל",
+        "owner": "בעלים באנקורה",
+        "noOwner": "בלי בעלים",
+        "clientVisible": "גלוי ללקוח"
+      },
+      "tags": {
+        "verified": "אומת: {date}",
+        "doNotTell": "לא לספר: {text}",
+        "owner": "בעלים: {name}"
+      },
+      "errors": {
+        "forbidden": "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.",
+        "generic": "אירעה שגיאה. נסו שוב.",
+        "badSource": "מקור לא מובן: {entries}. כותבים קוד ודקה, למשל S1 08:13.",
+        "invalidDate": "תאריך לא תקין.",
+        "invalidEmail": "כתובת מייל לא תקינה: {entries}",
+        "invalidPhone": "מספר טלפון לא תקין: {entries}",
+        "invalidMonthlyCost": "עלות חודשית לא תקינה.",
+        "clientNotFound": "לקוח לא נמצא.",
+        "policyKindRequired": "צריך לבחור את סוג הכלל.",
+        "paramsUnreadable": "מה שנבדק בכלל לא נקרא. רעננו ונסו שוב.",
+        "exceptionEndRequired": "חריגה צריכה תאריך סיום.",
+        "sourceKindRequired": "צריך לבחור סוג מקור.",
+        "domainKindRequired": "צריך לבחור של מי הדומיין.",
+        "factKindRequired": "צריך לבחור סוג.",
+        "chooseDate": "צריך לבחור תאריך."
+      },
+      "duplicates": {
+        "heading": "כפילויות אפשריות ({count})",
+        "intro": "אותו פריט אולי נכנס פעמיים בשם קצת אחר. משלימים את אחד מהם, ומסירים את השני.",
+        "kinds": {
+          "CONTACT": "אנשי קשר",
+          "ORGANIZATION": "ארגונים",
+          "SYSTEM": "מערכות",
+          "ENTITY": "ישויות",
+          "DATE": "מועדים"
+        },
+        "pair": "<a></a> ו<b></b>",
+        "sameName": "אותו שם"
+      }
+    },
+    "policies": {
+      "saving": "שומר...",
+      "sending": "שולח...",
+      "save": "שמירה",
+      "addToFile": "הוספה לתיק",
+      "heading": "כללים של הלקוח ({count})",
+      "add": "+ כלל",
+      "addTitle": "כלל של הלקוח",
+      "empty": "אין עדיין כללים. מה מותר ומה אסור אצל הלקוח, מי מאשר, מה לא מספרים למי, ומה לא נכנס לתיק בכלל.",
+      "retired": "כללים שבוטלו ({count})",
+      "kinds": {
+        "DATA_HANDLING": "טיפול במידע",
+        "DISCLOSURE": "חשיפה",
+        "COMMUNICATION": "תקשורת",
+        "SEPARATION": "הפרדה",
+        "APPROVAL_REQUIRED": "אישור נדרש",
+        "THRESHOLD": "סף",
+        "REQUIRED_STEP": "שלב חובה",
+        "TIMING": "תזמון",
+        "FORBIDDEN": "איסור",
+        "INFO": "כלל עבודה"
+      },
+      "kindHints": {
+        "DATA_HANDLING": "מה נכנס לתיק ואיך. נשלח לכל חילוץ, ידני ויומי.",
+        "DISCLOSURE": "למי אסור לספר מה. מוצג בראש מסך הלקוח ובראש התיק.",
+        "COMMUNICATION": "באיזה ערוץ עושים מה, ולאן מגיעות חשבוניות. עם ערוצים, נבדק מול שלבי נוהל (דורש חריגה). עם כתובות, נבדק מול מפת המערכות.",
+        "SEPARATION": "מה נשאר מופרד בין ישויות. נבדק מול שלבי נוהל (דורש חריגה) וסוגי פניות.",
+        "APPROVAL_REQUIRED": "מה דורש אישור. עם פעולות, נוהל בלי שלב אישור לא מאושר.",
+        "THRESHOLD": "סכום שמעליו צריך אישור. עם סכום, שלב מעליו בלי אישור חוסם את הנוהל.",
+        "REQUIRED_STEP": "שלב שחייב להיות. עם ניסוח, נבדק מול שלבי נוהל (דורש חריגה).",
+        "TIMING": "כמה זמן לפני. עם ימי עסקים, נבדק מול שלבי נוהל (דורש חריגה).",
+        "FORBIDDEN": "מה אסור לכולם, לא רק ל-AI. עם פעולות, שלב כזה בנוהל דורש חריגה.",
+        "INFO": "כל השאר: נקרא על ידי אנשים ועל ידי Claude."
+      },
+      "statuses": {
+        "PROPOSED": "מוצע",
+        "ACTIVE": "בתוקף",
+        "RETIRED": "בוטל"
+      },
+      "form": {
+        "activeWarning": "הכלל בתוקף. שינוי בשם, בסוג, בנוסח או במה שנבדק מחזיר אותו ל\"מוצע\", ומנהל צריך לאשר אותו שוב.",
+        "kind": "סוג הכלל *",
+        "title": "שם הכלל *",
+        "titlePlaceholder": "פגישות הנהלה",
+        "statement": "הכלל *",
+        "statementPlaceholder": "רושמים נושאים בלבד, בלי ציטוטים ובלי פרטים",
+        "interim": "עד שיאושר",
+        "interimRequired": "עד שיאושר *",
+        "interimPlaceholder": "כל הוצאה עוברת לאורן",
+        "interimHint": "הכלל הזהיר שחל עד שמנהל מאשר. בלי כלל ביניים, הכלל חל כפי שהוא כתוב.",
+        "rationale": "למה",
+        "effectiveFrom": "נכנס לתוקף ב-",
+        "reviewBy": "לסקירה עד",
+        "datesHint": "ריק: חל מיד, בלי מועד סקירה. שינוי של יום הכניסה לתוקף בכלל שבתוקף מחזיר אותו לאישור מנהל.",
+        "knowledgeStatus": "מה ידוע על הכלל"
+      },
+      "exception": {
+        "rule": "הכלל:",
+        "what": "מה עושים אחרת *",
+        "whatPlaceholder": "לשלוח לאיילה את חשבוניות Inc של אוקטובר",
+        "reason": "למה *",
+        "reasonPlaceholder": "שני בחופשה, והתשלום ב-25 לחודש",
+        "until": "עד (כולל) *",
+        "maxDays": "עד {max} יום. לתקופה ארוכה יותר משנים את הכלל עצמו.",
+        "submit": "שליחת הבקשה",
+        "rejectReason": "למה לא, בשורה אחת *",
+        "rejectSubmit": "דחיית הבקשה",
+        "badgeUntil": "חריגה עד {date}",
+        "badgeRequest": "בקשה לחריגה",
+        "until2": "עד {date}",
+        "requestedBy": "ביקש/ה {name}",
+        "decidedBy": "אישר/ה {name}",
+        "approve": "אישור החריגה",
+        "reject": "דחיית החריגה",
+        "rejectTitle": "דחיית בקשה לחריגה",
+        "withdraw": "משיכת הבקשה"
+      },
+      "approvers": {
+        "hint": "רק כשהלקוח קבע מי מאשר. בלי בחירה, מאשר כל מי שקיבל את ההרשאה \"אישור חריגות ומידע רגיש\" בדף המשתמש.",
+        "line": "חריגות ומידע רגיש מאשר/ת: {names}",
+        "none": "חריגות ומידע רגיש מאשר/ת: עוד אין מי שמאשר. נותנים הרשאה בדף המשתמש.",
+        "setByClient": "(לפי מה שהלקוח קבע)",
+        "change": "שינוי",
+        "title": "מי מאשר אצל הלקוח"
+      },
+      "retire": {
+        "reason": "למה מבטלים, בשורה אחת *",
+        "reasonPlaceholder": "אורן ביטל את המגבלה בפגישה מ-20.10",
+        "submit": "ביטול הכלל"
+      },
+      "history": {
+        "summary": "גרסאות קודמות ({count})",
+        "version": "גרסה {version}",
+        "versionTitled": "גרסה {version}: {title}",
+        "interim": "עד שאושר:",
+        "checked": "נבדק:",
+        "approvedBy": "אושר על ידי {name}",
+        "approvedByOn": "אושר על ידי {name}, {date}",
+        "notApproved": "לא אושר",
+        "replacedOn": "הוחלף ב-{date}"
+      },
+      "row": {
+        "interim": "עד שיאושר:",
+        "proposed": "הכלל המוצע:",
+        "why": "למה:",
+        "checked": "נבדק מול הנהלים:",
+        "textOnly": "טקסט בלבד: השרת לא בודק את הכלל הזה.",
+        "approveBlocked": "לפני שמאשרים: מוודאים מול הלקוח שזה מה שהוא אמר, ובעריכה מסמנים \"{status}\" עם המקור שמאשר. אחר כך אפשר לאשר את הכלל.",
+        "approve": "אישור הכלל",
+        "edit": "עריכה",
+        "editTitle": "עריכה: {title}",
+        "requestException": "בקשת חריגה",
+        "requestExceptionTitle": "בקשת חריגה: {title}",
+        "retire": "ביטול",
+        "retireTitle": "ביטול: {title}",
+        "remove": "הסרה"
+      },
+      "toast": {
+        "approveFailed": "האישור נכשל",
+        "ruleActive": "הכלל בתוקף",
+        "exceptionApproved": "החריגה אושרה",
+        "withdrawFailed": "המשיכה נכשלה",
+        "withdrawn": "הבקשה נמשכה",
+        "removeFailed": "ההסרה נכשלה",
+        "removed": "הוסר מהתיק"
+      },
+      "dates": {
+        "startsOn": "נכנס לתוקף ב-{date}",
+        "inForceFrom": "בתוקף מ-{date}",
+        "reviewOverdue": "מועד הסקירה עבר ({date})",
+        "reviewBy": "לסקירה עד {date}"
+      },
+      "checked": {
+        "entityOnly": "({entity} בלבד)",
+        "removedEntity": "ישות שהוסרה",
+        "threshold": "{tags} מעל {amount} דורש שלב אישור",
+        "thresholdDefaultTags": "תשלום, רכישה, זיכוי",
+        "approval": "{tags} דורש שלב אישור לפני הביצוע",
+        "forbidden": "שלב של {tags} אסור",
+        "requiredStep": "אחד השלבים כולל \"{text}\"",
+        "requiredStepWith": "בנוהל עם {tags}, אחד השלבים כולל \"{text}\"",
+        "timing": "{tags}: לפחות {days} ימי עסקים לפני המועד",
+        "channels": "{tags} רק ב: {channels}",
+        "invoices": "חשבוניות של מערכות מגיעות רק ל: {to}",
+        "separation": "הפרדה בין {entities}: שלב כספי משויך לישות, ואין גורם חיצוני של ישות אחרת",
+        "separationJoin": " ל-"
+      },
+      "disclosure": {
+        "lead": "לפני שמדברים עם מישהו אצל הלקוח:",
+        "proposed": "(מוצע)",
+        "more": "{count, plural, =1 {עוד כלל אחד} other {עוד # כללים}}"
+      },
+      "params": {
+        "check": "לבדוק את הכלל מול הנהלים",
+        "textOnlyHint": "בלי זה הכלל נקרא על ידי אנשים ועל ידי Claude, והשרת לא בודק אותו.",
+        "amountAbove": "מעל סכום של *",
+        "currency": "מטבע *",
+        "choose": "בחירה",
+        "interimThreshold": "עד שיאושר, הסף הוא",
+        "interimThresholdPlaceholder": "0: כל סכום דורש אישור",
+        "mustInclude": "מה חייב להופיע באחד השלבים *",
+        "mustIncludePlaceholder": "סיווג ומחלקה",
+        "leadDays": "לפחות כמה ימי עסקים לפני המועד *",
+        "channels": "ערוצים מותרים",
+        "invoiceTo": "חשבוניות של מערכות מגיעות רק ל",
+        "separatedEntities": "אילו ישויות נשארות מופרדות *",
+        "needTwoEntities": "צריך לפחות שתי ישויות משפטיות בתיק.",
+        "entityOnly": "רק לנהלים של ישות",
+        "allEntities": "כל הישויות",
+        "tagLabel": {
+          "whichActions": "על אילו פעולות",
+          "needsApproval": "מה דורש אישור",
+          "forbidden": "מה אסור",
+          "onlyWith": "רק בנוהל שיש בו",
+          "actions": "פעולות"
+        },
+        "actionTags": {
+          "PAYMENT": "תשלום",
+          "PURCHASE": "רכישה",
+          "INVOICE": "חשבונית",
+          "SUPPLIER_NEW": "ספק חדש",
+          "CONTRACT": "חוזה",
+          "PRICE_CHANGE": "שינוי מחיר",
+          "REFUND": "זיכוי או החזר",
+          "CLIENT_MESSAGE": "הודעה ללקוח",
+          "CREDENTIAL_ACCESS": "גישה לסיסמאות",
+          "DATA_EXPORT": "ייצוא מידע",
+          "HR": "משאבי אנוש",
+          "LEGAL": "משפטי",
+          "BANK_SIGNATURE": "חתימה בבנק"
+        },
+        "channelLabels": {
+          "EMAIL": "מייל",
+          "WHATSAPP": "WhatsApp",
+          "SLACK": "Slack",
+          "PHONE": "טלפון",
+          "PORTAL": "הפורטל",
+          "OTHER": "אחר"
+        }
+      }
+    },
+    "facts": {
+      "saving": "שומר...",
+      "addToFile": "הוספה לתיק",
+      "heading": "תיק הלקוח: עובדות ({count})",
+      "openQuestions": "{count} שאלות פתוחות",
+      "add": "+ פריט",
+      "addTitle": "פריט חדש בתיק",
+      "empty": "אין עדיין עובדות בתיק: תחומי אחריות, העדפות, דרישות, מידע זמני, החלטות ושאלות פתוחות נכנסים לכאן.",
+      "history": "היסטוריה: גרסאות שהוחלפו ({count})",
+      "supersededOn": "(הוחלף ב-{date})",
+      "lowImportance": "לא קריטי",
+      "kinds": {
+        "SCOPE_IN": "בתחום",
+        "SCOPE_OUT": "מחוץ לתחום",
+        "PREFERENCE": "העדפה",
+        "REQUIREMENT": "דרישה חוזרת",
+        "LOCATION": "מיקום",
+        "FINANCE": "כספים",
+        "TEMPORARY": "מידע זמני",
+        "ONE_OFF_DECISION": "החלטה חד-פעמית",
+        "QUESTION": "שאלה פתוחה",
+        "NOTE": "הערה"
+      },
+      "sections": {
+        "SCOPE_IN": "בתחום שלנו",
+        "SCOPE_OUT": "מחוץ לתחום, ולמי מפנים",
+        "PREFERENCE": "העדפות",
+        "REQUIREMENT": "דרישות חוזרות",
+        "LOCATION": "מקורות ידע ומיקומים",
+        "FINANCE": "כספים",
+        "TEMPORARY": "מידע נוכחי או זמני",
+        "ONE_OFF_DECISION": "החלטות חד-פעמיות",
+        "QUESTION": "שאלות פתוחות",
+        "NOTE": "הערות"
+      },
+      "topics": {
+        "COMMUNICATION": "תקשורת",
+        "REPORTING": "דיווח",
+        "DOCUMENTS": "מסמכים",
+        "AUTOMATION": "אוטומציה",
+        "ADMINS": "אדמינים",
+        "PAYMENTS": "תשלומים",
+        "SUPPLIERS": "ספקים",
+        "OTHER": "אחר"
+      },
+      "form": {
+        "supersedeHint": "הגרסה הנוכחית תישמר בהיסטוריה, מסומנת \"{status}\", והחדשה תופיע במקומה.",
+        "kind": "סוג",
+        "question": "השאלה *",
+        "body": "מה *",
+        "topic": "נושא",
+        "subject": "של מי",
+        "subjectClient": "הלקוח",
+        "referTo": "למי מפנים",
+        "validUntil": "בתוקף עד",
+        "validUntilEvent": "או עד אירוע",
+        "validUntilEventPlaceholder": "עד הצירוף לארגון",
+        "decidedAt": "תאריך ההחלטה *",
+        "decidedBy": "מי החליט",
+        "assigneeQuestion": "מי אחראי לברר",
+        "assigneeTemporary": "מי אחראי לבדוק שעדיין נכון",
+        "noAssignee": "לא נקבע",
+        "toResolveQuestion": "מה יסגור אותה",
+        "saveVersion": "שמירת הגרסה החדשה"
+      },
+      "confirm": {
+        "hint": "צריך מקור מהלקוח או מספק שלו. מסמך של אנקורה לבד לא מאשר.",
+        "submit": "אישור",
+        "title": "אישור פריט"
+      },
+      "answer": {
+        "label": "התשובה *",
+        "submit": "שמירת התשובה",
+        "title": "תשובה לשאלה"
+      },
+      "row": {
+        "referTo": "מפנים ל: {name}",
+        "validUntil": "בתוקף עד {until}",
+        "assignee": "אחראי: {name}",
+        "answer": "תשובה ({date}):",
+        "closedOn": "נסגר ב-{date}",
+        "alternative": "גרסה אחרת:",
+        "pastValidity": "עבר התוקף. עדיין נכון?",
+        "toTask": "למשימה",
+        "doNotTell": "לא לספר: {text}",
+        "answerAction": "תשובה",
+        "noLongerTrue": "כבר לא נכון",
+        "supersede": "החלפה",
+        "supersedeTitle": "גרסה חדשה: {kind}",
+        "remove": "הסרה"
+      },
+      "toast": {
+        "failed": "הפעולה נכשלה",
+        "taskOpened": "נפתחה משימה",
+        "closed": "נסגר",
+        "removed": "הוסר מהתיק"
+      }
+    },
+    "sources": {
+      "saving": "שומר...",
+      "save": "שמירה",
+      "remove": "הסרה",
+      "heading": "מרשם מקורות ({count})",
+      "add": "+ מקור",
+      "addTitle": "מקור חדש במרשם",
+      "intro": "כל פריט בתיק מציין מאיפה הוא ידוע, לפי הקודים כאן.",
+      "empty": "אין עדיין מקורות. מוסיפים את הפגישה או המסמך הראשון, ואז אפשר לציין אותם ליד כל פריט.",
+      "clientConversation": "סיכום שיחה עם הלקוח",
+      "lowered": "{count, plural, =1 {פריט אחד לא ודאי} other {# פריטים לא ודאיים}} רק כי זה מסמך של אנקורה.",
+      "badges": {
+        "secondary": "משני",
+        "topicsOnly": "נושאים בלבד"
+      },
+      "kinds": {
+        "TRANSCRIPT": "הקלטה",
+        "CLIENT_DOCUMENT": "מסמך של הלקוח",
+        "TASK": "משימה",
+        "PERSON": "נמסר בעל פה",
+        "ANKORA_DOCUMENT": "מסמך של אנקורה",
+        "EMAIL": "מייל"
+      },
+      "form": {
+        "kind": "סוג",
+        "date": "תאריך",
+        "title": "שם *",
+        "titlePlaceholder": "פגישת היכרות עם Nextage",
+        "participants": "משתתפים",
+        "participantsPlaceholder": "אורן, שני, הדס",
+        "externalId": {
+          "fireflies": "מזהה Fireflies",
+          "document": "מזהה מסמך בתיק",
+          "task": "מזהה משימה"
+        },
+        "externalIdPlaceholder": "אפשר כמה, מופרדים בפסיק",
+        "weight": "משקל",
+        "primary": "ראשוני: הלקוח או ספק שלו",
+        "primaryConversation": "ראשוני: סיכום שיחה עם הלקוח, מה שהלקוח אמר בכתב של אנקורה",
+        "secondary": "משני: מסמך שאנקורה כתבה",
+        "secondaryHint": "פריט שכל המקורות שלו משניים נשמר כ\"לא ודאי\", עד שהלקוח מאשר.",
+        "conversationHint": "למסמך שאנקורה כתבה מתוך שיחה עם הלקוח, כמו סיכום פגישת היכרות. מה שנכנס ממנו לא יסומן \"לא ודאי\" רק בגלל שהוא בכתב של אנקורה.",
+        "topicsOnly": "נושאים בלבד: בלי ציטוטים ובלי פרטים",
+        "notes": "הערות",
+        "submit": "הוספה למרשם"
+      },
+      "domains": {
+        "heading": "דומיינים ({count})",
+        "add": "+ דומיין",
+        "addTitle": "דומיין בתיק",
+        "intro": "כך מייל או הקלטה משויכים ללקוח הנכון.",
+        "empty": "אין עדיין דומיינים.",
+        "domain": "דומיין *",
+        "whose": "של מי",
+        "client": "של הלקוח",
+        "partnerOption": "של שותף או נותן שירות",
+        "partner": "שותף",
+        "partnerOf": "שותף: {name}",
+        "organization": "ארגון",
+        "partnerHint": "שותף יכול לעבוד עם כמה לקוחות, ולכן הדומיין שלו לבד לא משייך מייל ללקוח.",
+        "submit": "הוספה"
+      },
+      "anchors": {
+        "heading": "איפה עוד מחפשים",
+        "edit": "עריכה",
+        "title": "עוגנים למקורות",
+        "intro": "יחד עם הדומיינים, כך \"קדם עם קלוד\" מוצא מיילים, קבצים והקלטות של הלקוח.",
+        "keywords": "מילות מפתח:",
+        "driveFolder": "תיקיית שיחות:",
+        "conversationsDoc": "מסמך מצטבר:",
+        "none": "אין",
+        "openInDrive": "פתיחה בדרייב",
+        "keywordsLabel": "מילות מפתח בכותרת פגישה או מייל",
+        "keywordsPlaceholder": "nux, נוקס",
+        "driveFolderLabel": "תיקיית השיחות בדרייב (קישור או מזהה)",
+        "conversationsDocLabel": "המסמך המצטבר של השיחות (קישור או מזהה)",
+        "hint": "אלה אומרים לקלוד איפה לחפש, לא מה מותר לו. מה שכל עובד יכול לקרוא נקבע לפי החיבורים שלו."
+      },
+      "confirm": {
+        "done": "אושר מול הלקוח",
+        "doneDescription": "{count} פריטים מ-{code}",
+        "title": "אישור מול הלקוח: {code}",
+        "lead": "{count, plural, =1 {פריט אחד מסומן} other {# פריטים מסומנים}} \"לא ודאי\" רק כי המקור שלהם, {code}, הוא מסמך של אנקורה.",
+        "effect": "באישור הם יסומנו כמאושרים, ו-{code} יסומן \"{label}\", כך שמה שייכנס ממנו בהמשך לא יסומן שוב. פריט שלא ודאי מסיבה אחרת לא משתנה.",
+        "note": "איך זה אושר מול הלקוח, בשורה אחת *",
+        "notePlaceholder": "נדב עבר על הרשימה בוואטסאפ ב-21.10 ואישר"
+      },
+      "toast": {
+        "removeFailed": "ההסרה נכשלה",
+        "removedFromRegister": "הוסר מהמרשם",
+        "removed": "הוסר"
+      }
+    },
+    "people": {
+      "saving": "שומר...",
+      "save": "שמירה",
+      "addToFile": "הוספה לתיק",
+      "edit": "עריכה",
+      "remove": "הסרה",
+      "doNotTell": "לא לספר: {text}",
+      "relationships": {
+        "CLIENT_STAFF": "צוות הלקוח",
+        "PROVIDER": "נותן שירות",
+        "ADVISOR": "יועץ",
+        "INVESTOR": "משקיע",
+        "SUPPLIER": "ספק",
+        "ANKORA": "אנקורה"
+      },
+      "contact": {
+        "name": "שם",
+        "role": "תפקיד",
+        "nameOrRole": "שם או תפקיד, לפחות אחד מהם.",
+        "relationship": "קשר ללקוח",
+        "organization": "ארגון",
+        "emails": "מיילים",
+        "phones": "טלפונים",
+        "sharedDetails": "מייל וטלפון שייכים לאדם, ומתעדכנים בכל תיק שהוא מופיע בו.",
+        "channelOrder": "ערוצים לפי סדר עדיפות",
+        "channelOrderPlaceholder": "WhatsApp, Slack, מייל",
+        "context": "מה צריך לדעת כדי לעבוד איתו",
+        "user": "המשתמש שלו במערכת",
+        "noUser": "לא מקושר",
+        "clientSideAddress": "הכתובת שלו אצל הלקוח",
+        "isPrimary": "איש קשר ראשי",
+        "isDecisionMaker": "מקבל החלטות",
+        "sensitive": "רגיש (לא עובר ל-Claude)",
+        "toResolvePlaceholder": "לבקש מגיא את המייל"
+      },
+      "contacts": {
+        "heading": "אנשים ויחסים ({count})",
+        "add": "+ איש קשר",
+        "addTitle": "איש קשר בתיק",
+        "editTitle": "עריכת איש קשר",
+        "empty": "אין עדיין אנשי קשר בתיק.",
+        "primary": "ראשי",
+        "channels": "ערוצים: {channels}"
+      },
+      "organization": {
+        "name": "שם הארגון *",
+        "nameShared": "שם הארגון (משותף לכל אנקורה, לא נערך כאן)",
+        "domain": "דומיין",
+        "role": "מה הוא ללקוח",
+        "rolePlaceholder": "הנהלת חשבונות ושכר",
+        "kind": "סוג",
+        "monthlyCost": "עלות חודשית",
+        "currency": "מטבע",
+        "notes": "הערות"
+      },
+      "organizations": {
+        "heading": "ספקים ונותני שירות ({count})",
+        "add": "+ ארגון",
+        "addTitle": "ארגון בתיק",
+        "editTitle": "עריכת {name}",
+        "empty": "אין עדיין ספקים או נותני שירות קבועים בתיק.",
+        "perMonth": "{amount} בחודש"
+      },
+      "toast": {
+        "removeFailed": "ההסרה נכשלה",
+        "removed": "הוסר מהתיק"
+      }
+    },
+    "questions": {
+      "heading": "מה לברר עם הלקוח",
+      "intro": "השאלות הפתוחות, ופריטים שמישהו בחר לשאול עליהם. כל שורה אפשר לסגור כלא רלוונטית, להפוך למשימה שלנו או לדחות לתאריך.",
+      "empty": "אין כרגע שאלות פתוחות ללקוח.",
+      "noOpenQuestions": "אין שאלות פתוחות",
+      "cardTitleTo": "{count, plural, =1 {שאלה אחת} other {# שאלות}} {latin, select, yes {ל-{name}} other {ל{name}}}",
+      "cardTitleClient": "{count, plural, =1 {שאלה אחת} other {# שאלות}} ללקוח",
+      "owner": "אחראי: {name}",
+      "showDraft": "ניסוח הודעה",
+      "hideDraft": "הסתרת ההודעה",
+      "allAsked": "הכול נשאל, מחכים לתשובה",
+      "draftLabel": "ההודעה ללקוח",
+      "wait": "רגע...",
+      "copyAndMark": "העתקה וסימון שנשאל",
+      "sendTask": "משימה לשליחה",
+      "nothingSent": "לא נשלח כלום מכאן. שולחים בערוץ של הלקוח.",
+      "copiedAndMarked": "הועתק וסומן שנשאל",
+      "sendTaskOpened": "נפתחה משימה לשליחה",
+      "snoozed": "נדחו:",
+      "returnsOn": "(חוזר ב-{date})",
+      "internal": "פנימי, לא נכנס להודעה",
+      "askedOn": "נשאל ב-{date}",
+      "dismissPlaceholder": "למה זה לא רלוונטי, בשורה אחת",
+      "dismissLabel": "למה זה לא רלוונטי",
+      "dismissed": "נסגר כלא רלוונטי",
+      "saving": "שומר...",
+      "close": "סגירה",
+      "cancel": "ביטול",
+      "snoozeLabel": "לדחות עד",
+      "snoozedUntil": "נדחה עד {date}",
+      "snooze": "דחייה",
+      "notRelevant": "לא רלוונטי",
+      "checkOurselves": "נבדוק אצלנו",
+      "taskOpenedForYou": "נפתחה משימה אצלך",
+      "snoozeUntil": "לדחות עד...",
+      "uncertainSummary": "{count, plural, =1 {פריט אחד בתיק עדיין לא ודאי} other {# פריטים בתיק עדיין לא ודאיים}}. הם לא שאלות עד שמישהו בוחר לשאול עליהם.",
+      "added": "נוסף לשאלות",
+      "askClient": "לשאול את הלקוח",
+      "confirmedWithClient": "אושר מול הלקוח",
+      "sourceConfirmed": "{code}: אושר מול הלקוח.",
+      "loweredLine": "{count, plural, =1 {פריט אחד} other {# פריטים}} מ-{code} ({title}) לא ודאיים רק כי אנקורה כתבה את המקור. אם הלקוח אישר:",
+      "confirmNotePlaceholder": "איך זה אושר, בשורה אחת",
+      "confirmNoteLabel": "איך זה אושר",
+      "kinds": {
+        "question": "שאלה פתוחה",
+        "fact": "פריט",
+        "contact": "איש קשר",
+        "organization": "ארגון",
+        "system": "מערכת",
+        "entity": "ישות",
+        "requestType": "סוג פנייה",
+        "process": "תהליך",
+        "policy": "כלל"
+      },
+      "toast": {
+        "copyFailed": "ההעתקה נכשלה",
+        "copyFailedHint": "אפשר לסמן את הטקסט ולהעתיק ידנית.",
+        "markFailed": "הסימון נכשל",
+        "copied": "ההודעה הועתקה",
+        "copiedHint": "השאלות סומנו כנשאלו היום.",
+        "taskFailed": "המשימה לא נוצרה",
+        "sendTaskHint": "ההודעה בתוך המשימה.",
+        "failed": "לא הצליח",
+        "notAdded": "לא נוסף"
+      }
+    },
+    "narratives": {
+      "heading": "סקירה, רקע ותפקידנו",
+      "edit": "עריכה",
+      "write": "כתיבה",
+      "history": "גרסאות קודמות ({count})",
+      "formHint": "מקורות בסוגריים, למשל [S1 08:13]. קוד שלא קיים במרשם נחסם. הגרסה הקודמת נשמרת.",
+      "saving": "שומר...",
+      "saveVersion": "שמירת גרסה חדשה",
+      "kinds": {
+        "OVERVIEW": {
+          "title": "סקירת הלקוח",
+          "empty": "עוד לא נכתבה סקירה.",
+          "placeholder": "חברה, סטארטאפ AI. שתי ישויות: Inc בארה\"ב ו-LTD בישראל. [S1 08:13]"
+        },
+        "BACKGROUND": {
+          "title": "רקע",
+          "empty": "עוד לא נכתב רקע.",
+          "placeholder": "איך הגענו לכאן, מה היה לפנינו."
+        },
+        "OUR_ROLE": {
+          "title": "התפקיד שלנו",
+          "empty": "עוד לא נכתב מה התפקיד שלנו.",
+          "placeholder": "HR, שכר וספקים. לא הנהלת חשבונות."
+        }
+      }
+    },
+    "extract": {
+      "tooltip": "מעתיק פרומט עם כללי החילוץ ומה שכבר בתיק. קלוד קורא פגישה או מסמך, מכין איתכם טיוטה, ושולח הצעות לאישור",
+      "button": "חלץ ידע עם קלוד",
+      "copied": "הפרומט הועתק. הדביקו אותו בשיחה חדשה בחשבון הארגוני של אנקורה בקלוד.",
+      "openClaude": "פתיחת קלוד",
+      "manual": "הדפדפן לא אפשר העתקה אוטומטית. הטקסט מסומן, אפשר להעתיק אותו מכאן ולהדביק בחשבון הארגוני של אנקורה בקלוד.",
+      "promptLabel": "הפרומט לקלוד",
+      "copy": "העתקה",
+      "close": "סגירה"
+    }
+  },
+  "vault": {
+    "reveal": {
+      "show": "הצגת פרטי גישה",
+      "loading": "רגע...",
+      "cancel": "ביטול",
+      "username": "שם משתמש",
+      "password": "סיסמה",
+      "notes": "הערות",
+      "logged": "הצפייה נרשמה.",
+      "disappearsIn": "נעלם בעוד {seconds} שניות",
+      "hideNow": "להסתיר עכשיו",
+      "notSaved": "לא נשמר",
+      "copy": "העתקת {label}",
+      "errors": {
+        "notFound": "הגישה לא נמצאה.",
+        "sessionExpired": "פג תוקף ההתחברות. יש להתחבר מחדש.",
+        "rateLimited": "הגעת למספר החשיפות המרבי לשעה. אפשר להמשיך בשעה הבאה.",
+        "unavailable": "לא ניתן להציג את פרטי הגישה כרגע.",
+        "stepUpFailed": "האימות נכשל."
+      },
+      "stepUp": {
+        "title": "אימות זהות",
+        "passkey": "אימות עם Touch ID",
+        "orPassword": "או הסיסמה שלך לאנקורה.",
+        "passwordOnly": "הקלידו את הסיסמה שלכם לאנקורה. האימות תקף ל-5 דקות.",
+        "passwordLabel": "הסיסמה שלך לאנקורה",
+        "verify": "אימות",
+        "needsPasskey": "צפייה בגישות דורשת passkey (Touch ID).",
+        "setUp": "להגדרה בפרופיל"
+      }
     }
   }
 }

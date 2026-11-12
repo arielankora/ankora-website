@@ -62,6 +62,26 @@ export function runBlockers(p: ReadinessInput): string[] {
   return out;
 }
 
+/// ADR 0006: each reason as a key a screen words in the reader's language
+/// (clients.processes.readiness.blockers.<key>). The sentences above stay
+/// what Claude, the handover check and the next steps read.
+export type RunBlockerKey = "retired" | "paused" | "noOwner" | "noTrigger" | "noProcedure" | "scheduledNoDate" | "continuousNoCheck";
+
+const BLOCKER_KEYS: Record<string, RunBlockerKey> = {
+  "לא ירוץ: התהליך בוטל": "retired",
+  "לא ירוץ: התהליך מושהה": "paused",
+  "לא ירוץ: אין אחראי": "noOwner",
+  "לא ירוץ: לא כתוב מה מפעיל אותו": "noTrigger",
+  "לא ירוץ: אין נוהל מאושר": "noProcedure",
+  [SCHEDULED_NO_DATE_BLOCKER]: "scheduledNoDate",
+  [CONTINUOUS_NO_CHECK_BLOCKER]: "continuousNoCheck",
+};
+
+/// The key of a reason runBlockers() gave, or null for anything else.
+export function runBlockerKey(blocker: string | null | undefined): RunBlockerKey | null {
+  return blocker ? BLOCKER_KEYS[blocker] ?? null : null;
+}
+
 /// The one reason it will not run, the one to fix first; null when it runs.
 export function runBlocker(p: ReadinessInput): string | null {
   return runBlockers(p)[0] ?? null;
