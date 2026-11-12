@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import type { User } from "@prisma/client";
@@ -207,9 +208,9 @@ async function readableProcess(actor: User, processId: string) {
     where: { id: processId },
     include: { versions: { orderBy: { version: "desc" } }, client: { select: { accountManagerId: true, name: true } } },
   });
-  if (!p || p.deletedAt) throw new Error("התהליך לא נמצא.");
+  if (!p || p.deletedAt) throw new DomainError("procedureDocuments.notFound", "התהליך לא נמצא.");
   await assertClientAccess(actor, p.clientId);
-  if (!canSeeKnowledgeItem(p, { id: actor.id, isManager: canManageClients(actor.role) }, p.client.accountManagerId)) throw new Error("התהליך לא נמצא.");
+  if (!canSeeKnowledgeItem(p, { id: actor.id, isManager: canManageClients(actor.role) }, p.client.accountManagerId)) throw new DomainError("procedureDocuments.notFound", "התהליך לא נמצא.");
   return p;
 }
 
@@ -240,12 +241,12 @@ export async function procedureDocument(
   options: { version?: number; lang?: ProcedureLang; omitEmpty?: boolean; draftTranslation?: boolean } = {}
 ): Promise<ProcedureDocumentView> {
   const p = await readableProcess(actor, processId);
-  if (p.versions.length === 0) throw new Error("לתהליך הזה עוד אין נוהל.");
+  if (p.versions.length === 0) throw new DomainError("procedureDocuments.noProcedure", "לתהליך הזה עוד אין נוהל.");
   const v =
     options.version !== undefined
       ? p.versions.find((x) => x.version === options.version)
       : p.versions.find((x) => x.status === "APPROVED") ?? p.versions[0];
-  if (!v) throw new Error("הגרסה לא נמצאה.");
+  if (!v) throw new DomainError("procedureDocuments.versionNotFound", "הגרסה לא נמצאה.");
 
   const frozen = readSnapshot(v.document);
   const base = frozen ?? (await buildSnapshot(p.id, "approval"));
@@ -259,9 +260,9 @@ export async function procedureDocument(
   const state = translationState(v);
   let translation: ProcedureTranslation | null = null;
   if (lang === "en") {
-    if (state === "NONE" || (state === "DRAFT" && !options.draftTranslation)) throw new Error("לגרסה הזו אין עדיין תרגום מאושר לאנגלית.");
+    if (state === "NONE" || (state === "DRAFT" && !options.draftTranslation)) throw new DomainError("procedureDocuments.noApprovedTranslation", "לגרסה הזו אין עדיין תרגום מאושר לאנגלית.");
     translation = readTranslation(v.translationEn);
-    if (!translation) throw new Error("התרגום השמור לא תקין. צריך לתרגם מחדש.");
+    if (!translation) throw new DomainError("procedureDocuments.translationInvalid", "התרגום השמור לא תקין. צריך לתרגם מחדש.");
   }
 
   const history: HistoryRow[] = p.versions
@@ -319,7 +320,7 @@ export async function translationSource(actor: User, processId: string) {
   // Rule 3 (lib/knowledge.ts): what may leave the product for Claude.
   if (!canSendToAi(p, actor.id)) throw new Error("This process is sensitive or restricted, so it is not sent to Claude. Translate it by hand.");
   const v = p.versions.find((x) => x.status === "APPROVED");
-  if (!v) throw new Error("רק נוהל מאושר מתורגם. לתהליך הזה אין עדיין גרסה מאושרת.");
+  if (!v) throw new DomainError("procedureDocuments.noApprovedVersion", "רק נוהל מאושר מתורגם. לתהליך הזה אין עדיין גרסה מאושרת.");
   // Resolved before anything is handed over. canSendToAi above answers
   // for the process; it says nothing about the people named inside it,
   // and a Claude conversation is a copy outside the product.
@@ -363,11 +364,11 @@ export async function translationSource(actor: User, processId: string) {
 export async function saveProcedureTranslation(actor: User, processId: string, version: number, value: unknown) {
   const p = await readableProcess(actor, processId);
   const v = p.versions.find((x) => x.version === version);
-  if (!v) throw new Error("הגרסה לא נמצאה.");
-  if (v.status !== "APPROVED") throw new Error("רק הגרסה המאושרת מתורגמת.");
+  if (!v) throw new DomainError("procedureDocuments.versionNotFound", "הגרסה לא נמצאה.");
+  if (v.status !== "APPROVED") throw new DomainError("procedureDocuments.onlyApproved", "רק הגרסה המאושרת מתורגמת.");
   const tr = readTranslation(value);
-  if (!tr) throw new Error("התרגום צריך לפחות כותרת ורשימת שלבים.");
-  if (findSecrets(JSON.stringify(tr)).length) throw new Error("יש בתרגום סיסמה, מפתח או מספר כרטיס.");
+  if (!tr) throw new DomainError("procedureDocuments.translationTooShort", "התרגום צריך לפחות כותרת ורשימת שלבים.");
+  if (findSecrets(JSON.stringify(tr)).length) throw new DomainError("procedureDocuments.translationSecrets", "יש בתרגום סיסמה, מפתח או מספר כרטיס.");
   const { snapshot } = await resolveSnapshotPeople(readSnapshot(v.document) ?? (await buildSnapshot(p.id, "translation")), p);
   const gaps = translationGaps(snapshot, { steps: readSteps(v.steps), highlights: v.highlights, outputs: v.outputs }, tr);
   await prisma.processVersion.update({
@@ -386,17 +387,20 @@ export async function saveProcedureTranslation(actor: User, processId: string, v
 }
 
 export async function approveProcedureTranslation(actor: User, processId: string, version: number) {
-  if (!canManageClients(actor.role)) throw new Error("רק מנהל מאשר תרגום.");
+  if (!canManageClients(actor.role)) throw new DomainError("procedureDocuments.managerOnly", "רק מנהל מאשר תרגום.");
   const p = await readableProcess(actor, processId);
   const v = p.versions.find((x) => x.version === version);
-  if (!v || !v.translationEn) throw new Error("אין תרגום לאשר.");
+  if (!v || !v.translationEn) throw new DomainError("procedureDocuments.nothingToApprove", "אין תרגום לאשר.");
   if (v.translationEnApprovedAt) return;
   const stored = readSnapshot(v.document);
   const tr = readTranslation(v.translationEn);
-  if (!stored || !tr) throw new Error("התרגום השמור לא תקין. צריך לתרגם מחדש.");
+  if (!stored || !tr) throw new DomainError("procedureDocuments.translationInvalid", "התרגום השמור לא תקין. צריך לתרגם מחדש.");
   const { snapshot } = await resolveSnapshotPeople(stored, p);
   const gaps = translationGaps(snapshot, { steps: readSteps(v.steps), highlights: v.highlights, outputs: v.outputs }, tr);
-  if (gaps.length) throw new Error(`התרגום לא שלם: ${gaps.slice(0, 5).join(", ")}${gaps.length > 5 ? "..." : ""}`);
+  if (gaps.length) {
+    const list = `${gaps.slice(0, 5).join(", ")}${gaps.length > 5 ? "..." : ""}`;
+    throw new DomainError("procedureDocuments.incomplete", `התרגום לא שלם: ${list}`, { gaps: list });
+  }
   await prisma.processVersion.update({ where: { id: v.id }, data: { translationEnApprovedById: actor.id, translationEnApprovedAt: new Date() } });
   await recordAudit({ actorId: actor.id, action: "process.translation_approve", entityType: "Process", entityId: p.id, clientId: p.clientId, after: { version } });
 }
@@ -409,7 +413,7 @@ export async function clientProcedurePack(actor: User, clientId: string, lang: P
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, clientId);
   const client = await prisma.client.findUnique({ where: { id: clientId }, select: { name: true, accountManagerId: true } });
-  if (!client) throw new Error("הלקוח לא נמצא.");
+  if (!client) throw new DomainError("procedureDocuments.clientNotFound", "הלקוח לא נמצא.");
   const viewer = { id: actor.id, isManager: canManageClients(actor.role) };
   const rows = await prisma.process.findMany({
     where: { clientId, deletedAt: null, status: { in: ["ACTIVE", "PAUSED"] }, versions: { some: { status: "APPROVED" } } },

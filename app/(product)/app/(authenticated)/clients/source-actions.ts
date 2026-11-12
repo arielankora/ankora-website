@@ -1,7 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { ForbiddenError } from "@/lib/app-auth/permissions";
 import {
   addClientSource,
   removeClientSource,
@@ -10,6 +9,7 @@ import {
   setClientSourceAnchors,
 } from "@/lib/app-domain/client-sources";
 import { confirmSourceWithClient } from "@/lib/app-domain/source-confirmation";
+import { knowledgeErrorT, knowledgeErrorText } from "./knowledge-errors";
 import type { ClientDomainKind, SourceKind, SourceRestriction, SourceWeight } from "@prisma/client";
 
 // Org brain, phase 2: the source register and the domains on the client
@@ -21,12 +21,6 @@ const KINDS: SourceKind[] = ["TRANSCRIPT", "CLIENT_DOCUMENT", "TASK", "PERSON", 
 const WEIGHTS: SourceWeight[] = ["PRIMARY", "SECONDARY"];
 const RESTRICTIONS: SourceRestriction[] = ["NONE", "TOPICS_ONLY"];
 const DOMAIN_KINDS: ClientDomainKind[] = ["CLIENT", "PARTNER"];
-
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
-  if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
-}
 
 function pick<T extends string>(value: FormDataEntryValue | null, allowed: T[]): T | undefined {
   const v = String(value ?? "");
@@ -44,11 +38,11 @@ export async function addClientSourceAction(_prev: FormState | undefined, formDa
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
   const kind = pick(formData.get("kind"), KINDS);
-  if (!kind) return { error: "צריך לבחור סוג מקור." };
+  if (!kind) return { error: (await knowledgeErrorT())("sourceKindRequired") };
   const dateRaw = String(formData.get("occurredAt") ?? "").trim();
   let occurredAt: Date | null = null;
   if (dateRaw) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) return { error: "תאריך לא תקין." };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) return { error: (await knowledgeErrorT())("invalidDate") };
     occurredAt = new Date(`${dateRaw}T00:00:00Z`);
   }
   try {
@@ -64,7 +58,7 @@ export async function addClientSourceAction(_prev: FormState | undefined, formDa
       notes: String(formData.get("notes") ?? "").trim() || null,
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
@@ -75,7 +69,7 @@ export async function removeClientSourceAction(id: string, clientId: string): Pr
   try {
     await removeClientSource(user, id);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
@@ -85,7 +79,7 @@ export async function addClientDomainAction(_prev: FormState | undefined, formDa
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
   const kind = pick(formData.get("kind"), DOMAIN_KINDS);
-  if (!kind) return { error: "צריך לבחור של מי הדומיין." };
+  if (!kind) return { error: (await knowledgeErrorT())("domainKindRequired") };
   try {
     await addClientDomain(user, {
       clientId,
@@ -95,7 +89,7 @@ export async function addClientDomainAction(_prev: FormState | undefined, formDa
       notes: String(formData.get("notes") ?? "").trim() || null,
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
@@ -106,7 +100,7 @@ export async function removeClientDomainAction(id: string, clientId: string): Pr
   try {
     await removeClientDomain(user, id);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
@@ -124,7 +118,7 @@ export async function setClientSourceAnchorsAction(_prev: FormState | undefined,
       conversationsDoc: String(formData.get("conversationsDoc") ?? "").trim() || null,
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
@@ -141,6 +135,6 @@ export async function confirmSourceWithClientAction(_prev: (FormState & { confir
     revalidatePath("/app/approvals");
     return { ok: true, confirmed: r.confirmed };
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
 }

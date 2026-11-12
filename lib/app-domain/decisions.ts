@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -151,7 +152,7 @@ export async function createDecision(
   }
 
   const question = input.question.trim();
-  if (!question) throw new Error("יש לנסח את השאלה שהלקוח צריך להכריע בה.");
+  if (!question) throw new DomainError("decisions.questionRequired", "יש לנסח את השאלה שהלקוח צריך להכריע בה.");
 
   const options = input.options
     .map((o) => ({ ...o, label: o.label.trim() }))
@@ -161,17 +162,17 @@ export async function createDecision(
   // and three is where a decision stops reducing load and starts adding
   // it. Both ends are product rules, so both are enforced here rather
   // than left to whichever screen happens to call this.
-  if (options.length < 2) throw new Error("יש להזין לפחות שתי אפשרויות.");
-  if (options.length > MAX_OPTIONS) throw new Error(`אפשר עד ${MAX_OPTIONS} אפשרויות בהחלטה אחת.`);
+  if (options.length < 2) throw new DomainError("decisions.minOptions", "יש להזין לפחות שתי אפשרויות.");
+  if (options.length > MAX_OPTIONS) throw new DomainError("decisions.maxOptions", `אפשר עד ${MAX_OPTIONS} אפשרויות בהחלטה אחת.`, { max: String(MAX_OPTIONS) });
   if (options.filter((o) => o.recommended).length > 1) {
-    throw new Error("אפשר לסמן המלצה אחת בלבד.");
+    throw new DomainError("decisions.oneRecommendation", "אפשר לסמן המלצה אחת בלבד.");
   }
 
   const client = await prisma.client.findFirstOrThrow({ where: { id: input.clientId, deletedAt: null } });
 
   if (input.taskId) {
     const task = await prisma.task.findFirst({ where: { id: input.taskId, clientId: client.id, deletedAt: null } });
-    if (!task) throw new Error("המשימה המקושרת אינה שייכת ללקוח הזה.");
+    if (!task) throw new DomainError("decisions.taskNotForClient", "המשימה המקושרת אינה שייכת ללקוח הזה.");
   }
 
   const decision = await prisma.decision.create({
@@ -230,13 +231,13 @@ export async function cancelDecision(actor: User, decisionId: string) {
   assertCan(actor.role, "time_entry.create_self");
 
   const decision = await prisma.decision.findUnique({ where: { id: decisionId } });
-  if (!decision) throw new Error("ההחלטה לא נמצאה.");
+  if (!decision) throw new DomainError("decisions.notFound", "ההחלטה לא נמצאה.");
 
   const accessible = await listAccessibleClients(actor);
   if (!accessible.some((c) => c.id === decision.clientId)) {
     throw new ForbiddenError("You are not assigned to this client.");
   }
-  if (decision.status === "ANSWERED") throw new Error("אי אפשר לבטל החלטה שכבר נענתה.");
+  if (decision.status === "ANSWERED") throw new DomainError("decisions.cannotCancelAnswered", "אי אפשר לבטל החלטה שכבר נענתה.");
 
   const updated = await prisma.decision.update({
     where: { id: decisionId },
@@ -321,10 +322,10 @@ export async function respondToDecision(actor: User, decisionId: string, optionI
     include: { options: true },
   });
   if (!decision) throw new ForbiddenError("Decision does not belong to this client");
-  if (decision.status !== "OPEN") throw new Error("ההחלטה הזו כבר נסגרה.");
+  if (decision.status !== "OPEN") throw new DomainError("decisions.alreadyClosed", "ההחלטה הזו כבר נסגרה.");
 
   const option = decision.options.find((o) => o.id === optionId);
-  if (!option) throw new Error("האפשרות שנבחרה אינה שייכת להחלטה הזו.");
+  if (!option) throw new DomainError("decisions.optionNotInDecision", "האפשרות שנבחרה אינה שייכת להחלטה הזו.");
 
   // A task can wait on more than one question (the NUX approval matrix
   // asked two). Answering the first must not tell the client nothing is

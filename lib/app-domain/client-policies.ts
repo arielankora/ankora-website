@@ -1,11 +1,12 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { approvesProceduresOf } from "@/lib/procedure-approval";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
-import { changesSubstance, policyShapeError, policyVersions, type PolicyKindLike, type PolicyVersionView } from "@/lib/client-policies";
-import { entityIdsIn, paramsError, paramsKey, readParams, type PolicyParams } from "@/lib/policy-params";
+import { changesSubstance, policyShapeError, policyShapeProblem, policyVersions, type PolicyKindLike, type PolicyVersionView } from "@/lib/client-policies";
+import { entityIdsIn, paramsError, paramsKey, paramsProblem, readParams, type PolicyParams } from "@/lib/policy-params";
 import { Prisma } from "@prisma/client";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { rescanAfterRuleChange } from "@/lib/app-domain/process-review";
@@ -49,19 +50,22 @@ function clean(v: string | null | undefined): string | null {
 }
 
 function assertManager(actor: User) {
-  if (!canManageClients(actor.role)) throw new Error("רק מנהל מאשר או מבטל כלל של לקוח.");
+  if (!canManageClients(actor.role)) throw new DomainError("clientPolicies.managerOnly", "רק מנהל מאשר או מבטל כלל של לקוח.");
 }
 
 /// The parameters as stored: read for the kind, complete, and pointing
 /// only at this client's entities.
 async function checkedParams(clientId: string, kind: PolicyKindLike, value: unknown, what: string): Promise<PolicyParams> {
   const p = readParams(kind, value);
-  const error = paramsError(kind, p);
-  if (error) throw new Error(what === "interim" ? `בכלל הביניים: ${error}` : error);
+  const problem = paramsProblem(kind, p);
+  if (problem) {
+    const error = paramsError(kind, p)!;
+    throw new DomainError("clientPolicies.params", what === "interim" ? `בכלל הביניים: ${error}` : error, { interim: what === "interim" ? "yes" : "no", problem });
+  }
   const ids = entityIdsIn(p);
   if (ids.length) {
     const found = await prisma.clientEntity.count({ where: { id: { in: ids }, clientId, deletedAt: null } });
-    if (found !== ids.length) throw new Error("ישות שנבחרה בכלל לא נמצאת בתיק של הלקוח.");
+    if (found !== ids.length) throw new DomainError("clientPolicies.entityNotInFile", "ישות שנבחרה בכלל לא נמצאת בתיק של הלקוח.");
   }
   return p;
 }
@@ -70,7 +74,7 @@ const json = (p: PolicyParams) => p as unknown as Prisma.InputJsonValue;
 
 async function findPolicy(actor: User, id: string) {
   const row = await prisma.clientPolicy.findUnique({ where: { id } });
-  if (!row || row.deletedAt) throw new Error("הכלל לא נמצא.");
+  if (!row || row.deletedAt) throw new DomainError("clientPolicies.notFound", "הכלל לא נמצא.");
   await assertClientAccess(actor, row.clientId);
   return row;
 }
@@ -78,8 +82,8 @@ async function findPolicy(actor: User, id: string) {
 export async function addClientPolicy(actor: User, input: ClientPolicyInput) {
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
-  const shapeError = policyShapeError({ ...input, status: "PROPOSED" });
-  if (shapeError) throw new Error(shapeError);
+  const shapeProblem = policyShapeProblem({ ...input, status: "PROPOSED" });
+  if (shapeProblem) throw new DomainError("clientPolicies.shape", policyShapeError({ ...input, status: "PROPOSED" })!, { problem: shapeProblem });
   assertResolvable(input.knowledgeStatus, input.toResolve);
   const sourced = await sourcedFields(input.clientId, input, [input.statement, input.rationale, input.interimStatement]);
   const params = await checkedParams(input.clientId, input.kind as PolicyKindLike, input.params, "rule");
@@ -110,7 +114,7 @@ export async function addClientPolicy(actor: User, input: ClientPolicyInput) {
 export async function updateClientPolicy(actor: User, id: string, input: Partial<Omit<ClientPolicyInput, "clientId">>) {
   assertCan(actor.role, "time_entry.create_self");
   const before = await findPolicy(actor, id);
-  if (before.status === "RETIRED") throw new Error("כלל שבוטל לא נערך. כותבים כלל חדש.");
+  if (before.status === "RETIRED") throw new DomainError("clientPolicies.retiredNotEditable", "כלל שבוטל לא נערך. כותבים כלל חדש.");
   const kind = (input.kind ?? before.kind) as PolicyKindLike;
   // A change of kind rereads the stored parameters for the new kind.
   const params = await checkedParams(before.clientId, kind, input.params !== undefined ? input.params : before.params, "rule");
@@ -134,8 +138,8 @@ export async function updateClientPolicy(actor: User, id: string, input: Partial
     statement: input.statement !== undefined ? input.statement : before.statement,
     interimStatement: input.interimStatement !== undefined ? clean(input.interimStatement) : before.interimStatement,
   };
-  const shapeError = policyShapeError(next);
-  if (shapeError) throw new Error(shapeError);
+  const shapeProblem = policyShapeProblem(next);
+  if (shapeProblem) throw new DomainError("clientPolicies.shape", policyShapeError(next)!, { problem: shapeProblem });
   assertResolvable(input.knowledgeStatus ?? before.knowledgeStatus, input.toResolve !== undefined ? input.toResolve : before.toResolve);
   const sourced = await sourcedFields(before.clientId, input, [next.statement, input.rationale ?? before.rationale, next.interimStatement], before);
   const updated = await prisma.clientPolicy.update({
@@ -179,11 +183,11 @@ export async function approveClientPolicy(actor: User, id: string) {
   // manager's.
   const client = await prisma.client.findUnique({ where: { id: before.clientId }, select: { accountManagerId: true } });
   if (!approvesProceduresOf({ userId: actor.id, isManager: canManageClients(actor.role), accountManagerId: client?.accountManagerId ?? null })) {
-    throw new Error("רק מנהל או מנהל התיק של הלקוח מאשרים כלל של לקוח.");
+    throw new DomainError("clientPolicies.approverOnly", "רק מנהל או מנהל התיק של הלקוח מאשרים כלל של לקוח.");
   }
-  if (before.status !== "PROPOSED") throw new Error("רק כלל מוצע מאשרים.");
+  if (before.status !== "PROPOSED") throw new DomainError("clientPolicies.onlyProposed", "רק כלל מוצע מאשרים.");
   if (before.knowledgeStatus !== "CONFIRMED") {
-    throw new Error("הכלל עצמו עוד לא ודאי. קודם מוודאים מול הלקוח מה הוא אמר, ורק אז מאשרים.");
+    throw new DomainError("clientPolicies.notConfirmed", "הכלל עצמו עוד לא ודאי. קודם מוודאים מול הלקוח מה הוא אמר, ורק אז מאשרים.");
   }
   const updated = await prisma.clientPolicy.update({
     where: { id },
@@ -197,9 +201,9 @@ export async function approveClientPolicy(actor: User, id: string) {
 export async function retireClientPolicy(actor: User, id: string, reason: string) {
   assertManager(actor);
   const before = await findPolicy(actor, id);
-  if (before.status === "RETIRED") throw new Error("הכלל כבר בוטל.");
+  if (before.status === "RETIRED") throw new DomainError("clientPolicies.alreadyRetired", "הכלל כבר בוטל.");
   const why = reason.trim();
-  if (!why) throw new Error("צריך לכתוב בשורה אחת למה הכלל מבוטל.");
+  if (!why) throw new DomainError("clientPolicies.retireReasonRequired", "צריך לכתוב בשורה אחת למה הכלל מבוטל.");
   const updated = await prisma.clientPolicy.update({
     where: { id },
     data: { status: "RETIRED", retiredAt: new Date(), retiredById: actor.id },
@@ -222,7 +226,7 @@ export async function retireClientPolicy(actor: User, id: string, reason: string
 export async function removeClientPolicy(actor: User, id: string) {
   assertCan(actor.role, "time_entry.create_self");
   const row = await findPolicy(actor, id);
-  if (row.status !== "PROPOSED") throw new Error("כלל שאושר לא נמחק. מבטלים אותו, והוא נשאר בהיסטוריה.");
+  if (row.status !== "PROPOSED") throw new DomainError("clientPolicies.approvedNotRemovable", "כלל שאושר לא נמחק. מבטלים אותו, והוא נשאר בהיסטוריה.");
   const removed = await prisma.clientPolicy.update({ where: { id }, data: { deletedAt: new Date() } });
   await recordAudit({ actorId: actor.id, action: "client_policy.remove", entityType: "ClientPolicy", entityId: id, clientId: row.clientId, before: row });
   await rescanAfterRuleChange(row.clientId, ruleChangeCause(row, "כלל הוסר"));

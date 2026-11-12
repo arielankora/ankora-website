@@ -1,9 +1,10 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
-import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
+import { type KnowledgeStatusLike } from "@/lib/knowledge";
 import { addRequestTypeAction, updateRequestTypeAction, removeRequestTypeAction } from "../file-text-actions";
 import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
 
@@ -57,6 +58,8 @@ function RequestTypeForm({
   sourceOptions: SourceOption[];
   existing?: PanelRequestType;
 }) {
+  const t = useTranslations("clients.requestTypes");
+  const tStatus = useTranslations("clients.page.knowledgeStatus");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(existing ? updateRequestTypeAction : addRequestTypeAction, close);
   const [status, setStatus] = useState<KnowledgeStatusLike>(existing?.status ?? "CONFIRMED");
@@ -64,23 +67,23 @@ function RequestTypeForm({
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       {existing && <input type="hidden" name="id" value={existing.id} />}
-      <Field label="סוג הפנייה *">
-        <input name="title" required defaultValue={existing?.title ?? ""} placeholder="חשבונית Inc" className={INPUT} />
+      <Field label={t("title")}>
+        <input name="title" required defaultValue={existing?.title ?? ""} placeholder={t("titlePlaceholder")} className={INPUT} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="ממי">
-          <input name="fromWho" defaultValue={existing?.fromWho ?? ""} placeholder="ספק" className={INPUT} />
+        <Field label={t("fromWho")}>
+          <input name="fromWho" defaultValue={existing?.fromWho ?? ""} placeholder={t("fromWhoPlaceholder")} className={INPUT} />
         </Field>
-        <Field label="מגיעה דרך">
+        <Field label={t("arrivesVia")}>
           <input name="arrivesVia" defaultValue={existing?.arrivesVia ?? ""} placeholder="billing-us" className={INPUT} />
         </Field>
       </div>
-      <Field label="איך עונים ולאן מעבירים *">
-        <textarea name="handling" required rows={3} defaultValue={existing?.handling ?? ""} placeholder="לשני ולג'נן, לא לאיילה" className={INPUT} />
+      <Field label={t("handling")}>
+        <textarea name="handling" required rows={3} defaultValue={existing?.handling ?? ""} placeholder={t("handlingPlaceholder")} className={INPUT} />
       </Field>
       {contacts.length > 0 && (
         <fieldset>
-          <legend className="block text-xs font-medium text-app-text-secondary">למי מפנים</legend>
+          <legend className="block text-xs font-medium text-app-text-secondary">{t("routeTo")}</legend>
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
             {contacts.map((c) => (
               <label key={c.id} className="flex items-center gap-1.5 text-sm text-app-text-primary">
@@ -93,9 +96,9 @@ function RequestTypeForm({
       )}
       <EntitySelect entities={entities} defaultValue={existing?.entityId} />
       {processes.length > 0 && (
-        <Field label="מפעיל תהליך">
+        <Field label={t("process")}>
           <select name="processId" defaultValue={existing?.processId ?? ""} className={INPUT}>
-            <option value="">לא מפעיל תהליך</option>
+            <option value="">{t("noProcess")}</option>
             {processes.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -104,23 +107,23 @@ function RequestTypeForm({
           </select>
         </Field>
       )}
-      <Field label="סטטוס">
+      <Field label={t("status")}>
         <select name="knowledgeStatus" value={status} onChange={(e) => setStatus(e.target.value as KnowledgeStatusLike)} className={INPUT}>
-          <option value="CONFIRMED">{KNOWLEDGE_STATUS_LABELS.CONFIRMED}</option>
-          <option value="UNCERTAIN">{KNOWLEDGE_STATUS_LABELS.UNCERTAIN}</option>
-          <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
+          <option value="CONFIRMED">{tStatus("CONFIRMED")}</option>
+          <option value="UNCERTAIN">{tStatus("UNCERTAIN")}</option>
+          <option value="MISSING">{tStatus("MISSING")}</option>
         </select>
       </Field>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} confirmedBefore={existing?.status === "CONFIRMED"} />
       <ItemExtras existing={existing} disclose audience />
       {status !== "CONFIRMED" && (
-        <Field label="מה יסגור את זה *">
+        <Field label={t("toResolve")}>
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
         </Field>
       )}
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : existing ? "שמירה" : "הוספה לתיק"}
+        {pending ? t("saving") : existing ? t("save") : t("add")}
       </button>
     </form>
   );
@@ -146,31 +149,32 @@ export function RequestTypesPanel({
   ruleWarnings?: Record<string, string[]>;
 }) {
   const { showToast } = useToast();
+  const t = useTranslations("clients.requestTypes");
   async function remove(r: PanelRequestType) {
     const result = await removeRequestTypeAction(r.id, clientId);
-    if (result.error) showToast({ tone: "error", title: "ההסרה נכשלה", description: result.error });
-    else showToast({ tone: "info", title: "הוסר מהתיק", description: r.title });
+    if (result.error) showToast({ tone: "error", title: t("removeFailed"), description: result.error });
+    else showToast({ tone: "info", title: t("removed"), description: r.title });
   }
   return (
     <div className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <h2 className="text-sm font-medium text-app-text-primary">סוגי פניות ודרכי מענה ({requestTypes.length})</h2>
-        <Drawer triggerLabel="+ סוג פנייה" title="סוג פנייה" variant="link">
+        <h2 className="text-sm font-medium text-app-text-primary">{t("panelTitle", { count: requestTypes.length })}</h2>
+        <Drawer triggerLabel={t("addTrigger")} title={t("drawerTitle")} variant="link">
           <RequestTypeForm clientId={clientId} contacts={contacts} entities={entities} processes={processes} sourceOptions={sourceOptions} />
         </Drawer>
       </div>
       {requestTypes.length === 0 ? (
-        <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין סוגי פניות. מה מגיע, ממי, ואיך עונים: מה שמנהל תפעול חדש צריך ביום הראשון.</p>
+        <p className="mt-2 text-sm text-app-text-tertiary">{t("empty")}</p>
       ) : (
         <ul className="mt-4 divide-y divide-app-border">
           {requestTypes.map((r) => (
             <li key={r.id} id={`item-${r.id}`} className="flex flex-wrap items-start justify-between gap-3 py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
               <div className="min-w-0 flex-[1_1_18rem]">
-                <p className="text-sm font-medium text-app-text-primary">{r.title}</p>
-                <p className="text-xs text-app-text-secondary">{[r.fromWho ? `מ: ${r.fromWho}` : null, r.arrivesVia ? `דרך: ${r.arrivesVia}` : null, r.entityName].filter(Boolean).join(" · ")}</p>
-                <p className="mt-1 text-xs text-app-text-primary">{r.handling}</p>
-                {r.routeToNames.length > 0 && <p className="mt-1 text-xs text-app-text-secondary">מפנים ל: {r.routeToNames.join(", ")}</p>}
-                {r.processName && <p className="mt-1 text-xs text-app-text-secondary">מפעיל: {r.processName}</p>}
+                <p dir="auto" className="text-sm font-medium text-app-text-primary">{r.title}</p>
+                <p className="text-xs text-app-text-secondary">{[r.fromWho ? t("from", { value: r.fromWho }) : null, r.arrivesVia ? t("via", { value: r.arrivesVia }) : null, r.entityName].filter(Boolean).join(" · ")}</p>
+                <p dir="auto" className="mt-1 text-xs text-app-text-primary">{r.handling}</p>
+                {r.routeToNames.length > 0 && <p className="mt-1 text-xs text-app-text-secondary">{t("routedTo", { names: r.routeToNames.join(", ") })}</p>}
+                {r.processName && <p className="mt-1 text-xs text-app-text-secondary">{t("triggers", { name: r.processName })}</p>}
                 {(ruleWarnings[r.id] ?? []).map((w, i) => (
                   <p key={i} className="mt-1 text-xs text-app-error">
                     {w}
@@ -181,11 +185,11 @@ export function RequestTypesPanel({
                 <SourceCodes sources={r.sources} options={sourceOptions} />
               </div>
               <div className="flex shrink-0 items-center gap-3 text-xs">
-                <Drawer triggerLabel="עריכה" title={`עריכה: ${r.title}`} variant="link">
+                <Drawer triggerLabel={t("edit")} title={t("editTitle", { name: r.title })} variant="link">
                   <RequestTypeForm clientId={clientId} contacts={contacts} entities={entities} processes={processes} sourceOptions={sourceOptions} existing={r} />
                 </Drawer>
                 <button type="button" onClick={() => remove(r)} className="text-app-text-tertiary hover:text-app-error">
-                  הסרה
+                  {t("remove")}
                 </button>
               </div>
             </li>

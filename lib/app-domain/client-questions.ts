@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { can, canManageClients } from "@/lib/app-auth/permissions";
@@ -8,7 +9,7 @@ import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { loweredBySource, type LoweredSource } from "@/lib/app-domain/source-confirmation";
 import { createTask } from "@/lib/app-domain/tasks";
 import { factToTask } from "@/lib/app-domain/client-facts";
-import { ASK_CLIENT, SNOOZED, cardOwner, cardTitle, checkTaskTitle, dismissedAnswer, readAskFlags, readSnoozes, sendTaskTitle, snoozeError, type QuestionItem } from "@/lib/client-questions";
+import { ASK_CLIENT, SNOOZED, cardOwner, cardTitle, checkTaskTitle, dismissedAnswer, readAskFlags, readSnoozes, sendTaskTitle, snoozeError, snoozeProblem, QUESTION_ITEM_WHAT, type QuestionItemKind, type QuestionItem } from "@/lib/client-questions";
 import { internalClientIds } from "@/lib/app-domain/internal-client";
 import { SECONDARY_ONLY_TO_RESOLVE } from "@/lib/knowledge-sources";
 
@@ -37,7 +38,7 @@ export type QuestionCard = {
 
 /// An uncertain item in the file that is not on the card: it can be put
 /// there with "לשאול את הלקוח".
-export type UncertainItem = { id: string; what: string; title: string; toResolve: string | null; href: string };
+export type UncertainItem = { id: string; what: string; kind: QuestionItemKind; title: string; toResolve: string | null; href: string };
 
 const itemHref = (clientId: string, id: string) => `/app/clients/${clientId}?tab=file#item-${id}`;
 
@@ -117,7 +118,8 @@ export async function collectQuestionCards(user: User, options: { scope?: "mine"
   // uncertain there only because Ankora wrote it is a manager's decision,
   // on "אישורים" (lib/app-domain/internal-client.ts).
   const internal = await internalClientIds(clients);
-  const add = (r: Row & { assigneeId?: string | null }, what: string, title: string, isQuestion: boolean) => {
+  const add = (r: Row & { assigneeId?: string | null }, kind: QuestionItemKind, title: string, isQuestion: boolean) => {
+    const what = QUESTION_ITEM_WHAT[kind];
     if (internal.has(r.clientId) && r.toResolve === SECONDARY_ONLY_TO_RESOLVE) return;
     // 1.11.2026: an uncertain item is a question only once someone chose
     // to ask the client about it.
@@ -138,6 +140,7 @@ export async function collectQuestionCards(user: User, options: { scope?: "mine"
       item: {
         id: r.id,
         what,
+        kind,
         title: clean,
         toResolve: r.toResolve,
         isQuestion,
@@ -148,15 +151,15 @@ export async function collectQuestionCards(user: User, options: { scope?: "mine"
     });
     byClient.set(r.clientId, list);
   };
-  for (const r of g.questions) add(r, "שאלה פתוחה", r.body, true);
-  for (const r of g.facts) add(r, "פריט", r.body, false);
-  for (const r of g.contacts) add(r, "איש קשר", r.person.name ?? r.role ?? "איש קשר", false);
-  for (const r of g.orgs) add(r, "ארגון", r.organization.name, false);
-  for (const r of g.systems) add(r, "מערכת", r.systemName, false);
-  for (const r of g.entities) add(r, "ישות", r.name, false);
-  for (const r of g.requestTypes) add(r, "סוג פנייה", r.title, false);
-  for (const r of g.processes) add(r, "תהליך", `${r.code} ${r.title}`, false);
-  for (const r of g.policies) add(r, "כלל", r.title, false);
+  for (const r of g.questions) add(r, "question", r.body, true);
+  for (const r of g.facts) add(r, "fact", r.body, false);
+  for (const r of g.contacts) add(r, "contact", r.person.name ?? r.role ?? "איש קשר", false);
+  for (const r of g.orgs) add(r, "organization", r.organization.name, false);
+  for (const r of g.systems) add(r, "system", r.systemName, false);
+  for (const r of g.entities) add(r, "entity", r.name, false);
+  for (const r of g.requestTypes) add(r, "requestType", r.title, false);
+  for (const r of g.processes) add(r, "process", `${r.code} ${r.title}`, false);
+  for (const r of g.policies) add(r, "policy", r.title, false);
 
   const ownerIds = new Set<string>();
   for (const list of byClient.values()) for (const e of list) if (e.owner) ownerIds.add(e.owner);
@@ -209,24 +212,24 @@ export async function listUncertainItems(user: User, clientId: string): Promise<
   if ((await internalClientIds(clients)).has(clientId)) return [];
   const g = await gather([clientId]);
   const out: UncertainItem[] = [];
-  const add = (r: Row, what: string, title: string) => {
+  const add = (r: Row, kind: QuestionItemKind, title: string) => {
     if (g.flagged.has(r.id)) return;
-    out.push({ id: r.id, what, title: title.replace(/\s+/g, " ").trim(), toResolve: r.toResolve, href: itemHref(clientId, r.id) });
+    out.push({ id: r.id, what: QUESTION_ITEM_WHAT[kind], kind, title: title.replace(/\s+/g, " ").trim(), toResolve: r.toResolve, href: itemHref(clientId, r.id) });
   };
-  for (const r of g.facts) add(r, "פריט", r.body);
-  for (const r of g.contacts) add(r, "איש קשר", r.person.name ?? r.role ?? "איש קשר");
-  for (const r of g.orgs) add(r, "ארגון", r.organization.name);
-  for (const r of g.systems) add(r, "מערכת", r.systemName);
-  for (const r of g.entities) add(r, "ישות", r.name);
-  for (const r of g.requestTypes) add(r, "סוג פנייה", r.title);
-  for (const r of g.processes) add(r, "תהליך", `${r.code} ${r.title}`);
-  for (const r of g.policies) add(r, "כלל", r.title);
+  for (const r of g.facts) add(r, "fact", r.body);
+  for (const r of g.contacts) add(r, "contact", r.person.name ?? r.role ?? "איש קשר");
+  for (const r of g.orgs) add(r, "organization", r.organization.name);
+  for (const r of g.systems) add(r, "system", r.systemName);
+  for (const r of g.entities) add(r, "entity", r.name);
+  for (const r of g.requestTypes) add(r, "requestType", r.title);
+  for (const r of g.processes) add(r, "process", `${r.code} ${r.title}`);
+  for (const r of g.policies) add(r, "policy", r.title);
   return out;
 }
 
 async function assertItemsOfClient(clientId: string, itemIds: string[]): Promise<string[]> {
   const unique = [...new Set(itemIds.filter(Boolean))].slice(0, 200);
-  if (unique.length === 0) throw new Error("לא נבחרו שאלות.");
+  if (unique.length === 0) throw new DomainError("clientQuestions.noneSelected", "לא נבחרו שאלות.");
   const where = { id: { in: unique }, clientId, deletedAt: null };
   const counts = await Promise.all([
     prisma.clientFact.count({ where }),
@@ -238,7 +241,7 @@ async function assertItemsOfClient(clientId: string, itemIds: string[]): Promise
     prisma.process.count({ where }),
     prisma.clientPolicy.count({ where }),
   ]);
-  if (counts.reduce((a, b) => a + b, 0) !== unique.length) throw new Error("שאלה שנבחרה לא נמצאה בתיק של הלקוח.");
+  if (counts.reduce((a, b) => a + b, 0) !== unique.length) throw new DomainError("clientQuestions.notInFile", "שאלה שנבחרה לא נמצאה בתיק של הלקוח.");
   return unique;
 }
 
@@ -256,7 +259,7 @@ export async function createQuestionsTask(actor: User, clientId: string, itemIds
   await assertClientAccess(actor, clientId);
   const ids = await assertItemsOfClient(clientId, itemIds);
   const body = draft.trim();
-  if (!body) throw new Error("ההודעה ריקה.");
+  if (!body) throw new DomainError("clientQuestions.emptyMessage", "ההודעה ריקה.");
   const due = new Date();
   due.setUTCDate(due.getUTCDate() + 2);
   due.setUTCHours(0, 0, 0, 0);
@@ -277,7 +280,7 @@ export async function createQuestionsTask(actor: User, clientId: string, itemIds
 async function findItem(clientId: string, id: string): Promise<{ kind: "question"; body: string; taskId: string | null } | { kind: "item"; title: string; toResolve: string | null }> {
   const fact = await prisma.clientFact.findFirst({ where: { id, clientId, deletedAt: null }, select: { kind: true, body: true, taskId: true, answeredAt: true, toResolve: true } });
   if (fact?.kind === "QUESTION") {
-    if (fact.answeredAt) throw new Error("השאלה כבר נסגרה.");
+    if (fact.answeredAt) throw new DomainError("clientQuestions.alreadyClosed", "השאלה כבר נסגרה.");
     return { kind: "question", body: fact.body, taskId: fact.taskId };
   }
   if (fact) return { kind: "item", title: fact.body, toResolve: fact.toResolve };
@@ -295,7 +298,7 @@ async function findItem(clientId: string, id: string): Promise<{ kind: "question
     ? contact.person.name ?? contact.role ?? "איש קשר"
     : org?.organization.name ?? system?.systemName ?? entity?.name ?? requestType?.title ?? (process ? `${process.code} ${process.title}` : policy?.title);
   const toResolve = (contact ?? org ?? system ?? entity ?? requestType ?? process ?? policy)?.toResolve ?? null;
-  if (!title) throw new Error("הפריט לא נמצא בתיק של הלקוח.");
+  if (!title) throw new DomainError("clientQuestions.itemNotInFile", "הפריט לא נמצא בתיק של הלקוח.");
   return { kind: "item", title, toResolve };
 }
 
@@ -313,7 +316,7 @@ export async function askClientAbout(actor: User, clientId: string, itemIds: str
 export async function dismissQuestion(actor: User, clientId: string, itemId: string, reason: string): Promise<void> {
   await assertClientAccess(actor, clientId);
   const why = reason.replace(/\s+/g, " ").trim();
-  if (!why) throw new Error("צריך לכתוב בשורה אחת למה זה לא רלוונטי.");
+  if (!why) throw new DomainError("clientQuestions.dismissReasonRequired", "צריך לכתוב בשורה אחת למה זה לא רלוונטי.");
   const [id] = await assertItemsOfClient(clientId, [itemId]);
   const item = await findItem(clientId, id);
   if (item.kind === "question") {
@@ -336,7 +339,7 @@ export async function checkQuestionOurselves(actor: User, clientId: string, item
   const [id] = await assertItemsOfClient(clientId, [itemId]);
   const item = await findItem(clientId, id);
   if (item.kind === "question") {
-    if (item.taskId) throw new Error("כבר יש משימה לשאלה הזו.");
+    if (item.taskId) throw new DomainError("clientQuestions.taskExists", "כבר יש משימה לשאלה הזו.");
     const { task } = await factToTask(actor, id);
     return { taskId: task.id };
   }
@@ -353,8 +356,8 @@ export async function checkQuestionOurselves(actor: User, clientId: string, item
 /// "לדחות עד": the line leaves the card until the date, then comes back.
 export async function snoozeQuestion(actor: User, clientId: string, itemIds: string[], until: Date, now = new Date()): Promise<number> {
   await assertClientAccess(actor, clientId);
-  const error = snoozeError(until, now);
-  if (error) throw new Error(error);
+  const problem = snoozeProblem(until, now);
+  if (problem) throw new DomainError("clientQuestions.snooze", snoozeError(until, now)!, { problem });
   const ids = await assertItemsOfClient(clientId, itemIds);
   await recordAudit({ actorId: actor.id, action: "client_file.question_snoozed", entityType: "Client", entityId: clientId, clientId, after: { itemIds: ids, until: until.toISOString() } });
   return ids.length;

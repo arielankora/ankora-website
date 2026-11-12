@@ -1,19 +1,12 @@
 "use client";
 import { useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { StatusBadge } from "@/components/app/StatusBadge";
-import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
-import {
-  NEEDS_INTERIM,
-  POLICY_KINDS,
-  POLICY_KIND_HINTS,
-  POLICY_KIND_LABELS,
-  POLICY_STATUS_LABELS,
-  type PolicyKindLike,
-  type PolicyStatusLike,
-} from "@/lib/client-policies";
+import type { KnowledgeStatusLike } from "@/lib/knowledge";
+import { NEEDS_INTERIM, POLICY_KINDS, type PolicyKindLike, type PolicyStatusLike } from "@/lib/client-policies";
 import {
   addPolicyAction,
   approveExceptionAction,
@@ -28,7 +21,8 @@ import {
 } from "../policy-actions";
 import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
 import { PolicyParamsFields } from "./PolicyParamsFields";
-import { kindTakesParams, type PolicyParams } from "@/lib/policy-params";
+import { formatAmount, hasParams, kindTakesParams, paramsInForce, type PolicyParams } from "@/lib/policy-params";
+import type { ActionTag } from "@/lib/process-rules";
 
 // Org brain, phase 3: the client's own rules, sections 6 and 14 of the
 // client file (claude/org-brain-spec-2026-10-12.md, 3.11).
@@ -88,33 +82,92 @@ export type PanelException = {
   decisionNote: string | null;
 };
 
-function dayLabel(iso: string) {
-  return new Date(iso).toLocaleDateString("he-IL", { timeZone: "UTC" });
+type PoliciesT = ReturnType<typeof useTranslations<"clients.policies">>;
+type Formatter = ReturnType<typeof useFormatter>;
+
+const NUMERIC_DAY = { day: "numeric", month: "numeric", year: "numeric" } as const;
+
+/// A date-only value (UTC midnight), as the reader writes dates.
+function dayLabel(format: Formatter, iso: string) {
+  return format.dateTime(new Date(iso), { ...NUMERIC_DAY, timeZone: "UTC" });
+}
+
+/// What the server checks in the rule, in a line (lib/policy-params.ts
+/// paramsSummary words the same for the client file and Claude).
+function checkedLine(t: PoliciesT, kind: PolicyKindLike, p: PolicyParams, entityName: (id: string) => string): string | null {
+  if (!hasParams(p)) return null;
+  const on = (tags?: ActionTag[]) => (tags?.length ? tags.map((x) => t(`params.actionTags.${x}`)).join(", ") : null);
+  const withEntity = (line: string) => (p.entityId ? `${line} ${t("checked.entityOnly", { entity: entityName(p.entityId) })}` : line);
+  switch (kind) {
+    case "THRESHOLD":
+      return p.amountMinor !== undefined && p.currency
+        ? withEntity(t("checked.threshold", { tags: on(p.appliesToTags) ?? t("checked.thresholdDefaultTags"), amount: formatAmount(p.amountMinor, p.currency) }))
+        : null;
+    case "APPROVAL_REQUIRED":
+      return withEntity(t("checked.approval", { tags: on(p.appliesToTags) ?? "" }));
+    case "FORBIDDEN":
+      return withEntity(t("checked.forbidden", { tags: on(p.appliesToTags) ?? "" }));
+    case "REQUIRED_STEP":
+      return withEntity(
+        p.appliesToTags?.length ? t("checked.requiredStepWith", { tags: on(p.appliesToTags)!, text: p.mustInclude ?? "" }) : t("checked.requiredStep", { text: p.mustInclude ?? "" })
+      );
+    case "TIMING":
+      return withEntity(t("checked.timing", { tags: on(p.appliesToTags) ?? "", days: String(p.leadBusinessDays ?? "") }));
+    case "COMMUNICATION": {
+      const parts = [
+        p.channels?.length
+          ? t("checked.channels", { tags: on(p.appliesToTags) ?? t("params.actionTags.CLIENT_MESSAGE"), channels: p.channels.map((c) => t(`params.channelLabels.${c}`)).join(", ") })
+          : null,
+        p.invoiceTo?.length ? t("checked.invoices", { to: p.invoiceTo.join(", ") }) : null,
+      ].filter(Boolean);
+      return parts.length ? withEntity(parts.join(". ")) : null;
+    }
+    case "SEPARATION":
+      return t("checked.separation", { entities: (p.entityIds ?? []).map(entityName).join(t("checked.separationJoin")) });
+    default:
+      return null;
+  }
+}
+
+/// Spec 3.11: when the rule starts and when it is reviewed, in a line.
+function datesLine(t: PoliciesT, format: Formatter, p: PanelPolicy): string | null {
+  const parts: string[] = [];
+  if (p.effectiveFrom) {
+    const from = new Date(`${p.effectiveFrom}T00:00:00Z`);
+    const date = format.dateTime(from, { ...NUMERIC_DAY, timeZone: "UTC" });
+    parts.push(from.getTime() > Date.now() ? t("dates.startsOn", { date }) : t("dates.inForceFrom", { date }));
+  }
+  if (p.reviewBy) {
+    const date = format.dateTime(new Date(`${p.reviewBy}T00:00:00Z`), { ...NUMERIC_DAY, timeZone: "UTC" });
+    parts.push(p.reviewDue ? t("dates.reviewOverdue", { date }) : t("dates.reviewBy", { date }));
+  }
+  return parts.length ? parts.join(" · ") : null;
 }
 
 function ExceptionForm({ clientId, policy, maxDays }: { clientId: string; policy: PanelPolicy; maxDays: number }) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(requestExceptionAction, close);
+  const t = useTranslations("clients.policies");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="policyId" value={policy.id} />
       <p className="text-xs text-app-text-secondary">
-        הכלל: {policy.statement}
+        {t("exception.rule")} <span dir="auto">{policy.statement}</span>
       </p>
-      <Field label="מה עושים אחרת *">
-        <textarea name="what" required rows={2} placeholder="לשלוח לאיילה את חשבוניות Inc של אוקטובר" className={INPUT} />
+      <Field label={t("exception.what")}>
+        <textarea name="what" required rows={2} placeholder={t("exception.whatPlaceholder")} className={INPUT} />
       </Field>
-      <Field label="למה *">
-        <input name="reason" required placeholder="שני בחופשה, והתשלום ב-25 לחודש" className={INPUT} />
+      <Field label={t("exception.reason")}>
+        <input name="reason" required placeholder={t("exception.reasonPlaceholder")} className={INPUT} />
       </Field>
-      <Field label="עד (כולל) *">
+      <Field label={t("exception.until")}>
         <input name="validUntil" type="date" required className={INPUT} />
       </Field>
-      <p className="-mt-2 text-[11px] text-app-text-tertiary">עד {maxDays} יום. לתקופה ארוכה יותר משנים את הכלל עצמו.</p>
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">{t("exception.maxDays", { max: maxDays })}</p>
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שולח..." : "שליחת הבקשה"}
+        {pending ? t("sending") : t("exception.submit")}
       </button>
     </form>
   );
@@ -123,17 +176,18 @@ function ExceptionForm({ clientId, policy, maxDays }: { clientId: string; policy
 function RejectExceptionForm({ clientId, exception }: { clientId: string; exception: PanelException }) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(rejectExceptionAction, close);
+  const t = useTranslations("clients.policies");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="id" value={exception.id} />
-      <p className="text-sm text-app-text-primary">{exception.what}</p>
-      <Field label="למה לא, בשורה אחת *">
+      <p className="text-sm text-app-text-primary" dir="auto">{exception.what}</p>
+      <Field label={t("exception.rejectReason")}>
         <input name="note" required className={INPUT} />
       </Field>
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : "דחיית הבקשה"}
+        {pending ? t("saving") : t("exception.rejectSubmit")}
       </button>
     </form>
   );
@@ -142,11 +196,12 @@ function RejectExceptionForm({ clientId, exception }: { clientId: string; except
 function ApproversForm({ clientId, staff, selected }: { clientId: string; staff: { id: string; name: string }[]; selected: string[] }) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(setRuleApproversAction, close);
+  const t = useTranslations("clients.policies");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <p className="text-xs text-app-text-secondary">
-        רק כשהלקוח קבע מי מאשר. בלי בחירה, מאשר כל מי שקיבל את ההרשאה &quot;אישור חריגות ומידע רגיש&quot; בדף המשתמש.
+        {t("approvers.hint")}
       </p>
       <fieldset className="flex flex-col gap-1.5">
         {staff.map((u) => (
@@ -158,7 +213,7 @@ function ApproversForm({ clientId, staff, selected }: { clientId: string; staff:
       </fieldset>
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : "שמירה"}
+        {pending ? t("saving") : t("save")}
       </button>
     </form>
   );
@@ -181,42 +236,44 @@ function PolicyForm({
   const { onSubmit, pending, error } = useActionForm(existing ? updatePolicyAction : addPolicyAction, close);
   const [kind, setKind] = useState<PolicyKindLike>(existing?.kind ?? "INFO");
   const [status, setStatus] = useState<KnowledgeStatusLike>(existing?.knowledgeStatus ?? "CONFIRMED");
+  const t = useTranslations("clients.policies");
+  const tk = useTranslations("clients.knowledge");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       {existing && <input type="hidden" name="id" value={existing.id} />}
       {existing?.status === "ACTIVE" && (
         <p className="rounded-lg bg-app-warning-soft px-3 py-2 text-xs text-app-warning">
-          הכלל בתוקף. שינוי בשם, בסוג, בנוסח או במה שנבדק מחזיר אותו ל&quot;מוצע&quot;, ומנהל צריך לאשר אותו שוב.
+          {t("form.activeWarning")}
         </p>
       )}
-      <Field label="סוג הכלל *">
+      <Field label={t("form.kind")}>
         <select name="kind" value={kind} onChange={(e) => setKind(e.target.value as PolicyKindLike)} className={INPUT}>
           {POLICY_KINDS.map((k) => (
             <option key={k} value={k}>
-              {POLICY_KIND_LABELS[k]}
+              {t(`kinds.${k}`)}
             </option>
           ))}
         </select>
       </Field>
-      <p className="-mt-2 text-[11px] text-app-text-tertiary">{POLICY_KIND_HINTS[kind]}</p>
-      <Field label="שם הכלל *">
-        <input name="title" required defaultValue={existing?.title ?? ""} placeholder="פגישות הנהלה" className={INPUT} />
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">{t(`kindHints.${kind}`)}</p>
+      <Field label={t("form.title")}>
+        <input name="title" required defaultValue={existing?.title ?? ""} placeholder={t("form.titlePlaceholder")} className={INPUT} />
       </Field>
-      <Field label="הכלל *">
-        <textarea name="statement" required rows={3} defaultValue={existing?.statement ?? ""} placeholder="רושמים נושאים בלבד, בלי ציטוטים ובלי פרטים" className={INPUT} />
+      <Field label={t("form.statement")}>
+        <textarea name="statement" required rows={3} defaultValue={existing?.statement ?? ""} placeholder={t("form.statementPlaceholder")} className={INPUT} />
       </Field>
-      <Field label={NEEDS_INTERIM.includes(kind) ? "עד שיאושר *" : "עד שיאושר"}>
+      <Field label={NEEDS_INTERIM.includes(kind) ? t("form.interimRequired") : t("form.interim")}>
         <textarea
           name="interimStatement"
           rows={2}
           required={NEEDS_INTERIM.includes(kind)}
           defaultValue={existing?.interimStatement ?? ""}
-          placeholder="כל הוצאה עוברת לאורן"
+          placeholder={t("form.interimPlaceholder")}
           className={INPUT}
         />
       </Field>
-      <p className="-mt-2 text-[11px] text-app-text-tertiary">הכלל הזהיר שחל עד שמנהל מאשר. בלי כלל ביניים, הכלל חל כפי שהוא כתוב.</p>
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">{t("form.interimHint")}</p>
       <PolicyParamsFields
         key={kind}
         kind={kind}
@@ -224,35 +281,35 @@ function PolicyForm({
         initialInterim={existing?.kind === kind ? existing.interimParams : undefined}
         entities={entities}
       />
-      <Field label="למה">
+      <Field label={t("form.rationale")}>
         <input name="rationale" defaultValue={existing?.rationale ?? ""} className={INPUT} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="נכנס לתוקף ב-">
+        <Field label={t("form.effectiveFrom")}>
           <input type="date" name="effectiveFrom" defaultValue={existing?.effectiveFrom ?? ""} className={INPUT} />
         </Field>
-        <Field label="לסקירה עד">
+        <Field label={t("form.reviewBy")}>
           <input type="date" name="reviewBy" defaultValue={existing?.reviewBy ?? ""} className={INPUT} />
         </Field>
       </div>
-      <p className="-mt-2 text-[11px] text-app-text-tertiary">ריק: חל מיד, בלי מועד סקירה. שינוי של יום הכניסה לתוקף בכלל שבתוקף מחזיר אותו לאישור מנהל.</p>
-      <Field label="מה ידוע על הכלל">
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">{t("form.datesHint")}</p>
+      <Field label={t("form.knowledgeStatus")}>
         <select name="knowledgeStatus" value={status} onChange={(e) => setStatus(e.target.value as KnowledgeStatusLike)} className={INPUT}>
-          <option value="CONFIRMED">{KNOWLEDGE_STATUS_LABELS.CONFIRMED}</option>
-          <option value="UNCERTAIN">{KNOWLEDGE_STATUS_LABELS.UNCERTAIN}</option>
-          <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
+          <option value="CONFIRMED">{tk("status.CONFIRMED")}</option>
+          <option value="UNCERTAIN">{tk("status.UNCERTAIN")}</option>
+          <option value="MISSING">{tk("status.MISSING")}</option>
         </select>
       </Field>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} confirmedBefore={existing?.knowledgeStatus === "CONFIRMED"} />
       <ItemExtras existing={existing} disclose audience />
       {status !== "CONFIRMED" && (
-        <Field label="מה יסגור את זה *">
+        <Field label={tk("toResolve")}>
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
         </Field>
       )}
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : existing ? "שמירה" : "הוספה לתיק"}
+        {pending ? t("saving") : existing ? t("save") : t("addToFile")}
       </button>
     </form>
   );
@@ -261,42 +318,53 @@ function PolicyForm({
 function RetireForm({ clientId, policy }: { clientId: string; policy: PanelPolicy }) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(retirePolicyAction, close);
+  const t = useTranslations("clients.policies");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="id" value={policy.id} />
-      <p className="text-sm text-app-text-primary">{policy.title}</p>
-      <Field label="למה מבטלים, בשורה אחת *">
-        <input name="reason" required placeholder="אורן ביטל את המגבלה בפגישה מ-20.10" className={INPUT} />
+      <p className="text-sm text-app-text-primary" dir="auto">{policy.title}</p>
+      <Field label={t("retire.reason")}>
+        <input name="reason" required placeholder={t("retire.reasonPlaceholder")} className={INPUT} />
       </Field>
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : "ביטול הכלל"}
+        {pending ? t("saving") : t("retire.submit")}
       </button>
     </form>
   );
 }
 
-const shortDay = (iso: string) => new Date(iso).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" });
 
 /// Spec 3.11: the rule's earlier versions, folded, so what was agreed
 /// before can be read without the audit log.
 function PolicyHistory({ history }: { history: NonNullable<PanelPolicy["history"]> }) {
+  const t = useTranslations("clients.policies");
+  const format = useFormatter();
+  const shortDay = (iso: string) => format.dateTime(new Date(iso), NUMERIC_DAY);
   return (
     <details className="mt-1.5" data-testid="policy-history">
-      <summary className="cursor-pointer text-[11px] text-app-text-secondary">גרסאות קודמות ({history.length})</summary>
+      <summary className="cursor-pointer text-[11px] text-app-text-secondary">{t("history.summary", { count: history.length })}</summary>
       <ul className="mt-1 space-y-1.5 border-s border-app-border ps-3">
         {history.map((h) => (
           <li key={h.version} className="text-xs text-app-text-secondary">
-            <p className="font-medium">
-              גרסה {h.version}
-              {h.title ? `: ${h.title}` : ""}
+            <p className="font-medium" dir="auto">
+              {h.title ? t("history.versionTitled", { version: h.version, title: h.title }) : t("history.version", { version: h.version })}
             </p>
-            <p>{h.statement}</p>
-            {h.interimStatement && <p className="text-app-text-secondary">עד שאושר: {h.interimStatement}</p>}
-            {h.checked && <p className="text-app-text-secondary">נבדק: {h.checked}</p>}
+            <p dir="auto">{h.statement}</p>
+            {h.interimStatement && <p className="text-app-text-secondary">{t("history.interim")} <span dir="auto">{h.interimStatement}</span></p>}
+            {h.checked && <p className="text-app-text-secondary">{t("history.checked")} {h.checked}</p>}
             <p className="text-[11px] text-app-text-tertiary">
-              {[h.approvedByName ? `אושר על ידי ${h.approvedByName}${h.approvedAt ? `, ${shortDay(h.approvedAt)}` : ""}` : "לא אושר", h.until ? `הוחלף ב-${shortDay(h.until)}` : null].filter(Boolean).join(" · ")}
+              {[
+                h.approvedByName
+                  ? h.approvedAt
+                    ? t("history.approvedByOn", { name: h.approvedByName, date: shortDay(h.approvedAt) })
+                    : t("history.approvedBy", { name: h.approvedByName })
+                  : t("history.notApproved"),
+                h.until ? t("history.replacedOn", { date: shortDay(h.until) }) : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           </li>
         ))}
@@ -339,95 +407,110 @@ export function PoliciesPanel({
   entities: { id: string; name: string }[];
 }) {
   const { showToast } = useToast();
+  const t = useTranslations("clients.policies");
+  const tk = useTranslations("clients.knowledge");
+  const format = useFormatter();
+  const entityNames = new Map(entities.map((e) => [e.id, e.name]));
+  const entityName = (id: string) => entityNames.get(id) ?? t("checked.removedEntity");
   const live = policies.filter((p) => p.status !== "RETIRED");
   const retired = policies.filter((p) => p.status === "RETIRED");
 
   async function approve(p: PanelPolicy) {
     const r = await approvePolicyAction(p.id, clientId);
-    if (r.error) showToast({ tone: "error", title: "האישור נכשל", description: r.error });
-    else showToast({ tone: "success", title: "הכלל בתוקף", description: p.title });
+    if (r.error) showToast({ tone: "error", title: t("toast.approveFailed"), description: r.error });
+    else showToast({ tone: "success", title: t("toast.ruleActive"), description: p.title });
   }
   async function decide(e: PanelException) {
     const r = await approveExceptionAction(e.id, clientId);
-    if (r.error) showToast({ tone: "error", title: "האישור נכשל", description: r.error });
-    else showToast({ tone: "success", title: "החריגה אושרה", description: e.what.slice(0, 80) });
+    if (r.error) showToast({ tone: "error", title: t("toast.approveFailed"), description: r.error });
+    else showToast({ tone: "success", title: t("toast.exceptionApproved"), description: e.what.slice(0, 80) });
   }
   async function withdraw(e: PanelException) {
     const r = await withdrawExceptionAction(e.id, clientId);
-    if (r.error) showToast({ tone: "error", title: "המשיכה נכשלה", description: r.error });
-    else showToast({ tone: "info", title: "הבקשה נמשכה", description: e.what.slice(0, 80) });
+    if (r.error) showToast({ tone: "error", title: t("toast.withdrawFailed"), description: r.error });
+    else showToast({ tone: "info", title: t("toast.withdrawn"), description: e.what.slice(0, 80) });
   }
   async function remove(p: PanelPolicy) {
     const r = await removePolicyAction(p.id, clientId);
-    if (r.error) showToast({ tone: "error", title: "ההסרה נכשלה", description: r.error });
-    else showToast({ tone: "info", title: "הוסר מהתיק", description: p.title });
+    if (r.error) showToast({ tone: "error", title: t("toast.removeFailed"), description: r.error });
+    else showToast({ tone: "info", title: t("toast.removed"), description: p.title });
   }
 
   return (
     <div id="rules" className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <h2 className="text-sm font-medium text-app-text-primary">כללים של הלקוח ({live.length})</h2>
-        <Drawer triggerLabel="+ כלל" title="כלל של הלקוח" variant="link">
+        <h2 className="text-sm font-medium text-app-text-primary">{t("heading", { count: live.length })}</h2>
+        <Drawer triggerLabel={t("add")} title={t("addTitle")} variant="link">
           <PolicyForm clientId={clientId} sourceOptions={sourceOptions} entities={entities} />
         </Drawer>
       </div>
       <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-app-text-tertiary">
         <span>
-          חריגות ומידע רגיש מאשר/ת: {approvers.length ? approvers.map((a) => a.name).join(", ") : "עוד אין מי שמאשר. נותנים הרשאה בדף המשתמש."}
-          {clientApproverIds.length > 0 && " (לפי מה שהלקוח קבע)"}
+          {approvers.length ? t("approvers.line", { names: approvers.map((a) => a.name).join(", ") }) : t("approvers.none")}
+          {clientApproverIds.length > 0 && ` ${t("approvers.setByClient")}`}
         </span>
         {canApprove && (
-          <Drawer triggerLabel="שינוי" title="מי מאשר אצל הלקוח" variant="link">
+          <Drawer triggerLabel={t("approvers.change")} title={t("approvers.title")} variant="link">
             <ApproversForm clientId={clientId} staff={staff} selected={clientApproverIds} />
           </Drawer>
         )}
       </p>
       {live.length === 0 ? (
         <p className="mt-2 text-sm text-app-text-tertiary">
-          אין עדיין כללים. מה מותר ומה אסור אצל הלקוח, מי מאשר, מה לא מספרים למי, ומה לא נכנס לתיק בכלל.
+          {t("empty")}
         </p>
       ) : (
         <ul className="mt-4 divide-y divide-app-border">
-          {live.map((p) => (
+          {live.map((p) => {
+            const checked = checkedLine(t, p.kind, paramsInForce({ ...p, effectiveFrom: p.effectiveFrom ? new Date(`${p.effectiveFrom}T00:00:00Z`) : null }), entityName);
+            const dates = datesLine(t, format, p);
+            return (
             <li key={p.id} id={`item-${p.id}`} className="flex flex-wrap items-start justify-between gap-3 py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
               <div className="min-w-0 flex-[1_1_18rem]">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-medium text-app-text-primary">{p.title}</p>
-                  <StatusBadge label={POLICY_STATUS_LABELS[p.status]} tone={STATUS_TONE[p.status]} />
+                  <p className="text-sm font-medium text-app-text-primary" dir="auto">{p.title}</p>
+                  <StatusBadge label={t(`statuses.${p.status}`)} tone={STATUS_TONE[p.status]} />
                   <span className="text-[11px] text-app-text-tertiary">
-                    {POLICY_KIND_LABELS[p.kind]}
-                    {p.version > 1 && ` · גרסה ${p.version}`}
+                    {t(`kinds.${p.kind}`)}
+                    {p.version > 1 && ` · ${t("history.version", { version: p.version })}`}
                   </span>
                 </div>
                 {p.status === "PROPOSED" && p.interimStatement ? (
                   <>
                     <p className="mt-1 text-xs text-app-text-primary">
-                      <span className="font-medium">עד שיאושר: </span>
-                      {p.interimStatement}
+                      <span className="font-medium">{t("row.interim")} </span>
+                      <span dir="auto">{p.interimStatement}</span>
                     </p>
-                    <p className="mt-0.5 text-xs text-app-text-secondary">הכלל המוצע: {p.statement}</p>
+                    <p className="mt-0.5 text-xs text-app-text-secondary">
+                      {t("row.proposed")} <span dir="auto">{p.statement}</span>
+                    </p>
                   </>
                 ) : (
-                  <p className="mt-1 text-xs text-app-text-primary">{p.statement}</p>
+                  <p className="mt-1 text-xs text-app-text-primary" dir="auto">{p.statement}</p>
                 )}
-                {p.rationale && <p className="mt-0.5 text-xs text-app-text-secondary">למה: {p.rationale}</p>}
-                {p.checked ? (
+                {p.rationale && (
                   <p className="mt-0.5 text-xs text-app-text-secondary">
-                    <span className="font-medium">נבדק מול הנהלים: </span>
-                    {p.checked}
+                    {t("row.why")} <span dir="auto">{p.rationale}</span>
+                  </p>
+                )}
+                {checked ? (
+                  <p className="mt-0.5 text-xs text-app-text-secondary">
+                    <span className="font-medium">{t("row.checked")} </span>
+                    {checked}
                   </p>
                 ) : (
-                  kindTakesParams(p.kind) && <p className="mt-0.5 text-[11px] text-app-text-tertiary">טקסט בלבד: השרת לא בודק את הכלל הזה.</p>
+                  kindTakesParams(p.kind) && <p className="mt-0.5 text-[11px] text-app-text-tertiary">{t("row.textOnly")}</p>
                 )}
-                {p.datesLine && (
+                {dates && (
                   <p className={`mt-0.5 text-[11px] ${p.reviewDue ? "text-app-warning" : "text-app-text-secondary"}`} data-testid="policy-dates">
-                    {p.datesLine}
+                    {dates}
                   </p>
                 )}
                 {p.status === "ACTIVE" && p.approvedByName && (
                   <p className="mt-0.5 text-[11px] text-app-text-tertiary">
-                    אושר על ידי {p.approvedByName}
-                    {p.approvedAt && `, ${new Date(p.approvedAt).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}`}
+                    {p.approvedAt
+                      ? t("history.approvedByOn", { name: p.approvedByName, date: format.dateTime(new Date(p.approvedAt), NUMERIC_DAY) })
+                      : t("history.approvedBy", { name: p.approvedByName })}
                   </p>
                 )}
                 <StatusLine status={p.knowledgeStatus} toResolve={p.toResolve} />
@@ -436,7 +519,7 @@ export function PoliciesPanel({
                     offering an approval the server refuses (20.10.2026). */}
                 {(canApproveRules ?? canApprove) && p.status === "PROPOSED" && p.knowledgeStatus !== "CONFIRMED" && (
                   <p className="mt-1 text-[11px] text-app-text-secondary" data-testid="policy-approve-blocked">
-                    לפני שמאשרים: מוודאים מול הלקוח שזה מה שהוא אמר, ובעריכה מסמנים &quot;{KNOWLEDGE_STATUS_LABELS.CONFIRMED}&quot; עם המקור שמאשר. אחר כך אפשר לאשר את הכלל.
+                    {t("row.approveBlocked", { status: tk("status.CONFIRMED") })}
                   </p>
                 )}
                 <ItemTags item={p} disclose />
@@ -447,14 +530,14 @@ export function PoliciesPanel({
                   .map((e) => (
                     <div key={e.id} className="mt-2 rounded-lg border border-app-border bg-app-surface-sunken px-3 py-2 text-xs">
                       <div className="flex flex-wrap items-center gap-2">
-                        <StatusBadge label={e.status === "APPROVED" ? `חריגה עד ${dayLabel(e.validUntil)}` : "בקשה לחריגה"} tone={e.status === "APPROVED" ? "gray" : "amber"} />
-                        <span className="text-app-text-primary">{e.what}</span>
+                        <StatusBadge label={e.status === "APPROVED" ? t("exception.badgeUntil", { date: dayLabel(format, e.validUntil) }) : t("exception.badgeRequest")} tone={e.status === "APPROVED" ? "gray" : "amber"} />
+                        <span className="text-app-text-primary" dir="auto">{e.what}</span>
                       </div>
                       <p className="mt-1 text-app-text-secondary">
-                        למה: {e.reason}
-                        {e.status === "REQUESTED" && ` · עד ${dayLabel(e.validUntil)}`}
-                        {e.requestedByName && ` · ביקש/ה ${e.requestedByName}`}
-                        {e.decidedByName && ` · אישר/ה ${e.decidedByName}`}
+                        {t("row.why")} <span dir="auto">{e.reason}</span>
+                        {e.status === "REQUESTED" && ` · ${t("exception.until2", { date: dayLabel(format, e.validUntil) })}`}
+                        {e.requestedByName && ` · ${t("exception.requestedBy", { name: e.requestedByName })}`}
+                        {e.decidedByName && ` · ${t("exception.decidedBy", { name: e.decidedByName })}`}
                         {e.decisionNote && ` · ${e.decisionNote}`}
                       </p>
                       {e.status === "REQUESTED" && (
@@ -462,16 +545,16 @@ export function PoliciesPanel({
                           {canDecideExceptions && (
                             <>
                               <button type="button" onClick={() => decide(e)} className="font-medium text-app-text-accent hover:underline">
-                                אישור החריגה
+                                {t("exception.approve")}
                               </button>
-                              <Drawer triggerLabel="דחיית החריגה" title="דחיית בקשה לחריגה" variant="link">
+                              <Drawer triggerLabel={t("exception.reject")} title={t("exception.rejectTitle")} variant="link">
                                 <RejectExceptionForm clientId={clientId} exception={e} />
                               </Drawer>
                             </>
                           )}
                           {e.requestedById === viewerId && (
                             <button type="button" onClick={() => withdraw(e)} className="text-app-text-tertiary hover:text-app-text-primary">
-                              משיכת הבקשה
+                              {t("exception.withdraw")}
                             </button>
                           )}
                         </div>
@@ -482,36 +565,37 @@ export function PoliciesPanel({
               <div className="flex shrink-0 items-center gap-3 text-xs">
                 {(canApproveRules ?? canApprove) && p.status === "PROPOSED" && p.knowledgeStatus === "CONFIRMED" && (
                   <button type="button" onClick={() => approve(p)} className="font-medium text-app-text-accent hover:underline">
-                    אישור הכלל
+                    {t("row.approve")}
                   </button>
                 )}
-                <Drawer triggerLabel="עריכה" title={`עריכה: ${p.title}`} variant="link">
+                <Drawer triggerLabel={t("row.edit")} title={t("row.editTitle", { title: p.title })} variant="link">
                   <PolicyForm clientId={clientId} sourceOptions={sourceOptions} entities={entities} existing={p} />
                 </Drawer>
-                <Drawer triggerLabel="בקשת חריגה" title={`בקשת חריגה: ${p.title}`} variant="link">
+                <Drawer triggerLabel={t("row.requestException")} title={t("row.requestExceptionTitle", { title: p.title })} variant="link">
                   <ExceptionForm clientId={clientId} policy={p} maxDays={maxExceptionDays} />
                 </Drawer>
                 {canApprove && (
-                  <Drawer triggerLabel="ביטול" title={`ביטול: ${p.title}`} variant="link">
+                  <Drawer triggerLabel={t("row.retire")} title={t("row.retireTitle", { title: p.title })} variant="link">
                     <RetireForm clientId={clientId} policy={p} />
                   </Drawer>
                 )}
                 {p.status === "PROPOSED" && (
                   <button type="button" onClick={() => remove(p)} className="text-app-text-tertiary hover:text-app-error">
-                    הסרה
+                    {t("row.remove")}
                   </button>
                 )}
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
       {retired.length > 0 && (
         <details className="mt-3">
-          <summary className="cursor-pointer text-xs text-app-text-tertiary">כללים שבוטלו ({retired.length})</summary>
+          <summary className="cursor-pointer text-xs text-app-text-tertiary">{t("retired", { count: retired.length })}</summary>
           <ul className="mt-2 space-y-1.5">
             {retired.map((p) => (
-              <li key={p.id} className="text-xs text-app-text-tertiary">
+              <li key={p.id} className="text-xs text-app-text-tertiary" dir="auto">
                 {p.title}: {p.statement}
               </li>
             ))}
@@ -525,26 +609,27 @@ export function PoliciesPanel({
 /// The client's disclosure rules, above everything else on the client
 /// screen: the one thing a person must know before saying a word.
 export function DisclosureBanner({ rules }: { rules: { id: string; title: string; text: string; proposed: boolean }[] }) {
+  const t = useTranslations("clients.policies.disclosure");
   if (rules.length === 0) return null;
   return (
     // 31.10.2026: one line, so the file's index stays near the top. The first
     // rule is always in full; the others open under "עוד".
     <div role="note" className="rounded-xl border border-app-warning/30 bg-app-warning-soft px-4 py-2 text-xs text-app-warning" data-testid="disclosure-banner">
       <p>
-        <span className="font-medium">לפני שמדברים עם מישהו אצל הלקוח: </span>
-        <span className="font-medium">{rules[0].title}: </span>
-        {rules[0].text}
-        {rules[0].proposed && " (מוצע)"}
+        <span className="font-medium">{t("lead")} </span>
+        <span className="font-medium" dir="auto">{rules[0].title}: </span>
+        <span dir="auto">{rules[0].text}</span>
+        {rules[0].proposed && ` ${t("proposed")}`}
       </p>
       {rules.length > 1 && (
         <details className="mt-1">
-          <summary className="cursor-pointer font-medium">{rules.length === 2 ? "עוד כלל אחד" : `עוד ${rules.length - 1} כללים`}</summary>
+          <summary className="cursor-pointer font-medium">{t("more", { count: rules.length - 1 })}</summary>
           <ul className="mt-1 space-y-1">
             {rules.slice(1).map((r) => (
               <li key={r.id}>
-                <span className="font-medium">{r.title}: </span>
-                {r.text}
-                {r.proposed && " (מוצע)"}
+                <span className="font-medium" dir="auto">{r.title}: </span>
+                <span dir="auto">{r.text}</span>
+                {r.proposed && ` ${t("proposed")}`}
               </li>
             ))}
           </ul>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { FILE_SECTION_COOKIE, resolveFileSection, showsSection, type FileSection, type FileSectionKey } from "@/lib/client-file-parts";
 import { FilePartsNav, type PartCount } from "./FilePartsNav";
 import { PageBack } from "@/components/app/BackSlot";
@@ -17,7 +18,6 @@ import { listPortalSummaries } from "@/lib/app-domain/portal-summary";
 import { clientDocumentsFolder } from "@/lib/google-drive";
 import {
   listImportantDates,
-  IMPORTANT_DATE_STATUS_LABELS,
   listHolidayCalendars,
   listHolidaySubscriptionsForClient,
 } from "@/lib/app-domain/important-dates";
@@ -55,7 +55,7 @@ import { readReviewReason, reviewDueAt, REVIEW_REASON_LABELS } from "@/lib/proce
 import { ControlLine } from "./ControlLine";
 import { PossibleDuplicates } from "./PossibleDuplicates";
 import { dateDuplicatePairs, dateKeyFromRow, duplicatePairs } from "@/lib/name-match";
-import { controlDetails, controlFrom, controlParts } from "@/lib/client-control";
+import { controlDetails, controlFrom, controlPartMessages } from "@/lib/client-control";
 import { daysSinceLastBatch } from "@/lib/app-domain/client-control";
 import { DisclosureBanner, PoliciesPanel } from "./PoliciesPanel";
 import { listClientPolicies, policyHistory } from "@/lib/app-domain/client-policies";
@@ -159,6 +159,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   const client = await getClient(params.clientId);
   if (!client) notFound();
+  const t = await getTranslations("clients.page");
+  const tControl = await getTranslations("clients.control");
+  const format = await getFormatter();
 
   // A client that is not active is in nobody's working set:
   // listAccessibleClients() returns active clients only, and every panel
@@ -174,16 +177,14 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         <div>
           <PageBack href={backHref} label={backLabel} testId="client-back" />
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <h1 className="text-xl font-medium text-app-text-primary">{client.name}</h1>
-            <StatusBadge label={paused ? "מושהה" : "בארכיון"} tone={paused ? "amber" : "gray"} />
+            <h1 dir="auto" className="text-xl font-medium text-app-text-primary">{client.name}</h1>
+            <StatusBadge label={paused ? t("inactive.paused") : t("inactive.archived")} tone={paused ? "amber" : "gray"} />
           </div>
         </div>
 
         <div className="space-y-4 rounded-2xl border border-app-border bg-white p-6">
           <p className="text-sm text-app-text-secondary">
-            {paused
-              ? "הלקוח מושהה, ולכן המשימות, התיק והמסמכים שלו לא מוצגים כאן, והוא לא מופיע ברשימות העבודה. שום דבר לא נמחק: הכול חוזר כשהלקוח חוזר לפעיל."
-              : "הלקוח בארכיון. שום דבר לא נמחק: המשימות, התיק והשעות חוזרים כשהלקוח חוזר לפעיל."}
+            {paused ? t("inactive.pausedBody") : t("inactive.archivedBody")}
           </p>
           <RestoreClientButton clientId={client.id} />
         </div>
@@ -291,7 +292,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   // Spec 5.4: what people who closed runs said about each procedure.
   const [lessons, stranger] = await Promise.all([listLessons(processes.map((p) => p.id)), strangerPanel(processes.map((p) => p.id))]);
   const todayKey = localDateKey(new Date(), TIMEZONE);
-  const shortDate = (d: Date) => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Jerusalem" }).format(d);
+  const shortDate = (d: Date) => format.dateTime(d, { day: "numeric", month: "numeric", year: "numeric" });
+  const narrativeMeta = (version: number, at: Date, by: string | null) =>
+    by ? t("narrativeMetaBy", { version: String(version), date: shortDate(at), name: by }) : t("narrativeMeta", { version: String(version), date: shortDate(at) });
   const entityOptions = entities.map((e) => ({ id: e.id, name: e.name }));
   const entityName = new Map(entities.map((e) => [e.id, e.name]));
   const sourceOptions = sources.map((s) => ({ code: s.code, title: s.title, secondary: s.weight === "SECONDARY" && !client.isInternal }));
@@ -341,8 +344,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     .filter((cat) => cat.active && (cat.visibility === "GLOBAL" || cat.clientId === client.id))
     .map((cat) => ({ id: cat.id, name: cat.name, clientId: cat.clientId }));
 
-  const monthLabel = (date: Date) =>
-    new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "Asia/Jerusalem" }).format(date);
+  const monthLabel = (date: Date) => format.dateTime(date, { month: "long", year: "numeric" });
 
   // Phase 10 follow-up ("לוחות חגים" UI gap - ADR 21.6): gate matches
   // setHolidayCalendarSubscription()'s own important_date.manage_catalog
@@ -376,7 +378,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         <div>
           <PageBack href={backHref} label={backLabel} testId="client-back" />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-xl font-medium text-app-text-primary">{client.name}</h1>
+            <h1 dir="auto" className="text-xl font-medium text-app-text-primary">{client.name}</h1>
             {/* The same button as on a task, on the screen somebody
                 opens when they want to write to a client without a task
                 in mind. Nothing here sends by itself. See
@@ -386,24 +388,24 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               {/* Every approval on this client, in one place (20.10.2026). */}
               {approvalsHere > 0 && (
                 <Link href={`/app/approvals?clientId=${client.id}`} className="text-sm text-app-warning hover:underline" data-testid="client-approvals-link">
-                  {approvalsHere === 1 ? "דבר אחד ממתין לאישור שלך" : `${approvalsHere} ממתינים לאישור שלך`}
+                  {t("header.approvals", { count: approvalsHere })}
                 </Link>
               )}
               {pendingProposals > 0 && tab !== "file" && (
                 <Link href={`/app/clients/${client.id}?tab=file#client-pending`} className="text-sm text-app-text-accent hover:underline">
-                  {pendingProposals === 1 ? "הצעה אחת לתיק" : `${pendingProposals} הצעות לתיק`}
+                  {t("header.proposals", { count: pendingProposals })}
                 </Link>
               )}
               {openQuestions > 0 && (
                 <Link href={`/app/clients/${client.id}?tab=file#client-questions`} className="text-sm text-app-text-accent hover:underline" data-testid="client-questions-link">
-                  {openQuestions === 1 ? "שאלה אחת לברר עם הלקוח" : `${openQuestions} שאלות לברר עם הלקוח`}
+                  {t("header.questions", { count: openQuestions })}
                 </Link>
               )}
               <Link href={`/app/clients/${client.id}/client-file`} className="text-sm text-app-text-accent hover:underline">
-                תיק הלקוח לקריאה
+                {t("header.readFile")}
               </Link>
               <Link href={`/app/clients/${client.id}/handover`} className="text-sm text-app-text-accent hover:underline">
-                מוכנות לחפיפה
+                {t("header.handover")}
               </Link>
               {composer && <MessageClient clientId={client.id} {...composer} />}
             </div>
@@ -411,7 +413,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         </div>
 
         <ControlLine
-          parts={controlParts(
+          parts={controlPartMessages(
             controlFrom({
               processes,
               exceptions,
@@ -420,7 +422,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               systems,
               daysSinceBatch,
             })
-          )}
+          ).map((m) => ({ text: tControl(`parts.${m.id}`, m.values), warn: m.warn, key: m.key }))}
           clientId={client.id}
           approvalsHref={`/app/approvals?clientId=${client.id}`}
           details={controlDetails({
@@ -428,7 +430,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             exceptions: exceptions.map((e) => ({ status: e.status, what: e.what, ruleTitle: policies.find((r) => r.id === e.policyId)?.title ?? null, policyId: e.policyId })),
             facts: facts.current,
             otherItems: [
-              ...people.contacts.map((c) => ({ ...c, label: c.person.name ?? c.role ?? "איש קשר" })),
+              ...people.contacts.map((c) => ({ ...c, label: c.person.name ?? c.role ?? t("contactFallback") })),
               ...people.organizations.map((o) => ({ ...o, label: o.organization.name })),
               ...systems.map((x) => ({ ...x, label: x.systemName })),
               ...entities.map((e) => ({ ...e, label: e.name })),
@@ -436,7 +438,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               ...policies.filter((r) => r.status !== "RETIRED").map((r) => ({ ...r, label: r.title })),
             ],
             systems,
-          })}
+          }, { more: (count) => tControl("more", { count }), access: { NO_ACCESS: tControl("access.NO_ACCESS"), PENDING: tControl("access.PENDING") } })}
         />
 
         <DisclosureBanner
@@ -445,12 +447,12 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             .map((p) => ({ id: p.id, title: p.title, text: ruleInForce(p)!.text, proposed: p.status === "PROPOSED" }))}
         />
 
-        <nav className="flex gap-1 border-b border-app-border" aria-label="לשוניות הלקוח">
+        <nav className="flex gap-1 border-b border-app-border" aria-label={t("tabs.label")}>
           {(
             [
               // The way back to the list survives a change of tab (20.10.2026).
-              ["work", "עבודה שוטפת", `/app/clients/${client.id}${fromParam ? `?${fromParam}` : ""}`],
-              ["file", "תיק הלקוח", `/app/clients/${client.id}?tab=file${fromParam ? `&${fromParam}` : ""}`],
+              ["work", t("tabs.work"), `/app/clients/${client.id}${fromParam ? `?${fromParam}` : ""}`],
+              ["file", t("tabs.file"), `/app/clients/${client.id}?tab=file${fromParam ? `&${fromParam}` : ""}`],
             ] as const
           ).map(([key, label, href]) => (
             <Link
@@ -472,9 +474,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 {show("pending") && openBatches.length > 0 && (
                   <section id="client-pending" className="space-y-3" data-testid="client-pending-proposals">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <h2 className="text-sm font-medium text-app-text-primary">ממתין לאישור</h2>
+                      <h2 className="text-sm font-medium text-app-text-primary">{t("pending.title")}</h2>
                       <Link href={`/app/approvals?tab=knowledge&clientId=${client.id}`} className="text-xs text-app-text-accent hover:underline">
-                        בלשונית ידע מהחילוץ, עם סינון
+                        {t("pending.link")}
                       </Link>
                     </div>
                     {openBatches.map((b) => (
@@ -505,10 +507,10 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 version: n.current?.version ?? 0,
                 body: n.current?.body ?? "",
                 html: n.current ? renderMarkdownLite(n.current.body) : "",
-                meta: n.current ? `גרסה ${n.current.version}, ${shortDate(n.current.createdAt)}${n.current.createdByName ? `, ${n.current.createdByName}` : ""}` : null,
+                meta: n.current ? narrativeMeta(n.current.version, n.current.createdAt, n.current.createdByName) : null,
                 history: n.history.map((h) => ({
                   version: h.version,
-                  meta: `גרסה ${h.version}, ${shortDate(h.createdAt)}${h.createdByName ? `, ${h.createdByName}` : ""}`,
+                  meta: narrativeMeta(h.version, h.createdAt, h.createdByName),
                   html: renderMarkdownLite(h.body),
                 })),
               }))}
@@ -808,7 +810,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 reviewBy: p.reviewBy ? p.reviewBy.toISOString().slice(0, 10) : null,
                 datesLine: ruleDatesLine(p),
                 reviewDue: ruleReviewDue(p),
-                checked: paramsSummary(p.kind, paramsInForce(p), (id) => entityName.get(id) ?? "ישות שהוסרה"),
+                checked: paramsSummary(p.kind, paramsInForce(p), (id) => entityName.get(id) ?? t("removedEntity")),
                 approvedByName: p.approvedById ? staffName.get(p.approvedById) ?? null : null,
                 approvedAt: p.approvedAt ? p.approvedAt.toISOString() : null,
                 knowledgeStatus: effectiveStatus(p.knowledgeStatus, parseFieldStatus(p.fieldStatus)),
@@ -820,7 +822,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                   title: h.title,
                   statement: h.statement,
                   interimStatement: h.interimStatement,
-                  checked: POLICY_KINDS.includes(h.kind as PolicyKind) ? paramsSummary(h.kind as PolicyKind, readParams(h.kind as PolicyKind, h.params), (id) => entityName.get(id) ?? "ישות שהוסרה") : null,
+                  checked: POLICY_KINDS.includes(h.kind as PolicyKind) ? paramsSummary(h.kind as PolicyKind, readParams(h.kind as PolicyKind, h.params), (id) => entityName.get(id) ?? t("removedEntity")) : null,
                   approvedByName: h.approvedById ? staffName.get(h.approvedById) ?? null : null,
                   approvedAt: h.approvedAt,
                   until: h.until,
@@ -1019,15 +1021,15 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             />
 
             <div className="rounded-2xl border border-app-border bg-white p-6">
-              <h2 className="text-sm font-medium text-app-text-primary">קטגוריות ({client.categories.length})</h2>
+              <h2 className="text-sm font-medium text-app-text-primary">{t("categories.title", { count: client.categories.length })}</h2>
               {client.categories.length === 0 ? (
-                <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין קטגוריות ייעודיות ללקוח זה.</p>
+                <p className="mt-2 text-sm text-app-text-tertiary">{t("categories.empty")}</p>
               ) : (
                 <ul className="mt-3 space-y-1.5">
                   {client.categories.map((cat) => (
                     <li key={cat.id} className="text-sm text-app-text-secondary">
-                      {cat.name}
-                      {!cat.active && <span className="ms-2 text-xs text-app-text-tertiary">(לא פעיל)</span>}
+                      <span dir="auto">{cat.name}</span>
+                      {!cat.active && <span className="ms-2 text-xs text-app-text-tertiary">{t("categories.inactive")}</span>}
                     </li>
                   ))}
                 </ul>
@@ -1036,21 +1038,21 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
             <div className="rounded-2xl border border-app-border bg-white p-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium text-app-text-primary">מועדים חשובים ({clientDates.length})</h2>
+                <h2 className="text-sm font-medium text-app-text-primary">{t("dates.title", { count: clientDates.length })}</h2>
                 <Link href={`/app/important-dates?clientId=${client.id}`} className="text-xs text-app-text-accent underline underline-offset-4">
-                  לכל המועדים של הלקוח
+                  {t("dates.all")}
                 </Link>
               </div>
               {clientDates.length === 0 ? (
-                <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין מועדים חשובים ללקוח זה.</p>
+                <p className="mt-2 text-sm text-app-text-tertiary">{t("dates.empty")}</p>
               ) : (
                 <ul className="mt-3 space-y-2">
                   {clientDates.slice(0, 8).map((d) => (
                     <li key={d.id} className="flex items-center justify-between gap-3 text-sm">
-                      <Link href={`/app/important-dates/${d.id}`} className="text-app-text-primary hover:text-app-text-accent">
+                      <Link href={`/app/important-dates/${d.id}`} dir="auto" className="text-app-text-primary hover:text-app-text-accent">
                         {d.title}
                       </Link>
-                      <StatusBadge label={IMPORTANT_DATE_STATUS_LABELS[d.status]} tone={STATUS_TONE[d.status]} />
+                      <StatusBadge label={t(`dates.status.${d.status}`)} tone={STATUS_TONE[d.status]} />
                     </li>
                   ))}
                 </ul>
@@ -1060,20 +1062,20 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             {canManageHolidayCalendars && (
               <div className="rounded-2xl border border-app-border bg-white p-6">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-medium text-app-text-primary">לוחות חגים</h2>
-                  <span className="text-xs text-app-text-tertiary">תזכורות ברירת מחדל: 30 ו-7 ימים לפני</span>
+                  <h2 className="text-sm font-medium text-app-text-primary">{t("holidays.title")}</h2>
+                  <span className="text-xs text-app-text-tertiary">{t("holidays.defaults")}</span>
                 </div>
                 <p className="mt-1 text-xs text-app-text-tertiary">
-                  רישום הלקוח ללוח חג יוצר אוטומטית מועד חשוב לכל חג בלוח, ומתעדכן מדי שנה.
+                  {t("holidays.intro")}
                 </p>
                 <HolidayCalendarsPanel clientId={client.id} calendars={holidayCalendars} subscriptions={holidaySubscriptions} />
               </div>
             )}
 
             <div className="rounded-2xl border border-app-border bg-white p-6">
-              <h2 className="text-sm font-medium text-app-text-primary">משתמשים מוקצים ({client.employeeAccess.length})</h2>
+              <h2 className="text-sm font-medium text-app-text-primary">{t("staff.title", { count: client.employeeAccess.length })}</h2>
               {client.employeeAccess.length === 0 ? (
-                <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין אנשי צוות מוקצים ללקוח זה.</p>
+                <p className="mt-2 text-sm text-app-text-tertiary">{t("staff.empty")}</p>
               ) : (
                 <ul className="mt-3 space-y-1.5">
                   {client.employeeAccess.map((access) => (
@@ -1084,11 +1086,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 </ul>
               )}
               <p className="mt-3 text-xs text-app-text-tertiary">
-                הקצאת אנשי צוות ללקוחות מתבצעת מעמוד{" "}
-                <Link href="/app/users" className="underline">
-                  משתמשים
-                </Link>
-                .
+                {t.rich("staff.hint", { link: (chunks) => <Link href="/app/users" className="underline">{chunks}</Link> })}
               </p>
             </div>
           </>

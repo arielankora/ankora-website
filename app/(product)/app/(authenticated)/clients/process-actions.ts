@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { parseSourceRefs } from "@/lib/knowledge-sources";
@@ -13,7 +15,6 @@ import {
   type SaveAndActivateResult,
   setProcessStatus,
   updateProcess,
-  ProcessVersionConflictError,
   type ProcessInput,
   setProcessFieldNotApplicable,
 } from "@/lib/app-domain/processes";
@@ -41,27 +42,37 @@ const TRIGGERS: ProcessTrigger[] = ["SCHEDULED", "EVENT", "ON_DEMAND", "CONTINUO
 const TRANSITIONS: ProcessTransition[] = ["WITH_CLIENT", "IN_HANDOVER", "WITH_ANKORA", "NOT_PLANNED"];
 const CLASSIFICATIONS: ProcedureClassification[] = ["PUBLIC", "INTERNAL", "CONFIDENTIAL"];
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
-  if (err instanceof ProcessVersionConflictError) return err.message;
+/// ADR 0006: every refusal in the reader's language. A DomainError
+/// (ProcessVersionConflictError among them) is worded from its code;
+/// anything else keeps its message, as before.
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("clients.processes.errors");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  const domain = await domainErrorText(err);
+  if (domain) return domain;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
+}
+
+async function errors() {
+  return getTranslations("clients.processes.errors");
 }
 
 const text = (f: FormData, n: string) => String(f.get(n) ?? "").trim() || null;
 const list = (f: FormData, n: string) => f.getAll(n).map(String).filter(Boolean);
 
-function parseProcess(f: FormData, selfId?: string): { error?: string; value?: Omit<ProcessInput, "clientId"> } {
+async function parseProcess(f: FormData, selfId?: string): Promise<{ error?: string; value?: Omit<ProcessInput, "clientId"> }> {
+  const t = await errors();
   const { refs, invalid } = parseSourceRefs(String(f.get("sources") ?? ""));
-  if (invalid.length) return { error: `מקור לא מובן: ${invalid.join(", ")}. כותבים קוד ודקה, למשל S1 08:13.` };
+  if (invalid.length) return { error: t("sourceUnclear", { sources: invalid.join(", ") }) };
   const status = String(f.get("knowledgeStatus") ?? "");
   const transition = String(f.get("transitionStatus") ?? "");
   const sla = text(f, "slaBusinessDays");
-  if (sla !== null && !/^\d+$/.test(sla)) return { error: "ה-SLA בימי עסקים הוא מספר שלם." };
+  if (sla !== null && !/^\d+$/.test(sla)) return { error: t("slaInteger") };
   const every = text(f, "checkEveryDays");
-  if (every !== null && !/^\d+$/.test(every)) return { error: "הבדיקה היא כל מספר שלם של ימים." };
+  if (every !== null && !/^\d+$/.test(every)) return { error: t("checkInteger") };
   const review = text(f, "reviewEveryDays");
-  if (review !== null && !/^\d+$/.test(review)) return { error: "הסקירה היא כל מספר שלם של ימים." };
+  if (review !== null && !/^\d+$/.test(review)) return { error: t("reviewInteger") };
   return {
     value: {
       ...itemExtrasFrom(f, selfId),
@@ -114,7 +125,7 @@ async function run(clientId: string, fn: () => Promise<unknown>): Promise<FormSt
   try {
     await fn();
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
@@ -123,7 +134,7 @@ async function run(clientId: string, fn: () => Promise<unknown>): Promise<FormSt
 export async function addProcessAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(f.get("clientId") ?? "");
-  const parsed = parseProcess(f, user.id);
+  const parsed = await parseProcess(f, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   return run(clientId, () => addProcess(user, { ...parsed.value!, clientId }));
 }
@@ -131,7 +142,7 @@ export async function addProcessAction(_prev: FormState | undefined, f: FormData
 export async function updateProcessAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(f.get("clientId") ?? "");
-  const parsed = parseProcess(f, user.id);
+  const parsed = await parseProcess(f, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   // The entity and the external parties are what separation rules read:
   // a change to them is a change to what the rules say about the process.
@@ -184,7 +195,7 @@ export async function restoreProcessFieldAction(processId: string, field: string
 export async function resolveLessonAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
   const user = await requireUser();
   const status = String(f.get("status") ?? "");
-  if (status !== "APPLIED" && status !== "DISMISSED") return { error: "בוחרים אם זה נכנס לנוהל או לא." };
+  if (status !== "APPLIED" && status !== "DISMISSED") return { error: (await errors())("lessonChoice") };
   return run(String(f.get("clientId") ?? ""), () => resolveLesson(user, String(f.get("id") ?? ""), status, String(f.get("resolution") ?? "")));
 }
 
@@ -195,7 +206,7 @@ export async function saveProcessVersionAction(_prev: FormState | undefined, f: 
   try {
     steps = JSON.parse(String(f.get("steps") ?? "[]"));
   } catch {
-    return { error: "השלבים לא נקראו. רעננו ונסו שוב." };
+    return { error: (await errors())("stepsUnread") };
   }
   return run(clientId, () =>
     saveProcessVersion(user, String(f.get("processId") ?? ""), {
@@ -231,9 +242,22 @@ export async function saveAndActivateFlowAction(input: {
       baseVersion: input.baseVersion,
     });
     revalidatePath(`/app/clients/${input.clientId}`);
-    return { result };
+    if (result.live) return { result };
+    // Why it is not live, in the reader's language. The refusal that held
+    // the approval back is an Error and does not cross to the browser.
+    const { reasonKey, reasonError, ...rest } = result;
+    const t = await getTranslations("clients.processes.flow.reasons");
+    const reason =
+      reasonKey === "waitingSecondEye"
+        ? t("waitingSecondEye", { titles: result.secondEye.map((x) => `"${x}"`).join(", ") })
+        : reasonKey
+          ? t(reasonKey)
+          : reasonError
+            ? await friendlyError(reasonError)
+            : result.reason;
+    return { result: { ...rest, reason } };
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 }
 
@@ -276,7 +300,7 @@ export async function startProcessRunAction(_prev: FormState | undefined, f: For
   const user = await requireUser();
   const clientId = String(f.get("clientId") ?? "");
   const day = String(f.get("day") ?? "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { error: "צריך תאריך לריצה." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { error: (await errors())("runDate") };
   return run(clientId, () => startProcessRun(user, String(f.get("processId") ?? ""), new Date(`${day}T00:00:00Z`)));
 }
 
@@ -284,12 +308,12 @@ export async function recordProcessCheckAction(_prev: FormState | undefined, f: 
   const user = await requireUser();
   const clientId = String(f.get("clientId") ?? "");
   const outcome = String(f.get("outcome") ?? "");
-  if (outcome !== "OK" && outcome !== "ISSUE") return { error: "מה נמצא בבדיקה?" };
+  if (outcome !== "OK" && outcome !== "ISSUE") return { error: (await errors())("checkOutcome") };
   const from = String(f.get("from") ?? "");
   try {
     await recordProcessCheck(user, String(f.get("processId") ?? ""), { outcome, note: text(f, "note") });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   // From the home screen's routine, the home screen is what changed.
@@ -304,7 +328,7 @@ export async function approveProcedureTranslationAction(processId: string, versi
   try {
     await approveProcedureTranslation(user, processId, version);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath(`/app/clients/${clientId}/processes/${processId}/document`);
   revalidatePath(`/app/clients/${clientId}/procedures`);

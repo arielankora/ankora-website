@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Check, Copy, ExternalLink, Sparkles } from "lucide-react";
 
 // "חלץ ידע עם קלוד" (org-brain spec 5.1): one press copies a prompt that
@@ -13,6 +14,7 @@ import { Check, Copy, ExternalLink, Sparkles } from "lucide-react";
 const CLAUDE_NEW_CHAT = "https://claude.ai/new";
 
 export function ExtractWithClaude({ prompt }: { prompt: string }) {
+  const t = useTranslations("clients.extract");
   const [state, setState] = useState<"idle" | "copied" | "manual">("idle");
   const boxRef = useRef<HTMLTextAreaElement>(null);
 
@@ -40,17 +42,17 @@ export function ExtractWithClaude({ prompt }: { prompt: string }) {
         <button
           type="button"
           onClick={copy}
-          title="מעתיק פרומט עם כללי החילוץ ומה שכבר בתיק. קלוד קורא פגישה או מסמך, מכין איתכם טיוטה, ושולח הצעות לאישור"
+          title={t("tooltip")}
           className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
         >
           {state === "copied" ? <Check size={14} className="text-app-text-accent" /> : <Sparkles size={14} className="text-app-text-accent" />}
-          חלץ ידע עם קלוד
+          {t("button")}
         </button>
         {state === "copied" && (
           <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-app-text-secondary" role="status">
-            הפרומט הועתק. הדביקו אותו בשיחה חדשה בחשבון הארגוני של אנקורה בקלוד.
+            {t("copied")}
             <a href={CLAUDE_NEW_CHAT} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-app-text-accent hover:text-app-text-primary">
-              פתיחת קלוד
+              {t("openClaude")}
               <ExternalLink size={12} />
             </a>
           </p>
@@ -58,23 +60,23 @@ export function ExtractWithClaude({ prompt }: { prompt: string }) {
       </div>
       {state === "manual" && (
         <div className="rounded-xl border border-app-border bg-cream/40 p-3">
-          <p className="text-[12.5px] text-app-text-secondary">הדפדפן לא אפשר העתקה אוטומטית. הטקסט מסומן, אפשר להעתיק אותו מכאן ולהדביק בחשבון הארגוני של אנקורה בקלוד.</p>
+          <p className="text-[12.5px] text-app-text-secondary">{t("manual")}</p>
           <textarea
             ref={boxRef}
             readOnly
             value={prompt}
             dir="rtl"
             rows={8}
-            aria-label="הפרומט לקלוד"
+            aria-label={t("promptLabel")}
             className="mt-2 w-full resize-y rounded-lg border border-app-border-strong bg-white p-2 font-jbmono text-[11.5px] leading-relaxed text-app-text-primary"
           />
           <div className="mt-2 flex items-center gap-2">
             <button type="button" onClick={copyFromBox} className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold">
               <Copy size={13} />
-              העתקה
+              {t("copy")}
             </button>
             <button type="button" onClick={() => setState("idle")} className="rounded-full px-3 py-1.5 text-[12.5px] text-app-text-secondary hover:text-app-text-primary">
-              סגירה
+              {t("close")}
             </button>
           </div>
         </div>

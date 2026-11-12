@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { syncDateCalendars } from "@/lib/app-domain/date-calendars";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
@@ -43,9 +44,13 @@ function clean(v: string | null | undefined): string | null {
   return v?.trim() || null;
 }
 
-function code(v: string | null | undefined, length: number, label: string): string | null {
+function code(v: string | null | undefined, length: number, kind: "country" | "currency"): string | null {
   const c = clean(v)?.toUpperCase() ?? null;
-  if (c && !new RegExp(`^[A-Z]{${length}}$`).test(c)) throw new Error(`${label} לא תקין.`);
+  if (c && !new RegExp(`^[A-Z]{${length}}$`).test(c)) {
+    throw kind === "country"
+      ? new DomainError("clientEntities.invalidCountry", "קוד המדינה לא תקין.")
+      : new DomainError("clientEntities.invalidCurrency", "קוד המטבע לא תקין.");
+  }
   return c;
 }
 
@@ -53,13 +58,13 @@ function code(v: string | null | undefined, length: number, label: string): stri
 export async function assertEntityBelongs(clientId: string, entityId: string | null | undefined) {
   if (!entityId) return;
   const ok = await prisma.clientEntity.count({ where: { id: entityId, clientId, deletedAt: null } });
-  if (!ok) throw new Error("הישות לא נמצאה אצל הלקוח.");
+  if (!ok) throw new DomainError("clientEntities.notFoundForClient", "הישות לא נמצאה אצל הלקוח.");
 }
 
 function fieldStatusFor(missing: EntityField[] | undefined, toResolve: string | null | undefined): FieldStatusMap | undefined {
   if (missing === undefined) return undefined;
   const why = clean(toResolve);
-  if (missing.length > 0 && !why) throw new Error("לשדה חסר צריך לכתוב מה יסגור אותו.");
+  if (missing.length > 0 && !why) throw new DomainError("clientEntities.missingNeedsWhy", "לשדה חסר צריך לכתוב מה יסגור אותו.");
   const out: FieldStatusMap = {};
   for (const f of missing) {
     if (!(ENTITY_FIELDS as readonly string[]).includes(f)) continue;
@@ -78,20 +83,20 @@ function entityData(input: Partial<ClientEntityInput>) {
     name: has("name") ? clean(input.name) ?? undefined : undefined,
     legalName: has("legalName") ? value("legalName", clean(input.legalName)) : undefined,
     registrationNumber: has("registrationNumber") ? value("registrationNumber", clean(input.registrationNumber)) : undefined,
-    country: has("country") ? value("country", code(toCountryCode(input.country), 2, "קוד המדינה")) : undefined,
-    currency: has("currency") ? value("currency", code(toCurrencyCode(input.currency), 3, "קוד המטבע")) : undefined,
+    country: has("country") ? value("country", code(toCountryCode(input.country), 2, "country")) : undefined,
+    currency: has("currency") ? value("currency", code(toCurrencyCode(input.currency), 3, "currency")) : undefined,
     billingAddress: has("billingAddress") ? value("billingAddress", clean(input.billingAddress)) : undefined,
   };
 }
 
 async function assertParent(clientId: string, parentId: string | null | undefined, selfId?: string) {
   if (!parentId) return;
-  if (parentId === selfId) throw new Error("ישות לא יכולה להיות האם של עצמה.");
+  if (parentId === selfId) throw new DomainError("clientEntities.selfParent", "ישות לא יכולה להיות האם של עצמה.");
   await assertEntityBelongs(clientId, parentId);
   // No cycles: walk up from the parent and make sure we are not on the way.
   let cursor: string | null = parentId;
   for (let i = 0; cursor && i < 20; i++) {
-    if (cursor === selfId) throw new Error("זה היה יוצר מעגל בין ישויות.");
+    if (cursor === selfId) throw new DomainError("clientEntities.cycle", "זה היה יוצר מעגל בין ישויות.");
     const next: { parentId: string | null } | null = await prisma.clientEntity.findUnique({ where: { id: cursor }, select: { parentId: true } });
     cursor = next?.parentId ?? null;
   }
@@ -101,7 +106,7 @@ export async function addClientEntity(actor: User, input: ClientEntityInput) {
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
   const name = clean(input.name);
-  if (!name) throw new Error("צריך שם לישות.");
+  if (!name) throw new DomainError("clientEntities.nameRequired", "צריך שם לישות.");
   assertResolvable(input.knowledgeStatus, input.toResolve);
   await assertParent(input.clientId, input.parentId);
   const fieldStatus = fieldStatusFor(input.missingFields, input.missingToResolve);
@@ -132,9 +137,9 @@ export async function addClientEntity(actor: User, input: ClientEntityInput) {
 export async function updateClientEntity(actor: User, id: string, input: Partial<Omit<ClientEntityInput, "clientId">>) {
   assertCan(actor.role, "time_entry.create_self");
   const before = await prisma.clientEntity.findUnique({ where: { id } });
-  if (!before || before.deletedAt) throw new Error("הישות לא נמצאה.");
+  if (!before || before.deletedAt) throw new DomainError("clientEntities.notFound", "הישות לא נמצאה.");
   await assertClientAccess(actor, before.clientId);
-  if (input.name !== undefined && !clean(input.name)) throw new Error("צריך שם לישות.");
+  if (input.name !== undefined && !clean(input.name)) throw new DomainError("clientEntities.nameRequired", "צריך שם לישות.");
   assertResolvable(input.knowledgeStatus ?? before.knowledgeStatus, input.toResolve !== undefined ? input.toResolve : before.toResolve);
   if (input.parentId !== undefined) await assertParent(before.clientId, input.parentId, id);
   const fieldStatus = fieldStatusFor(input.missingFields, input.missingToResolve);
@@ -168,7 +173,7 @@ export async function updateClientEntity(actor: User, id: string, input: Partial
 export async function removeClientEntity(actor: User, id: string) {
   assertCan(actor.role, "time_entry.create_self");
   const entity = await prisma.clientEntity.findUnique({ where: { id } });
-  if (!entity || entity.deletedAt) throw new Error("הישות לא נמצאה.");
+  if (!entity || entity.deletedAt) throw new DomainError("clientEntities.notFound", "הישות לא נמצאה.");
   await assertClientAccess(actor, entity.clientId);
   const [contacts, systems, children] = await Promise.all([
     prisma.clientContact.count({ where: { entityId: id, deletedAt: null } }),
@@ -176,7 +181,7 @@ export async function removeClientEntity(actor: User, id: string) {
     prisma.clientEntity.count({ where: { parentId: id, deletedAt: null } }),
   ]);
   const uses = contacts + systems + children;
-  if (uses > 0) throw new Error(`${entity.name} משויכת ל-${uses} פריטים בתיק. קודם צריך לשייך אותם מחדש.`);
+  if (uses > 0) throw new DomainError("clientEntities.inUse", `${entity.name} משויכת ל-${uses} פריטים בתיק. קודם צריך לשייך אותם מחדש.`, { name: entity.name, count: String(uses) });
   const removed = await prisma.clientEntity.update({ where: { id }, data: { deletedAt: new Date() } });
   await recordAudit({
     actorId: actor.id,
