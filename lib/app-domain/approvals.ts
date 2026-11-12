@@ -1,14 +1,14 @@
 import "server-only";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { approvesProceduresOf, procedureApprovalBlocker } from "@/lib/procedure-approval";
+import { approvesProceduresOf, procedureApprovalBlockerCode, PROCEDURE_APPROVAL_BLOCKER_MESSAGES } from "@/lib/procedure-approval";
 import { can, canManageClients } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
 import { countAutoReview } from "@/lib/app-domain/auto-apply";
 import { sentForApprovalAt } from "@/lib/app-domain/task-approval-times";
 import { OPEN_STATUSES } from "@/lib/app-domain/tasks";
-import { approvalsHref, knowledgeBatchIsMine, onlyMine, tabCounts, type ApprovalItem } from "@/lib/approvals";
+import { APPROVAL_DATE_FORMATS, approvalsHref, knowledgeBatchIsMine, onlyMine, tabCounts, type ApprovalItem, type ApprovalText } from "@/lib/approvals";
 import { internalClientIds } from "@/lib/app-domain/internal-client";
 import { loweredBySource } from "@/lib/app-domain/source-confirmation";
 import { SECONDARY_ONLY_TO_RESOLVE } from "@/lib/knowledge-sources";
@@ -61,10 +61,16 @@ async function namesOf(ids: (string | null | undefined)[]): Promise<Map<string, 
   return new Map(rows.map((u) => [u.id, u.name]));
 }
 
-const day = (d: Date) => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }).format(d);
+// The Hebrew fields are what Claude reads (list_approvals), so they keep
+// formatting in Hebrew; the screen formats the same dates in the reader's
+// language from `screen` (ADR 0006).
+const day = (d: Date) => new Intl.DateTimeFormat("he-IL", APPROVAL_DATE_FORMATS.day).format(d);
 // Israel, not UTC: a summary's periodStart is local midnight on the 1st,
 // which in UTC is still the last day of the month before (1.11.2026).
-const month = (d: Date) => new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "Asia/Jerusalem" }).format(d);
+const month = (d: Date) => new Intl.DateTimeFormat("he-IL", APPROVAL_DATE_FORMATS.month).format(d);
+
+/// A key under approvals.items, for `screen`.
+const k = (key: ApprovalText["key"], values?: ApprovalText["values"]): ApprovalText => (values ? { key, values } : { key });
 
 async function tasks(s: Scope): Promise<ApprovalItem[]> {
   const ids = s.clients.map((c) => c.id);
@@ -95,6 +101,12 @@ async function tasks(s: Scope): Promise<ApprovalItem[]> {
     href: `/app/tasks/${t.parentId ?? t.id}`,
     actions: { approve: "אישור וסגירה", reject: { label: "החזרה לביצוע", note: false } },
     recommend: { text: "לבדוק את התוצאה, לאשר ולסגור", why: "העבודה הושלמה ונשלחה לחתימה. המשימה לא נסגרת בלי האישור." },
+    screen: {
+      detail: t.parent ? k("task.detail", { title: t.parent.title }) : undefined,
+      approve: k("task.approve"),
+      reject: k("task.reject"),
+      recommend: { text: k("task.recommend"), why: k("task.why") },
+    },
     deadline: t.dueDate,
   }));
 }
@@ -120,6 +132,12 @@ async function exceptions(s: Scope): Promise<ApprovalItem[]> {
     href: itemHref(e.clientId, e.policy.id),
     actions: { approve: "אישור החריגה", reject: { label: "דחייה", note: true } },
     recommend: { text: "לאשר אם הסיבה מספיקה", why: `החריגה מוגבלת עד ${day(e.validUntil)}, ואחר כך חוזרים לכלל.` },
+    screen: {
+      detail: k("exception.detail", { rule: e.policy.title, until: { date: e.validUntil, as: "day" }, reason: e.reason }),
+      approve: k("exception.approve"),
+      reject: k("exception.reject"),
+      recommend: { text: k("exception.recommend"), why: k("exception.why", { until: { date: e.validUntil, as: "day" } }) },
+    },
     deadline: e.validUntil,
   }));
 }
@@ -160,6 +178,11 @@ async function rules(s: Scope): Promise<ApprovalItem[]> {
       recommend: internal
         ? { text: "לאשר", why: "תיק פנימי: אנקורה היא הלקוח, ואין את מי לשאול. האישור מסמן את הכלל כמאומת ומפעיל אותו." }
         : { text: "לאשר", why: p.interimStatement ? "הלקוח אמר את זה במפורש. עד האישור חל כלל הביניים, ואחריו הכלל עצמו נבדק מול כל נוהל ומשימה." : "הלקוח אמר את זה במפורש. מאושר, הכלל נבדק מול כל נוהל ומשימה." },
+      screen: {
+        approve: k("rule.approve"),
+        reject: k("rule.reject"),
+        recommend: { text: k("rule.recommend"), why: k(internal ? "rule.whyInternal" : p.interimStatement ? "rule.whyInterim" : "rule.whyConfirmed") },
+      },
     };
   });
 }
@@ -207,13 +230,14 @@ async function procedures(s: Scope): Promise<ApprovalItem[]> {
     const held = preview.problems.length > 0;
     // With the client's separation on, the author of the version sees it
     // waiting for someone else, not a button that fails.
-    const separated = procedureApprovalBlocker({
+    const separatedCode = procedureApprovalBlockerCode({
       userId: s.user.id,
       isManager: s.manager,
       accountManagerId: approving.find((c) => c.id === d.process.clientId)?.accountManagerId ?? null,
       separation: approving.find((c) => c.id === d.process.clientId)?.procedureApprovalSeparation ?? false,
       authorId: d.createdById,
     });
+    const separated = separatedCode ? PROCEDURE_APPROVAL_BLOCKER_MESSAGES[separatedCode] : null;
     return {
       kind: "procedure",
       id: d.processId,
@@ -234,6 +258,19 @@ async function procedures(s: Scope): Promise<ApprovalItem[]> {
         : separated
           ? { text: "מישהו אחר מאשר", why: "הלקוח ביקש הפרדה בין מי שכותב נוהל לבין מי שמאשר אותו." }
           : { text: "לקרוא ולאשר", why: "עובר את כל הבדיקות מול הכללים של הלקוח. בלי נוהל מאושר התהליך לא פותח ריצות." },
+      screen: {
+        detail: k("procedure.detail", {
+          version: d.changeNote ? k("procedure.versionNote", { version: String(d.version), note: clip(d.changeNote) }) : k("procedure.versionPlain", { version: String(d.version) }),
+          steps: k("procedure.steps", { count: steps.length }),
+        }),
+        blocked: held ? k("procedure.blockedChecks") : separatedCode ? k(`procedure.blocker.${separatedCode}`) : undefined,
+        approve: held || separated ? undefined : k("procedure.approve"),
+        recommend: held
+          ? { text: k("procedure.recommendFix"), why: k("procedure.whyFix") }
+          : separated
+            ? { text: k("procedure.recommendOther"), why: k("procedure.whyOther") }
+            : { text: k("procedure.recommend"), why: k("procedure.why") },
+      },
       // Waiting on this is waiting with the work: no run opens without it.
       blocking: !held,
     };
@@ -281,6 +318,11 @@ async function knowledge(s: Scope): Promise<ApprovalItem[]> {
       weight: n,
       recommend: { text: "לעבור על ההצעות", why: "כל הצעה נכנסת לתיק רק אחרי אישור, עם המקור שלה." },
       go: { label: "לעבור", href: approvalsHref("knowledge", b.clientId) },
+      screen: {
+        title: from ? k("knowledge.titleFrom", { count: n, source: from }) : k("knowledge.title", { count: n }),
+        recommend: { text: k("knowledge.recommend"), why: k("knowledge.why") },
+        go: k("knowledge.go"),
+      },
       // Whose count and "היום" it is in (22.10.2026).
       mine: knowledgeBatchIsMine({ createdById: b.createdById, accountManagerId: am.get(b.clientId) ?? null }, s.user.id, s.manager),
     };
@@ -321,6 +363,11 @@ async function plans(s: Scope): Promise<ApprovalItem[]> {
       href: `/app/tasks/${d.taskId}`,
       actions: { approve: "אישור התוכנית", reject: null },
       recommend: { text: "לקרוא ולאשר", why: "מי שמבצע את המשימה מחכה לתוכנית מאושרת כדי להתחיל." },
+      screen: {
+        detail: k("plan.detail", { version: String(d.version), body: clip(d.body) }),
+        approve: k("plan.approve"),
+        recommend: { text: k("plan.recommend"), why: k("plan.why") },
+      },
       deadline: d.task.dueDate,
     }));
 }
@@ -341,6 +388,12 @@ async function summaries(s: Scope): Promise<ApprovalItem[]> {
     href: `/app/clients/${x.clientId}#portal-summary`,
     actions: { approve: "אישור לפורטל", reject: { label: "ביטול הטיוטה", note: false } },
     recommend: { text: "לקרוא ולאשר לפורטל", why: "הלקוח יראה את הסיכום בפורטל רק אחרי האישור." },
+    screen: {
+      title: k("summary.title", { month: { date: x.periodStart, as: "month" } }),
+      approve: k("summary.approve"),
+      reject: k("summary.reject"),
+      recommend: { text: k("summary.recommend"), why: k("summary.why") },
+    },
   }));
 }
 
@@ -362,6 +415,12 @@ async function guides(s: Scope): Promise<ApprovalItem[]> {
     href: "/app/extraction-guide",
     actions: { approve: "אישור הגרסה", reject: { label: "דחייה", note: true } },
     recommend: { text: "לקרוא את השינוי ולאשר", why: "ההנחיות קובעות מה Claude מחלץ מכל פגישה, מעכשיו." },
+    screen: {
+      title: k("guide.title", { version: String(g.version) }),
+      approve: k("guide.approve"),
+      reject: k("guide.reject"),
+      recommend: { text: k("guide.recommend"), why: k("guide.why") },
+    },
   }));
 }
 
@@ -444,6 +503,12 @@ async function internalItems(s: Scope): Promise<ApprovalItem[]> {
       href: `/app/clients/${x.clientId}?tab=file`,
       actions: { approve: "לאשר את כולם", reject: null },
       recommend: { text: "לאשר", why: "תיק פנימי: אנקורה היא הלקוח, ואין את מי לשאול. האישור נרשם ביומן, עם המקור." },
+      screen: {
+        title: k("internal.title", { count: others, source: x.title }),
+        detail: k("internal.detail"),
+        approve: k("internal.approve"),
+        recommend: { text: k("internal.recommend"), why: k("internal.why") },
+      },
       weight: others,
     }));
 }
@@ -470,6 +535,12 @@ async function checks(s: Scope): Promise<ApprovalItem[]> {
     actions: { approve: null, reject: null },
     recommend: { text: "לבדוק ולרשום", why: "בראש דף המשתמש: הקובץ, מה לבדוק בו, ורישום או החזרה עם סיבה. אפשר גם לבקש מ-Claude לבדוק." },
     go: { label: "לבדיקה", href: `/app/users/${x.userId}` },
+    screen: {
+      title: k("check.title", { document: k(x.kind === "CONFIDENTIALITY" || x.kind === "DELETION_DECLARATION" ? `check.documents.${x.kind}` : "check.documents.other"), name: x.user.name }),
+      detail: k("check.detail"),
+      recommend: { text: k("check.recommend"), why: k("check.why") },
+      go: k("check.go"),
+    },
   }));
 }
 

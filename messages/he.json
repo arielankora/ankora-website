@@ -1564,6 +1564,58 @@
       "dismissReasonRequired": "צריך לכתוב בשורה אחת למה זה לא רלוונטי.",
       "taskExists": "כבר יש משימה לשאלה הזו.",
       "snooze": "{problem, select, date {צריך לבחור תאריך.} past {התאריך צריך להיות בעתיד.} other {אפשר לדחות עד שנה קדימה.}}"
+    },
+    "decideApproval": {
+      "procedureHere": "נוהל מאשרים כאן, ומתקנים אותו בתהליך עצמו.",
+      "planHere": "תוכנית מאשרים כאן, ומתקנים אותה במשימה עצמה.",
+      "processNoOp": "אין כאן פעולה לבצע. פותחים את התהליך.",
+      "internalHere": "את הפריטים של התיק הפנימי מאשרים כאן, או פותחים את התיק.",
+      "checkWithClaude": "את החתימה בודקים עם Claude, בדף של איש הצוות.",
+      "knowledgeOneByOne": "הצעות לתיק מאשרים אחת אחת, בלשונית ידע מהחילוץ."
+    },
+    "procedureApproval": {
+      "notApprover": "רק מנהל או מנהל התיק של הלקוח מאשרים נוהל.",
+      "separationRequired": "ללקוח הזה נדרשת הפרדה: מי שכתב את גרסת הנוהל לא מאשר אותה. מישהו אחר מאשר."
+    },
+    "knowledgeProposals": {
+      "notFound": "ההצעה לא נמצאה.",
+      "alreadyDecided": "כבר הוחלט על ההצעה הזו.",
+      "parentEntityMissing": "ישות האם \"{name}\" לא נמצאת בתיק. מוסיפים אותה קודם, או מוחקים את השם בעריכה.",
+      "narrativeUnchanged": "זה כבר הטקסט שבתיק. דוחים את ההצעה.",
+      "narrativeChanged": "מישהו שינה את הטקסט מאז שההצעה הגיעה. דוחים אותה, ומעדכנים את הטקסט במסך הלקוח.",
+      "taskMalformed": "המשימה לא בנויה נכון: {issues}",
+      "unknownKind": "סוג פריט לא מוכר.",
+      "noSuggestion": "אין להצעה הזו נוסח מוצע. משלימים בעריכה, או דוחים.",
+      "secretInEdit": "בעריכה יש סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בתיק.",
+      "alreadyInFile": "{item}: כבר בתיק. \"כבר בתיק: הוספת המקור\" מוסיף את המקור לפריט שבתיק.",
+      "noLongerInFile": "הפריט כבר לא בתיק. מאשרים את ההצעה כרגיל.",
+      "mergeOnlyNew": "רק הצעה לפריט חדש עם שם אפשר להוסיף לפריט קיים.",
+      "existingGone": "הפריט הקיים כבר לא בתיק.",
+      "rejectReasonRequired": "צריך לכתוב בשורה אחת למה ההצעה נדחתה.",
+      "taskBlocked": "{reason, select, alreadyTask {ההצעה כבר משימה: אישור פותח אותה.} sensitive {פריט רגיש לא הופך למשימה: משימה גלויה לכל מי שעובד על הלקוח.} other {פריט שרק חלק מהצוות רואה לא הופך למשימה.}}",
+      "taskTitle": "{reason, select, empty {צריך לכתוב בכותרת מה עושים.} other {כותרת המשימה צריכה לומר מה עושים, לא לחזור על מה שנאמר. למשל: \"לברר עם דקלה מתי השכר משולם\".}}",
+      "secretInTask": "בטקסט יש סיסמה, מפתח או מספר כרטיס. צריך להסיר אותם לפני שפותחים משימה.",
+      "noneChosen": "לא נבחרו הצעות.",
+      "tooMany": "עד {max} הצעות בפעם אחת.",
+      "bulkRejectReasonRequired": "צריך לכתוב בשורה אחת למה ההצעות נדחות.",
+      "approveOneByOne": "מאשרים אחת אחת: {reason, select, blocked {יש בה משהו שחוסם אישור} changesExisting {משנה פריט שכבר בתיק} maybeInFile {ייתכן שכבר בתיק} sensitive {מידע רגיש} doNotDisclose {יש בה מה לא לספר} clientVisible {גלוי ללקוח} taskForOther {משימה נפתחת לאדם אחר} domain {דומיין משנה אילו פגישות שייכות ללקוח} other {רמת בדיקה נמוכה}}.",
+      "cannotRevert": "{reason, select, notApproved {אפשר לבטל רק הצעה שאושרה.} alreadyReverted {ההצעה כבר בוטלה.} notCreate {ביטול אפשרי רק להצעה שהוסיפה פריט חדש, לא לשינוי של פריט קיים.} nothingCreated {ההצעה לא יצרה פריט חדש (כבר היה בתיק), אז אין מה לבטל.} other {ביטול אפשרי רק לעובדה, איש קשר, ספק או ישות משפטית, לא {target, select, SYSTEM {למערכת} REQUEST_TYPE {לסוג פנייה} POLICY {לכלל של הלקוח} NARRATIVE {לסקירה, רקע או תפקידנו} PROCESS {לתהליך} DOMAIN {לדומיין} TASK {למשימה} DATE {למועד} FACT {לעובדה} CONTACT {לאיש קשר} ORGANIZATION {לספק או נותן שירות} ENTITY {לישות משפטית} other {לפריט מהסוג הזה}}.}}",
+      "alreadyReverted": "ההצעה כבר בוטלה.",
+      "notRemoved": "הפריט לא הוסר מהתיק: {error}",
+      "managersOnly": "רק למנהלים."
+    },
+    "batchAssignment": {
+      "notWaiting": "השיחה כבר שויכה, או שהיא לא נמצאה.",
+      "notACandidate": "הלקוח שנבחר אינו אחד המועמדים.",
+      "alreadyAssigned": "השיחה כבר שויכה.",
+      "discardReasonRequired": "כותבים בשורה אחת למה השיחה לא שייכת לאף אחד מהם."
+    },
+    "autoApply": {
+      "pauseAlreadyLifted": "העצירה כבר הוסרה.",
+      "notFound": "ההצעה לא נמצאה.",
+      "notAutoApplied": "ההצעה לא נכנסה אוטומטית.",
+      "alreadyRemoved": "הפריט כבר הוסר מהתיק.",
+      "alreadyMarked": "כבר סומן כתקין."
     }
   },
   "home": {
@@ -4247,6 +4299,588 @@
         "needsPasskey": "צפייה בגישות דורשת passkey (Touch ID).",
         "setUp": "להגדרה בפרופיל"
       }
+    }
+  },
+  "approvals": {
+    "title": "אישורים",
+    "intro": "מה מחכה להחלטה שלך. בכל שורה: מה מומלץ ולמה, וכפתור שעושה את זה. מה שעוצר עבודה מופיע ראשון.",
+    "clientsNav": "סינון לפי לקוח",
+    "allClients": "כל הלקוחות",
+    "tabsLabel": "סוגי אישורים",
+    "tabWithCount": "{label} ({count})",
+    "tabs": {
+      "all": "הכול",
+      "task": "משימות לחתימה",
+      "exception": "חריגות",
+      "rule": "כללים",
+      "procedure": "נהלים",
+      "process": "תהליכים",
+      "internal": "תיק פנימי",
+      "knowledge": "ידע מהחילוץ",
+      "plan": "תוכניות משימה",
+      "summary": "סיכומים ללקוח",
+      "guide": "מדריך חילוץ",
+      "check": "לבדיקה"
+    },
+    "kinds": {
+      "task": "משימה",
+      "exception": "חריגה",
+      "rule": "כלל",
+      "procedure": "נוהל",
+      "process": "תהליך",
+      "internal": "תיק פנימי",
+      "knowledge": "ידע",
+      "plan": "תוכנית",
+      "summary": "סיכום",
+      "guide": "מדריך",
+      "check": "לבדיקה"
+    },
+    "empty": {
+      "all": "אין כרגע שום דבר שמחכה להחלטה שלך.",
+      "tab": "אין כרגע {tab} שמחכים לך."
+    },
+    "today": "היום",
+    "rest": "כל השאר ({count})",
+    "scope": {
+      "mine": "שלי",
+      "everyone": "של כולם",
+      "hidden": "{count, plural, =1 {פגישה אחת של מישהו אחר} other {# פגישות של אחרים}} מחכות להם, לא לך."
+    },
+    "waited": {
+      "today": "מהיום",
+      "yesterday": "מאתמול",
+      "days": "כבר {count} ימים"
+    },
+    "row": {
+      "recommend": "מומלץ: {text}.",
+      "toProcess": "לתהליך",
+      "moreFailing": "ועוד {count} בדיקות, ב\"{toggle}\".",
+      "hide": "הסתרה",
+      "from": "מ{name}",
+      "reasonPlaceholder": "למה, בשורה אחת",
+      "reasonLabel": "סיבה",
+      "saving": "שומר...",
+      "cancel": "ביטול",
+      "confirm": "כן, {label}",
+      "open": "לפתוח",
+      "otherwise": "אחרת",
+      "approveFailed": "האישור נכשל",
+      "actionFailed": "הפעולה נכשלה",
+      "done": "בוצע",
+      "approved": "אושר",
+      "rejected": "נדחה",
+      "blockingTitle": "מה מעכב את האישור"
+    },
+    "preview": {
+      "toggle": {
+        "procedure": "הצגת הנוהל",
+        "rule": "הצגת הכלל",
+        "plan": "הצגת התוכנית"
+      },
+      "headings": {
+        "steps": "שלבים",
+        "highlights": "דגשים",
+        "outputs": "מה צריך להיות בסוף",
+        "excepted": "בדיקות עם חריגה מאושרת",
+        "rule": "הכלל",
+        "interim": "עד שיאושר",
+        "why": "למה",
+        "planSteps": "שלבים שהתוכנית מציעה"
+      }
+    },
+    "bulk": {
+      "label": "לאשר את {count} הכללים של {client}",
+      "confirm": "כן, {label}",
+      "approving": "מאשר...",
+      "cancel": "ביטול",
+      "approveFailed": "האישור נכשל",
+      "approved": "{count} כללים אושרו",
+      "notApproved": "לא אושרו: {list}"
+    },
+    "errors": {
+      "forbidden": "אין לך הרשאה להחליט על זה.",
+      "generic": "אירעה שגיאה. נסו שוב."
+    },
+    "items": {
+      "task": {
+        "detail": "שלב במשימה: {title}",
+        "approve": "אישור וסגירה",
+        "reject": "החזרה לביצוע",
+        "recommend": "לבדוק את התוצאה, לאשר ולסגור",
+        "why": "העבודה הושלמה ונשלחה לחתימה. המשימה לא נסגרת בלי האישור."
+      },
+      "exception": {
+        "detail": "חריגה מהכלל \"{rule}\" עד {until}. למה: {reason}",
+        "approve": "אישור החריגה",
+        "reject": "דחייה",
+        "recommend": "לאשר אם הסיבה מספיקה",
+        "why": "החריגה מוגבלת עד {until}, ואחר כך חוזרים לכלל."
+      },
+      "rule": {
+        "approve": "אישור הכלל",
+        "reject": "הסרה",
+        "recommend": "לאשר",
+        "whyInternal": "תיק פנימי: אנקורה היא הלקוח, ואין את מי לשאול. האישור מסמן את הכלל כמאומת ומפעיל אותו.",
+        "whyInterim": "הלקוח אמר את זה במפורש. עד האישור חל כלל הביניים, ואחריו הכלל עצמו נבדק מול כל נוהל ומשימה.",
+        "whyConfirmed": "הלקוח אמר את זה במפורש. מאושר, הכלל נבדק מול כל נוהל ומשימה."
+      },
+      "procedure": {
+        "detail": "{version} · {steps}",
+        "versionNote": "גרסה {version}: {note}",
+        "versionPlain": "גרסה {version} של הנוהל",
+        "steps": "{count, plural, =1 {שלב אחד} other {# שלבים}}",
+        "blockedChecks": "הנוהל לא עובר את הבדיקות. מתקנים אותו בתהליך, ואז מאשרים.",
+        "blocker": {
+          "notApprover": "רק מנהל או מנהל התיק של הלקוח מאשרים נוהל.",
+          "separationRequired": "ללקוח הזה נדרשת הפרדה: מי שכתב את גרסת הנוהל לא מאשר אותה. מישהו אחר מאשר."
+        },
+        "approve": "אישור הנוהל",
+        "recommendFix": "לתקן בתהליך, ואז לאשר",
+        "whyFix": "נוהל שלא עומד בכללים של הלקוח לא מאושר.",
+        "recommendOther": "מישהו אחר מאשר",
+        "whyOther": "הלקוח ביקש הפרדה בין מי שכותב נוהל לבין מי שמאשר אותו.",
+        "recommend": "לקרוא ולאשר",
+        "why": "עובר את כל הבדיקות מול הכללים של הלקוח. בלי נוהל מאושר התהליך לא פותח ריצות."
+      },
+      "knowledge": {
+        "title": "{count, plural, =1 {הצעה אחת} other {# הצעות}} לתיק",
+        "titleFrom": "{count, plural, =1 {הצעה אחת} other {# הצעות}} לתיק מ\"{source}\"",
+        "recommend": "לעבור על ההצעות",
+        "why": "כל הצעה נכנסת לתיק רק אחרי אישור, עם המקור שלה.",
+        "go": "לעבור"
+      },
+      "plan": {
+        "detail": "תוכנית, גרסה {version}: {body}",
+        "approve": "אישור התוכנית",
+        "recommend": "לקרוא ולאשר",
+        "why": "מי שמבצע את המשימה מחכה לתוכנית מאושרת כדי להתחיל."
+      },
+      "summary": {
+        "title": "סיכום {month}",
+        "approve": "אישור לפורטל",
+        "reject": "ביטול הטיוטה",
+        "recommend": "לקרוא ולאשר לפורטל",
+        "why": "הלקוח יראה את הסיכום בפורטל רק אחרי האישור."
+      },
+      "guide": {
+        "title": "הנחיות החילוץ, גרסה {version}",
+        "approve": "אישור הגרסה",
+        "reject": "דחייה",
+        "recommend": "לקרוא את השינוי ולאשר",
+        "why": "ההנחיות קובעות מה Claude מחלץ מכל פגישה, מעכשיו."
+      },
+      "internal": {
+        "title": "{count, plural, =1 {פריט אחד} other {# פריטים}} מ\"{source}\"",
+        "detail": "מסומנים לא ודאיים רק כי המקור הוא מסמך של אנקורה.",
+        "approve": "לאשר את כולם",
+        "recommend": "לאשר",
+        "why": "תיק פנימי: אנקורה היא הלקוח, ואין את מי לשאול. האישור נרשם ביומן, עם המקור."
+      },
+      "check": {
+        "title": "{document} של {name}",
+        "documents": {
+          "CONFIDENTIALITY": "התחייבות לסודיות",
+          "DELETION_DECLARATION": "הצהרת מחיקה",
+          "other": "מסמך"
+        },
+        "detail": "PDF חתום שהועלה ומחכה לבדיקה.",
+        "recommend": "לבדוק ולרשום",
+        "why": "בראש דף המשתמש: הקובץ, מה לבדוק בו, ורישום או החזרה עם סיבה. אפשר גם לבקש מ-Claude לבדוק.",
+        "go": "לבדיקה"
+      }
+    }
+  },
+  "knowledge": {
+    "saving": "שומר...",
+    "or": "או",
+    "sensitiveHidden": "פריט רגיש. רק {who} רואה אותו ומחליט עליו.",
+    "sensitiveApprovers": "מי שמאשר מידע רגיש",
+    "policyKind": "כלל: {kind}",
+    "targets": {
+      "FACT": "עובדה",
+      "CONTACT": "איש קשר",
+      "ORGANIZATION": "ספק או נותן שירות",
+      "SYSTEM": "מערכת",
+      "REQUEST_TYPE": "סוג פנייה",
+      "POLICY": "כלל של הלקוח",
+      "ENTITY": "ישות משפטית",
+      "NARRATIVE": "סקירה, רקע או תפקידנו",
+      "PROCESS": "תהליך",
+      "DOMAIN": "דומיין",
+      "TASK": "משימה",
+      "DATE": "מועד"
+    },
+    "factKinds": {
+      "SCOPE_IN": "בתחום",
+      "SCOPE_OUT": "מחוץ לתחום",
+      "PREFERENCE": "העדפה",
+      "REQUIREMENT": "דרישה חוזרת",
+      "LOCATION": "מיקום",
+      "FINANCE": "כספים",
+      "TEMPORARY": "מידע זמני",
+      "ONE_OFF_DECISION": "החלטה חד-פעמית",
+      "QUESTION": "שאלה פתוחה",
+      "NOTE": "הערה"
+    },
+    "policyKinds": {
+      "DATA_HANDLING": "טיפול במידע",
+      "DISCLOSURE": "חשיפה",
+      "COMMUNICATION": "תקשורת",
+      "SEPARATION": "הפרדה",
+      "APPROVAL_REQUIRED": "אישור נדרש",
+      "THRESHOLD": "סף",
+      "REQUIRED_STEP": "שלב חובה",
+      "TIMING": "תזמון",
+      "FORBIDDEN": "איסור",
+      "INFO": "כלל עבודה"
+    },
+    "narrativeKinds": {
+      "OVERVIEW": "סקירה",
+      "BACKGROUND": "רקע",
+      "OUR_ROLE": "התפקיד שלנו"
+    },
+    "actions": {
+      "CREATE": "חדש",
+      "SUPERSEDE": "גרסה חדשה לפריט קיים",
+      "CONTRADICT": "סותר פריט קיים"
+    },
+    "confidence": {
+      "HIGH": "ביטחון גבוה",
+      "MEDIUM": "ביטחון בינוני",
+      "LOW": "ביטחון נמוך"
+    },
+    "confidenceReasons": {
+      "notStated": "Claude לא ציין עד כמה הוא בטוח",
+      "noMinute": "בלי דקה בהקלטה",
+      "topicsOnly": "מקור של נושאים בלבד",
+      "secondary": "מקור משני",
+      "uncertain": "לא ודאי לפי Claude"
+    },
+    "statuses": {
+      "CONFIRMED": "מאושר",
+      "UNCERTAIN": "לא ודאי",
+      "MISSING": "חסר",
+      "SUPERSEDED": "הוחלף"
+    },
+    "sourceKinds": {
+      "TRANSCRIPT": "הקלטה",
+      "CLIENT_DOCUMENT": "מסמך של הלקוח",
+      "TASK": "משימה",
+      "PERSON": "נמסר בעל פה",
+      "ANKORA_DOCUMENT": "מסמך של אנקורה",
+      "EMAIL": "מייל"
+    },
+    "tierReasons": {
+      "blocked": "יש בה משהו שחוסם אישור",
+      "changesExisting": "משנה פריט שכבר בתיק",
+      "maybeInFile": "ייתכן שכבר בתיק",
+      "sensitive": "מידע רגיש",
+      "doNotDisclose": "יש בה מה לא לספר",
+      "clientVisible": "גלוי ללקוח",
+      "taskForOther": "משימה נפתחת לאדם אחר",
+      "domain": "דומיין משנה אילו פגישות שייכות ללקוח",
+      "lowLevel": "רמת בדיקה נמוכה",
+      "simpleHigh": "פריט חדש ופשוט, ברמת בדיקה גבוהה",
+      "medium": "רמת בדיקה בינונית",
+      "openQuestion": "שאלה פתוחה",
+      "temporary": "מידע זמני",
+      "needsPerson": "לא נכנס בלי אדם"
+    },
+    "priority": {
+      "LOW": "נמוכה",
+      "NORMAL": "רגילה",
+      "HIGH": "גבוהה",
+      "URGENT": "דחופה"
+    },
+    "billingCycle": {
+      "MONTHLY": "חודשי",
+      "ANNUAL": "שנתי",
+      "OTHER": "אחר"
+    },
+    "details": {
+      "refs": "הפניות: {refs}",
+      "clientVisible": "גלוי ללקוח",
+      "owner": "בעלים: {name}",
+      "entity": "ישות: {name}",
+      "subject": "של: {name}",
+      "routeTo": "מפנים אל: {names}",
+      "triggersProcess": "מפעיל את: {name}",
+      "externalParty": "גורם חיצוני: {names}",
+      "systems": "מערכות: {names}",
+      "approver": "מאשר: {name}",
+      "approvalPolicies": "כללי אישור: {titles}",
+      "invoiceTo": "חשבונית אל: {name}",
+      "dueDate": "תאריך יעד: {date}",
+      "assignee": "אחראי: {name}",
+      "trigger": "מה מפעיל: {text}",
+      "sla": "SLA: {text}",
+      "condition": "בתנאי: {text}",
+      "expectsReceipt": "ממתין לקבלה",
+      "expectsReceiptFrom": "ממתין לקבלה מ-{from}",
+      "businessDayBefore": "ביום עסקים לפני, אם נופל על יום חופש",
+      "businessDayAfter": "ביום העסקים הבא, אם נופל על יום חופש",
+      "responsible": "אחראי: {name}",
+      "taskSameDay": "משימה ביום עצמו",
+      "taskDaysBefore": "משימה {days} ימים לפני",
+      "parent": "בת של {name}",
+      "effectiveFrom": "נכנס לתוקף ב-{date}",
+      "reviewBy": "לסקירה עד {date}",
+      "partnerDomain": "דומיין של שותף",
+      "clientDomain": "דומיין של הלקוח",
+      "priority": "עדיפות: {priority}",
+      "billing": "חיוב: {details}",
+      "card": "כרטיס {last4}",
+      "requiresApproval": "(דורש אישור)"
+    },
+    "source": {
+      "none": "בלי מקור",
+      "topicsOnly": "נושאים בלבד",
+      "sentBy": "נשלח על ידי {name}"
+    },
+    "toasts": {
+      "processAndProcedureApproved": "התהליך והנוהל אושרו",
+      "processDraftProcedureWaits": "התהליך נכנס כטיוטה. הנוהל ממתין",
+      "taskOpened": "נפתחה משימה",
+      "approveFailed": "האישור נכשל",
+      "enteredFile": "נכנס לתיק",
+      "completedAndEntered": "הושלם ונכנס לתיק",
+      "notClosed": "לא נסגר",
+      "sourceAdded": "המקור נוסף לפריט שבתיק",
+      "closedAlreadyIn": "נסגר: כבר בתיק",
+      "mergeFailed": "ההוספה נכשלה",
+      "merged": "נוסף אל {name}",
+      "someEntered": "{done} נכנסו לתיק, {failed} לא",
+      "entered": "{count, plural, =1 {נכנס לתיק} other {# נכנסו לתיק}}"
+    },
+    "edit": {
+      "fields": {
+        "body": "מה",
+        "validUntilEvent": "בתוקף עד אירוע",
+        "decidedBy": "מי החליט",
+        "decidedAt": "תאריך ההחלטה (2026-10-17)",
+        "name": "שם",
+        "role": "תפקיד",
+        "context": "מה צריך לדעת",
+        "orgRole": "מה הוא ללקוח",
+        "notes": "הערות",
+        "requestTitle": "סוג הפנייה",
+        "handling": "איך עונים ולאן מעבירים",
+        "policyTitle": "שם הכלל",
+        "statement": "הכלל",
+        "interimStatement": "עד שיאושר",
+        "systemName": "מערכת",
+        "systemPurpose": "למה היא משמשת",
+        "blocker": "מה חוסם",
+        "legalName": "שם משפטי",
+        "registrationNumber": "ח.פ. או EIN",
+        "narrativeBody": "הטקסט",
+        "processTitle": "שם התהליך",
+        "processPurpose": "למה הוא קיים",
+        "triggerText": "מה מפעיל אותו",
+        "domain": "דומיין",
+        "taskTitle": "מה עושים",
+        "description": "פירוט",
+        "assigneeName": "אחראי באנקורה (שם)",
+        "dueDate": "תאריך יעד (2026-10-22)",
+        "dateTitle": "מה המועד",
+        "date": "תאריך (2026-10-22), לחד-פעמי או שנתי",
+        "responsibleName": "אחראי באנקורה (שם)"
+      },
+      "status": "סטטוס",
+      "toResolveIfNotConfirmed": "מה יסגור את זה (אם לא מאושר)",
+      "whatClosesQuestion": "מה יסגור אותה",
+      "ownerName": "בעלים באנקורה (שם)",
+      "clientVisible": "גלוי ללקוח",
+      "no": "לא",
+      "yes": "כן",
+      "openTask": "פתיחת המשימה",
+      "approveCombinedWithChanges": "אישור ההצעה והנוהל עם השינויים",
+      "approveWithChanges": "אישור עם השינויים"
+    },
+    "reject": {
+      "whyLabel": "למה, בשורה אחת *",
+      "placeholder": "שיחת חולין, לא רלוונטי לעבודה",
+      "submit": "דחייה",
+      "title": "דחיית הצעה"
+    },
+    "rejectMany": {
+      "intro": "{count, plural, =1 {הצעה אחת נדחית.} other {# הצעות נדחות, עם אותה סיבה.}}",
+      "placeholder": "כבר בתיק מהחילוץ היומי",
+      "title": "דחיית הצעות"
+    },
+    "task": {
+      "intro": "ההצעה לא תיכנס לתיק. במקומה תיפתח משימה על הלקוח, וההצעה תסומן \"הפכה למשימה\".",
+      "titleLabel": "מה עושים? כותרת המשימה *",
+      "titlePlaceholder": "לברר עם... / לשלוח ל... / להזמין...",
+      "said": "מה שנאמר: {said}. בכותרת כותבים מה צריך לעשות, לא את מה שנאמר.",
+      "description": "תיאור",
+      "assignee": "אחראי",
+      "dueDate": "תאריך יעד",
+      "categoryHint": "הקטגוריה נבחרת לפי הכותרת, ואפשר לשנות אותה במשימה.",
+      "priority": "עדיפות",
+      "opening": "פותח...",
+      "submit": "פתיחת משימה"
+    },
+    "revert": {
+      "button": "ביטול",
+      "failed": "הביטול נכשל",
+      "done": "בוטל: הפריט הוסר מהתיק",
+      "confirm": "להסיר את הפריט מהתיק?",
+      "removing": "מסיר...",
+      "remove": "להסיר",
+      "keep": "להשאיר"
+    },
+    "decided": {
+      "reverted": "אושר ובוטל:",
+      "autoApplied": "נכנס אוטומטית:",
+      "alreadyIn": "כבר בתיק:",
+      "taskOpened": "נפתחה משימה:",
+      "approved": "אושר:",
+      "becameTask": "הפך למשימה:",
+      "rejected": "נדחה:",
+      "toTask": "למשימה"
+    },
+    "proposal": {
+      "select": "בחירה: {headline}",
+      "aloneHint": "אפשר לדחות יחד עם אחרות. לאשר: אחת אחת ({reason})",
+      "alreadyIn": "כבר בתיק:",
+      "inFileToday": "היום בתיק:",
+      "momentInCall": "לרגע בשיחה",
+      "why": "למה:",
+      "suggested": "נוסח מוצע:",
+      "openDate": "לפתוח את {name}",
+      "addTo": "להוסיף אל {name}",
+      "alreadyInAddSource": "כבר בתיק: הוספת המקור",
+      "alreadyInClose": "כבר בתיק: סגירה",
+      "approveSuggestedCombined": "להשלים בנוסח המוצע ולאשר את ההצעה והנוהל",
+      "approveSuggested": "להשלים בנוסח המוצע ולאשר",
+      "approveCombined": "אישור ההצעה והנוהל",
+      "approve": "אישור",
+      "editAndApprove": "עריכה ואישור",
+      "editTitle": "עריכה לפני אישור",
+      "toTask": "למשימה",
+      "toTaskTitle": "הצעה שהיא משימה"
+    },
+    "batch": {
+      "kindCount": "{count} {kind}",
+      "dropped": "{count, plural, =1 {פריט אחד לא נכנס להצעות} other {# פריטים לא נכנסו להצעות}} (סוד, ציטוט ממקור מוגבל או מבנה שגוי). מה שנדחה לא נשמר.",
+      "selectAllFiltered": "כל מה שבסינון ({count})",
+      "selectAll": "הכול ({count})",
+      "selectTogether": "רק מה שאפשר לאשר יחד ({count})",
+      "chosen": "נבחרו {count}",
+      "approving": "מאשר...",
+      "approveCount": "אישור {count}",
+      "rejectCount": "דחיית {count}",
+      "someAlone": "{count} מהנבחרות מאשרים אחת אחת: משנות פריט קיים, אולי כבר בתיק, או רגישות."
+    },
+    "summary": {
+      "allTogether": "{count, plural, =1 {הצעה אחת, אפשר לאשר ישר.} other {אפשר לאשר את כל ה-# יחד.}}",
+      "allAlone": "{count, plural, =1 {הצעה אחת לבדוק לבד.} other {# הצעות לבדוק אחת אחת.}}",
+      "mixedAlone": "{count, plural, =1 {אחת לבדוק לבד} other {# לבדוק אחת אחת}}",
+      "mixedTogether": "{count, plural, =1 {ואחת אפשר לאשר יחד} other {ו-# אפשר לאשר יחד}}",
+      "mixed": "{alone}, {together}."
+    },
+    "awaiting": {
+      "label": "ממתין לשיוך",
+      "itemCount": "{count, plural, =1 {פריט אחד} other {# פריטים}}",
+      "claudeThinks": "Claude חושב שזו שיחה של <b>{name}</b>.",
+      "claudeThinksBecause": "Claude חושב שזו שיחה של <b>{name}</b>: {reason}",
+      "removedClient": "לקוח שהוסר",
+      "clientFallback": "לקוח",
+      "dropped": "{count, plural, =1 {פריט אחד לא נשמר} other {# פריטים לא נשמרו}} (סוד או ציטוט ממקור מוגבל).",
+      "item": "{kind}: {text}",
+      "sensitiveItem": "{kind}: פריט רגיש",
+      "whose": "של מי השיחה",
+      "claudesProposal": "(ההצעה של Claude)",
+      "assigning": "משייך...",
+      "assignTo": "שיוך ל{name}",
+      "assigned": "שויך ל{name}",
+      "assignedDescription": "הפריטים ממתינים עכשיו לאישור, כמו כל אצווה.",
+      "noneOfThem": "לא של אף אחד מהם",
+      "discardTitle": "הסרת שיחה שממתינה לשיוך",
+      "discardIntro": "השיחה והפריטים שלה יוסרו, ולא ייכנסו לאף תיק.",
+      "discardWhy": "למה, בשורה אחת *",
+      "discardPlaceholder": "שיחה של הספק עם לקוח שלא שלנו",
+      "removing": "מסיר...",
+      "remove": "הסרה",
+      "otherClientNote": "ללקוח אחר מזה ש-Claude הציע: פריט שמשנה עובדה בתיק של הלקוח המוצע לא עובר, וקודי מקורות שלו לא נשמרים."
+    },
+    "auto": {
+      "title": "נכנס אוטומטית",
+      "titleCount": "נכנס אוטומטית ({count})",
+      "intro": "פריטים חדשים ופשוטים, ברמת בדיקה גבוהה, נכנסים לתיק בלי לחכות. בשבועיים הראשונים, ובשבוע שאחרי הנחיות חילוץ חדשות, בודקים כאן כל אחד; אחר כך מדגם של 20%. \"ביטול\" מוריד את הפריט מהתיק ונספר כשגיאה.",
+      "empty": "אין כרגע פריטים שנכנסו אוטומטית ומחכים לבדיקה.",
+      "pausesTitle": "חזרו לאישור של אדם",
+      "why": {
+        "firstDays": "{days} הימים הראשונים: בודקים כל פריט",
+        "newGuide": "הנחיות חילוץ חדשות: בודקים כל פריט שבוע",
+        "sample": "מדגם של {percent}%"
+      },
+      "entered": "נכנס {date}",
+      "toItem": "לפריט בתיק",
+      "ok": "תקין",
+      "marking": "מסמן...",
+      "marked": "סומן תקין",
+      "markFailed": "הסימון נכשל",
+      "switchLabel": "כניסה אוטומטית לתיקים:",
+      "on": "פועלת",
+      "off": "כבויה",
+      "firstEnabled": "הופעלה לראשונה {date}",
+      "saving": "שומר...",
+      "turnOff": "לכבות לכל הלקוחות",
+      "turnOn": "להפעיל",
+      "switchFailed": "השינוי נכשל",
+      "switchedOff": "כניסה אוטומטית כבויה לכל הלקוחות",
+      "switchedOn": "כניסה אוטומטית פועלת",
+      "pauseKind": "סוג:",
+      "pauseClient": "לקוח:",
+      "clientFallback": "לקוח",
+      "pausedSince": "נעצר {date}",
+      "pauseBar": "מאז: {decisions} החלטות של אדם אחת אחת, {approvedAsIs} אושרו כמו שהן, גבול תחתון {lowerBound}%. הרף להחזרה: 30 החלטות וגבול תחתון של 85%.",
+      "lift": "להחזיר לכניסה אוטומטית",
+      "lifting": "מחזיר...",
+      "liftFailed": "ההחזרה נכשלה",
+      "lifted": "{label}: חזר לכניסה אוטומטית"
+    },
+    "filters": {
+      "ariaLabel": "סינון הצעות",
+      "client": "לקוח",
+      "allClients": "כל הלקוחות",
+      "chosenClient": "לקוח שנבחר",
+      "optionCount": "{label} ({count})",
+      "attention": "דורש תשומת לב",
+      "attentionHint": "רגיש, משנה פריט קיים, אולי כבר בתיק, או שכלל סימן אותו",
+      "more": "עוד סינונים",
+      "source": "מקור",
+      "allSources": "כל המקורות",
+      "sentBy": "נשלח על ידי",
+      "everyone": "כולם",
+      "waiting": "ממתין",
+      "anyTime": "כל זמן",
+      "olderThan": "יותר מ-{days} ימים",
+      "clear": "ניקוי הסינון"
+    },
+    "review": {
+      "intro": "מה ש-Claude הציע לתיקי הלקוחות. פריט חדש ופשוט ברמת בדיקה גבוהה נכנס לתיק לבד ומופיע ב\"נכנס אוטומטית\"; כל השאר נכנס לתיק רק אחרי שמישהו מאשר אותו כאן.",
+      "extractionGuide": "הנחיות החילוץ",
+      "brainMetrics": "מדדי התיק",
+      "unknownSender": "לא ידוע",
+      "empty": "אין הצעות שממתינות לאישור.",
+      "noMatch": "אין הצעות שמתאימות לסינון."
+    },
+    "quality": {
+      "none": "עוד לא הוחלט על הצעות ב-{days} הימים האחרונים.",
+      "head": "ב-{days} הימים האחרונים: {approved} אושרו, {edited} מהן אחרי עריכה ({pct}%), {rejected} נדחו.",
+      "firstMonth": "{head} החודש הראשון נגמר ב-{date}. אז מחליטים אם אפשר לאשר פריטים קלים גם בשיחה (היעד: פחות מ-10% עם עריכה).",
+      "good": "{head} פחות מ-10% תוקנו: לפי החלטה 1 אפשר לשקול לאשר פריטים קלים גם בשיחה.",
+      "warn": "{head} יותר מ-10% תוקנו: ממשיכים לאשר רק כאן."
+    },
+    "errors": {
+      "forbidden": "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.",
+      "generic": "אירעה שגיאה. נסו שוב.",
+      "notRejected": "{count} לא נדחו: {error}",
+      "managerSwitch": "רק מנהל מפעיל או מכבה כניסה אוטומטית.",
+      "managerLift": "רק מנהל מחזיר לכניסה אוטומטית."
     }
   }
 }

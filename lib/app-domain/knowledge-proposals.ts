@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma, User, SourceKind, SourceRestriction, SourceWeight, TaskPriority } from "@prisma/client";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
+import { DomainError, type DomainErrorValues } from "@/lib/domain-error";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { findSecrets } from "@/lib/secret-scan";
 import { normalizeDomain, normalizeEmail } from "@/lib/contact-normalize";
@@ -23,7 +24,10 @@ import {
   approvalTier,
   bulkApproveBlocker,
   proposalReviewLevel,
-  revertBlocker,
+  revertBlockerOf,
+  bulkApproveBlockerCode,
+  taskBlockerCode,
+  taskTitleProblemCode,
   MAX_BULK,
   missingRequired,
   resolveKnowledgeStatus,
@@ -599,9 +603,11 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
   // Everyone else sees that one is waiting, and for whom, not what it says.
   const approverOf = new Map<string, boolean>();
   const approverNames = new Map<string, string>();
+  const approverList = new Map<string, string[]>();
   for (const clientId of new Set(batches.filter((b) => b.proposals.some((p) => isSensitive(p.payload))).map((b) => b.clientId))) {
     approverOf.set(clientId, await canApproveForClient(actor, clientId));
-    approverNames.set(clientId, (await ruleApproversFor(clientId)).map((u) => u.name).join(" או "));
+    approverList.set(clientId, (await ruleApproversFor(clientId)).map((u) => u.name));
+    approverNames.set(clientId, (approverList.get(clientId) ?? []).join(" או "));
   }
   // "Already in the file", as it stands now (proposal-existing.ts): an
   // item that entered after the proposal arrived is found too, and one
@@ -658,6 +664,9 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
             existing: null,
             alreadyIn: null as (ExistingItem & { addsSources: boolean }) | null,
             hiddenFor: approverNames.get(b.clientId) || "מי שמאשר מידע רגיש",
+            /// ADR 0006: who decides it, by name, for a screen in another
+            /// language (empty: whoever approves sensitive information).
+            hiddenApprovers: approverList.get(b.clientId) ?? ([] as string[]),
           }
         : {
             ...p,
@@ -665,6 +674,7 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
             existing: p.targetId ? targetById.get(p.targetId) ?? null : null,
             alreadyIn: alreadyIn.get(p.id) ? { ...alreadyIn.get(p.id)!, addsSources: keepsSources(p.target) && readSourceRefs((p.payload as Record<string, unknown>).sources).length > 0 } : null,
             hiddenFor: null as string | null,
+            hiddenApprovers: [] as string[],
           };
     }),
   }));
@@ -685,9 +695,9 @@ export async function countPendingProposals(actor: User, clientId?: string): Pro
 
 async function findPending(actor: User, id: string) {
   const proposal = await prisma.knowledgeProposal.findUnique({ where: { id } });
-  if (!proposal) throw new Error("ההצעה לא נמצאה.");
+  if (!proposal) throw new DomainError("knowledgeProposals.notFound", "ההצעה לא נמצאה.");
   await assertClientAccess(actor, proposal.clientId);
-  if (proposal.state !== "PENDING") throw new Error("כבר הוחלט על ההצעה הזו.");
+  if (proposal.state !== "PENDING") throw new DomainError("knowledgeProposals.alreadyDecided", "כבר הוחלט על ההצעה הזו.");
   return proposal;
 }
 
@@ -812,7 +822,7 @@ async function apply(
     let parentId: string | null = null;
     if (parentName?.trim()) {
       const parent = await prisma.clientEntity.findFirst({ where: { clientId: p.clientId, deletedAt: null, name: { equals: parentName.trim(), mode: "insensitive" } }, select: { id: true } });
-      if (!parent) throw new Error(`ישות האם "${parentName}" לא נמצאת בתיק. מוסיפים אותה קודם, או מוחקים את השם בעריכה.`);
+      if (!parent) throw new DomainError("knowledgeProposals.parentEntityMissing", `ישות האם "${parentName}" לא נמצאת בתיק. מוסיפים אותה קודם, או מוחקים את השם בעריכה.`, { name: parentName });
       parentId = parent.id;
     }
     return (await addClientEntity(actor, { ...e, ...owner, parentId, sources, clientId: p.clientId })).id;
@@ -821,10 +831,10 @@ async function apply(
     const n = PAYLOADS.NARRATIVE.parse(payload);
     try {
       const row = await saveNarrative(actor, { clientId: p.clientId, kind: n.kind, body: n.body, baseVersion: n.baseVersion ?? 0 });
-      if (!row) throw new Error("זה כבר הטקסט שבתיק. דוחים את ההצעה.");
+      if (!row) throw new DomainError("knowledgeProposals.narrativeUnchanged", "זה כבר הטקסט שבתיק. דוחים את ההצעה.");
       return row.id;
     } catch (err) {
-      if (err instanceof NarrativeConflictError) throw new Error("מישהו שינה את הטקסט מאז שההצעה הגיעה. דוחים אותה, ומעדכנים את הטקסט במסך הלקוח.");
+      if (err instanceof NarrativeConflictError) throw new DomainError("knowledgeProposals.narrativeChanged", "מישהו שינה את הטקסט מאז שההצעה הגיעה. דוחים אותה, ומעדכנים את הטקסט במסך הלקוח.");
       throw err;
     }
   }
@@ -873,7 +883,10 @@ async function apply(
   // can be done without going back to the meeting.
   if (p.target === "TASK") {
     const parsed = PAYLOADS.TASK.safeParse(payload);
-    if (!parsed.success) throw new Error(`המשימה לא בנויה נכון: ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
+    if (!parsed.success) {
+      const issues = parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ");
+      throw new DomainError("knowledgeProposals.taskMalformed", `המשימה לא בנויה נכון: ${issues}`, { issues });
+    }
     const t = parsed.data;
     const draft = await draftFor({ ...p, payload: payload as Prisma.JsonValue });
     const assignee = await ownerByName(t.assigneeName);
@@ -889,7 +902,7 @@ async function apply(
     });
     return task.id;
   }
-  throw new Error("סוג פריט לא מוכר.");
+  throw new DomainError("knowledgeProposals.unknownKind", "סוג פריט לא מוכר.");
 }
 
 /// "להשלים בנוסח המוצע": every suggested wording on the proposal, as the
@@ -903,7 +916,7 @@ export async function approveWithSuggestion(actor: User, id: string) {
   const source = batch?.sourceId ? await prisma.clientSource.findUnique({ where: { id: batch.sourceId }, select: { title: true } }) : null;
   const flags = proposalProblems(proposal.target, proposal.payload as Record<string, unknown>, await registerCodes(proposal.clientId), { sourceTitle: source?.title });
   const edits = suggestedFix(flags);
-  if (!edits) throw new Error("אין להצעה הזו נוסח מוצע. משלימים בעריכה, או דוחים.");
+  if (!edits) throw new DomainError("knowledgeProposals.noSuggestion", "אין להצעה הזו נוסח מוצע. משלימים בעריכה, או דוחים.");
   return approveProposal(actor, id, edits);
 }
 
@@ -921,7 +934,7 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
   const payload = { ...original, ...Object.fromEntries(changed) };
   // An edit is checked for secrets like the original was.
   if (changed.length > 0 && findSecrets(payloadText(Object.fromEntries(changed))).length > 0) {
-    throw new Error("בעריכה יש סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בתיק.");
+    throw new DomainError("knowledgeProposals.secretInEdit", "בעריכה יש סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בתיק.");
   }
   // The same checks the card showed, on the text as approved: an edit can
   // fix a problem, and one cannot sneak one in.
@@ -931,7 +944,7 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
   // that it is there (20.10.2026).
   if (["ORGANIZATION", "CONTACT", "SYSTEM"].includes(proposal.target)) {
     const existing = await findExisting(proposal.clientId, proposal.target, proposal.action, payload);
-    if (existing) throw new Error(`${existing.body}: כבר בתיק. "כבר בתיק: הוספת המקור" מוסיף את המקור לפריט שבתיק.`);
+    if (existing) throw new DomainError("knowledgeProposals.alreadyInFile", `${existing.body}: כבר בתיק. "כבר בתיק: הוספת המקור" מוסיף את המקור לפריט שבתיק.`, { item: existing.body });
   }
   // 3.11.2026: the procedure version this proposal brings is approved
   // with it, when this person approves procedures and it passes the
@@ -993,7 +1006,7 @@ export async function attachProposalToExisting(actor: User, id: string) {
   if (isSensitive(proposal.payload)) await assertCanApproveForClient(actor, proposal.clientId);
   const payload = proposal.payload as Record<string, unknown>;
   const existing = await findExisting(proposal.clientId, proposal.target, proposal.action, payload);
-  if (!existing) throw new Error("הפריט כבר לא בתיק. מאשרים את ההצעה כרגיל.");
+  if (!existing) throw new DomainError("knowledgeProposals.noLongerInFile", "הפריט כבר לא בתיק. מאשרים את ההצעה כרגיל.");
   const sources = readSourceRefs(payload.sources);
   if (sources.length && keepsSources(proposal.target)) {
     if (proposal.target === "FACT") await addClientFactSources(actor, existing.id, sources);
@@ -1023,10 +1036,10 @@ export async function attachProposalToExisting(actor: User, id: string) {
 export async function mergeProposal(actor: User, id: string, targetId: string) {
   assertCan(actor.role, "time_entry.create_self");
   const proposal = await findPending(actor, id);
-  if (proposal.action !== "CREATE" || !isNamedTarget(proposal.target)) throw new Error("רק הצעה לפריט חדש עם שם אפשר להוסיף לפריט קיים.");
+  if (proposal.action !== "CREATE" || !isNamedTarget(proposal.target)) throw new DomainError("knowledgeProposals.mergeOnlyNew", "רק הצעה לפריט חדש עם שם אפשר להוסיף לפריט קיים.");
   const target = proposal.target;
   const now = await currentItem(proposal.clientId, target, targetId);
-  if (!now) throw new Error("הפריט הקיים כבר לא בתיק.");
+  if (!now) throw new DomainError("knowledgeProposals.existingGone", "הפריט הקיים כבר לא בתיק.");
   const existing = (await namesInFile(proposal.clientId, target)).find((n) => n.id === targetId);
   const payload = { ...(proposal.payload as Record<string, unknown>) };
   const field = nameFieldOf(target);
@@ -1066,7 +1079,7 @@ export async function rejectProposal(actor: User, id: string, reason: string, op
   if (isSensitive(proposal.payload)) await assertCanApproveForClient(actor, proposal.clientId);
   const why = reason.trim();
   // One line, so the next prompt can learn from it (spec 5.4).
-  if (!why) throw new Error("צריך לכתוב בשורה אחת למה ההצעה נדחתה.");
+  if (!why) throw new DomainError("knowledgeProposals.rejectReasonRequired", "צריך לכתוב בשורה אחת למה ההצעה נדחתה.");
   const updated = await prisma.knowledgeProposal.update({
     where: { id },
     data: { state: "REJECTED", decidedById: actor.id, decidedAt: new Date(), rejectReason: why.slice(0, 500) },
@@ -1129,16 +1142,18 @@ export async function proposalToTask(
 ) {
   assertCan(actor.role, "time_entry.create_self");
   const proposal = await findPending(actor, id);
-  const blocker = taskBlocker({ target: proposal.target as ProposalTargetLike, payload: (proposal.payload ?? {}) as Record<string, unknown> });
-  if (blocker) throw new Error(blocker);
+  const blockerInput = { target: proposal.target as ProposalTargetLike, payload: (proposal.payload ?? {}) as Record<string, unknown> };
+  const blocker = taskBlocker(blockerInput);
+  if (blocker) throw new DomainError("knowledgeProposals.taskBlocked", blocker, { reason: taskBlockerCode(blockerInput) ?? "" });
   const draft = await draftFor(proposal);
   const title = actionTitle(input.title?.trim() || draft.title).slice(0, TASK_TITLE_MAX);
-  const problem = taskTitleProblem(title, { target: proposal.target as ProposalTargetLike, headline: draft.said });
-  if (problem) throw new Error(problem);
+  const titleFrom = { target: proposal.target as ProposalTargetLike, headline: draft.said };
+  const problem = taskTitleProblem(title, titleFrom);
+  if (problem) throw new DomainError("knowledgeProposals.taskTitle", problem, { reason: taskTitleProblemCode(title, titleFrom) ?? "" });
   const description = input.description?.trim() || draft.description;
   // The same check as on the way in: what the person typed is not saved
   // if it holds a password, a key or a card number.
-  if (findSecrets(`${title}\n${description}`).length > 0) throw new Error("בטקסט יש סיסמה, מפתח או מספר כרטיס. צריך להסיר אותם לפני שפותחים משימה.");
+  if (findSecrets(`${title}\n${description}`).length > 0) throw new DomainError("knowledgeProposals.secretInTask", "בטקסט יש סיסמה, מפתח או מספר כרטיס. צריך להסיר אותם לפני שפותחים משימה.");
   const task = await createTask(actor, {
     clientId: proposal.clientId,
     title,
@@ -1164,7 +1179,10 @@ export async function proposalToTask(
   return { proposal: updated, taskId: task.id };
 }
 
-export type BulkResult = { done: string[]; failed: { id: string; error: string }[] };
+/// `code` and `values`: the failure as a DomainError said it, so a screen
+/// can word it in the reader's language (ADR 0006). `error` stays the
+/// message, for Claude.
+export type BulkResult = { done: string[]; failed: { id: string; error: string; code?: string; values?: DomainErrorValues }[] };
 
 /// Several proposals at once, each decided exactly as on its own, so every
 /// check still runs per item and the audit log has a line per item
@@ -1177,35 +1195,40 @@ export async function decideProposals(
 ): Promise<BulkResult> {
   assertCan(actor.role, "time_entry.create_self");
   const unique = [...new Set(ids.filter(Boolean))];
-  if (unique.length === 0) throw new Error("לא נבחרו הצעות.");
-  if (unique.length > MAX_BULK) throw new Error(`עד ${MAX_BULK} הצעות בפעם אחת.`);
-  if (!decision.approve && !decision.reason.trim()) throw new Error("צריך לכתוב בשורה אחת למה ההצעות נדחות.");
+  if (unique.length === 0) throw new DomainError("knowledgeProposals.noneChosen", "לא נבחרו הצעות.");
+  if (unique.length > MAX_BULK) throw new DomainError("knowledgeProposals.tooMany", `עד ${MAX_BULK} הצעות בפעם אחת.`, { max: MAX_BULK });
+  if (!decision.approve && !decision.reason.trim()) throw new DomainError("knowledgeProposals.bulkRejectReasonRequired", "צריך לכתוב בשורה אחת למה ההצעות נדחות.");
   const out: BulkResult = { done: [], failed: [] };
   for (const id of unique) {
     try {
       if (decision.approve) {
         const p = await prisma.knowledgeProposal.findUnique({ where: { id }, select: { clientId: true, batchId: true, target: true, action: true, flags: true, payload: true, confidence: true } });
-        if (!p) throw new Error("ההצעה לא נמצאה.");
+        if (!p) throw new DomainError("knowledgeProposals.notFound", "ההצעה לא נמצאה.");
         // The flags as they stand now, as the card showed them, and the
         // review level the card read from them.
         const existing = await findExisting(p.clientId, p.target, p.action, p.payload as Record<string, unknown>);
         const flags = withLiveDuplicate((Array.isArray(p.flags) ? p.flags : []) as ProposalFlag[], p.target, existing) as ProposalFlag[];
         const payload = p.payload as Record<string, unknown>;
-        const blocker = bulkApproveBlocker({
+        const tierInput = {
           target: p.target,
           action: p.action,
           flags,
           payload,
           level: proposalReviewLevel({ confidence: p.confidence, flags, payload }, await batchSource(p.batchId)),
-        });
-        if (blocker) throw new Error(`מאשרים אחת אחת: ${blocker}.`);
+        };
+        const blocker = bulkApproveBlocker(tierInput);
+        if (blocker) throw new DomainError("knowledgeProposals.approveOneByOne", `מאשרים אחת אחת: ${blocker}.`, { reason: bulkApproveBlockerCode(tierInput) ?? "" });
         await approveProposal(actor, id, {}, { bulk: true });
       } else {
         await rejectProposal(actor, id, decision.reason, { bulk: true });
       }
       out.done.push(id);
     } catch (err) {
-      out.failed.push({ id, error: err instanceof Error ? err.message : "אירעה שגיאה." });
+      out.failed.push({
+        id,
+        error: err instanceof Error ? err.message : "אירעה שגיאה.",
+        ...(err instanceof DomainError ? { code: err.code, values: err.values } : {}),
+      });
     }
   }
   return out;
@@ -1227,11 +1250,11 @@ export async function batchSource(batchId: string): Promise<{ kind: SourceKind; 
 export async function revertProposal(actor: User, id: string) {
   assertCan(actor.role, "time_entry.create_self");
   const proposal = await prisma.knowledgeProposal.findUnique({ where: { id } });
-  if (!proposal) throw new Error("ההצעה לא נמצאה.");
+  if (!proposal) throw new DomainError("knowledgeProposals.notFound", "ההצעה לא נמצאה.");
   await assertClientAccess(actor, proposal.clientId);
   if (isSensitive(proposal.payload)) await assertCanApproveForClient(actor, proposal.clientId);
-  const why = revertBlocker(proposal);
-  if (why) throw new Error(why);
+  const why = revertBlockerOf(proposal);
+  if (why) throw new DomainError("knowledgeProposals.cannotRevert", why.message, { reason: why.code, target: proposal.target });
   const resultId = proposal.resultId!;
   // Claimed first, so two presses take the item out once.
   const now = new Date();
@@ -1239,7 +1262,7 @@ export async function revertProposal(actor: User, id: string) {
     where: { id, state: "APPROVED", revertedAt: null },
     data: { revertedAt: now, revertedById: actor.id },
   });
-  if (claimed.count === 0) throw new Error("ההצעה כבר בוטלה.");
+  if (claimed.count === 0) throw new DomainError("knowledgeProposals.alreadyReverted", "ההצעה כבר בוטלה.");
   try {
     if (proposal.target === "FACT") await removeClientFact(actor, resultId);
     else if (proposal.target === "CONTACT") await removeClientContact(actor, resultId);
@@ -1250,7 +1273,7 @@ export async function revertProposal(actor: User, id: string) {
     // points at): the proposal goes back to what it was.
     await prisma.knowledgeProposal.update({ where: { id }, data: { revertedAt: null, revertedById: null } });
     const message = err instanceof Error ? err.message : "אירעה שגיאה.";
-    throw new Error(`הפריט לא הוסר מהתיק: ${message}`);
+    throw new DomainError("knowledgeProposals.notRemoved", `הפריט לא הוסר מהתיק: ${message}`, { error: message });
   }
   await recordAudit({
     actorId: actor.id,
@@ -1277,7 +1300,7 @@ export async function revertProposal(actor: User, id: string) {
 /// Decision 1's measure: of the proposals decided in the window, how many
 /// were changed before approval, and how many rejected.
 export async function proposalQuality(actor: User, since: Date) {
-  if (!canManageClients(actor.role)) throw new Error("רק למנהלים.");
+  if (!canManageClients(actor.role)) throw new DomainError("knowledgeProposals.managersOnly", "רק למנהלים.");
   const rows = await prisma.knowledgeProposal.groupBy({
     by: ["state", "edited"],
     where: { decidedAt: { gte: since } },
