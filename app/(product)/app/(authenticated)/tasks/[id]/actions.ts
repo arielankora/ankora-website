@@ -341,8 +341,7 @@ export async function createTaskManualEntryAction(
     if (err instanceof OverlapError && !err.sameClient) {
       return { overlapWarning: overlapWarningFrom(err) };
     }
-    // entryError is my-time's; awaited so it works whether it stays sync
-    // or becomes async when that screen is translated.
+    // entryError is my-time's (async, in the reader's language).
     return { error: (await domainErrorText(err)) ?? (await entryError(err)) };
   }
 }
