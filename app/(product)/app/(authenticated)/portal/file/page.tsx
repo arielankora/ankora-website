@@ -5,6 +5,7 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalFile } from "@/lib/app-domain/client-file";
 import { Forbidden } from "@/components/app/Forbidden";
 import { CopyValue } from "@/components/app/CopyValue";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import { SITE_URL } from "@/lib/site";
 
 /// The client portal connector (app/api/mcp/portal). Built from SITE_URL
@@ -194,7 +195,7 @@ export default async function PortalFilePage() {
             {documents.map((d) => {
               const size = formatSize(d.sizeBytes);
               return (
-                <li key={d.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0">
+                <li key={d.id} {...noTranslateProps(d.aiExcluded)} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0">
                   <span className="text-sm text-app-text-primary">
                     <bdi dir="auto">{d.title}</bdi>
                     <span className="text-app-text-secondary"> · {t(`documentKinds.${d.kind}`)}</span>

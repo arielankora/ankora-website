@@ -3,6 +3,7 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { resolvePortalClient } from "@/lib/app-domain/client-portal";
 import { PortalContextBar } from "./PortalContextBar";
 import { ScopedMessages } from "@/components/app/ScopedMessages";
+import { NoMachineTranslation } from "@/components/app/NoMachineTranslation";
 
 // Portal phase 0. The context bar belongs to all four portal screens, so
 // it is resolved once here rather than repeated in each page. The layout
@@ -19,9 +20,12 @@ export default async function PortalLayout({ children }: { children: React.React
     if (!(err instanceof ForbiddenError)) throw err;
   }
 
-  // ADR 0006, decision 7: this area's part of the dictionary.
+  // ADR 0006, decision 7: this area's part of the dictionary. A client
+  // marked "בלי AI" gets every portal screen kept from the browser's
+  // translator (ADR 0006, "Content in English"), here once for all of them.
   return (
     <ScopedMessages area="portal">
+    <NoMachineTranslation active={!!ctx?.client.aiExcluded}>
     <div className="space-y-4">
       {ctx && (
         <PortalContextBar
@@ -33,6 +37,7 @@ export default async function PortalLayout({ children }: { children: React.React
       )}
       {children}
     </div>
+    </NoMachineTranslation>
     </ScopedMessages>
   );
 }

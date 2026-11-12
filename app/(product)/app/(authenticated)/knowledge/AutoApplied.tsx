@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import { useFormatter, useTranslations } from "next-intl";
 import { autoReviewAnchor } from "@/lib/approval-links";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -22,6 +23,9 @@ export type AutoReviewRow = {
   enteredAt: Date | null;
   /// Why a person looks at it (lib/auto-apply.ts, autoReviewReasonCode).
   why: { code: "firstDays"; days: number } | { code: "newGuide" } | { code: "sample"; percent: number };
+  /// ADR 0006: the item's client is "בלי AI", so the row is kept from the
+  /// browser's translator.
+  aiExcluded?: boolean;
 };
 
 export type AutoApplyPauseRow = {
@@ -62,7 +66,7 @@ function ReviewRow({ row }: { row: AutoReviewRow }) {
   }
   const why = row.why.code === "firstDays" ? t("why.firstDays", { days: row.why.days }) : row.why.code === "newGuide" ? t("why.newGuide") : t("why.sample", { percent: row.why.percent });
   return (
-    <li id={autoReviewAnchor(row.id)} className="flex flex-wrap items-start justify-between gap-3 py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft" data-testid="auto-review-row">
+    <li id={autoReviewAnchor(row.id)} {...noTranslateProps(row.aiExcluded)} className="flex flex-wrap items-start justify-between gap-3 py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft" data-testid="auto-review-row">
       <div className="min-w-0 flex-1">
         <p className="text-sm text-app-text-primary" dir="auto">
           {row.headline}

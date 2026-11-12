@@ -2,6 +2,7 @@
 import { startTransition, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import { updateMyEntryAction, deleteMyEntryAction, type SavedEntry } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
 import { StatusBadge } from "@/components/app/StatusBadge";
@@ -38,6 +39,9 @@ type Entry = {
   /// save so the server can detect a concurrent edit; see
   /// lib/app-domain/time-entries.ts's ConflictError.
   updatedAt: string;
+  /// ADR 0006: the entry's client or task is "בלי AI", so its row is kept
+  /// from the browser's translator.
+  aiExcluded?: boolean;
 };
 
 function timeKey(iso: string): string {
@@ -269,7 +273,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
     // App redesign (handoff README, screen 3): "פס זהב אנכי 3px לכל שורה
     // וכפתור עריכה" - the vertical bar plus a bordered pill edit button,
     // replacing the plain text link.
-    <div className="flex flex-wrap items-center gap-3.5 px-4 py-3.5">
+    <div {...noTranslateProps(entry.aiExcluded)} className="flex flex-wrap items-center gap-3.5 px-4 py-3.5">
       <span className="h-[34px] w-[3px] shrink-0 rounded-full bg-gold/60" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <p dir="auto" className="truncate text-[13.5px] text-app-text-primary">

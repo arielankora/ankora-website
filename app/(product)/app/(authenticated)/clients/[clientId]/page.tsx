@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { taskAiExclusion } from "@/lib/ai-exclusion";
 import { cookies } from "next/headers";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { FILE_SECTION_COOKIE, resolveFileSection, showsSection, type FileSection, type FileSectionKey } from "@/lib/client-file-parts";
@@ -977,6 +978,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 assigneeName: t.assignedTo?.name ?? null,
                 dueDate: t.dueDate ? t.dueDate.toISOString() : null,
                 seconds: taskOverview.hoursByTask.get(t.id) ?? 0,
+                aiExcluded: taskAiExclusion(t) !== null,
               }))}
             />
 

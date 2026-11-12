@@ -36,6 +36,7 @@ import { runLesson } from "@/lib/app-domain/process-lessons";
 import { asksForLesson } from "@/lib/process-lessons";
 import { prisma } from "@/lib/prisma";
 import { taskAiExclusion } from "@/lib/ai-exclusion";
+import { NoMachineTranslation } from "@/components/app/NoMachineTranslation";
 import { listTaskPortalNotes } from "@/lib/app-domain/task-portal-notes";
 import { PortalNotesPanel } from "./PortalNotesPanel";
 
@@ -267,7 +268,10 @@ export default async function TaskDetailPage(props: {
     )
     .map((c) => ({ id: c.id, name: c.name }));
 
+  // ADR 0006, "Content in English": a task marked "בלי AI", by itself, its
+  // parent or its client, is kept from the browser's translator.
   return (
+    <NoMachineTranslation active={aiExcluded}>
     <div className="space-y-6">
       {/* Ariel, 7.10.2026: a way back that says it is one, and lands on
           the list as it was left. It used to be a breadcrumb "משימות"
@@ -472,5 +476,6 @@ export default async function TaskDetailPage(props: {
         />
       </div>
     </div>
+    </NoMachineTranslation>
   );
 }

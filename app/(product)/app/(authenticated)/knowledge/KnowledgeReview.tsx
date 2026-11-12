@@ -26,6 +26,7 @@ import { autoApplyOverview, listAutoReview } from "@/lib/app-domain/auto-apply";
 import { liftBarMet } from "@/lib/auto-apply";
 import { fileItemUrl } from "@/lib/approval-links";
 import { AutoApplied } from "./AutoApplied";
+import { aiExcludedClientIds } from "@/lib/app-domain/ai-exclusion-db";
 import { kindKeyLabel, sourceKindLabel } from "./labels";
 
 // Org brain, phase 2: "ממתין לאישור", now the tab "ידע מהחילוץ" of "אישורים" (claude/org-brain-spec-2026-10-12.md,
@@ -61,6 +62,9 @@ export async function KnowledgeReview({ searchParams, mineOnly = false }: { sear
     listAutoReview(user, { clientId: filters.clientId }),
     autoApplyOverview(user),
   ]);
+  // ADR 0006: a card or row of a client marked "בלי AI" is kept from the
+  // browser's translator.
+  const excludedClients = await aiExcludedClientIds([...queue.map((b) => b.client.id), ...autoRows.map((r) => r.clientId)]);
   // 22.10.2026: by default the meetings waiting on this person, whoever
   // sent them or the client's account manager; "של כולם" shows the rest.
   const manager = canManageClients(user.role);
@@ -146,6 +150,7 @@ export async function KnowledgeReview({ searchParams, mineOnly = false }: { sear
           itemHref: r.resultId ? fileItemUrl("", r.clientId, r.resultId) : null,
           enteredAt: r.decidedAt,
           why: r.whyCode,
+          aiExcluded: excludedClients.has(r.clientId),
         }))}
         controls={
           autoControls && {
@@ -219,6 +224,7 @@ export async function KnowledgeReview({ searchParams, mineOnly = false }: { sear
             filtered={filtering}
             staff={staff}
             meId={user.id}
+            aiExcluded={excludedClients.has(b.client.id)}
           />
         ))
       )}

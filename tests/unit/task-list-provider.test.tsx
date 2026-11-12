@@ -43,6 +43,7 @@ function row(over: Partial<ListRow> = {}): ListRow {
     clientOutcome: null,
     stepsTotal: 0,
     stepsDone: 0,
+    aiExcluded: false,
     ...over,
   };
 }

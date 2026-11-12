@@ -93,6 +93,7 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
       day: d.precision === "UNKNOWN" ? "?" : format.dateTime(occurrence, { day: "2-digit" }),
       month: d.precision === "UNKNOWN" ? t("missingMonth") : format.dateTime(occurrence, { month: "short" }),
       clientName: d.client.name,
+      aiExcluded: d.client.aiExcluded,
       meta: [
         t(`recurrence.${d.recurrence}`),
         d.precision === "APPROXIMATE" && d.dayAlternatives.length > 1

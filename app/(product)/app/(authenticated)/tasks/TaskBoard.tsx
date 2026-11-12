@@ -1,5 +1,6 @@
 "use client";
 import { Hourglass } from "lucide-react";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import { useEffect, useMemo, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -74,6 +75,8 @@ export type BoardCard = {
   /// Tasks phase 5. Null means nothing is holding this card up.
   blockedOn: TaskBlocker | null;
   blockedSince: string | null;
+  /// ADR 0006: "בלי AI", so the card is kept from the browser's translator.
+  aiExcluded?: boolean;
 };
 
 export function TaskBoard({ cards }: { cards: BoardCard[] }) {
@@ -231,6 +234,7 @@ function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
         e.dataTransfer.effectAllowed = "move";
       }}
       data-task-card={card.id}
+      {...noTranslateProps(card.aiExcluded)}
       className="cursor-grab rounded-xl border border-app-border bg-white p-3 active:cursor-grabbing"
     >
       <div className="flex items-start gap-2">

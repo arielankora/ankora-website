@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "./setup";
-import { createTestCategory, createTestClient, createTestUser } from "./factories";
+import { createTestCategory, createTestClient, createTestTimeEntry, createTestUser } from "./factories";
+import { aiExcludedRowIds } from "@/lib/app-domain/ai-exclusion-db";
+import { aiExcludedNotificationIds } from "@/lib/app-domain/notifications";
+import { taskAiExclusion } from "@/lib/ai-exclusion";
 import { getTaskDetail, listTasks, updateTask } from "@/lib/app-domain/tasks";
 import { lookupClient, lookupTask, lookupTaskById } from "@/lib/mcp/lookup";
 import { redactEntriesForAi } from "@/lib/mcp/ai-redact";
@@ -200,5 +203,46 @@ describe("בלי AI in the MCP layer", () => {
     const row = brief.clients.find((c) => c.name === "NUX");
     expect(row).toMatchObject({ aiExcluded: true });
     expect(row).not.toHaveProperty("dataHandlingRules");
+  });
+
+  // ADR 0006, "Content in English": the screens keep a marked row from the
+  // browser's translator, from flags the server reads with the same rule.
+  it("gives the screens what they need to keep a marked row from the browser's translator", async () => {
+    const { client, hadas, task, step } = await setup();
+    const other = await createTestClient({ name: "Other" });
+    await prisma.userClientAccess.create({ data: { userId: hadas.id, clientId: other.id } });
+    const otherTask = await prisma.task.create({ data: { clientId: other.id, title: "פתוחה" } });
+    await prisma.task.update({ where: { id: task.id }, data: { aiExcluded: true } });
+
+    // The tasks list carries the parent's and the client's marks.
+    const top = await listTasks(hadas, {});
+    expect(top.map((t) => [t.id, taskAiExclusion(t)]).sort()).toEqual([[otherTask.id, null], [task.id, "TASK"]].sort());
+    const steps = await listTasks(hadas, { parentId: task.id });
+    expect(steps.map((t) => taskAiExclusion(t))).toEqual(["PARENT_TASK"]);
+
+    // Time entries: by the task (or its parent), or by the client.
+    const category = await createTestCategory();
+    const onStep = await createTestTimeEntry({ userId: hadas.id, clientId: client.id, categoryId: category.id });
+    await prisma.timeEntry.update({ where: { id: onStep.id }, data: { taskId: step.id } });
+    const plain = await createTestTimeEntry({ userId: hadas.id, clientId: other.id, categoryId: category.id, startAt: new Date(Date.now() - 3 * 3600_000) });
+    const rows = await prisma.timeEntry.findMany({ select: { id: true, clientId: true, taskId: true } });
+    expect([...(await aiExcludedRowIds(rows))]).toEqual([onStep.id]);
+    await prisma.client.update({ where: { id: other.id }, data: { aiExcluded: true } });
+    expect(new Set(await aiExcludedRowIds(rows))).toEqual(new Set([onStep.id, plain.id]));
+    await prisma.client.update({ where: { id: other.id }, data: { aiExcluded: false } });
+
+    // The bell: a row about a marked task, its client's file, or an entry on it.
+    const note = (entityType: string | null, entityId: string | null) =>
+      prisma.notification.create({ data: { userId: hadas.id, type: "t", title: "x", body: "y", entityType, entityId } });
+    const aboutTask = await note("Task", step.id);
+    const aboutOtherTask = await note("Task", otherTask.id);
+    const aboutEntry = await note("TimeEntry", onStep.id);
+    const aboutNothing = await note(null, null);
+    const aboutClient = await note("Client", other.id);
+    const all = await prisma.notification.findMany({ where: { userId: hadas.id } });
+    expect(new Set(await aiExcludedNotificationIds(all))).toEqual(new Set([aboutTask.id, aboutEntry.id]));
+    await prisma.client.update({ where: { id: other.id }, data: { aiExcluded: true } });
+    expect(new Set(await aiExcludedNotificationIds(all))).toEqual(new Set([aboutTask.id, aboutEntry.id, aboutOtherTask.id, aboutClient.id]));
+    expect((await aiExcludedNotificationIds(all)).has(aboutNothing.id)).toBe(false);
   });
 });

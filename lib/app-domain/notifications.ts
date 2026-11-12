@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { aiExcludedClientIds, aiExcludedRowIds, aiExcludedTaskIds } from "@/lib/app-domain/ai-exclusion-db";
 import { sendEmail } from "@/lib/email";
 import { LONG_TIMER_HOURS } from "@/lib/app-domain/reports";
 import type { User } from "@prisma/client";
@@ -26,6 +27,52 @@ export async function listNotificationsForUser(userId: string) {
     orderBy: { createdAt: "desc" },
     take: 100,
   });
+}
+
+/// ADR 0006: of these bell rows, the ids of those about something marked
+/// "בלי AI" (lib/ai-exclusion.ts): a task, a client (its file, rules,
+/// processes or knowledge), a time entry or an important date of one. A
+/// screen keeps such a row from the browser's translator. Rows about
+/// nothing of a client (a user, a global pause) are never excluded.
+export async function aiExcludedNotificationIds(
+  rows: { id: string; entityType: string | null; entityId: string | null }[]
+): Promise<Set<string>> {
+  const idsOf = (...types: string[]) => rows.flatMap((r) => (r.entityId && r.entityType && types.includes(r.entityType) ? [r.entityId] : []));
+  const entryIds = idsOf("TimeEntry");
+  const dateIds = idsOf("ImportantDate");
+  const [entries, dates] = await Promise.all([
+    entryIds.length ? prisma.timeEntry.findMany({ where: { id: { in: entryIds } }, select: { id: true, clientId: true, taskId: true } }) : [],
+    dateIds.length ? prisma.importantDate.findMany({ where: { id: { in: dateIds } }, select: { id: true, clientId: true } }) : [],
+  ]);
+  const [tasks, clients, excludedEntries, dateClients] = await Promise.all([
+    aiExcludedTaskIds(idsOf("Task")),
+    aiExcludedClientIds(idsOf("Client", "ClientRules", "ClientProcesses", "Knowledge")),
+    aiExcludedRowIds(entries),
+    aiExcludedClientIds(dates.map((d) => d.clientId)),
+  ]);
+  const excludedDates = new Set(dates.filter((d) => dateClients.has(d.clientId)).map((d) => d.id));
+  return new Set(
+    rows
+      .filter((r) => {
+        if (!r.entityId) return false;
+        switch (r.entityType) {
+          case "Task":
+            return tasks.has(r.entityId);
+          case "Client":
+          case "ClientRules":
+          case "ClientProcesses":
+          case "Knowledge":
+            return clients.has(r.entityId);
+          case "TimeEntry":
+            return excludedEntries.has(r.entityId);
+          case "ImportantDate":
+            return excludedDates.has(r.entityId);
+          default:
+            return false;
+        }
+      })
+      .map((r) => r.id)
+  );
 }
 
 export async function unreadNotificationCount(userId: string) {

@@ -46,3 +46,15 @@ export async function isDocumentAiExcluded(documentId: string): Promise<boolean>
   });
   return !!doc && documentAiExclusion(doc) !== null;
 }
+
+/// Of these rows (time entries, timers, anything on a client and maybe a
+/// task), the ids of those whose client or task is marked "בלי AI". For a
+/// screen that keeps such a row from the browser's translator (ADR 0006).
+export async function aiExcludedRowIds(rows: { id: string; clientId: string; taskId: string | null }[]): Promise<Set<string>> {
+  if (rows.length === 0) return new Set();
+  const [clients, tasks] = await Promise.all([
+    aiExcludedClientIds(rows.map((r) => r.clientId)),
+    aiExcludedTaskIds(rows.flatMap((r) => (r.taskId ? [r.taskId] : []))),
+  ]);
+  return new Set(rows.filter((r) => clients.has(r.clientId) || (r.taskId !== null && tasks.has(r.taskId))).map((r) => r.id));
+}

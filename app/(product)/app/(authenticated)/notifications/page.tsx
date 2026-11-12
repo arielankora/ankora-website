@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
-import { listNotificationsForUser } from "@/lib/app-domain/notifications";
+import { aiExcludedNotificationIds, listNotificationsForUser } from "@/lib/app-domain/notifications";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { markNotificationReadAction, markAllNotificationsReadAction } from "./actions";
@@ -15,6 +16,9 @@ export const metadata = { robots: { index: false, follow: false } };
 export default async function NotificationsPage() {
   const user = await requireUser();
   const notifications = await listNotificationsForUser(user.id);
+  // ADR 0006: a row about something marked "בלי AI" is kept from the
+  // browser's translator.
+  const excluded = await aiExcludedNotificationIds(notifications);
   const unreadCount = notifications.filter((n) => !n.readAt).length;
   // ADR 0006: only the screen's own words follow the reader. A
   // notification's title and body were written when it was created, in
@@ -44,7 +48,7 @@ export default async function NotificationsPage() {
             <p className="px-5 py-8 text-center text-sm text-app-text-tertiary">{t("empty")}</p>
           )}
           {notifications.map((n) => (
-            <div key={n.id} className="flex items-start justify-between gap-4 px-5 py-4">
+            <div key={n.id} {...noTranslateProps(excluded.has(n.id))} className="flex items-start justify-between gap-4 px-5 py-4">
               <div>
                 <div className="flex items-center gap-2">
                   {/* Tasks: the row is a way in, not only a record. A

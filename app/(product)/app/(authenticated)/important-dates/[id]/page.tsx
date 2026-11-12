@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { getImportantDate } from "@/lib/app-domain/important-dates";
+import { NoMachineTranslation } from "@/components/app/NoMachineTranslation";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listUsers } from "@/lib/app-domain/users";
 import { listCategories } from "@/lib/app-domain/categories";
@@ -97,8 +98,10 @@ export default async function ImportantDateDetailPage(props: {
     (cat) => cat.active && (cat.visibility === "GLOBAL" || (cat.clientId && clientIds.has(cat.clientId)))
   );
 
+  // ADR 0006: a date of a client marked "בלי AI" is kept from the
+  // browser's translator, page and all.
   return (
-    <>
+    <NoMachineTranslation active={date.client.aiExcluded}>
       <div className="space-y-6">
         <div>
           <PageBack href={backHref} label={calendarBack ? t("detail.backToCalendar") : importantDatesBackTitle(rawFrom, tList)} />
@@ -338,6 +341,6 @@ export default async function ImportantDateDetailPage(props: {
           </div>
         </div>
       </div>
-    </>
+    </NoMachineTranslation>
   );
 }

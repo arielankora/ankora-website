@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import { useFormatter, useTranslations } from "next-intl";
 import { MessageSquare, Paperclip, Trash2, Eye, EyeOff, Download } from "lucide-react";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -37,6 +38,8 @@ export type ThreadEntry =
       mimeType: string;
       sizeBytes: number | null;
       clientVisible: boolean;
+      /// ADR 0006: the document's own "בלי AI" mark.
+      aiExcluded?: boolean;
     };
 
 export function TaskThread({
@@ -250,7 +253,9 @@ function Comment({
 function FileLine({ entry }: { entry: Extract<ThreadEntry, { kind: "file" }> }) {
   const t = useTranslations("tasks.detail.thread");
   return (
-    <p className="flex flex-wrap items-center gap-1.5 text-[13.5px] text-app-text-primary">
+    // ADR 0006: a document marked "בלי AI" is kept from the browser's
+    // translator; a marked task or client covers the whole task page.
+    <p {...noTranslateProps(entry.aiExcluded)} className="flex flex-wrap items-center gap-1.5 text-[13.5px] text-app-text-primary">
       <Paperclip size={13} className="text-app-text-tertiary" />
       {/* 5.11.2026: the title is the download, and says so. A file line
           that only names the file left people looking for a way to open

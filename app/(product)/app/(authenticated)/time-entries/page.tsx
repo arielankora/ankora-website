@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { timed } from "@/lib/slow-log";
 import { can } from "@/lib/app-auth/permissions";
 import { listTimeEntriesForAdmin } from "@/lib/app-domain/time-entries";
+import { aiExcludedRowIds } from "@/lib/app-domain/ai-exclusion-db";
 import { listClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
 import { listUsers } from "@/lib/app-domain/users";
@@ -69,6 +70,9 @@ export default async function AdminTimeEntriesPage(
   );
 
   const activeClients = clients.filter((c) => c.status === "ACTIVE");
+  // ADR 0006: an entry of a client or task marked "בלי AI" (its note is
+  // that work's content) is kept from the browser's translator.
+  const excludedEntries = await aiExcludedRowIds(entries);
   const employees = users.filter((u) => u.role !== "CLIENT_USER" && u.status === "ACTIVE");
 
   return (
@@ -107,6 +111,7 @@ export default async function AdminTimeEntriesPage(
             clientName: entry.client.name,
             categoryName: entry.category.name,
             updatedAt: entry.updatedAt.toISOString(),
+            aiExcluded: excludedEntries.has(entry.id),
           }))}
         />
       </div>

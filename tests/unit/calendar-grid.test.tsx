@@ -71,6 +71,15 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("CalendarGrid", () => {
+  it("keeps a task marked \"בלי AI\" from the browser's translator, and only that one (ADR 0006)", () => {
+    renderGrid([task("t1", "2026-10-21", { aiExcluded: true }), task("t2", "2026-10-21"), task("t3", null, { aiExcluded: true })]);
+    expect(cell("2026-10-21").querySelector('[data-calendar-task="t1"]')?.getAttribute("translate")).toBe("no");
+    expect(cell("2026-10-21").querySelector('[data-calendar-task="t2"]')?.hasAttribute("translate")).toBe(false);
+    expect(screen.getByTestId("calendar-drawer").querySelector('[data-calendar-task="t3"]')?.getAttribute("translate")).toBe("no");
+    // The page itself stays translatable: other clients' work is on it.
+    expect(document.head.querySelector('meta[name="google"]')).toBeNull();
+  });
+
   it("draws a task on its due day, a date on its day, and an undated task in the panel", () => {
     renderGrid([task("t1", "2026-10-21"), task("t2", null)]);
     expect(cell("2026-10-21").querySelector('[data-calendar-task="t1"]')).not.toBeNull();

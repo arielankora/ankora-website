@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import { useActionForm } from "@/components/app/useActionForm";
 import { adminUpdateEntryAction, deleteEntryAction, restoreEntryAction, getEntryRevisionsAction } from "./actions";
 import { ClosedBankNotice } from "../my-time/ClosedBankNotice";
@@ -33,6 +34,9 @@ export type Entry = {
   /// save so the server can detect a concurrent edit; see
   /// lib/app-domain/time-entries.ts's ConflictError.
   updatedAt: string;
+  /// ADR 0006: the entry's client or task is "בלי AI", so its row is kept
+  /// from the browser's translator.
+  aiExcluded?: boolean;
 };
 
 type Revision = {
@@ -170,7 +174,7 @@ export function AdminEntryRow({
 
   if (editing) {
     return (
-      <tr className="border-b border-app-border">
+      <tr {...noTranslateProps(entry.aiExcluded)} className="border-b border-app-border">
         <td colSpan={9} className="px-5 py-4">
           <form ref={editFormRef} onSubmit={onSubmit} className="space-y-3">
             <input type="hidden" name="timeEntryId" value={entry.id} />
@@ -257,7 +261,7 @@ export function AdminEntryRow({
 
   return (
     <>
-      <tr className="border-b border-app-border last:border-0">
+      <tr {...noTranslateProps(entry.aiExcluded)} className="border-b border-app-border last:border-0">
         <td className="px-5 py-3">
           <button
             type="button"
@@ -323,7 +327,7 @@ export function AdminEntryRow({
         </tr>
       )}
       {showHistory && (
-        <tr className="border-b border-app-border bg-cream/60">
+        <tr {...noTranslateProps(entry.aiExcluded)} className="border-b border-app-border bg-cream/60">
           <td colSpan={9} className="px-5 py-4">
             {loadingHistory && <p className="text-xs text-app-text-tertiary">{t("loadingHistory")}</p>}
             {!loadingHistory && revisions && revisions.length === 0 && (
