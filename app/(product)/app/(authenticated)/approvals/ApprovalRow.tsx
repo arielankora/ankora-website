@@ -1,6 +1,7 @@
 "use client";
 import { approvalAnchor } from "@/lib/approval-links";
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import type { ApprovalKind, KindTone, RowActions } from "@/lib/approvals";
 import type { ApprovalPreview } from "@/lib/approvals-preview";
@@ -52,6 +53,7 @@ export type RowView = {
 };
 
 export function ApprovalRow({ row }: { row: RowView }) {
+  const t = useTranslations("approvals");
   const { showToast } = useToast();
   const [pending, start] = useTransition();
   const [rejecting, setRejecting] = useState(false);
@@ -63,13 +65,13 @@ export function ApprovalRow({ row }: { row: RowView }) {
     start(async () => {
       const r = await decideApprovalAction({ kind: row.kind, id: row.kind === "process" ? row.id.split(":")[0] : row.id, version: row.version, decision, note, clientId: row.clientId, op: row.op ?? null });
       if (r.error) {
-        showToast({ tone: "error", title: decision === "approve" ? "האישור נכשל" : "הפעולה נכשלה", description: r.error });
+        showToast({ tone: "error", title: decision === "approve" ? t("row.approveFailed") : t("row.actionFailed"), description: r.error });
         return;
       }
       setRejecting(false);
-      const did = row.kind === "process" ? "בוצע" : "אושר";
-      setDone(decision === "approve" ? did : row.actions.reject?.label ?? "נדחה");
-      showToast({ tone: decision === "approve" ? "success" : "info", title: decision === "approve" ? did : "בוצע", description: row.title.slice(0, 80) });
+      const did = row.kind === "process" ? t("row.done") : t("row.approved");
+      setDone(decision === "approve" ? did : (row.actions.reject?.label ?? t("row.rejected")));
+      showToast({ tone: decision === "approve" ? "success" : "info", title: decision === "approve" ? did : t("row.done"), description: row.title.slice(0, 80) });
     });
 
   const reject = row.actions.reject;
@@ -79,14 +81,14 @@ export function ApprovalRow({ row }: { row: RowView }) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           {row.showLabel && <KindLabel label={row.label} tone={row.tone} />}
-          <a href={row.href} className="text-[14px] font-medium text-app-text-primary hover:text-app-text-accent hover:underline">
+          <a href={row.href} dir="auto" className="text-[14px] font-medium text-app-text-primary hover:text-app-text-accent hover:underline">
             {row.title}
           </a>
         </div>
-        {row.detail && <p className="mt-1 text-[12.5px] leading-relaxed text-app-text-secondary">{row.detail}</p>}
+        {row.detail && <p dir="auto" className="mt-1 text-[12.5px] leading-relaxed text-app-text-secondary">{row.detail}</p>}
         {row.recommend && (
           <p className="mt-1 text-[12.5px] leading-relaxed text-app-text-primary" data-testid="approval-recommend">
-            <span className="font-medium">מומלץ: {row.recommend.text}.</span>
+            <span className="font-medium">{t("row.recommend", { text: row.recommend.text })}</span>
             {row.recommend.why && <span className="text-app-text-secondary"> {row.recommend.why}</span>}
           </p>
         )}
@@ -97,7 +99,7 @@ export function ApprovalRow({ row }: { row: RowView }) {
               <>
                 {" "}
                 <a href={row.href} className="font-medium text-app-text-accent hover:underline">
-                  לתהליך
+                  {t("row.toProcess")}
                 </a>
               </>
             )}
@@ -110,7 +112,7 @@ export function ApprovalRow({ row }: { row: RowView }) {
             {row.failing.slice(0, MAX_FAILING).map((line, i) => (
               <li key={i}>{line}</li>
             ))}
-            {row.failing.length > MAX_FAILING && <li className="list-none text-app-text-secondary">ועוד {row.failing.length - MAX_FAILING} בדיקות, ב&quot;{row.preview?.toggle ?? "הצגת הנוהל"}&quot;.</li>}
+            {row.failing.length > MAX_FAILING && <li className="list-none text-app-text-secondary">{t("row.moreFailing", { count: String(row.failing.length - MAX_FAILING), toggle: t(`preview.toggle.${row.preview?.toggleKey ?? "procedure"}`) })}</li>}
           </ul>
         )}
         {row.preview && (
@@ -121,27 +123,27 @@ export function ApprovalRow({ row }: { row: RowView }) {
             className="mt-1.5 text-[12.5px] font-medium text-app-text-accent hover:underline"
             data-testid="approval-preview-toggle"
           >
-            {open ? "הסתרה" : row.preview.toggle}
+            {open ? t("row.hide") : t(`preview.toggle.${row.preview.toggleKey}`)}
           </button>
         )}
         {row.preview && open && <PreviewBody preview={row.preview} />}
         <p className="mt-1 text-[11.5px] text-app-text-tertiary">
-          {[row.clientName, row.by ? `מ${row.by}` : null, row.waited].filter(Boolean).join(" · ")}
+          {[row.clientName, row.by ? t("row.from", { name: row.by }) : null, row.waited].filter(Boolean).join(" · ")}
         </p>
         {rejecting && reject?.note && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <input
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="למה, בשורה אחת"
-              aria-label="סיבה"
+              placeholder={t("row.reasonPlaceholder")}
+              aria-label={t("row.reasonLabel")}
               className="min-w-[14rem] flex-1 rounded-lg border border-app-border bg-white px-3 py-1.5 text-[13px] text-app-text-primary"
             />
             <button type="button" disabled={pending || !note.trim()} onClick={() => decide("reject")} className="rounded-full border border-app-border px-3 py-1 text-[12.5px] text-app-error disabled:opacity-40">
-              {pending ? "שומר..." : reject.label}
+              {pending ? t("row.saving") : reject.label}
             </button>
             <button type="button" onClick={() => setRejecting(false)} className="text-[12px] text-app-text-tertiary hover:underline">
-              ביטול
+              {t("row.cancel")}
             </button>
           </div>
         )}
@@ -152,10 +154,10 @@ export function ApprovalRow({ row }: { row: RowView }) {
         ) : rejecting && reject && !reject.note ? (
           <>
             <button type="button" disabled={pending} onClick={() => decide("reject")} className="font-medium text-app-error hover:underline disabled:opacity-40">
-              {pending ? "שומר..." : `כן, ${reject.label}`}
+              {pending ? t("row.saving") : t("row.confirm", { label: reject.label })}
             </button>
             <button type="button" onClick={() => setRejecting(false)} className="text-app-text-tertiary hover:underline">
-              ביטול
+              {t("row.cancel")}
             </button>
           </>
         ) : (
@@ -167,7 +169,7 @@ export function ApprovalRow({ row }: { row: RowView }) {
                 onClick={() => decide("approve")}
                 className="rounded-full bg-app-surface-nav px-3.5 py-1.5 font-medium text-cream disabled:opacity-40"
               >
-                {pending ? "שומר..." : row.actions.approve}
+                {pending ? t("row.saving") : row.actions.approve}
               </button>
             )}
             {reject && !rejecting && (
@@ -182,12 +184,12 @@ export function ApprovalRow({ row }: { row: RowView }) {
             )}
             {!row.actions.approve && !row.go && !reject && (
               <a href={row.href} className="font-medium text-app-text-accent hover:underline">
-                לפתוח
+                {t("row.open")}
               </a>
             )}
             {!reject && (row.actions.approve || row.go) && (
               <a href={row.href} className="text-app-text-secondary hover:text-app-text-primary hover:underline">
-                אחרת
+                {t("row.otherwise")}
               </a>
             )}
           </>
@@ -199,11 +201,12 @@ export function ApprovalRow({ row }: { row: RowView }) {
 
 /// The item in full, under its row: read before deciding.
 function PreviewBody({ preview }: { preview: ApprovalPreview }) {
+  const t = useTranslations("approvals");
   return (
     <div className="mt-2 space-y-2.5 rounded-lg border border-app-border bg-app-surface-sunken px-3 py-2.5" data-testid="approval-preview">
       {preview.problems.length > 0 && (
         <div>
-          <p className="text-[12px] font-medium text-app-error">מה מעכב את האישור</p>
+          <p className="text-[12px] font-medium text-app-error">{t("row.blockingTitle")}</p>
           {preview.problems.map((line, i) => (
             <p key={i} className="mt-0.5 text-[12.5px] leading-relaxed text-app-error">
               {line}
@@ -213,9 +216,9 @@ function PreviewBody({ preview }: { preview: ApprovalPreview }) {
       )}
       {preview.sections.map((sec, i) => (
         <div key={i}>
-          {sec.heading && <p className="text-[12px] font-medium text-app-text-secondary">{sec.heading}</p>}
+          {sec.headingKey && <p className="text-[12px] font-medium text-app-text-secondary">{t(`preview.headings.${sec.headingKey}`)}</p>}
           {sec.lines.map((line, j) => (
-            <p key={j} className="mt-0.5 whitespace-pre-line text-[12.5px] leading-relaxed text-app-text-primary">
+            <p key={j} dir="auto" className="mt-0.5 whitespace-pre-line text-[12.5px] leading-relaxed text-app-text-primary">
               {line}
             </p>
           ))}

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { AutoApplyScope, Prisma, User } from "@prisma/client";
 import { assertCan, canManageClients, ForbiddenError } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
+import { DomainError } from "@/lib/domain-error";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { proposalHeadline, revertBlocker, type ProposalTargetLike } from "@/lib/knowledge-proposals";
@@ -14,6 +15,7 @@ import {
   KIND_WINDOW,
   autoErrorAt,
   autoReviewReason,
+  autoReviewReasonCode,
   clientPauseDue,
   kindPauseDue,
   wilsonLower,
@@ -175,7 +177,7 @@ export async function evaluateAutoPauses(scope: { clientId: string; kindKeys: st
 export async function liftAutoApplyPause(actor: User, id: string) {
   if (!canManageClients(actor.role)) throw new ForbiddenError("רק מנהל מחזיר לכניסה אוטומטית.");
   const done = await prisma.autoApplyPause.updateMany({ where: { id, liftedAt: null }, data: { liftedAt: new Date(), liftedById: actor.id } });
-  if (done.count === 0) throw new Error("העצירה כבר הוסרה.");
+  if (done.count === 0) throw new DomainError("autoApply.pauseAlreadyLifted", "העצירה כבר הוסרה.");
   const row = await prisma.autoApplyPause.findUniqueOrThrow({ where: { id } });
   await recordAudit({ actorId: actor.id, action: "knowledge.auto_apply_lift", entityType: "AutoApplyPause", entityId: id, clientId: row.scope === "CLIENT" ? row.key : null, after: { scope: row.scope, key: row.key } });
   return row;
@@ -221,6 +223,10 @@ export async function autoApplyOverview(actor: User) {
       id: p.id,
       scope: p.scope,
       label: p.scope === "KIND" ? proposalKindLabel(p.key) : nameOf.get(p.key) ?? "לקוח",
+      /// ADR 0006: what the screen words `label` from. The kind's key, or
+      /// the client's name (null when the client is gone).
+      kindKey: p.scope === "KIND" ? p.key : null,
+      clientName: p.scope === "CLIENT" ? (nameOf.get(p.key) ?? null) : null,
       reason: p.reason,
       since: p.createdAt,
       decisions: alone.length,
@@ -237,10 +243,14 @@ export type AutoReviewItem = {
   clientName: string;
   target: ProposalTargetLike;
   kindLabel: string;
+  /// ADR 0006: the kind (proposalKindKey), for a screen in another language.
+  kindKey: string;
   headline: string;
   resultId: string | null;
   decidedAt: Date;
   why: string;
+  /// `why` as a code with its numbers (autoReviewReasonCode).
+  whyCode: NonNullable<ReturnType<typeof autoReviewReasonCode>>;
   /// "ביטול" may still take its item out (revertBlocker).
   revertible: boolean;
 };
@@ -268,8 +278,10 @@ export async function listAutoReview(actor: User, filter: { clientId?: string | 
   const out: AutoReviewItem[] = [];
   for (const r of rows) {
     if (!r.decidedAt) continue;
-    const why = autoReviewReason({ id: r.id, decidedAt: r.decidedAt }, { firstEnabledAt: setting.firstEnabledAt, guideApprovals: guides });
-    if (!why) continue;
+    const ctx = { firstEnabledAt: setting.firstEnabledAt, guideApprovals: guides };
+    const why = autoReviewReason({ id: r.id, decidedAt: r.decidedAt }, ctx);
+    const whyCode = autoReviewReasonCode({ id: r.id, decidedAt: r.decidedAt }, ctx);
+    if (!why || !whyCode) continue;
     const payload = (r.payload ?? {}) as Record<string, unknown>;
     const target = r.target as ProposalTargetLike;
     out.push({
@@ -278,10 +290,12 @@ export async function listAutoReview(actor: User, filter: { clientId?: string | 
       clientName: nameOf.get(r.clientId) ?? "",
       target,
       kindLabel: proposalKindLabel(proposalKindKey({ target, payload })),
+      kindKey: proposalKindKey({ target, payload }),
       headline: proposalHeadline(target, payload),
       resultId: r.resultId,
       decidedAt: r.decidedAt,
       why,
+      whyCode,
       revertible: revertBlocker(r) === null,
     });
   }
@@ -299,11 +313,11 @@ export async function countAutoReview(actor: User, filter: { clientId?: string |
 export async function markAutoReviewed(actor: User, id: string) {
   assertCan(actor.role, "time_entry.create_self");
   const p = await prisma.knowledgeProposal.findUnique({ where: { id }, select: { clientId: true, autoApplied: true, revertedAt: true } });
-  if (!p) throw new Error("ההצעה לא נמצאה.");
+  if (!p) throw new DomainError("autoApply.notFound", "ההצעה לא נמצאה.");
   await assertClientAccess(actor, p.clientId);
-  if (!p.autoApplied) throw new Error("ההצעה לא נכנסה אוטומטית.");
-  if (p.revertedAt) throw new Error("הפריט כבר הוסר מהתיק.");
+  if (!p.autoApplied) throw new DomainError("autoApply.notAutoApplied", "ההצעה לא נכנסה אוטומטית.");
+  if (p.revertedAt) throw new DomainError("autoApply.alreadyRemoved", "הפריט כבר הוסר מהתיק.");
   const done = await prisma.knowledgeProposal.updateMany({ where: { id, autoReviewedAt: null }, data: { autoReviewedAt: new Date(), autoReviewedById: actor.id } });
-  if (done.count === 0) throw new Error("כבר סומן כתקין.");
+  if (done.count === 0) throw new DomainError("autoApply.alreadyMarked", "כבר סומן כתקין.");
   await recordAudit({ actorId: actor.id, action: "knowledge_proposal.auto_review", entityType: "KnowledgeProposal", entityId: id, clientId: p.clientId });
 }

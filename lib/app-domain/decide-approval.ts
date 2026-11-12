@@ -10,6 +10,7 @@ import { approvePortalSummary, discardPortalSummary } from "@/lib/app-domain/por
 import { approveGuide, rejectGuide } from "@/lib/app-domain/extraction-guide";
 import { runStep } from "@/lib/app-domain/process-next-steps";
 import type { ApprovalKind } from "@/lib/approvals";
+import { DomainError } from "@/lib/domain-error";
 import type { StepOp } from "@/lib/next-steps";
 
 // One decision on a row of "אישורים" (lib/approvals.ts), with three doors:
@@ -45,11 +46,11 @@ export async function decideApproval(user: User, input: DecideInput): Promise<vo
       else await removeClientPolicy(user, input.id);
       return;
     case "procedure":
-      if (!approve || input.version === undefined) throw new Error("נוהל מאשרים כאן, ומתקנים אותו בתהליך עצמו.");
+      if (!approve || input.version === undefined) throw new DomainError("decideApproval.procedureHere", "נוהל מאשרים כאן, ומתקנים אותו בתהליך עצמו.");
       await approveProcessVersion(user, input.id, input.version);
       return;
     case "plan":
-      if (!approve || input.version === undefined) throw new Error("תוכנית מאשרים כאן, ומתקנים אותה במשימה עצמה.");
+      if (!approve || input.version === undefined) throw new DomainError("decideApproval.planHere", "תוכנית מאשרים כאן, ומתקנים אותה במשימה עצמה.");
       await approveTaskPlan(user, input.id, input.version);
       return;
     case "summary":
@@ -61,16 +62,16 @@ export async function decideApproval(user: User, input: DecideInput): Promise<vo
       else await rejectGuide(user, input.id, note);
       return;
     case "process":
-      if (!approve || !input.op) throw new Error("אין כאן פעולה לבצע. פותחים את התהליך.");
+      if (!approve || !input.op) throw new DomainError("decideApproval.processNoOp", "אין כאן פעולה לבצע. פותחים את התהליך.");
       await runStep(user, input.op);
       return;
     case "internal":
-      if (!approve || !input.clientId) throw new Error("את הפריטים של התיק הפנימי מאשרים כאן, או פותחים את התיק.");
+      if (!approve || !input.clientId) throw new DomainError("decideApproval.internalHere", "את הפריטים של התיק הפנימי מאשרים כאן, או פותחים את התיק.");
       await confirmInternalSource(user, input.clientId, input.id);
       return;
     case "check":
-      throw new Error("את החתימה בודקים עם Claude, בדף של איש הצוות.");
+      throw new DomainError("decideApproval.checkWithClaude", "את החתימה בודקים עם Claude, בדף של איש הצוות.");
     case "knowledge":
-      throw new Error("הצעות לתיק מאשרים אחת אחת, בלשונית ידע מהחילוץ.");
+      throw new DomainError("decideApproval.knowledgeOneByOne", "הצעות לתיק מאשרים אחת אחת, בלשונית ידע מהחילוץ.");
   }
 }

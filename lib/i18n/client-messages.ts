@@ -14,6 +14,7 @@
 // entry must still be used. Adding a translated client component with a
 // new namespace fails that test until the namespace is listed here.
 export const CLIENT_MESSAGE_PATHS = [
+  "approvals",
   "auth",
   "claude",
   "clients.connections",
@@ -44,6 +45,7 @@ export const CLIENT_MESSAGE_PATHS = [
   "clients.systems",
   "clients.tasks",
   "guide",
+  "knowledge",
   "messageClient",
   "myTime.closedBank",
   "myTime.entry",
