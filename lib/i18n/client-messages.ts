@@ -16,6 +16,7 @@
 export const CLIENT_MESSAGE_PATHS = [
   "auth",
   "claude",
+  "guide",
   "messageClient",
   "myTime.closedBank",
   "myTime.entry",
