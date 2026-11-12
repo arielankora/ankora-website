@@ -74,6 +74,17 @@
 //   Measured shares of #602's files under vitest's own `--shard`: about 12.4,
 //   14.4 and 12.0 minutes. Level 3's critical path becomes `main` again.
 
+// 12.11.2026, fifth pass: `integration` is split four ways, the same budget
+// story as 25.10 and 27.10, on the Israel pass this time.
+//
+//   integration-3 ran 954s on main (#819, 11.11) and 1107s, then past the
+//   20-minute budget in checks/vitest.mjs, on #468's runs the next morning;
+//   its rerun took 924s. The three shards together are 45 to 50 minutes of
+//   tests, and vitest's `--shard` divides by files, not by time, so the
+//   third that holds the heaviest files (time-entries alone is 133s) sits
+//   closest to the budget. Four ways is about 12 minutes a shard. Level 2
+//   pays one more job setup for it, about two minutes of runner time.
+
 /**
  * Shards that own specific checks, and how a check is divided inside one.
  *
@@ -81,9 +92,10 @@
  * split runs whole in its shard. Everything unclaimed runs in `main`.
  */
 export const SHARD_CHECKS = {
-  "integration-1": { checks: ["integration"], split: [1, 3] },
-  "integration-2": { checks: ["integration"], split: [2, 3] },
-  "integration-3": { checks: ["integration"], split: [3, 3] },
+  "integration-1": { checks: ["integration"], split: [1, 4] },
+  "integration-2": { checks: ["integration"], split: [2, 4] },
+  "integration-3": { checks: ["integration"], split: [3, 4] },
+  "integration-4": { checks: ["integration"], split: [4, 4] },
   "utc-1": { checks: ["integration-utc"], split: [1, 3] },
   "utc-2": { checks: ["integration-utc"], split: [2, 3] },
   "utc-3": { checks: ["integration-utc"], split: [3, 3] },
@@ -103,8 +115,8 @@ export const MAIN_SHARD = "main";
  */
 export const PLAN = {
   1: null,
-  2: [MAIN_SHARD, "integration-1", "integration-2", "integration-3"],
-  3: [MAIN_SHARD, "integration-1", "integration-2", "integration-3", "utc-1", "utc-2", "utc-3", "coverage-1", "coverage-2", "coverage-3"],
+  2: [MAIN_SHARD, "integration-1", "integration-2", "integration-3", "integration-4"],
+  3: [MAIN_SHARD, "integration-1", "integration-2", "integration-3", "integration-4", "utc-1", "utc-2", "utc-3", "coverage-1", "coverage-2", "coverage-3"],
 };
 
 /** The shard names for a level, or null when that level runs as one job. */
