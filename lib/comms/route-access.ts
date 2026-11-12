@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { matchPhones } from "@/lib/whatsapp-poc/clients-by-phone";
 import { readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { commsAccess } from "./access";
-import { canSeeConversation, isExcludedViewer, parseViewerEmails } from "./visibility";
+import { canSeeConversation, isExcludedViewer } from "./visibility";
+import { fullViewerEmails } from "./grants";
 
 // The audio and file routes (1.11.2026, several numbers): which Unipile
 // account a chat's file is read from, and whether this person may have it.
@@ -43,6 +44,6 @@ export async function accountForChatFile(
     ...(conversation.groupClientId ? [conversation.groupClientId] : []),
   ];
   const clients = await prisma.client.findMany({ where: { id: { in: clientIds } }, select: { id: true, accountManagerId: true } });
-  const ok = canSeeConversation({ viewer: user, channel, clients, fullViewers: parseViewerEmails(process.env.COMMS_FULL_VIEWERS) });
+  const ok = canSeeConversation({ viewer: user, channel, clients, fullViewers: await fullViewerEmails() });
   return ok ? { apiKey, accountId: channel.accountId } : null;
 }
