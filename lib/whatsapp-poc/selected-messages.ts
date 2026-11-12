@@ -34,6 +34,23 @@ export type SelectedMessage = {
   transcript?: string | null;
 };
 
+/// The word a file goes by inside the comment a task gets (formatSelectedMessages).
+/// It is written into the task, so it is content and stays in Hebrew
+/// (ADR 0006); the screen shows its own, translated word beside it.
+const CONTENT_FILE_LABEL: Record<string, string> = {
+  img: "תמונה",
+  image: "תמונה",
+  video: "וידאו",
+  audio: "הודעה קולית",
+  file: "קובץ",
+  sticker: "מדבקה",
+};
+
+export function contentFileLabel(a: { type: string; voiceNote?: boolean }): string {
+  if (a.voiceNote) return "הודעה קולית";
+  return CONTENT_FILE_LABEL[a.type] ?? "קובץ";
+}
+
 /// Per message. The comment as a whole is capped by MAX_COMMENT_LENGTH.
 export const MAX_TRANSCRIPT_IN_COMMENT = 3000;
 

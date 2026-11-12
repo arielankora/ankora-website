@@ -88,13 +88,15 @@ export function canReplyTo(
   return chat.type === "1to1" || chat.type === "group";
 }
 
-export type MessageTextCheck = { ok: true; text: string } | { ok: false; error: string };
+/// `code` names the refusal for a translated screen (ADR 0006); `error` is
+/// the Hebrew sentence it always was.
+export type MessageTextCheck = { ok: true; text: string } | { ok: false; error: string; code: "empty" | "tooLong" };
 
 export function checkMessageText(raw: unknown): MessageTextCheck {
   const text = typeof raw === "string" ? raw.trim() : "";
-  if (!text) return { ok: false, error: "ההודעה ריקה." };
+  if (!text) return { ok: false, error: "ההודעה ריקה.", code: "empty" };
   if (text.length > MAX_MESSAGE_LENGTH) {
-    return { ok: false, error: `ההודעה ארוכה מדי (עד ${MAX_MESSAGE_LENGTH} תווים).` };
+    return { ok: false, error: `ההודעה ארוכה מדי (עד ${MAX_MESSAGE_LENGTH} תווים).`, code: "tooLong" };
   }
   return { ok: true, text };
 }

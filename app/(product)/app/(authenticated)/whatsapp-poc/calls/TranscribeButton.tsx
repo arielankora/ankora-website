@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useState } from "react";
+import { useTranslations } from "next-intl";
 import { transcribeRecordingAction, transcribeVoiceNoteAction, type TranscribeState } from "./actions";
 
 // One button for both kinds of audio: a call recording (by email id) and a
@@ -10,6 +11,7 @@ type Target = { kind: "recording"; emailId: string } | { kind: "voice"; chatId: 
 /// A transcript with "hide" and "copy". Used for a stored transcript too
 /// (1.11.2026: recordings are transcribed on arrival, no button needed).
 export function TranscriptText({ text }: { text: string }) {
+  const t = useTranslations("comms.transcript");
   const [hidden, setHidden] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -38,23 +40,24 @@ export function TranscriptText({ text }: { text: string }) {
     <div className="space-y-2">
       <div className="flex flex-wrap gap-3 text-sm">
         <button type="button" onClick={() => setHidden((h) => !h)} className="min-h-11 text-app-text-primary underline">
-          {hidden ? "הצגת התמלול" : "הסתרת התמלול"}
+          {hidden ? t("show") : t("hide")}
         </button>
         <button type="button" onClick={copy} className="min-h-11 text-app-text-primary underline">
-          העתקת התמלול
+          {t("copy")}
         </button>
         <span role="status" className="inline-flex min-h-11 items-center text-app-success">
-          {copied ? "התמלול הועתק" : ""}
+          {copied ? t("copied") : ""}
         </span>
       </div>
       {!hidden ? (
-        <p className="whitespace-pre-wrap rounded-lg bg-app-surface-sunken p-3 text-sm leading-relaxed text-app-text-primary">{text}</p>
+        <p dir="auto" className="whitespace-pre-wrap rounded-lg bg-app-surface-sunken p-3 text-sm leading-relaxed text-app-text-primary">{text}</p>
       ) : null}
     </div>
   );
 }
 
 export function TranscribeButton(props: Target & { label?: string }) {
+  const t = useTranslations("comms.transcript");
   const serverAction = props.kind === "recording" ? transcribeRecordingAction : transcribeVoiceNoteAction;
   const [state, action, pending] = useActionState<TranscribeState | undefined, FormData>(serverAction, undefined);
 
@@ -75,7 +78,7 @@ export function TranscribeButton(props: Target & { label?: string }) {
         disabled={pending}
         className="min-h-11 rounded-lg border border-app-border-strong bg-white px-4 text-sm text-app-text-primary disabled:opacity-60"
       >
-        {pending ? "מתמלל... (עד דקה)" : (props.label ?? "תמלול")}
+        {pending ? t("transcribing") : (props.label ?? t("transcribe"))}
       </button>
       {state?.error ? (
         <p role="alert" className="text-sm text-app-error">

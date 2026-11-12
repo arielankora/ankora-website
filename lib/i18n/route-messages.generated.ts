@@ -16,6 +16,8 @@ export const GLOBAL_MESSAGE_PATHS = [
   "clients.knowledge",
   "clients.processes.checkForm",
   "clients.processes.common",
+  "home.kpi.activeTimers",
+  "home.trend",
   "shell",
 ] as const;
 
@@ -158,6 +160,9 @@ export const AREA_MESSAGE_PATHS = {
     "users.personalEmail",
     "users.resendInvite",
     "users.roleStatus",
+  ],
+  "whatsapp-poc": [
+    "comms",
   ],
 } as const satisfies Record<string, readonly string[]>;
 

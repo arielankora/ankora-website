@@ -1,6 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canManageClients } from "@/lib/app-auth/permissions";
@@ -15,7 +17,18 @@ import { afterResponse } from "@/lib/after-response";
 import { CHANNEL_PERSON_WHERE, ineligibleChannelPeople, personLabel } from "@/lib/comms/channel-people";
 import { prisma } from "@/lib/prisma";
 
-export type SetupState = { error?: string; ok?: string };
+/// `kept`: the answer to "לשמור" on a new chat, which the row can undo.
+export type SetupState = { error?: string; ok?: string; kept?: boolean };
+
+/// The words these actions answer with, in the reader's language (ADR 0006).
+async function words() {
+  return getTranslations("comms.setup.result");
+}
+
+/// A BlockError's sentence in the reader's language.
+async function blockText(err: BlockError): Promise<string> {
+  return (await domainErrorText(err)) ?? err.message;
+}
 
 const PATHS = ["/app/whatsapp-poc", "/app/whatsapp-poc/setup"];
 function refresh() {
@@ -25,7 +38,7 @@ function refresh() {
 async function gate() {
   const user = await requireUser();
   const access = await commsAccess(user);
-  if (!access.allowed && !canManageClients(user.role)) return { user, access, error: "אין הרשאה." as const };
+  if (!access.allowed && !canManageClients(user.role)) return { user, access, error: (await words())("forbidden") };
   return { user, access, error: null };
 }
 
@@ -33,20 +46,21 @@ async function gate() {
 /// and who must never see its conversations. A manager may connect a number
 /// for someone else; anyone else, only as their own.
 export async function connectChannelAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const w = await words();
   const user = await requireUser();
-  if (user.role === "CLIENT_USER") return { error: "אין הרשאה." };
+  if (user.role === "CLIENT_USER") return { error: w("forbidden") };
   const manager = canManageClients(user.role);
   const accountId = String(formData.get("accountId") || "").trim();
-  if (!/^acc_[A-Za-z0-9]+$/.test(accountId)) return { error: "מזהה חשבון לא תקין (acc_...)." };
+  if (!/^acc_[A-Za-z0-9]+$/.test(accountId)) return { error: w("badAccount") };
   const ownerUserId = manager ? String(formData.get("ownerUserId") || user.id) : user.id;
   // The owner sees every conversation on the number, so it has to be someone
   // who can sign in (lib/comms/channel-people.ts).
   const owner = await prisma.user.findFirst({ where: { ...CHANNEL_PERSON_WHERE, id: ownerUserId }, select: { id: true } });
-  if (!owner) return { error: "אפשר לבחור כבעלים רק משתמש פעיל במערכת." };
-  if (await prisma.commsChannel.findUnique({ where: { accountId } })) return { error: "המספר הזה כבר מחובר." };
+  if (!owner) return { error: w("ownerMustBeActive") };
+  if (await prisma.commsChannel.findUnique({ where: { accountId } })) return { error: w("alreadyConnected") };
   const excluded = [...new Set(formData.getAll("excluded").map(String).filter((id) => id && id !== ownerUserId))];
   if ((await ineligibleChannelPeople(excluded)).length > 0) {
-    return { error: "ברשימת \"מי לא יראה\" אפשר לסמן רק משתמשים פעילים במערכת." };
+    return { error: w("excludedMustBeActive") };
   }
   const channel = await prisma.commsChannel.create({
     data: { accountId, ownerUserId, excludedViewerIds: excluded },
@@ -59,7 +73,7 @@ export async function connectChannelAction(_prev: SetupState | undefined, formDa
     after: { ownerUserId, excludedViewerIds: channel.excludedViewerIds },
   });
   refresh();
-  return { ok: "המספר מחובר. עכשיו מסמנים מה לא לשמור." };
+  return { ok: w("connected") };
 }
 
 /// Edit "לא רואים שיחות מהמספר" of a connected number (Ariel, 5.11.2026).
@@ -67,12 +81,13 @@ export async function connectChannelAction(_prev: SetupState | undefined, formDa
 /// themselves off it: a manager the owner kept out stays out until the owner
 /// says otherwise.
 export async function updateExcludedViewersAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const w = await words();
   const user = await requireUser();
-  if (user.role === "CLIENT_USER") return { error: "אין הרשאה." };
+  if (user.role === "CLIENT_USER") return { error: w("forbidden") };
   const channel = await prisma.commsChannel.findUnique({ where: { id: String(formData.get("channelId") || "") } });
-  if (!channel) return { error: "המספר לא נמצא." };
+  if (!channel) return { error: w("channelNotFound") };
   const isOwner = channel.ownerUserId === user.id;
-  if (!isOwner && !canManageClients(user.role)) return { error: "אין הרשאה." };
+  if (!isOwner && !canManageClients(user.role)) return { error: w("forbidden") };
   const picked = [...new Set(formData.getAll("excluded").map(String).filter(Boolean))].slice(0, 300);
   // Only active people may be added (lib/comms/channel-people.ts). Someone
   // already on the list who is no longer active is not in the form, and stays
@@ -80,7 +95,7 @@ export async function updateExcludedViewersAction(_prev: SetupState | undefined,
   // back.
   const added = picked.filter((id) => !channel.excludedViewerIds.includes(id));
   if ((await ineligibleChannelPeople(added)).length > 0) {
-    return { error: "ברשימת \"מי לא יראה\" אפשר לסמן רק משתמשים פעילים במערכת." };
+    return { error: w("excludedMustBeActive") };
   }
   const kept = await ineligibleChannelPeople(channel.excludedViewerIds);
   const excludedViewerIds = nextExcludedViewers({ channel, editorId: user.id, picked: [...picked, ...kept.filter((id) => !picked.includes(id))] });
@@ -96,8 +111,8 @@ export async function updateExcludedViewersAction(_prev: SetupState | undefined,
     after: { excludedViewerIds, excludeAllViewers },
   });
   refresh();
-  if (excludeAllViewers) return { ok: "הרשימה נשמרה. רק בעל המספר רואה את השיחות, גם כשיתווספו אנשים חדשים למערכת." };
-  return { ok: excludedViewerIds.length ? "הרשימה נשמרה." : "הרשימה נשמרה. כל מי שיש לו גישה רואה עכשיו את השיחות מהמספר." };
+  if (excludeAllViewers) return { ok: w("listSavedAll") };
+  return { ok: excludedViewerIds.length ? w("listSaved") : w("listSavedNone") };
 }
 
 /// "שינוי בעלים" (5.11.2026): a manager moves a connected number to another
@@ -109,16 +124,17 @@ export async function updateExcludedViewersAction(_prev: SetupState | undefined,
 /// as they are. Nothing is cached per person: commsAccess reads the owned
 /// numbers on every request, so the change takes effect on the next page load.
 export async function changeChannelOwnerAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const w = await words();
   const user = await requireUser();
-  if (!canManageClients(user.role)) return { error: "רק מנהל יכול לשנות בעלים של מספר." };
+  if (!canManageClients(user.role)) return { error: w("managerChangesOwner") };
   const channelId = String(formData.get("channelId") || "");
   const newOwnerId = String(formData.get("ownerUserId") || "");
   const channel = await prisma.commsChannel.findUnique({ where: { id: channelId } });
-  if (!channel) return { error: "המספר לא נמצא." };
-  if (!newOwnerId) return { error: "לא נבחר בעלים חדש." };
-  if (channel.ownerUserId === newOwnerId) return { error: "זה כבר הבעלים של המספר." };
+  if (!channel) return { error: w("channelNotFound") };
+  if (!newOwnerId) return { error: w("noNewOwner") };
+  if (channel.ownerUserId === newOwnerId) return { error: w("sameOwner") };
   const newOwner = await prisma.user.findFirst({ where: { ...CHANNEL_PERSON_WHERE, id: newOwnerId }, select: { name: true, email: true } });
-  if (!newOwner) return { error: "אפשר לבחור כבעלים רק משתמש פעיל במערכת." };
+  if (!newOwner) return { error: w("ownerMustBeActive") };
 
   const before = { ownerUserId: channel.ownerUserId, excludedViewerIds: channel.excludedViewerIds };
   const excludedViewerIds = channel.excludedViewerIds.filter((id) => id !== newOwnerId);
@@ -127,7 +143,7 @@ export async function changeChannelOwnerAction(_prev: SetupState | undefined, fo
     where: { id: channel.id, ownerUserId: channel.ownerUserId },
     data: { ownerUserId: newOwnerId, excludedViewerIds },
   });
-  if (count === 0) return { error: "הבעלים של המספר השתנה בינתיים. רעננו את הדף ונסו שוב." };
+  if (count === 0) return { error: w("ownerChangedMeanwhile") };
   await recordAudit({
     actorId: user.id,
     action: "comms_channel.owner_changed",
@@ -138,7 +154,7 @@ export async function changeChannelOwnerAction(_prev: SetupState | undefined, fo
   });
   refresh();
   return {
-    ok: `הבעלים של המספר עכשיו ${personLabel(newOwner)}. השיחות שכבר נשמרו ורשימת החסימה לא השתנו.`,
+    ok: w("ownerChanged", { owner: personLabel(newOwner) }),
   };
 }
 
@@ -155,22 +171,23 @@ function target(formData: FormData): { kind: "PHONE" | "CHAT"; value: string; la
 
 /// One "לא לשמור" (the setup list, or the button on a conversation).
 export async function blockAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const w = await words();
   const g = await gate();
   if (g.error) return { error: g.error };
   const t = target(formData);
   const channelId = String(formData.get("channelId") || "");
-  if (!t || !channelId) return { error: "לא ברור מה לחסום." };
+  if (!t || !channelId) return { error: w("unclearTarget") };
   try {
     const { block } = await requestBlock(g.user, { channelId, ...t });
     refresh();
     return {
       ok:
         block.status === "APPROVED"
-          ? "נחסם. מה שנשמר ממנו נמחק, ושום דבר ממנו לא יישמר."
-          : "נשלחה בקשה למנהל. עד ההחלטה ההודעות לא מוצגות לאף אחד.",
+          ? w("blocked")
+          : w("blockRequested"),
     };
   } catch (err) {
-    if (err instanceof BlockError) return { error: err.message };
+    if (err instanceof BlockError) return { error: await blockText(err) };
     throw err;
   }
 }
@@ -178,6 +195,7 @@ export async function blockAction(_prev: SetupState | undefined, formData: FormD
 /// The setup list: several "לא לשמור" at once (values "PHONE|+972..." or
 /// "CHAT|<chat id>|<name>").
 export async function blockManyAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const w = await words();
   const g = await gate();
   if (g.error) return { error: g.error };
   const channelId = String(formData.get("channelId") || "");
@@ -195,12 +213,12 @@ export async function blockManyAction(_prev: SetupState | undefined, formData: F
       await requestBlock(g.user, { channelId, ...t });
       done += 1;
     } catch (err) {
-      if (err instanceof BlockError) return { error: err.message };
+      if (err instanceof BlockError) return { error: await blockText(err) };
       throw err;
     }
   }
   refresh();
-  return { ok: done ? `סומנו ${done} שיחות "לא לשמור".` : "לא סומנה אף שיחה." };
+  return { ok: done ? w("marked", { count: done }) : w("noneMarked") };
 }
 
 export async function startStoringAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
@@ -209,7 +227,7 @@ export async function startStoringAction(_prev: SetupState | undefined, formData
   try {
     await startStoring(g.user, String(formData.get("channelId") || ""));
   } catch (err) {
-    if (err instanceof BlockError) return { error: err.message };
+    if (err instanceof BlockError) return { error: await blockText(err) };
     throw err;
   }
   // The history starts loading now, not at night: as much as a minute
@@ -226,58 +244,62 @@ export async function startStoringAction(_prev: SetupState | undefined, formData
 }
 
 export async function decideBlockAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const w = await words();
   const g = await gate();
   if (g.error) return { error: g.error };
-  if (!canManageClients(g.user.role)) return { error: "רק מנהל מחליט על חסימה." };
+  if (!canManageClients(g.user.role)) return { error: w("managerDecides") };
   try {
     await decideBlock(g.user, String(formData.get("blockId") || ""), formData.get("decision") === "approve");
   } catch (err) {
-    if (err instanceof BlockError) return { error: err.message };
+    if (err instanceof BlockError) return { error: await blockText(err) };
     throw err;
   }
   refresh();
-  return { ok: "נשמר." };
+  return { ok: w("saved") };
 }
 
 export async function revokeBlockAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const w = await words();
   const g = await gate();
   if (g.error) return { error: g.error };
   try {
     await revokeBlock(g.user, String(formData.get("blockId") || ""));
   } catch (err) {
-    if (err instanceof BlockError) return { error: err.message };
+    if (err instanceof BlockError) return { error: await blockText(err) };
     throw err;
   }
   refresh();
-  return { ok: "החסימה בוטלה. מעכשיו השיחות נשמרות שוב." };
+  return { ok: w("revoked") };
 }
 
 /// "טעינת היסטוריה עכשיו": the next part of the history, now, instead of at
 /// night. Up to about a minute of loading per press, after the answer.
 export async function loadHistoryAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const w = await words();
   const g = await gate();
   if (g.error) return { error: g.error };
   const channel = await prisma.commsChannel.findUnique({ where: { id: String(formData.get("channelId") || "") } });
-  if (!channel?.storeEnabled) return { error: "השמירה עוד לא התחילה." };
-  if (channel.ownerUserId !== g.user.id && !canManageClients(g.user.role)) return { error: "אין הרשאה." };
+  if (!channel?.storeEnabled) return { error: w("notStarted") };
+  if (channel.ownerUserId !== g.user.id && !canManageClients(g.user.role)) return { error: w("forbidden") };
   await afterResponse("comms: history load on request", async () => {
     await backfillChannel(channel, { budgetMs: 50_000, transcribe: transcribeRecording });
   });
-  return { ok: "הטעינה רצה ברקע, כדקה. רעננו את מסך התקשורת בעוד דקה. אפשר ללחוץ שוב כדי להמשיך." };
+  return { ok: w("historyLoading") };
 }
 
 /// 2.11.2026: recordings Aloha sent by hand (a batch for one line, no other
 /// side), into the store. Managers only. Runs after the response; running it
 /// again stores nothing twice.
 export async function importManualRecordingsAction(_prev: SetupState | undefined): Promise<SetupState> {
+  const w = await words();
   const g = await gate();
   if (g.error) return { error: g.error };
-  if (!canManageClients(g.user.role)) return { error: "אין הרשאה." };
+  if (!canManageClients(g.user.role)) return { error: w("forbidden") };
   const actorId = g.user.id;
   await afterResponse("comms: manual recordings import", async () => {
     await importManualRecordings(actorId);
   });
-  return { ok: "הייבוא רץ ברקע, כדקה. ההקלטות יופיעו במסך התקשורת, ויתומללו בריצה הלילית." };
+  return { ok: w("importRunning") };
 }
 
 /// "שיחות חדשות לבדיקה" (5.11.2026, Ariel): one decision on a chat that began
@@ -286,6 +308,7 @@ export async function importManualRecordingsAction(_prev: SetupState | undefined
 /// "block" is the ordinary "לא לשמור" (requestBlock: a manager's deletes
 /// what was kept, anyone else's holds it for a manager).
 export async function reviewNewChatAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const w = await words();
   const g = await gate();
   if (g.error) return { error: g.error };
   const decision = String(formData.get("decision") || "");
@@ -293,14 +316,14 @@ export async function reviewNewChatAction(_prev: SetupState | undefined, formDat
     where: { id: String(formData.get("conversationId") || "") },
     include: { channel: true },
   });
-  if (!conversation) return { error: "השיחה לא נמצאה." };
-  if (conversation.channel.ownerUserId !== g.user.id && !canManageClients(g.user.role)) return { error: "רק בעל המספר או מנהל מחליטים." };
+  if (!conversation) return { error: w("conversationNotFound") };
+  if (conversation.channel.ownerUserId !== g.user.id && !canManageClients(g.user.role)) return { error: w("ownerOrManagerDecides") };
   try {
     if (decision === "keep" || decision === "undo") {
       await prisma.commsConversation.update({ where: { id: conversation.id }, data: { reviewedAt: decision === "keep" ? new Date() : null } });
       // No refresh here: the row stays on screen with "ביטול" until the
       // next load, so a click by mistake can be taken back.
-      return { ok: decision === "keep" ? "נשמרת." : "חזרה לרשימה." };
+      return { ok: decision === "keep" ? w("kept") : w("backToList"), kept: decision === "keep" };
     }
     if (decision === "block") {
       const phone = !conversation.isGroup ? conversation.otherPhone : null;
@@ -312,28 +335,29 @@ export async function reviewNewChatAction(_prev: SetupState | undefined, formDat
       });
       await prisma.commsConversation.update({ where: { id: conversation.id }, data: { reviewedAt: new Date() } }).catch(() => undefined);
       refresh();
-      return { ok: block.status === "APPROVED" ? "לא נשמרת. מה שנשמר ממנה נמחק." : "נשלחה בקשה למנהל. ההודעות מוסתרות עד ההחלטה." };
+      return { ok: block.status === "APPROVED" ? w("chatBlocked") : w("chatBlockRequested") };
     }
   } catch (err) {
-    if (err instanceof BlockError) return { error: err.message };
+    if (err instanceof BlockError) return { error: await blockText(err) };
     throw err;
   }
-  return { error: "החלטה לא מוכרת." };
+  return { error: w("unknownDecision") };
 }
 
 /// "לשמור את כל השאר": the chats still listed, all kept.
 export async function keepAllNewChatsAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const w = await words();
   const g = await gate();
   if (g.error) return { error: g.error };
   const channel = await prisma.commsChannel.findUnique({ where: { id: String(formData.get("channelId") || "") } });
-  if (!channel) return { error: "המספר לא נמצא." };
-  if (channel.ownerUserId !== g.user.id && !canManageClients(g.user.role)) return { error: "רק בעל המספר או מנהל מחליטים." };
+  if (!channel) return { error: w("channelNotFound") };
+  if (channel.ownerUserId !== g.user.id && !canManageClients(g.user.role)) return { error: w("ownerOrManagerDecides") };
   const ids = [...new Set(formData.getAll("conversationId").map(String).filter(Boolean))].slice(0, 100);
-  if (ids.length === 0) return { error: "אין שיחות לסמן." };
+  if (ids.length === 0) return { error: w("nothingToMark") };
   const { count } = await prisma.commsConversation.updateMany({
     where: { id: { in: ids }, channelId: channel.id, reviewedAt: null },
     data: { reviewedAt: new Date() },
   });
   refresh();
-  return { ok: `${count} שיחות סומנו כנבדקו, וממשיכות להישמר.` };
+  return { ok: w("keptAll", { count }) };
 }

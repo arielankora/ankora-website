@@ -1,7 +1,16 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import type { HoursTrendData, TrendBasis, TrendDimension, TrendUnit } from "@/lib/app-domain/overview-trend";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { OTHER_KEY } from "@/lib/overview-trend-key";
+import type {
+  HoursTrendData,
+  TrendBasis,
+  TrendBucket,
+  TrendDimension,
+  TrendLabel,
+  TrendUnit,
+} from "@/lib/app-domain/overview-trend";
 
 /// Overview home-page widget (Ariel's request, redesign direction A
 /// follow-up). Design direction A of three proposed mockups, approved by
@@ -26,15 +35,19 @@ import type { HoursTrendData, TrendBasis, TrendDimension, TrendUnit } from "@/li
 // Each step now changes hue as well as lightness.
 const SERIES_COLORS = ["#1B2A3D", "#4A78A6", "#7FA89C", "#A9BCCB", "#8E7FA6"];
 const OTHER_COLOR = "#B08D57";
-const OTHER_KEY = "__other__";
+
+const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+const MONTH_KEYS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"] as const;
 
 function colorFor(key: string, index: number): string {
   return key === OTHER_KEY ? OTHER_COLOR : SERIES_COLORS[index % SERIES_COLORS.length];
 }
 
-function formatHours(hours: number): string {
-  const rounded = Math.round(hours * 10) / 10;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+/// A `YYYY-MM-DD` key as a Date at UTC midnight, formatted in UTC below, so
+/// the calendar day never moves with the reader's time zone.
+function dateOfKey(dateKey: string): Date {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
 }
 
 function SegToggle<T extends string>({
@@ -66,6 +79,35 @@ function SegToggle<T extends string>({
 }
 
 export function HoursTrendChart({ data }: { data: HoursTrendData }) {
+  const t = useTranslations("home.trend");
+  const format = useFormatter();
+  // The plot row is forced left to right; the tooltip inside it reads in
+  // the page's own direction.
+  const textDir = useLocale().startsWith("he") ? "rtl" : "ltr";
+
+  // One decimal at most, no thousands separator: the Hebrew read "1234.5"
+  // before ADR 0006 and still does.
+  const formatHours = (hours: number) =>
+    format.number(Math.round(hours * 10) / 10, { maximumFractionDigits: 1, useGrouping: false });
+
+  const labelOf = (label: TrendLabel): string => {
+    if (label.kind === "day") {
+      const day = t(`weekdays.${WEEKDAY_KEYS[label.weekday]}`);
+      return label.current ? t("today", { day }) : day;
+    }
+    if (label.kind === "month") {
+      const month = t(`months.${MONTH_KEYS[label.month]}`);
+      return label.current ? t("thisMonth", { month }) : month;
+    }
+    return t("weeksAgo", { count: label.weeksAgo });
+  };
+
+  const shortDay = (dateKey: string) =>
+    format.dateTime(dateOfKey(dateKey), { day: "numeric", month: "numeric", timeZone: "UTC" });
+  const rangeOf = (bucket: TrendBucket): string =>
+    bucket.firstDay === bucket.lastDay ? shortDay(bucket.firstDay) : `${shortDay(bucket.firstDay)} - ${shortDay(bucket.lastDay)}`;
+  const nameOf = (s: { key: string; name: string }) => (s.key === OTHER_KEY ? t("other") : s.name);
+
   const [unit, setUnit] = useState<TrendUnit>("day");
   const [dimension, setDimension] = useState<TrendDimension>("employee");
   const [basis, setBasis] = useState<TrendBasis>("actual");
@@ -87,15 +129,10 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-app-text-secondary">
-            {basis === "actual" ? "שעות בפועל" : "שעות לחיוב"} ·{" "}
-            {unit === "day"
-              ? "14 הימים האחרונים"
-              : unit === "week"
-                ? "7 השבועות האחרונים, כולל השבוע"
-                : "7 החודשים האחרונים, כולל החודש"}
+            {t(`basisTitle.${basis}`)} · {t(`period.${unit}`)}
           </p>
           <p className="mt-1 text-3xl font-medium text-app-text-primary">
-            {formatHours(grandTotal)} <span className="text-base font-normal text-app-text-tertiary">שעות</span>
+            {formatHours(grandTotal)} <span className="text-base font-normal text-app-text-tertiary">{t("hours")}</span>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -103,42 +140,46 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
             value={basis}
             onChange={setBasis}
             options={[
-              { value: "actual", label: "בפועל" },
-              { value: "billable", label: "לחיוב" },
+              { value: "actual", label: t("basis.actual") },
+              { value: "billable", label: t("basis.billable") },
             ]}
           />
           <SegToggle
             value={unit}
             onChange={setUnit}
             options={[
-              { value: "day", label: "ימים" },
-              { value: "week", label: "שבועות" },
-              { value: "month", label: "חודשים" },
+              { value: "day", label: t("unit.day") },
+              { value: "week", label: t("unit.week") },
+              { value: "month", label: t("unit.month") },
             ]}
           />
           <SegToggle
             value={dimension}
             onChange={setDimension}
             options={[
-              { value: "employee", label: "לפי איש צוות" },
-              { value: "client", label: "לפי לקוח" },
-              { value: "category", label: "לפי קטגוריה" },
+              { value: "employee", label: t("dimension.employee") },
+              { value: "client", label: t("dimension.client") },
+              { value: "category", label: t("dimension.category") },
             ]}
           />
         </div>
       </div>
 
       {!hasData ? (
-        <p className="mt-8 py-8 text-center text-sm text-app-text-tertiary">אין נתוני שעות בתקופה זו.</p>
+        <p className="mt-8 py-8 text-center text-sm text-app-text-tertiary">{t("empty")}</p>
       ) : (
         <>
-          <div dir="ltr" className="mt-8 flex h-48 items-end gap-2 sm:gap-4" role="img" aria-label={`גרף שעות מדווחות, ${series.buckets.map((b) => `${b.label}: ${formatHours(b.segments.reduce((s, x) => s + x.hours, 0))} שעות`).join(", ")}`}>
+          <div dir="ltr" className="mt-8 flex h-48 items-end gap-2 sm:gap-4" role="img" aria-label={t("chartLabel", {
+              bars: series.buckets
+                .map((b) => t("barLabel", { label: labelOf(b.label), hours: formatHours(b.segments.reduce((s, x) => s + x.hours, 0)) }))
+                .join(", "),
+            })}>
             {series.buckets.map((bucket, i) => {
               const total = totalsPerBucket[i];
               const barHeightPct = Math.max(2, (total / maxTotal) * 82);
               return (
                 <div
-                  key={bucket.label + i}
+                  key={i}
                   className="relative flex h-full flex-1 flex-col items-center justify-end"
                   onMouseEnter={() => setHoverIdx(i)}
                   onMouseLeave={() => setHoverIdx(null)}
@@ -149,13 +190,13 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                   {hoverIdx === i && (
                     <div
                       id={`${tooltipBaseId}-${i}`}
-                      dir="rtl"
+                      dir={textDir}
                       className="absolute bottom-full z-10 mb-2 w-max max-w-[200px] rounded-lg bg-app-surface-nav px-3 py-2 text-xs text-cream shadow-lg"
                     >
-                      <p className="font-medium">{bucket.label}</p>
+                      <p className="font-medium">{labelOf(bucket.label)}</p>
                       <p className="mb-1 text-cream/60">
-                        {bucket.range}
-                        {bucket.partial ? " · עד עכשיו" : ""}
+                        {rangeOf(bucket)}
+                        {bucket.partial ? ` · ${t("soFar")}` : ""}
                       </p>
                       {bucket.segments
                         .filter((s) => s.hours > 0)
@@ -165,7 +206,7 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                               className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
                               style={{ background: colorFor(s.key, series.legend.findIndex((l) => l.key === s.key)) }}
                             />
-                            <span className="flex-1">{s.name}</span>
+                            <span dir="auto" className="flex-1">{nameOf(s)}</span>
                             <span className="font-medium">{formatHours(s.hours)}</span>
                           </div>
                         ))}
@@ -211,9 +252,9 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
           </div>
           <div dir="ltr" className="mt-2 flex gap-2 sm:gap-4 text-center">
             {series.buckets.map((bucket, i) => (
-              <span key={bucket.label + i} className="flex flex-1 flex-col truncate text-[11px] text-app-text-tertiary">
-                <span className="truncate">{bucket.label}</span>
-                <span className="truncate text-[10px] text-app-text-tertiary">{bucket.range}</span>
+              <span key={i} className="flex flex-1 flex-col truncate text-[11px] text-app-text-tertiary">
+                <span className="truncate">{labelOf(bucket.label)}</span>
+                <span className="truncate text-[10px] text-app-text-tertiary">{rangeOf(bucket)}</span>
               </span>
             ))}
           </div>
@@ -222,7 +263,7 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
             {series.legend.map((l, i) => (
               <div key={l.key} className="flex items-center gap-1.5 text-xs text-app-text-secondary">
                 <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: colorFor(l.key, i) }} />
-                {l.name}
+                <span dir="auto">{nameOf(l)}</span>
               </div>
             ))}
           </div>
