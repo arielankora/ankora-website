@@ -1,12 +1,14 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { restoreClientAction } from "./actions";
 
 /// Brings an archived or paused client back to active. Used on the
 /// list's "בארכיון" section and on the screen of a client that is not
 /// active.
 export function RestoreClientButton({ clientId }: { clientId: string }) {
+  const t = useTranslations("clients.list.restore");
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export function RestoreClientButton({ clientId }: { clientId: string }) {
         disabled={pending}
         className="rounded-full border border-app-border px-3.5 py-2 text-xs text-app-text-primary hover:border-gold disabled:opacity-50"
       >
-        {pending ? "מחזיר..." : "החזרה לפעיל"}
+        {pending ? t("pending") : t("restore")}
       </button>
       {error && <span className="text-xs text-app-error">{error}</span>}
     </div>

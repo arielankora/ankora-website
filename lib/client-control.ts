@@ -122,6 +122,56 @@ export function controlParts(d: ControlData): ControlPart[] {
   return parts;
 }
 
+/// ADR 0006: the same parts as controlParts, in the same order, as keys
+/// under `clients.control.parts` and their values, for a screen that words
+/// them in the reader's language. controlParts stays as it is: the client
+/// file and its tests read the Hebrew sentences.
+export type ControlMessageId =
+  | "noProcesses"
+  | "processes"
+  | "processesWithAnkora"
+  | "processesInHandover"
+  | "processesBoth"
+  | "notRunning"
+  | "documentation"
+  | "needsReview"
+  | "exceptionsInForce"
+  | "exceptionsRequested"
+  | "uncertain"
+  | "openQuestions"
+  | "clientVisible"
+  | "noOwner"
+  | "systemsWithoutAccess"
+  | "noBatch"
+  | "lastBatch";
+export type ControlMessage = { id: ControlMessageId; values: Record<string, number>; warn: boolean; key?: ControlKey };
+
+export function controlPartMessages(d: ControlData): ControlMessage[] {
+  const parts: ControlMessage[] = [];
+  if (d.processes === 0) {
+    parts.push({ id: "noProcesses", values: {}, warn: false });
+  } else {
+    const id: ControlMessageId = d.withAnkora && d.inHandover ? "processesBoth" : d.withAnkora ? "processesWithAnkora" : d.inHandover ? "processesInHandover" : "processes";
+    parts.push({ id, values: { count: d.processes, withAnkora: d.withAnkora, inHandover: d.inHandover }, warn: false, key: "processes" });
+    if (d.notRunning) parts.push({ id: "notRunning", values: { count: d.notRunning }, warn: true, key: "notRunning" });
+    if (d.avgDocumentation !== null) parts.push({ id: "documentation", values: { pct: d.avgDocumentation }, warn: false, key: "completeness" });
+  }
+  if (d.needsReview) parts.push({ id: "needsReview", values: { count: d.needsReview }, warn: true, key: "needsReview" });
+  if (d.exceptionsInForce) parts.push({ id: "exceptionsInForce", values: { count: d.exceptionsInForce }, warn: false, key: "exceptionsInForce" });
+  if (d.exceptionsRequested) parts.push({ id: "exceptionsRequested", values: { count: d.exceptionsRequested }, warn: true, key: "exceptionsRequested" });
+  if (d.uncertain) parts.push({ id: "uncertain", values: { count: d.uncertain }, warn: false, key: "uncertain" });
+  if (d.openQuestions) parts.push({ id: "openQuestions", values: { count: d.openQuestions }, warn: false, key: "openQuestions" });
+  if (d.clientVisible) parts.push({ id: "clientVisible", values: { count: d.clientVisible }, warn: false, key: "clientVisible" });
+  if (d.noOwner) parts.push({ id: "noOwner", values: { count: d.noOwner }, warn: false, key: "noOwner" });
+  if (d.systemsWithoutAccess) parts.push({ id: "systemsWithoutAccess", values: { count: d.systemsWithoutAccess }, warn: true, key: "systemsWithoutAccess" });
+  parts.push(
+    d.daysSinceBatch === null
+      ? { id: "noBatch", values: {}, warn: false }
+      : { id: "lastBatch", values: { days: d.daysSinceBatch }, warn: d.daysSinceBatch > STALE_BUSINESS_DAYS }
+  );
+  return parts;
+}
+
 export function controlLine(d: ControlData): string {
   return controlParts(d)
     .map((p) => p.text)
@@ -195,7 +245,11 @@ export type ControlDetail = { text: string; id?: string; note?: string };
 
 const ACCESS_NOTE: Record<string, string> = { NO_ACCESS: "אין גישה", PENDING: "הגישה ממתינה" };
 
-export function controlDetails(input: DetailInput): Partial<Record<ControlKey, ControlDetail[]>> {
+/// ADR 0006: the two phrases controlDetails writes itself, for a screen
+/// in another language. Without them, the Hebrew as before.
+export type ControlDetailWords = { more: (count: number) => string; access: Record<string, string> };
+
+export function controlDetails(input: DetailInput, words?: ControlDetailWords): Partial<Record<ControlKey, ControlDetail[]>> {
   const live = input.processes.filter((p) => p.status !== "RETIRED");
   const name = (p: { code: string; title: string }) => `${p.code} ${p.title}`;
   const proc = (p: (typeof live)[number], note?: string): ControlDetail => ({ text: name(p), id: p.id, ...(note ? { note } : {}) });
@@ -206,7 +260,7 @@ export function controlDetails(input: DetailInput): Partial<Record<ControlKey, C
     const s = effectiveStatus(i.knowledgeStatus, parseFieldStatus(i.fieldStatus));
     return s === "UNCERTAIN" || s === "MISSING";
   };
-  const cap = (xs: ControlDetail[]) => (xs.length > CONTROL_DETAIL_LIMIT ? [...xs.slice(0, CONTROL_DETAIL_LIMIT), { text: `ועוד ${xs.length - CONTROL_DETAIL_LIMIT}` }] : xs);
+  const cap = (xs: ControlDetail[]) => (xs.length > CONTROL_DETAIL_LIMIT ? [...xs.slice(0, CONTROL_DETAIL_LIMIT), { text: words ? words.more(xs.length - CONTROL_DETAIL_LIMIT) : `ועוד ${xs.length - CONTROL_DETAIL_LIMIT}` }] : xs);
   const exception = (e: DetailInput["exceptions"][number]): ControlDetail => ({ text: e.ruleTitle ? `${e.ruleTitle}: ${e.what}` : e.what, id: e.policyId ?? undefined });
   const out: Partial<Record<ControlKey, ControlDetail[]>> = {
     processes: live.map((p) => proc(p)),
@@ -219,7 +273,7 @@ export function controlDetails(input: DetailInput): Partial<Record<ControlKey, C
     openQuestions: input.facts.filter((f) => f.kind === "QUESTION" && !f.answeredAt).map((f) => ({ text: f.body, id: f.id })),
     clientVisible: [...live.filter((p) => p.clientVisible).map((p) => proc(p)), ...items.filter((i) => i.clientVisible).map((i) => item(i))],
     noOwner: items.filter((i) => !i.ownerId).map((i) => item(i)),
-    systemsWithoutAccess: input.systems.filter((s) => s.accessStatus === "NO_ACCESS" || s.accessStatus === "PENDING").map((s) => ({ text: s.systemName, id: s.id, note: ACCESS_NOTE[s.accessStatus] })),
+    systemsWithoutAccess: input.systems.filter((s) => s.accessStatus === "NO_ACCESS" || s.accessStatus === "PENDING").map((s) => ({ text: s.systemName, id: s.id, note: (words?.access ?? ACCESS_NOTE)[s.accessStatus] })),
   };
   const short = (x: string) => (x.length > 140 ? `${x.slice(0, 139)}…` : x);
   for (const k of Object.keys(out) as ControlKey[]) out[k] = cap(out[k]!.map((d) => ({ ...d, text: short(d.text), ...(d.note ? { note: short(d.note) } : {}) })));

@@ -145,6 +145,7 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   ProcessCheck: { decision: "DUMP", table: "process_checks", reason: "Each check of an ongoing process: who looked, what they found, and the task an issue opened." },
   ProcessLesson: { decision: "DUMP", table: "process_lessons", reason: "What the person who closed a run said about the procedure, and whether it went into the next version." },
   CommsChannel: { decision: "DUMP", table: "comms_channels", reason: "Which WhatsApp numbers are stored, whose they are and who never sees them." },
+  CommsLineOwner: { decision: "DUMP", table: "comms_line_owners", reason: "Whose Aloha line is whose, set by a person in the app; nothing regenerates it." },
   CommsConversation: { decision: "DUMP", table: "comms_conversations", reason: "Each stored WhatsApp conversation: the other number and its name." },
   CommsMessage: { decision: "DUMP", table: "comms_messages", reason: "The stored WhatsApp messages. Unipile keeps no history we can rely on, so this is the only copy." },
   CommsAttachment: { decision: "DUMP", table: "comms_attachments", reason: "What each message carried, and where a voice message's audio sits in Drive." },

@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Check, ExternalLink, Languages } from "lucide-react";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { approveProcedureTranslationAction } from "../../../../process-actions";
@@ -12,6 +13,7 @@ import { approveProcedureTranslationAction } from "../../../../process-actions";
 const CLAUDE_NEW_CHAT = "https://claude.ai/new";
 
 export function TranslateWithClaude({ prompt, label }: { prompt: string; label: string }) {
+  const t = useTranslations("clients.processes.translation");
   const [state, setState] = useState<"idle" | "copied" | "manual">("idle");
   const boxRef = useRef<HTMLTextAreaElement>(null);
 
@@ -39,22 +41,23 @@ export function TranslateWithClaude({ prompt, label }: { prompt: string; label: 
         </button>
         {state === "copied" && (
           <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-app-text-secondary" role="status">
-            הפרומט הועתק. הדביקו אותו בשיחה חדשה בחשבון הארגוני של אנקורה בקלוד.
+            {t("copied")}
             <a href={CLAUDE_NEW_CHAT} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-app-text-accent hover:text-app-text-primary">
-              פתיחת קלוד
+              {t("openClaude")}
               <ExternalLink size={12} />
             </a>
           </p>
         )}
       </div>
       {state === "manual" && (
-        <textarea ref={boxRef} readOnly value={prompt} rows={5} dir="rtl" className="w-full rounded-lg border border-app-border bg-cream/40 p-2 text-xs" aria-label="הפרומט להעתקה" />
+        <textarea ref={boxRef} readOnly value={prompt} rows={5} dir="rtl" className="w-full rounded-lg border border-app-border bg-cream/40 p-2 text-xs" aria-label={t("promptAria")} />
       )}
     </div>
   );
 }
 
 export function ApproveTranslation({ processId, version, clientId, disabled }: { processId: string; version: number; clientId: string; disabled: boolean }) {
+  const t = useTranslations("clients.processes.translation");
   const [pending, start] = useTransition();
   const { showToast } = useToast();
   const router = useRouter();
@@ -65,9 +68,9 @@ export function ApproveTranslation({ processId, version, clientId, disabled }: {
       onClick={() =>
         start(async () => {
           const r = await approveProcedureTranslationAction(processId, version, clientId);
-          if (r.error) showToast({ tone: "error", title: "האישור נכשל", description: r.error });
+          if (r.error) showToast({ tone: "error", title: t("approveFailed"), description: r.error });
           else {
-            showToast({ tone: "success", title: "התרגום אושר" });
+            showToast({ tone: "success", title: t("approved") });
             router.refresh();
           }
         })
@@ -75,7 +78,7 @@ export function ApproveTranslation({ processId, version, clientId, disabled }: {
       className="rounded-full bg-app-surface-nav px-3 py-1 text-[12px] font-medium text-cream disabled:opacity-50"
       data-testid="approve-translation"
     >
-      {pending ? "מאשר..." : "אישור התרגום"}
+      {pending ? t("approving") : t("approve")}
     </button>
   );
 }

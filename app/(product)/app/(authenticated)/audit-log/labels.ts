@@ -191,6 +191,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "process.check": "בדיקה של תהליך שוטף",
   "client.rule_approvers": "שינוי מי מאשר חריגות ומידע רגיש אצל לקוח",
   "user.exception_approver": "שינוי הרשאת אישור חריגות ומידע רגיש",
+  "user.comms_access": "שינוי הגישה למסך התקשורת",
   "client_narrative.save": "גרסה חדשה לטקסט בתיק הלקוח",
   "extraction_guide.propose": "הצעת גרסה להנחיות החילוץ",
   "extraction_guide.approve": "אישור גרסה של הנחיות החילוץ",

@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { Prisma, type ConnectionKind, type User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canManageClients } from "@/lib/app-auth/permissions";
@@ -41,7 +42,7 @@ async function assertManagesConnections(actor: User, clientId: string) {
   await assertClientAccess(actor, clientId);
   const client = await prisma.client.findUnique({ where: { id: clientId }, select: { accountManagerId: true } });
   if (!canManageClients(actor.role) && client?.accountManagerId !== actor.id) {
-    throw new Error("רק מנהל או מנהל התיק של הלקוח מחברים מערכות של הלקוח.");
+    throw new DomainError("connections.managersOnly", "רק מנהל או מנהל התיק של הלקוח מחברים מערכות של הלקוח.");
   }
 }
 
@@ -108,10 +109,10 @@ export async function addAppPasswordConnection(
 ): Promise<{ id: string }> {
   await assertManagesConnections(actor, input.clientId);
   const account = input.account.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account)) throw new Error("כתובת המייל לא תקינה.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account)) throw new DomainError("connections.invalidEmail", "כתובת המייל לא תקינה.");
   const password = input.appPassword.replace(/\s+/g, "");
-  if (password.length < 8) throw new Error("סיסמת האפליקציה קצרה מדי.");
-  if (!input.consentText.trim()) throw new Error("כותבים מי אצל הלקוח מסר את הגישה, ומתי.");
+  if (password.length < 8) throw new DomainError("connections.appPasswordTooShort", "סיסמת האפליקציה קצרה מדי.");
+  if (!input.consentText.trim()) throw new DomainError("connections.consentRequired", "כותבים מי אצל הלקוח מסר את הגישה, ומתי.");
   const cred = await createCredential(actor, {
     clientId: input.clientId,
     systemName: `חיבור לנהלים: ${account}`,
@@ -128,7 +129,7 @@ export async function addAppPasswordConnection(
 
 export async function disconnect(actor: User, id: string): Promise<void> {
   const row = await prisma.clientConnection.findUnique({ where: { id } });
-  if (!row || row.revokedAt) throw new Error("החיבור לא נמצא.");
+  if (!row || row.revokedAt) throw new DomainError("connections.notFound", "החיבור לא נמצא.");
   await assertManagesConnections(actor, row.clientId);
   if (row.credentialId) {
     if (row.kind !== "MAIL_APP_PASSWORD") {
@@ -145,11 +146,19 @@ export async function disconnect(actor: User, id: string): Promise<void> {
 /// reading any content. Mail: how many threads Google reports (metadata
 /// only). Drive: how many files the folder holds, when a folder is given.
 /// Send: a short mail to the manager's own mailbox.
-export async function testConnection(actor: User, id: string, opts: { folderId?: string | null } = {}): Promise<string> {
+/// ADR 0006: what the test found, for the screen to word in the reader's
+/// language (connections/actions.ts). Each kind is one of the sentences
+/// this used to return.
+export type ConnectionTestResult =
+  | { kind: "appPassword" }
+  | { kind: "sent"; account: string }
+  | { kind: "mail"; threads: number | null; driveFiles: number | null };
+
+export async function testConnection(actor: User, id: string, opts: { folderId?: string | null } = {}): Promise<ConnectionTestResult> {
   const row = await prisma.clientConnection.findUnique({ where: { id } });
-  if (!row || row.revokedAt || !row.credentialId) throw new Error("החיבור לא נמצא.");
+  if (!row || row.revokedAt || !row.credentialId) throw new DomainError("connections.notFound", "החיבור לא נמצא.");
   await assertManagesConnections(actor, row.clientId);
-  if (row.kind === "MAIL_APP_PASSWORD") return "חיבור בסיסמת אפליקציה נבדק בריצה הראשונה שקוראת מייל. בדיקה מכאן עוד לא בנויה.";
+  if (row.kind === "MAIL_APP_PASSWORD") return { kind: "appPassword" };
   const refresh = await openConnectionSecret({ credentialId: row.credentialId, connectionId: row.id, actorId: actor.id, purpose: "בדיקת חיבור" });
   const token = await accessTokenFrom(refresh);
   const auth = { authorization: `Bearer ${token}` };
@@ -162,23 +171,23 @@ export async function testConnection(actor: User, id: string, opts: { folderId?:
       headers: { ...auth, "content-type": "application/json" },
       body: JSON.stringify({ raw: Buffer.from(raw).toString("base64url") }),
     });
-    if (!res.ok) throw new Error("השליחה נכשלה. אולי ההרשאה בוטלה ב-Google.");
+    if (!res.ok) throw new DomainError("connections.sendFailed", "השליחה נכשלה. אולי ההרשאה בוטלה ב-Google.");
     await recordAudit({ actorId: actor.id, action: "connection.test", entityType: "ClientConnection", entityId: id, clientId: row.clientId, after: { kind: row.kind, sentTo: row.account } });
-    return `נשלח מייל בדיקה ל-${row.account}.`;
+    return { kind: "sent", account: row.account };
   }
 
   const mail = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", { headers: auth });
-  if (!mail.ok) throw new Error("אין גישה למייל. אולי ההרשאה בוטלה ב-Google.");
+  if (!mail.ok) throw new DomainError("connections.noMailAccess", "אין גישה למייל. אולי ההרשאה בוטלה ב-Google.");
   const profile = (await mail.json()) as { threadsTotal?: number };
-  const parts = [`מייל: מחובר (${profile.threadsTotal ?? "?"} שרשורים, בלי קריאת תוכן)`];
+  let driveFiles: number | null = null;
   const folder = opts.folderId?.trim();
   if (folder) {
-    if (!/^[A-Za-z0-9_-]{10,100}$/.test(folder)) throw new Error("מזהה התיקייה לא תקין.");
+    if (!/^[A-Za-z0-9_-]{10,100}$/.test(folder)) throw new DomainError("connections.invalidFolderId", "מזהה התיקייה לא תקין.");
     const q = new URLSearchParams({ q: `'${folder}' in parents and trashed = false`, fields: "files(id)", pageSize: "100" });
     const drive = await fetch(`https://www.googleapis.com/drive/v3/files?${q}`, { headers: auth });
-    if (!drive.ok) throw new Error("אין גישה לתיקייה בדרייב.");
-    parts.push(`דרייב: ${((await drive.json()) as { files?: unknown[] }).files?.length ?? 0} קבצים בתיקייה`);
+    if (!drive.ok) throw new DomainError("connections.noDriveAccess", "אין גישה לתיקייה בדרייב.");
+    driveFiles = ((await drive.json()) as { files?: unknown[] }).files?.length ?? 0;
   }
   await recordAudit({ actorId: actor.id, action: "connection.test", entityType: "ClientConnection", entityId: id, clientId: row.clientId, after: { kind: row.kind, folder: folder ?? null } });
-  return parts.join(". ") + ".";
+  return { kind: "mail", threads: profile.threadsTotal ?? null, driveFiles };
 }

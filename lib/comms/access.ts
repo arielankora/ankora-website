@@ -1,11 +1,11 @@
 import "server-only";
-import type { User } from "@prisma/client";
+import type { CommsAccessLevel, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { normalizeEmail } from "@/lib/contact-normalize";
 import { parseEmailList } from "@/lib/whatsapp-poc/access";
-import { parseViewerEmails } from "./visibility";
-import { linesOwnedBy, parseLineOwners } from "./call-lines";
+import { linesOwnedBy } from "./call-lines";
+import { callViewerEmails, fullViewerEmails, lineOwnerEmails } from "./grants";
 
 // Who may open the communications screen (1.11.2026, step 1 of "several
 // numbers"). It used to be WHATSAPP_POC_VIEWERS alone (Ariel). Now also:
@@ -16,6 +16,12 @@ import { linesOwnedBy, parseLineOwners } from "./call-lines";
 //     who answer it).
 // What each of them sees inside is decided per conversation and per call
 // (lib/comms/visibility.ts, canSeeCall below). Clients never get in.
+//
+// 12.11.2026: access is given in the app now, on the person's page
+// (User.commsAccessLevel, and the owner of each Aloha line). The lists
+// above still count, read together with the app in lib/comms/grants.ts.
+// OWN opens the screen without a number or a line of their own, so a new
+// person can get in and connect theirs.
 
 export type CommsAccess = {
   allowed: boolean;
@@ -26,22 +32,31 @@ export type CommsAccess = {
   /// Sees every call recording.
   allCalls: boolean;
   ownedChannelIds: string[];
-  /// Aloha lines that are this person's (ALOHA_LINE_OWNERS): every call on
+  /// Aloha lines that are this person's (lib/comms/grants.ts): every call on
   /// them is theirs to see.
   ownedLines?: string[];
 };
 
-export async function commsAccess(user: Pick<User, "id" | "email" | "role">): Promise<CommsAccess> {
+export async function commsAccess(
+  user: Pick<User, "id" | "email" | "role"> & { commsAccessLevel?: CommsAccessLevel },
+): Promise<CommsAccess> {
   const none: CommsAccess = { allowed: false, full: false, manager: false, allCalls: false, ownedChannelIds: [], ownedLines: [] };
   if (user.role === "CLIENT_USER") return none;
   const email = normalizeEmail(user.email);
   if (!email) return none;
   const viewers = parseEmailList(process.env.WHATSAPP_POC_VIEWERS);
-  const full = parseViewerEmails(process.env.COMMS_FULL_VIEWERS).includes(email) || viewers.includes(email);
-  const callViewer = parseViewerEmails(process.env.COMMS_CALL_VIEWERS).includes(email);
+  const [fullList, callList, lineOwners, level] = await Promise.all([
+    fullViewerEmails(),
+    callViewerEmails(),
+    lineOwnerEmails(),
+    user.commsAccessLevel ??
+      prisma.user.findUnique({ where: { id: user.id }, select: { commsAccessLevel: true } }).then((u) => u?.commsAccessLevel ?? "NONE"),
+  ]);
+  const full = fullList.includes(email) || viewers.includes(email);
+  const callViewer = callList.includes(email);
   const owned = (await prisma.commsChannel.findMany({ where: { ownerUserId: user.id }, select: { id: true } })).map((c) => c.id);
-  const ownedLines = linesOwnedBy(parseLineOwners(process.env.ALOHA_LINE_OWNERS), email);
-  const allowed = full || callViewer || owned.length > 0 || ownedLines.length > 0;
+  const ownedLines = linesOwnedBy(lineOwners, email);
+  const allowed = full || callViewer || level !== "NONE" || owned.length > 0 || ownedLines.length > 0;
   return { allowed, full, manager: allowed && canManageClients(user.role), allCalls: full || callViewer, ownedChannelIds: owned, ownedLines };
 }
 

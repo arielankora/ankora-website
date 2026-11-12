@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { rescanAfterRuleChange } from "@/lib/app-domain/process-review";
 import { ruleChangeCause } from "@/lib/process-review";
 import { prisma } from "@/lib/prisma";
@@ -7,7 +8,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { assertCanApproveForClient, notifyRuleApprovers } from "@/lib/app-domain/rule-approvals";
 import { findSecrets } from "@/lib/secret-scan";
-import { exceptionShapeError, isExceptionInForce, EXCEPTION_MAX_DAYS } from "@/lib/client-policies";
+import { exceptionShapeError, exceptionShapeProblem, isExceptionInForce, EXCEPTION_MAX_DAYS } from "@/lib/client-policies";
 import type { User } from "@prisma/client";
 
 // Org brain, phase 3: exceptions to a client's rules
@@ -27,7 +28,7 @@ export type ExceptionInput = { policyId: string; what: string; reason: string; v
 
 async function findException(actor: User, id: string) {
   const row = await prisma.policyException.findUnique({ where: { id }, include: { policy: { select: { title: true, clientId: true, audience: true } } } });
-  if (!row) throw new Error("הבקשה לא נמצאה.");
+  if (!row) throw new DomainError("policyExceptions.notFound", "הבקשה לא נמצאה.");
   await assertClientAccess(actor, row.clientId);
   return row;
 }
@@ -35,12 +36,12 @@ async function findException(actor: User, id: string) {
 export async function requestException(actor: User, input: ExceptionInput, now = new Date()) {
   assertCan(actor.role, "time_entry.create_self");
   const policy = await prisma.clientPolicy.findUnique({ where: { id: input.policyId } });
-  if (!policy || policy.deletedAt) throw new Error("הכלל לא נמצא.");
+  if (!policy || policy.deletedAt) throw new DomainError("policyExceptions.policyNotFound", "הכלל לא נמצא.");
   await assertClientAccess(actor, policy.clientId);
-  if (policy.status === "RETIRED") throw new Error("הכלל בוטל, ואין ממנו חריגה.");
-  const shapeError = exceptionShapeError(input, now);
-  if (shapeError) throw new Error(shapeError);
-  if (findSecrets(`${input.what}\n${input.reason}`).length > 0) throw new Error("בבקשה יש סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת.");
+  if (policy.status === "RETIRED") throw new DomainError("policyExceptions.policyRetired", "הכלל בוטל, ואין ממנו חריגה.");
+  const shapeProblem = exceptionShapeProblem(input, now);
+  if (shapeProblem) throw new DomainError("policyExceptions.shape", exceptionShapeError(input, now)!, { problem: shapeProblem, max: EXCEPTION_MAX_DAYS });
+  if (findSecrets(`${input.what}\n${input.reason}`).length > 0) throw new DomainError("policyExceptions.secrets", "בבקשה יש סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת.");
 
   const row = await prisma.policyException.create({
     data: {
@@ -66,10 +67,10 @@ export async function requestException(actor: User, input: ExceptionInput, now =
 async function decide(actor: User, id: string, approve: boolean, note: string | null) {
   assertCan(actor.role, "time_entry.create_self");
   const before = await findException(actor, id);
-  if (before.status !== "REQUESTED") throw new Error("כבר הוחלט על הבקשה הזו.");
+  if (before.status !== "REQUESTED") throw new DomainError("policyExceptions.alreadyDecided", "כבר הוחלט על הבקשה הזו.");
   await assertCanApproveForClient(actor, before.clientId);
   const why = note?.trim() || null;
-  if (!approve && !why) throw new Error("צריך לכתוב בשורה אחת למה הבקשה נדחתה.");
+  if (!approve && !why) throw new DomainError("policyExceptions.rejectReasonRequired", "צריך לכתוב בשורה אחת למה הבקשה נדחתה.");
   const updated = await prisma.policyException.update({
     where: { id },
     data: { status: approve ? "APPROVED" : "REJECTED", decidedById: actor.id, decidedAt: new Date(), decisionNote: why },
@@ -104,8 +105,8 @@ export const rejectException = (actor: User, id: string, note: string) => decide
 
 export async function withdrawException(actor: User, id: string) {
   const before = await findException(actor, id);
-  if (before.status !== "REQUESTED") throw new Error("אפשר למשוך רק בקשה שעוד לא הוחלט עליה.");
-  if (before.requestedById !== actor.id) throw new Error("רק מי שביקש מושך את הבקשה.");
+  if (before.status !== "REQUESTED") throw new DomainError("policyExceptions.onlyUndecided", "אפשר למשוך רק בקשה שעוד לא הוחלט עליה.");
+  if (before.requestedById !== actor.id) throw new DomainError("policyExceptions.requesterOnly", "רק מי שביקש מושך את הבקשה.");
   const updated = await prisma.policyException.update({ where: { id }, data: { status: "WITHDRAWN" } });
   await recordAudit({ actorId: actor.id, action: "policy_exception.withdraw", entityType: "PolicyException", entityId: id, clientId: before.clientId, before, after: updated });
   return updated;

@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
-import { ACTION_TAGS, ACTION_TAG_LABELS, MONEY_TAGS, type ActionTag } from "@/lib/process-rules";
-import { CHANNELS, CHANNEL_LABELS, kindTakesParams, type Channel, type PolicyParams } from "@/lib/policy-params";
+import { useTranslations } from "next-intl";
+import { ACTION_TAGS, MONEY_TAGS, type ActionTag } from "@/lib/process-rules";
+import { CHANNELS, kindTakesParams, type Channel, type PolicyParams } from "@/lib/policy-params";
 import type { PolicyKindLike } from "@/lib/client-policies";
 import { Field, INPUT } from "./knowledge-ui";
 
@@ -18,13 +19,15 @@ const DEFAULT_TAGS: Partial<Record<PolicyKindLike, ActionTag[]>> = {
   COMMUNICATION: ["CLIENT_MESSAGE"],
 };
 
-const TAG_LABEL: Partial<Record<PolicyKindLike, string>> = {
-  THRESHOLD: "על אילו פעולות",
-  APPROVAL_REQUIRED: "מה דורש אישור",
-  FORBIDDEN: "מה אסור",
-  REQUIRED_STEP: "רק בנוהל שיש בו",
-  TIMING: "על אילו פעולות",
-  COMMUNICATION: "על אילו פעולות",
+/// The kinds whose rule is about step tags, and what the tags field is
+/// called for each (clients.policies.params.tagLabel).
+const TAG_LABEL: Partial<Record<PolicyKindLike, "whichActions" | "needsApproval" | "forbidden" | "onlyWith">> = {
+  THRESHOLD: "whichActions",
+  APPROVAL_REQUIRED: "needsApproval",
+  FORBIDDEN: "forbidden",
+  REQUIRED_STEP: "onlyWith",
+  TIMING: "whichActions",
+  COMMUNICATION: "whichActions",
 };
 
 const minorToText = (m: number | undefined) => (m === undefined ? "" : String(m / 100));
@@ -34,18 +37,20 @@ const textToMinor = (t: string): number | undefined => {
 };
 
 function TagBoxes({ kind, value, onChange }: { kind: PolicyKindLike; value: ActionTag[]; onChange: (v: ActionTag[]) => void }) {
+  const t = useTranslations("clients.policies.params");
+  const label = TAG_LABEL[kind];
   return (
-    <Field label={TAG_LABEL[kind] ?? "פעולות"}>
+    <Field label={label ? t(`tagLabel.${label}`) : t("tagLabel.actions")}>
       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-        {ACTION_TAGS.map((t) => (
-          <label key={t} className="flex items-center gap-1 text-xs text-app-text-secondary">
+        {ACTION_TAGS.map((tag) => (
+          <label key={tag} className="flex items-center gap-1 text-xs text-app-text-secondary">
             <input
               type="checkbox"
-              checked={value.includes(t)}
-              onChange={(e) => onChange(e.target.checked ? [...value, t] : value.filter((x) => x !== t))}
+              checked={value.includes(tag)}
+              onChange={(e) => onChange(e.target.checked ? [...value, tag] : value.filter((x) => x !== tag))}
               className="h-3.5 w-3.5 accent-gold"
             />
-            {ACTION_TAG_LABELS[t]}
+            {t(`actionTags.${tag}`)}
           </label>
         ))}
       </div>
@@ -64,6 +69,7 @@ export function PolicyParamsFields({
   initialInterim?: PolicyParams;
   entities: { id: string; name: string }[];
 }) {
+  const t = useTranslations("clients.policies.params");
   const [on, setOn] = useState<boolean>(!!initial && Object.keys(initial).length > 0);
   const [p, setP] = useState<PolicyParams>(initial ?? {});
   const [interimAmount, setInterimAmount] = useState<string>(minorToText(initialInterim?.amountMinor));
@@ -89,16 +95,16 @@ export function PolicyParamsFields({
       <input type="hidden" name="interimParams" value={JSON.stringify(interim)} />
       <label className="flex items-center gap-1.5 text-xs font-medium text-app-text-primary">
         <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} className="h-4 w-4 accent-gold" />
-        לבדוק את הכלל מול הנהלים
+        {t("check")}
       </label>
       {!on ? (
-        <p className="mt-1 text-[11px] text-app-text-tertiary">בלי זה הכלל נקרא על ידי אנשים ועל ידי Claude, והשרת לא בודק אותו.</p>
+        <p className="mt-1 text-[11px] text-app-text-tertiary">{t("textOnlyHint")}</p>
       ) : (
         <div className="mt-2 flex flex-col gap-3">
           {kind === "THRESHOLD" && (
             <>
               <div className="grid grid-cols-[1fr_6rem] gap-2">
-                <Field label="מעל סכום של *">
+                <Field label={t("amountAbove")}>
                   <input
                     inputMode="decimal"
                     value={minorToText(p.amountMinor)}
@@ -107,9 +113,9 @@ export function PolicyParamsFields({
                     className={INPUT}
                   />
                 </Field>
-                <Field label="מטבע *">
+                <Field label={t("currency")}>
                   <select value={p.currency ?? ""} onChange={(e) => set({ currency: e.target.value || undefined })} className={INPUT}>
-                    <option value="">בחירה</option>
+                    <option value="">{t("choose")}</option>
                     {CURRENCIES.map((c) => (
                       <option key={c} value={c}>
                         {c}
@@ -118,18 +124,18 @@ export function PolicyParamsFields({
                   </select>
                 </Field>
               </div>
-              <Field label="עד שיאושר, הסף הוא">
-                <input inputMode="decimal" value={interimAmount} onChange={(e) => setInterimAmount(e.target.value)} placeholder="0: כל סכום דורש אישור" className={INPUT} />
+              <Field label={t("interimThreshold")}>
+                <input inputMode="decimal" value={interimAmount} onChange={(e) => setInterimAmount(e.target.value)} placeholder={t("interimThresholdPlaceholder")} className={INPUT} />
               </Field>
             </>
           )}
           {kind === "REQUIRED_STEP" && (
-            <Field label="מה חייב להופיע באחד השלבים *">
-              <input value={p.mustInclude ?? ""} onChange={(e) => set({ mustInclude: e.target.value || undefined })} placeholder="סיווג ומחלקה" className={INPUT} />
+            <Field label={t("mustInclude")}>
+              <input value={p.mustInclude ?? ""} onChange={(e) => set({ mustInclude: e.target.value || undefined })} placeholder={t("mustIncludePlaceholder")} className={INPUT} />
             </Field>
           )}
           {kind === "TIMING" && (
-            <Field label="לפחות כמה ימי עסקים לפני המועד *">
+            <Field label={t("leadDays")}>
               <input
                 inputMode="numeric"
                 value={p.leadBusinessDays ?? ""}
@@ -141,7 +147,7 @@ export function PolicyParamsFields({
           )}
           {kind === "COMMUNICATION" && (
             <>
-              <Field label="ערוצים מותרים">
+              <Field label={t("channels")}>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
                   {CHANNELS.map((c) => (
                     <label key={c} className="flex items-center gap-1 text-xs text-app-text-secondary">
@@ -155,12 +161,12 @@ export function PolicyParamsFields({
                         }}
                         className="h-3.5 w-3.5 accent-gold"
                       />
-                      {CHANNEL_LABELS[c]}
+                      {t(`channelLabels.${c}`)}
                     </label>
                   ))}
                 </div>
               </Field>
-              <Field label="חשבוניות של מערכות מגיעות רק ל">
+              <Field label={t("invoiceTo")}>
                 <input
                   defaultValue={(p.invoiceTo ?? []).join(", ")}
                   onChange={(e) => {
@@ -174,9 +180,9 @@ export function PolicyParamsFields({
             </>
           )}
           {kind === "SEPARATION" ? (
-            <Field label="אילו ישויות נשארות מופרדות *">
+            <Field label={t("separatedEntities")}>
               {entities.length < 2 ? (
-                <p className="mt-1 text-[11px] text-app-text-tertiary">צריך לפחות שתי ישויות משפטיות בתיק.</p>
+                <p className="mt-1 text-[11px] text-app-text-tertiary">{t("needTwoEntities")}</p>
               ) : (
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
                   {entities.map((e) => (
@@ -201,9 +207,9 @@ export function PolicyParamsFields({
             <>
               <TagBoxes kind={kind} value={tags} onChange={(v) => set({ appliesToTags: v })} />
               {entities.length > 0 && (
-                <Field label="רק לנהלים של ישות">
+                <Field label={t("entityOnly")}>
                   <select value={p.entityId ?? ""} onChange={(e) => set({ entityId: e.target.value || undefined })} className={INPUT}>
-                    <option value="">כל הישויות</option>
+                    <option value="">{t("allEntities")}</option>
                     {entities.map((e) => (
                       <option key={e.id} value={e.id}>
                         {e.name}

@@ -18,7 +18,7 @@
 // data, and the screens only show.
 
 import { taskCoveredBy, contentWords, sameForm } from "@/lib/process-task-overlap";
-import { SCHEDULED_NO_DATE_BLOCKER } from "@/lib/process-readiness";
+import { runBlockerKey, SCHEDULED_NO_DATE_BLOCKER } from "@/lib/process-readiness";
 
 /// An action the server carries out in one click.
 export type StepOp =
@@ -49,7 +49,19 @@ export type NextStepKind =
   | "no_access"
   | "uncertain";
 
+/// ADR 0006: a line of a step as a key a screen words in the reader's
+/// language, relative to the `clients.processes` messages. `refs` are
+/// values that are keys themselves (a field's label), worded first. `raw`
+/// is text that has no key: what a person wrote, or a sentence from
+/// elsewhere, shown as it is.
+export type StepText = { key: string; values?: Record<string, string | number>; refs?: Record<string, string> } | { raw: string };
+
+export type NextStepText = { title: StepText; recommend: StepText | null; why: StepText | null; fix: StepText; alt?: StepText };
+
 export type NextStep = {
+  /// The same lines as keys, for a screen in the reader's language. The
+  /// strings beside it stay the Hebrew every other reader has.
+  text?: NextStepText;
   kind: NextStepKind;
   /// What waits, in one line.
   title: string;
@@ -85,7 +97,8 @@ export type ProcessFacts = {
   noAccess: string[];
   /// Why it needs review, in words, and whether it is the periodic kind
   /// (marked reviewed in one click) or the rules (needs a new version).
-  review: { label: string; periodic: boolean } | null;
+  /// `reason`, when known, lets a screen word the label itself.
+  review: { label: string; periodic: boolean; reason?: "RULES" | "PERIODIC" } | null;
   openLessons: number;
   knowledge: { uncertain: boolean; toResolve: string | null };
   dateCandidate: DateCandidate | null;
@@ -103,6 +116,9 @@ export type ProcessFacts = {
 };
 
 const ORDER: NextStepKind[] = ["not_ready", "no_next_date", "procedure_draft", "review", "covered_tasks", "lessons", "uncertain", "link_mention", "missing_fields", "doc_field", "no_access"];
+
+const k = (key: string, values?: Record<string, string | number>, refs?: Record<string, string>): StepText => ({ key: `nextSteps.${key}`, ...(values ? { values } : {}), ...(refs ? { refs } : {}) });
+const fixKey = (key: string): StepText => k(`fix.${key}`);
 
 function plural(n: number, one: string, many: string): string {
   return n === 1 ? one : many.replace("{n}", String(n));
@@ -134,6 +150,15 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
       why: "עד אז התהליך לא פותח ריצות לבד.",
       fix: noOwnerOrTrigger ? { kind: "edit", label: "להשלים" } : noProcedure ? { kind: "procedure", label: "לכתוב נוהל" } : { kind: "open", label: "לתהליך" },
       blocking: true,
+      text: {
+        title: (() => {
+          const key = runBlockerKey(blocker);
+          return key ? { key: `readiness.blockers.${key}` } : { raw: blocker };
+        })(),
+        recommend: k(noOwnerOrTrigger ? (/אחראי/.test(blocker) ? "notReady.recommendOwner" : "notReady.recommendTrigger") : noProcedure ? "notReady.recommendProcedure" : "notReady.recommendRenew"),
+        why: k("notReady.why"),
+        fix: fixKey(noOwnerOrTrigger ? "complete" : noProcedure ? "writeProcedure" : "toProcess"),
+      },
     });
   }
 
@@ -146,6 +171,12 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
       why: p.dateCandidate ? "המועד כבר בתיק, ושמו מתאר את העבודה של התהליך. מקושר, הוא פותח את הריצה." : "בלי מועד מקושר אף ריצה לא נפתחת לבד.",
       fix: p.dateCandidate ? { kind: "op", op: { type: "link_date", processId: p.id, dateId: p.dateCandidate.id }, label: "לקשר" } : { kind: "dates", label: "להוסיף מועד" },
       blocking: active,
+      text: {
+        title: active ? { key: "readiness.blockers.scheduledNoDate" } : k("noNextDate.title"),
+        recommend: p.dateCandidate ? k("noNextDate.recommendLink", { title: p.dateCandidate.title }) : k("noNextDate.recommendAdd"),
+        why: k(p.dateCandidate ? "noNextDate.whyCandidate" : "noNextDate.whyNone"),
+        fix: fixKey(p.dateCandidate ? "link" : "addDate"),
+      },
     });
   }
 
@@ -158,6 +189,7 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
         why: "נוהל שלא עומד בכללים של הלקוח לא מאושר.",
         fix: { kind: "procedure", label: "לתקן" },
         blocking: true,
+        text: { title: k("draft.blockedTitle", { version: String(p.draft.version) }), recommend: k("draft.blockedRecommend"), why: k("draft.blockedWhy"), fix: fixKey("fix") },
       });
     } else {
       out.push({
@@ -167,6 +199,12 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
         why: p.status === "ACTIVE" ? "עד האישור הריצות ממשיכות לפי הגרסה הקודמת." : "בלי נוהל מאושר התהליך לא פותח ריצות.",
         fix: approveProcedure ? { kind: "op", op: { type: "approve_procedure", processId: p.id, version: p.draft.version }, label: "אישור הנוהל" } : { kind: "open", label: "לנוהל" },
         blocking: true,
+        text: {
+          title: k("draft.waitingTitle", { version: String(p.draft.version) }),
+          recommend: k(approveProcedure ? "draft.recommendApprove" : "draft.recommendAsk"),
+          why: k(p.status === "ACTIVE" ? "draft.whyActive" : "draft.whyInactive"),
+          fix: fixKey(approveProcedure ? "approveProcedure" : "toProcedure"),
+        },
       });
     }
   }
@@ -179,6 +217,12 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
       why: p.review.periodic ? "כך הנוהל נשאר נכון לאורך זמן." : "הנוהל שבתוקף לא עומד היום בכלל של הלקוח.",
       fix: p.review.periodic && manager ? { kind: "op", op: { type: "mark_reviewed", processId: p.id }, label: "סימון שנסקר" } : { kind: "procedure", label: "לנוהל" },
       blocking: false,
+      text: {
+        title: p.review.reason ? { key: `labels.reviewReasons.${p.review.reason}` } : { raw: p.review.label },
+        recommend: k(p.review.periodic ? "review.recommendPeriodic" : "review.recommendRules"),
+        why: k(p.review.periodic ? "review.whyPeriodic" : "review.whyRules"),
+        fix: fixKey(p.review.periodic && manager ? "markReviewed" : "toProcedure"),
+      },
     });
   }
 
@@ -191,6 +235,12 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
       why: "כל ריצה של התהליך פותחת משימה משלה, אז הישנה היא אותה עבודה פעמיים.",
       fix: manager ? { kind: "op", op: { type: "close_covered", processId: p.id, taskIds: p.covered.map((t) => t.taskId) }, label: n === 1 ? "לסגור" : n === 2 ? "לסגור את שתיהן" : "לסגור את כולן" } : { kind: "open", label: "לתהליך" },
       blocking: false,
+      text: {
+        title: k("covered.title", { count: n, titles: p.covered.map((t) => `"${t.title}"`).join(", ") }),
+        recommend: k("covered.recommend", { count: n }),
+        why: k("covered.why"),
+        fix: fixKey(manager ? (n === 1 ? "close" : n === 2 ? "closeBoth" : "closeAll") : "toProcess"),
+      },
     });
   }
 
@@ -202,6 +252,7 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
       why: "מי שהריץ את התהליך מצא משהו שכדאי לשנות.",
       fix: { kind: "open", label: "להערות" },
       blocking: false,
+      text: { title: k("lessons.title", { count: p.openLessons }), recommend: k("lessons.recommend"), why: k("lessons.why"), fix: fixKey("toLessons") },
     });
   }
 
@@ -213,6 +264,7 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
       why: p.knowledge.toResolve ?? "לא כתוב מה יסגור את זה.",
       fix: { kind: "edit", label: "לעדכן" },
       blocking: false,
+      text: { title: k("uncertain.title"), recommend: k("uncertain.recommend"), why: p.knowledge.toResolve ? { raw: p.knowledge.toResolve } : k("uncertain.whyNone"), fix: fixKey("update") },
     });
   }
 
@@ -225,6 +277,7 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
       why: "כך התהליך יודע לאיזו מערכת צריך גישה.",
       fix: { kind: "op", op: { type: "link_system", processId: p.id, systemId: x.id }, label: "לקשר" },
       blocking: false,
+      text: { title: k("mention.systemTitle", { name: x.name }), recommend: k("mention.systemRecommend"), why: k("mention.systemWhy"), fix: fixKey("link") },
     });
   }
   for (const x of p.suggestions?.contacts ?? []) {
@@ -236,6 +289,7 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
       why: "כך ברור מי בחוץ שותף לתהליך.",
       fix: { kind: "op", op: { type: "link_contact", processId: p.id, contactId: x.id }, label: "לקשר" },
       blocking: false,
+      text: { title: k("mention.contactTitle", { name: x.name }), recommend: k("mention.contactRecommend"), why: k("mention.contactWhy"), fix: fixKey("link") },
     });
   }
 
@@ -251,6 +305,13 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
         fix: { kind: "edit", label: "להשלים" },
         ...(p.canMarkNotApplicable && f.field !== "permissions" ? { alt: { kind: "op" as const, op: { type: "mark_not_applicable" as const, processId: p.id, field: f.field }, label: "לא רלוונטי" } } : {}),
         blocking: false,
+        text: {
+          title: k("docField.title", undefined, { field: `labels.fields.${f.field}` }),
+          recommend: null,
+          why: null,
+          fix: fixKey("complete"),
+          ...(p.canMarkNotApplicable && f.field !== "permissions" ? { alt: fixKey("notApplicable") } : {}),
+        },
       });
     }
   } else if (p.missing.length > 0) {
@@ -261,6 +322,7 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
       why: "כך כל מי שנכנס לתהליך יודע לעשות אותו בלי לשאול.",
       fix: { kind: "edit", label: "להשלים" },
       blocking: false,
+      text: { title: k("missing.title", { fields: p.missing.join(", ") }), recommend: k("missing.recommend"), why: k("missing.why"), fix: fixKey("complete") },
     });
   }
 
@@ -272,6 +334,7 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
       why: "בלי גישה התהליך תלוי במישהו אחר.",
       fix: { kind: "open", label: "למערכות" },
       blocking: false,
+      text: { title: k("noAccess.title", { systems: p.noAccess.join(", ") }), recommend: k("noAccess.recommend"), why: k("noAccess.why"), fix: fixKey("toSystems") },
     });
   }
 
