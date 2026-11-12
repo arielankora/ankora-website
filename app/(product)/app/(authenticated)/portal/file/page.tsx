@@ -87,7 +87,7 @@ export default async function PortalFilePage() {
     <div className="space-y-4">
 
       <div className="rounded-[20px] border border-gold/28 bg-app-surface-sunken p-6 sm:p-7">
-        <p className="text-xl font-medium text-app-text-primary">{t("title", { name: client.name })}</p>
+        <p className="text-xl font-medium text-app-text-primary">{t.rich("title", { name: client.name, who: (c) => <bdi>{c}</bdi> })}</p>
         <p className="mt-1.5 text-[13.5px] text-app-text-secondary">
           {t("intro")}
         </p>

@@ -6670,7 +6670,7 @@
       "shownFile": "התיק המוצג"
     },
     "home": {
-      "greeting": "שלום, {name}",
+      "greeting": "שלום, <who>{name}</who>",
       "headline": {
         "decisions": "{count, plural, =1 {החלטה אחת מחכה לך.} other {# החלטות מחכות לך.}}",
         "needsYou": "{count, plural, =1 {דבר אחד מחכה לך.} other {# דברים מחכים לך.}}",
@@ -6690,7 +6690,7 @@
       "inProgressEmpty": "אין כרגע הבטחות פתוחות.",
       "recentlyDoneTitle": "נסגר לאחרונה",
       "allActivity": "כל הפעילות",
-      "managerNamed": "מנהל התיק שלך: {name}",
+      "managerNamed": "מנהל התיק שלך: <who>{name}</who>",
       "managerUnnamed": "מנהל התיק שלך ב-Ankora",
       "whatsapp": "וואטסאפ",
       "whatsappSoon": "וואטסאפ: זמין בקרוב",
@@ -6859,7 +6859,7 @@
       "saved": "נשמר."
     },
     "file": {
-      "title": "התיק של {name}",
+      "title": "התיק של <who>{name}</who>",
       "intro": "מה שאנחנו יודעים עליך ומה שנאסף תוך כדי עבודה. הכול כאן כדי שלא תצטרך לזכור את זה.",
       "preferencesTitle": "העדפות",
       "preferencesCanEdit": "מה שתכתוב כאן מגיע למנהל התיק שלך, ומשנה איך אנחנו עובדים.",

@@ -52,7 +52,7 @@ export default async function PortalHomePage() {
           there; otherwise the headline is the whole message. */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[20px] border border-app-border bg-white p-6 sm:p-7">
         <div>
-          <p className="text-[13.5px] text-app-text-secondary">{t("greeting", { name: client.name })}</p>
+          <p className="text-[13.5px] text-app-text-secondary">{t.rich("greeting", { name: client.name, who: (c) => <bdi>{c}</bdi> })}</p>
           <p className="mt-1.5 text-xl font-medium text-app-text-primary">
             {t(`headline.${headline.kind}`, { count: headline.count })}
           </p>
@@ -127,7 +127,7 @@ export default async function PortalHomePage() {
         {(contact.managerName || waHref) && (
           <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] border border-app-border bg-white px-[18px] py-3.5">
             <span className="text-[12.5px] text-app-text-secondary">
-              {contact.managerName ? t("managerNamed", { name: contact.managerName }) : t("managerUnnamed")}
+              {contact.managerName ? t.rich("managerNamed", { name: contact.managerName, who: (c) => <bdi>{c}</bdi> }) : t("managerUnnamed")}
             </span>
             {waHref ? (
               <a

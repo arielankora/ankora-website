@@ -6670,7 +6670,7 @@
       "shownFile": "Showing"
     },
     "home": {
-      "greeting": "Hello, {name}",
+      "greeting": "Hello, <who>{name}</who>",
       "headline": {
         "decisions": "{count, plural, =1 {One decision is waiting for you.} other {# decisions are waiting for you.}}",
         "needsYou": "{count, plural, =1 {One thing is waiting for you.} other {# things are waiting for you.}}",
@@ -6690,7 +6690,7 @@
       "inProgressEmpty": "Nothing is open right now.",
       "recentlyDoneTitle": "Recently done",
       "allActivity": "All activity",
-      "managerNamed": "Your account manager: {name}",
+      "managerNamed": "Your account manager: <who>{name}</who>",
       "managerUnnamed": "Your account manager at Ankora",
       "whatsapp": "WhatsApp",
       "whatsappSoon": "WhatsApp: coming soon",
@@ -6859,7 +6859,7 @@
       "saved": "Saved."
     },
     "file": {
-      "title": "{name}'s file",
+      "title": "<who>{name}</who>'s file",
       "intro": "What we know about you and what we've gathered along the way. It's all here so you don't have to remember it.",
       "preferencesTitle": "Preferences",
       "preferencesCanEdit": "What you write here goes to your account manager and changes how we work.",
