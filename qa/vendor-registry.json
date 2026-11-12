@@ -43,6 +43,7 @@
     "mcp-handler": null,
     "next": null,
     "next-auth": null,
+    "next-intl": null,
     "next-mdx-remote-client": null,
     "pdfjs-dist": null,
     "pdfkit": null,
