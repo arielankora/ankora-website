@@ -2,14 +2,14 @@
 
 import { useId, useMemo, useState } from "react";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
-import {
-  OTHER_KEY,
-  type HoursTrendData,
-  type TrendBasis,
-  type TrendBucket,
-  type TrendDimension,
-  type TrendLabel,
-  type TrendUnit,
+import { OTHER_KEY } from "@/lib/overview-trend-key";
+import type {
+  HoursTrendData,
+  TrendBasis,
+  TrendBucket,
+  TrendDimension,
+  TrendLabel,
+  TrendUnit,
 } from "@/lib/app-domain/overview-trend";
 
 /// Overview home-page widget (Ariel's request, redesign direction A

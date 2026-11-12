@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
+import { OTHER_KEY } from "@/lib/overview-trend-key";
 
 // Overview home-page chart (Ariel's request, redesign direction A
 // follow-up): "כמות השעות המדווחות לפי עובד/לקוח ל-7 ימים/שבועות
@@ -32,7 +33,7 @@ export type TrendBasis = "actual" | "billable";
 const TOP_N = 5;
 /// The folded "everyone else" slot. Its name is left empty here: the
 /// chart names it in the reader's language (ADR 0006).
-export const OTHER_KEY = "__other__";
+export { OTHER_KEY };
 const OTHER_LABEL = "";
 
 /// What a bar is called, as data rather than words, so the chart can say
