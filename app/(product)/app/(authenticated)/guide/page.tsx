@@ -1,20 +1,27 @@
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
-import { GUIDE_GROUPS } from "./content";
+import { resolveRequestLocale } from "@/lib/i18n/resolve";
+import { GUIDE_GROUPS as GUIDE_HE } from "./content";
+import { GUIDE_GROUPS as GUIDE_EN } from "./content.en";
 import { GuideBrowser } from "./GuideBrowser";
 
 export const metadata = { robots: { index: false, follow: false } };
 
 export default async function GuidePage() {
-  const user = await requireUser();
+  await requireUser();
+  const t = await getTranslations("guide.page");
+  // The guide is long prose, so it is two whole files rather than
+  // dictionary keys (ADR 0006): content.ts in Hebrew, content.en.ts in
+  // English, kept section for section by tests/unit/guide-content-parity.
+  const { locale } = await resolveRequestLocale();
+  const groups = locale === "en" ? GUIDE_EN : GUIDE_HE;
 
   return (
     <>
       <div className="space-y-10">
         <div>
-          <h1 className="text-xl font-medium text-app-text-primary">מדריך שימוש</h1>
-          <p className="mt-1 text-sm text-app-text-secondary">
-            הסבר מלא על כל יכולות המערכת - מה כל מסך עושה, מי יכול לגשת אליו, ואיך עובדים איתו.
-          </p>
+          <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">{t("subtitle")}</p>
         </div>
 
         {/* App redesign (handoff README, screen 18): dark intro card matching
@@ -26,15 +33,11 @@ export default async function GuidePage() {
             three-step onboarding flow - so the text here describes the real
             thing instead of reproducing an invented pitch. */}
         <div className="rounded-2xl bg-navy p-6 text-cream-warm sm:p-8">
-          <p className="text-base font-medium text-white">איך להשתמש במדריך הזה</p>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-cream-warm/70">
-            תוכן העניינים למטה מקובץ לפי נושא, ובכל סעיף מופיע תג שמראה בדיוק אילו תפקידים רואים אותו - כך שהמדריך
-            תמיד משקף את מה שאתם עצמכם יכולים לעשות במערכת, לא רשימת יכולות כללית. אפשר גם לקפוץ ישירות לסעיף
-            רלוונטי דרך תוכן העניינים, או לחפש מילה בתיבת החיפוש, במקום לגלול על פני כל המדריך.
-          </p>
+          <p className="text-base font-medium text-white">{t("introTitle")}</p>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-cream-warm/70">{t("introBody")}</p>
         </div>
 
-        <GuideBrowser groups={GUIDE_GROUPS} />
+        <GuideBrowser groups={groups} />
       </div>
     </>
   );

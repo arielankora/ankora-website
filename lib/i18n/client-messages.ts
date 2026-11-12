@@ -43,6 +43,7 @@ export const CLIENT_MESSAGE_PATHS = [
   "clients.subprocessors",
   "clients.systems",
   "clients.tasks",
+  "guide",
   "messageClient",
   "myTime.closedBank",
   "myTime.entry",
