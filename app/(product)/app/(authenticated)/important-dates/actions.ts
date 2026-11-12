@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { timed, trace } from "@/lib/slow-log";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import {
   createImportantDate,
   updateImportantDate,
@@ -18,11 +20,14 @@ import type { ImportantDateCategory, ImportantDateSensitivity, ImportantDateStat
 
 type FormState = { error?: string; ok?: boolean };
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
-  if (err instanceof ConflictError) return "המועד עודכן על ידי מישהו אחר בינתיים. רעננו את העמוד ונסו שוב.";
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("importantDates.errors");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  if (err instanceof ConflictError) return t("conflict");
+  const text = await domainErrorText(err);
+  if (text) return text;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
 }
 
 function parseImportantDateFormData(formData: FormData) {
@@ -112,11 +117,12 @@ export async function createImportantDateAction(_prev: FormState | undefined, fo
   trace("createImportantDateAction: in");
   const user = await requireUser();
   const input = parseImportantDateFormData(formData);
+  const t = await getTranslations("importantDates.errors");
 
-  if (!input.clientId) return { error: "יש לבחור לקוח." };
-  if (!input.title) return { error: "יש להזין כותרת." };
-  if (!input.category) return { error: "יש לבחור קטגוריה." };
-  if (!input.responsibleUserId) return { error: "יש לבחור אחראי." };
+  if (!input.clientId) return { error: t("clientRequired") };
+  if (!input.title) return { error: t("titleRequired") };
+  if (!input.category) return { error: t("categoryRequired") };
+  if (!input.responsibleUserId) return { error: t("responsibleRequired") };
 
   // A ONCE date carries its whole date in `onceDate`; the form renders that
   // field INSTEAD of month/day, so both arrive empty. This validation ran
@@ -129,12 +135,12 @@ export async function createImportantDateAction(_prev: FormState | undefined, fo
   // ignored for ONCE - so they are derived from the chosen date rather than
   // made nullable, which would be a migration for no behavioural gain.
   if (input.recurrence === "ONCE") {
-    if (!input.onceDate || Number.isNaN(input.onceDate.getTime())) return { error: "יש לבחור תאריך." };
+    if (!input.onceDate || Number.isNaN(input.onceDate.getTime())) return { error: t("dateRequired") };
     input.month = input.onceDate.getUTCMonth() + 1;
     input.day = input.onceDate.getUTCDate();
   } else {
-    if (!input.month || input.month < 1 || input.month > 13) return { error: "חודש לא תקין." };
-    if (!input.day || input.day < 1 || input.day > 31) return { error: "יום לא תקין." };
+    if (!input.month || input.month < 1 || input.month > 13) return { error: t("monthInvalid") };
+    if (!input.day || input.day < 1 || input.day > 31) return { error: t("dayInvalid") };
   }
 
   trace("createImportantDateAction: writing");
@@ -142,7 +148,7 @@ export async function createImportantDateAction(_prev: FormState | undefined, fo
     await createImportantDate(user, input);
   } catch (err) {
     trace("createImportantDateAction: out (refused)");
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   trace("createImportantDateAction: written");
 
@@ -163,13 +169,14 @@ export async function createImportantDateAction(_prev: FormState | undefined, fo
 
 export async function updateImportantDateAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
+  const t = await getTranslations("importantDates.errors");
   const id = String(formData.get("id") || "");
-  if (!id) return { error: "מועד לא נמצא." };
+  if (!id) return { error: t("notFound") };
 
   const input = parseImportantDateFormData(formData);
   const expectedUpdatedAtRaw = String(formData.get("expectedUpdatedAt") || "");
 
-  if (!input.title) return { error: "יש להזין כותרת." };
+  if (!input.title) return { error: t("titleRequired") };
 
   try {
     await updateImportantDate(user, id, {
@@ -177,7 +184,7 @@ export async function updateImportantDateAction(_prev: FormState | undefined, fo
       expectedUpdatedAt: expectedUpdatedAtRaw ? new Date(expectedUpdatedAtRaw) : undefined,
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/important-dates");
@@ -212,7 +219,7 @@ export async function setImportantDateStatusAction(id: string, status: Important
     revalidatePath("/app");
     return { ok: true as const, status: updated.status };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 

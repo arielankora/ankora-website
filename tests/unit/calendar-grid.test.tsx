@@ -17,6 +17,7 @@ vi.mock("@/app/(product)/app/(authenticated)/calendar/actions", () => ({
 import { CalendarGrid } from "@/app/(product)/app/(authenticated)/calendar/CalendarGrid";
 import { visibleDays } from "@/lib/calendar-keys";
 import type { CalendarTask } from "@/lib/app-domain/calendar";
+import { intlWrapper } from "../helpers/intl";
 
 const days = visibleDays("week", "2026-10-19");
 
@@ -39,7 +40,8 @@ function renderGrid(tasks: CalendarTask[], drawer: "undated" | "overdue" | "clos
       overdueMore={false}
       query="view=week&date=2026-10-19"
       dayHrefs={Object.fromEntries(days.map((d) => [d, `/app/calendar?view=day&date=${d}`]))}
-    />
+    />,
+    { wrapper: intlWrapper() }
   );
 }
 

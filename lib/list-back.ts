@@ -53,8 +53,6 @@ export const CLIENTS_LIST_KEYS = ["q"] as const;
 export const IMPORTANT_DATES_LIST_KEYS = ["tab"] as const;
 
 /// 19.10.2026: the words on the way back, naming the list as it was.
-const IMPORTANT_DATES_TABS: Record<string, string> = { all: "הכל", done: "טופלו" };
-
 /// ADR 0006: with `t` (the "clients.list" namespace) the label is in the
 /// reader's language; without it, the Hebrew it has always been.
 export function clientsBackTitle(
@@ -67,7 +65,11 @@ export function clientsBackTitle(
   return shown ? `לקוחות · "${shown}"` : "לקוחות";
 }
 
-export function importantDatesBackTitle(from?: string | string[] | null): string {
+/// The words come from the dictionary (ADR 0006): the caller passes its
+/// translator for "importantDates.list" (title, tabs.*).
+export type ImportantDatesBackWords = (key: "title" | "tabs.all" | "tabs.done") => string;
+
+export function importantDatesBackTitle(from: string | string[] | null | undefined, t: ImportantDatesBackWords): string {
   const tab = typeof from === "string" ? new URLSearchParams(cleanListQuery(new URLSearchParams(from), IMPORTANT_DATES_LIST_KEYS)).get("tab") : null;
-  return tab && IMPORTANT_DATES_TABS[tab] ? `מועדים חשובים · ${IMPORTANT_DATES_TABS[tab]}` : "מועדים חשובים";
+  return tab === "all" || tab === "done" ? `${t("title")} · ${t(`tabs.${tab}`)}` : t("title");
 }

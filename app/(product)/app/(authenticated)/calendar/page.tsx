@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { ChevronLeft, ChevronRight, Clock, Inbox } from "lucide-react";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
@@ -11,15 +12,17 @@ import {
   CALENDAR_VIEWS,
   calendarHref,
   isDayKey,
+  KEY_FORMAT,
+  keyDate,
   parseDrawer,
   parseShow,
   parseView,
-  rangeTitle,
   shiftAnchor,
+  weekBounds,
   type CalendarState,
 } from "@/lib/calendar-keys";
 import { Forbidden } from "@/components/app/Forbidden";
-import { MINE_OPTIONS, parseMineScope } from "../tasks/mine-scope";
+import { MINE_SCOPES, parseMineScope } from "../tasks/mine-scope";
 import { CalendarClientSelect } from "./CalendarClientSelect";
 import { CalendarGrid } from "./CalendarGrid";
 
@@ -46,6 +49,9 @@ export default async function CalendarPage(props: {
   const user = await requireUser();
   if (!can(user.role, "time_entry.create_self")) return <Forbidden />;
 
+  const t = await getTranslations("calendar");
+  const tList = await getTranslations("tasks.list");
+  const format = await getFormatter();
   const today = localDateKey(new Date());
   const clients = await listAccessibleClients(user);
   const clientId = clients.some((c) => c.id === searchParams.clientId) ? searchParams.clientId : undefined;
@@ -74,6 +80,15 @@ export default async function CalendarPage(props: {
   // date opened from here comes back to exactly this.
   const query = href({}).split("?")[1] ?? "";
 
+  // The heading over the grid: "אוקטובר 2026", "18.10 עד 24.10", or the
+  // full day, in the reader's language (ADR 0006).
+  const rangeTitle = () => {
+    if (state.view === "day") return format.dateTime(keyDate(state.date), KEY_FORMAT.day);
+    if (state.view === "month") return format.dateTime(keyDate(state.date), KEY_FORMAT.month);
+    const { start, end } = weekBounds(state.date);
+    return t("weekRange", { start: format.dateTime(keyDate(start), KEY_FORMAT.short), end: format.dateTime(keyDate(end), KEY_FORMAT.short) });
+  };
+
   const segment = (active: boolean) =>
     `shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
       active ? "bg-app-surface-nav text-cream" : "text-app-text-secondary hover:text-app-text-primary"
@@ -82,31 +97,31 @@ export default async function CalendarPage(props: {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-medium text-app-text-primary">יומן</h1>
-        <p className="mt-1 text-sm text-app-text-secondary">משימות לפי תאריך יעד ומועדים לפי היום שבו הם חלים. גוררים משימה ליום אחר כדי לשנות לה את היעד.</p>
+        <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
+        <p className="mt-1 text-sm text-app-text-secondary">{t("subtitle")}</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2.5">
         <div data-testid="calendar-view" className="flex rounded-full border border-app-border bg-white p-[3px]">
           {CALENDAR_VIEWS.map((v) => (
-            <Link key={v.view} href={href({ view: v.view })} className={segment(state.view === v.view)} aria-current={state.view === v.view ? "page" : undefined}>
-              {v.label}
+            <Link key={v} href={href({ view: v })} className={segment(state.view === v)} aria-current={state.view === v ? "page" : undefined}>
+              {t(`views.${v}`)}
             </Link>
           ))}
         </div>
 
         <div data-testid="calendar-show" className="flex rounded-full border border-app-border bg-white p-[3px]">
           {CALENDAR_SHOWS.map((s) => (
-            <Link key={s.show} href={href({ show: s.show })} className={segment(state.show === s.show)} aria-current={state.show === s.show ? "page" : undefined}>
-              {s.label}
+            <Link key={s} href={href({ show: s })} className={segment(state.show === s)} aria-current={state.show === s ? "page" : undefined}>
+              {t(`shows.${s}`)}
             </Link>
           ))}
         </div>
 
         <div data-testid="calendar-mine" className="flex rounded-full border border-app-border bg-white p-[3px]">
-          {MINE_OPTIONS.map((option) => (
-            <Link key={option.scope} href={href({ mine: option.scope })} className={segment(state.mine === option.scope)} aria-current={state.mine === option.scope ? "page" : undefined}>
-              {option.label}
+          {MINE_SCOPES.map((scope) => (
+            <Link key={scope} href={href({ mine: scope })} className={segment(state.mine === scope)} aria-current={state.mine === scope ? "page" : undefined}>
+              {tList(`mine.${scope}`)}
             </Link>
           ))}
         </div>
@@ -117,17 +132,17 @@ export default async function CalendarPage(props: {
       <div className="flex flex-wrap items-center gap-3">
         {/* Right is "back" in Hebrew, so the right arrow goes to the past.
             In a left-to-right page both arrows turn around (ADR 0006). */}
-        <Link href={href({ date: shiftAnchor(state.view, state.date, -1) })} aria-label="הקודם" data-testid="calendar-prev" className="rounded-full border border-app-border bg-white p-2 text-app-text-secondary hover:text-app-text-primary">
+        <Link href={href({ date: shiftAnchor(state.view, state.date, -1) })} aria-label={t("nav.prev")} data-testid="calendar-prev" className="rounded-full border border-app-border bg-white p-2 text-app-text-secondary hover:text-app-text-primary">
           <ChevronRight size={16} className="ltr:rotate-180" />
         </Link>
         <Link href={href({ date: today })} className="rounded-full border border-app-border bg-white px-4 py-1.5 text-[13px] font-medium text-app-text-secondary hover:text-app-text-primary">
-          היום
+          {t("nav.today")}
         </Link>
-        <Link href={href({ date: shiftAnchor(state.view, state.date, 1) })} aria-label="הבא" data-testid="calendar-next" className="rounded-full border border-app-border bg-white p-2 text-app-text-secondary hover:text-app-text-primary">
+        <Link href={href({ date: shiftAnchor(state.view, state.date, 1) })} aria-label={t("nav.next")} data-testid="calendar-next" className="rounded-full border border-app-border bg-white p-2 text-app-text-secondary hover:text-app-text-primary">
           <ChevronLeft size={16} className="ltr:rotate-180" />
         </Link>
         <h2 data-testid="calendar-title" className="text-[15px] font-medium text-app-text-primary">
-          {rangeTitle(state.view, state.date)}
+          {rangeTitle()}
         </h2>
 
         {/* 20.10.2026: the two lists that used to be a fixed column. A
@@ -144,7 +159,7 @@ export default async function CalendarPage(props: {
               }`}
             >
               <Clock size={14} strokeWidth={1.8} />
-              באיחור
+              {t("overdue")}
               <span className="font-jbmono text-[12px]">{data.overdueTotal}{data.overdueTotal > OVERDUE_LIMIT ? "+" : ""}</span>
             </Link>
             <Link
@@ -156,7 +171,7 @@ export default async function CalendarPage(props: {
               }`}
             >
               <Inbox size={14} strokeWidth={1.8} />
-              בלי תאריך
+              {t("undated")}
               <span className="font-jbmono text-[12px]">{data.undatedTotal}{data.undatedTotal > UNDATED_LIMIT ? "+" : ""}</span>
             </Link>
           </div>

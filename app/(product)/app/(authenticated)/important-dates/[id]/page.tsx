@@ -1,4 +1,4 @@
-import { RECEIPT_LABEL } from "@/lib/date-receipt";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { PageBack } from "@/components/app/BackSlot";
 import { IMPORTANT_DATES_LIST_KEYS, importantDatesBackTitle, listBackHref } from "@/lib/list-back";
 import { notFound } from "next/navigation";
@@ -8,9 +8,6 @@ import { getImportantDate } from "@/lib/app-domain/important-dates";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listUsers } from "@/lib/app-domain/users";
 import { listCategories } from "@/lib/app-domain/categories";
-import { IMPORTANT_DATE_CATEGORY_LABELS } from "@/lib/app-domain/important-dates-reminders";
-import { formatDayAlternatives } from "@/lib/app-domain/important-dates-recurrence";
-import { IMPORTANT_DATE_STATUS_LABELS } from "@/lib/app-domain/important-dates";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { Drawer } from "@/components/app/Drawer";
@@ -19,13 +16,13 @@ import { ImportantDateStatusSelect } from "../ImportantDateStatusSelect";
 import { snoozeImportantDateAction, deleteImportantDateAction, startWorkOnImportantDateAction } from "../actions";
 import Link from "next/link";
 import { AdvanceWithClaude } from "../../tasks/[id]/AdvanceWithClaude";
-import { getTaskDetail, TASK_STATUS_LABELS } from "@/lib/app-domain/tasks";
+import { getTaskDetail } from "@/lib/app-domain/tasks";
 import { getTaskPlans } from "@/lib/app-domain/task-plans";
 import { advancePromptFor } from "@/lib/app-domain/advance-prompt-input";
 import type { ImportantDateStatus } from "@prisma/client";
 import { lockedCalendarFor } from "@/lib/app-domain/date-calendars";
 import { calendarBackHref } from "@/lib/calendar-keys";
-import { BUSINESS_CALENDAR_LABELS, calendarSourceLine, isBusinessCalendarKey } from "@/lib/business-calendar";
+import { isBusinessCalendarKey } from "@/lib/business-calendar";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -38,16 +35,16 @@ const STATUS_TONE: Record<ImportantDateStatus, "green" | "amber" | "gray" | "red
   ARCHIVED: "gray",
 };
 
-function formatDate(date: Date | null): string {
-  if (!date) return "-";
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
-}
-
 export default async function ImportantDateDetailPage(props: {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ from?: string | string[] }>;
 }) {
   const params = await props.params;
+  const t = await getTranslations("importantDates");
+  const tList = await getTranslations("importantDates.list");
+  const tTask = await getTranslations("tasks.common");
+  const format = await getFormatter();
+  const formatDate = (date: Date | null): string => (date ? format.dateTime(date, { dateStyle: "medium" }) : t("detail.noDate"));
   // 19.10.2026: a date opened from the calendar goes back to it, with the
   // same view and filters. See lib/calendar-keys.ts.
   const rawFrom = (await props.searchParams).from;
@@ -73,7 +70,13 @@ export default async function ImportantDateDetailPage(props: {
   if (!date) notFound();
   // Decision 6: a date that starts a process is on the process's calendar.
   const lock = await lockedCalendarFor(date.processId);
-  const calendarLine = lock ? calendarSourceLine(lock.code, lock.title, lock) : null;
+  // How the date's calendar reads when its process decides it. The
+  // process's code and title are what people wrote.
+  const calendarLine = lock
+    ? lock.by === "PROCESS"
+      ? t("detail.calendarByProcess", { label: t(`businessCalendar.${lock.key}`), code: lock.code, title: lock.title })
+      : t("detail.calendarByEntity", { label: t(`businessCalendar.${lock.key}`), entity: lock.entityName ?? "", code: lock.code, title: lock.title })
+    : null;
 
   // "התחלת עבודה" (8.11.2026): work with Claude and the timer live on a
   // task, so the date shows them for its open task. The prompt is built
@@ -98,15 +101,15 @@ export default async function ImportantDateDetailPage(props: {
     <>
       <div className="space-y-6">
         <div>
-          <PageBack href={backHref} label={calendarBack ? "יומן" : importantDatesBackTitle(rawFrom)} />
+          <PageBack href={backHref} label={calendarBack ? t("detail.backToCalendar") : importantDatesBackTitle(rawFrom, tList)} />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h1 className="text-xl font-medium text-app-text-primary">{date.title}</h1>
+              <h1 dir="auto" className="text-xl font-medium text-app-text-primary">{date.title}</h1>
               <p className="mt-1 text-sm text-app-text-secondary">
-                {date.client.name} · {IMPORTANT_DATE_CATEGORY_LABELS[date.category]} · {date.type}
+                <bdi>{date.client.name}</bdi> · {t(`category.${date.category}`)} · <bdi>{date.type}</bdi>
               </p>
             </div>
-            <Drawer triggerLabel="עריכה" title="עריכת מועד חשוב">
+            <Drawer triggerLabel={t("detail.edit")} title={t("detail.editTitle")}>
               {/* Mapped, not passed whole - same reason as the list screen:
                   this is a client component, and listUsers() rows carry
                   passwordHash. */}
@@ -161,78 +164,81 @@ export default async function ImportantDateDetailPage(props: {
           <div className="space-y-6 lg:col-span-2">
             <div className="rounded-2xl border border-app-border bg-white p-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium text-app-text-primary">פרטים</h2>
-                <StatusBadge label={IMPORTANT_DATE_STATUS_LABELS[date.status]} tone={STATUS_TONE[date.status]} />
+                <h2 className="text-sm font-medium text-app-text-primary">{t("detail.details")}</h2>
+                <StatusBadge label={t(`status.${date.status}`)} tone={STATUS_TONE[date.status]} />
               </div>
               <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                 <div>
-                  <dt className="text-xs text-app-text-tertiary">מופע הבא</dt>
+                  <dt className="text-xs text-app-text-tertiary">{t("detail.nextOccurrence")}</dt>
                   <dd className="text-app-text-primary">
-                    {date.precision === "UNKNOWN" ? "מועד חסר" : formatDate(date.nextOccurrenceAt)}
+                    {date.precision === "UNKNOWN" ? t("detail.missing") : formatDate(date.nextOccurrenceAt)}
                     {date.precision === "APPROXIMATE" && date.dayAlternatives.length > 1 && (
-                      <span className="text-app-text-tertiary"> (משוער: {formatDayAlternatives(date.dayAlternatives)} לחודש)</span>
+                      <span className="text-app-text-tertiary"> ({t("detail.approximate", { days: format.list([...new Set(date.dayAlternatives)].sort((a, b) => a - b).map(String), { type: "disjunction" }) })})</span>
                     )}
                   </dd>
                 </div>
                 {date.expectsReceipt && (
                   <div className="col-span-2">
-                    <dt className="text-xs text-app-text-tertiary">{RECEIPT_LABEL}</dt>
-                    <dd className="text-app-text-primary">{date.expectedFrom ? `מ-${date.expectedFrom}. ` : ""}האחראי מוודא שזה התקבל.</dd>
+                    <dt className="text-xs text-app-text-tertiary">{t("detail.receipt")}</dt>
+                    <dd className="text-app-text-primary">{date.expectedFrom ? t("detail.receiptBodyFrom", { from: date.expectedFrom }) : t("detail.receiptBody")}</dd>
                   </div>
                 )}
                 {date.conditionText && (
                   <div className="col-span-2">
-                    <dt className="text-xs text-app-text-tertiary">בתנאי ש</dt>
-                    <dd className="text-app-text-primary">{date.conditionText}</dd>
+                    <dt className="text-xs text-app-text-tertiary">{t("detail.condition")}</dt>
+                    <dd dir="auto" className="text-app-text-primary">{date.conditionText}</dd>
                   </div>
                 )}
                 {(date.rangeStart || date.rangeEnd) && (
                   <div className="col-span-2">
-                    <dt className="text-xs text-app-text-tertiary">תקופה</dt>
+                    <dt className="text-xs text-app-text-tertiary">{t("detail.period")}</dt>
                     <dd className="text-app-text-primary">
-                      {date.rangeStart ? formatDate(date.rangeStart) : "מההתחלה"} עד {date.rangeEnd ? formatDate(date.rangeEnd) : "ללא סוף"}
+                      {t("detail.periodRange", {
+                        start: date.rangeStart ? formatDate(date.rangeStart) : t("detail.fromStart"),
+                        end: date.rangeEnd ? formatDate(date.rangeEnd) : t("detail.noEnd"),
+                      })}
                     </dd>
                   </div>
                 )}
                 <div>
-                  <dt className="text-xs text-app-text-tertiary">אחראי</dt>
-                  <dd className="text-app-text-primary">{date.responsibleUser.name}</dd>
+                  <dt className="text-xs text-app-text-tertiary">{t("detail.responsible")}</dt>
+                  <dd dir="auto" className="text-app-text-primary">{date.responsibleUser.name}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-app-text-tertiary">לוח שנה</dt>
-                  <dd className="text-app-text-primary">{date.calendarType === "HEBREW" ? "עברי" : "לועזי"}</dd>
+                  <dt className="text-xs text-app-text-tertiary">{t("detail.calendar")}</dt>
+                  <dd className="text-app-text-primary">{date.calendarType === "HEBREW" ? t("detail.hebrew") : t("detail.gregorian")}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-app-text-tertiary">ימי עבודה לפי</dt>
+                  <dt className="text-xs text-app-text-tertiary">{t("detail.businessDays")}</dt>
                   <dd className="text-app-text-primary" data-testid="date-business-calendar">
-                    {calendarLine ?? BUSINESS_CALENDAR_LABELS[isBusinessCalendarKey(date.businessCalendar) ? date.businessCalendar : "IL"]}
+                    {calendarLine ?? t(`businessCalendar.${isBusinessCalendarKey(date.businessCalendar) ? date.businessCalendar : "IL"}`)}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-app-text-tertiary">רגישות</dt>
-                  <dd className="text-app-text-primary">{date.sensitivity === "SENSITIVE" ? "רגיש" : "רגיל"}</dd>
+                  <dt className="text-xs text-app-text-tertiary">{t("detail.sensitivity")}</dt>
+                  <dd className="text-app-text-primary">{date.sensitivity === "SENSITIVE" ? t("detail.sensitive") : t("detail.normal")}</dd>
                 </div>
                 {date.notes && (
                   <div className="col-span-2">
-                    <dt className="text-xs text-app-text-tertiary">הערות</dt>
-                    <dd className="text-app-text-primary">{date.notes}</dd>
+                    <dt className="text-xs text-app-text-tertiary">{t("detail.notes")}</dt>
+                    <dd dir="auto" className="text-app-text-primary">{date.notes}</dd>
                   </div>
                 )}
               </dl>
             </div>
 
             <div className="rounded-2xl border border-app-border bg-white p-6">
-              <h2 className="text-sm font-medium text-app-text-primary">תזכורות</h2>
+              <h2 className="text-sm font-medium text-app-text-primary">{t("detail.reminders")}</h2>
               {date.reminderRules.length === 0 ? (
-                <p className="mt-2 text-sm text-app-text-tertiary">אין תזכורות מוגדרות למועד זה.</p>
+                <p className="mt-2 text-sm text-app-text-tertiary">{t("detail.noReminders")}</p>
               ) : (
                 <ul className="mt-3 space-y-2">
                   {date.reminderRules.map((rule) => (
                     <li key={rule.id} className="flex items-center gap-3 text-sm text-app-text-secondary">
-                      <span className="rounded-full bg-app-surface-sunken px-3 py-1 text-xs text-app-text-primary">{rule.daysBefore} ימים לפני</span>
-                      {rule.sendInApp && <span className="text-xs text-app-text-tertiary">בתוך המערכת</span>}
-                      {rule.sendEmail && <span className="text-xs text-app-text-tertiary">מייל</span>}
-                      {!rule.enabled && <span className="text-xs text-app-error">מושבת</span>}
+                      <span className="rounded-full bg-app-surface-sunken px-3 py-1 text-xs text-app-text-primary">{t("detail.daysBefore", { days: rule.daysBefore })}</span>
+                      {rule.sendInApp && <span className="text-xs text-app-text-tertiary">{t("detail.inApp")}</span>}
+                      {rule.sendEmail && <span className="text-xs text-app-text-tertiary">{t("detail.email")}</span>}
+                      {!rule.enabled && <span className="text-xs text-app-error">{t("detail.disabled")}</span>}
                     </li>
                   ))}
                 </ul>
@@ -241,14 +247,14 @@ export default async function ImportantDateDetailPage(props: {
 
             {ownTasks.length > 0 && (
               <div className="rounded-2xl border border-app-border bg-white p-6">
-                <h2 className="text-sm font-medium text-app-text-primary">משימות של המועד</h2>
+                <h2 className="text-sm font-medium text-app-text-primary">{t("detail.tasks")}</h2>
                 <ul className="mt-3 space-y-1.5">
                   {ownTasks.map((task) => (
                     <li key={task.id} className="flex items-center justify-between gap-3 text-sm">
-                      <Link href={`/app/tasks/${task.id}`} className="text-app-text-primary underline-offset-4 hover:underline">
+                      <Link href={`/app/tasks/${task.id}`} dir="auto" className="text-app-text-primary underline-offset-4 hover:underline">
                         {task.title}
                       </Link>
-                      <span className="whitespace-nowrap text-xs text-app-text-tertiary">{TASK_STATUS_LABELS[task.status]}</span>
+                      <span className="whitespace-nowrap text-xs text-app-text-tertiary">{tTask(`status.${task.status}`)}</span>
                     </li>
                   ))}
                 </ul>
@@ -258,34 +264,37 @@ export default async function ImportantDateDetailPage(props: {
 
           <div className="space-y-6">
             <div className="rounded-2xl border border-app-border bg-white p-6" data-testid="date-start-work">
-              <h2 className="text-sm font-medium text-app-text-primary">התחלת עבודה</h2>
+              <h2 className="text-sm font-medium text-app-text-primary">{t("detail.startWork")}</h2>
               {workTask ? (
                 <>
                   <p className="mt-1 text-xs text-app-text-tertiary">
-                    העבודה מתנהלת במשימה{" "}
-                    <Link href={`/app/tasks/${workTask.id}`} className="text-app-text-secondary underline underline-offset-4">
-                      {workTask.title}
-                    </Link>
-                    . הטיימר ירוץ עליה.
+                    {t.rich("detail.workIn", {
+                      title: workTask.title,
+                      task: (chunks) => (
+                        <Link href={`/app/tasks/${workTask.id}`} dir="auto" className="text-app-text-secondary underline underline-offset-4">
+                          {chunks}
+                        </Link>
+                      ),
+                    })}
                   </p>
                   <div className="mt-3">
                     {workPrompt ? (
                       <AdvanceWithClaude taskId={workTask.id} prompt={workPrompt} hasPlan={workPlan !== null} />
                     ) : (
                       <p className="text-xs text-app-text-secondary">
-                        {workDetail ? "בלי AI: המשימה הזו מטופלת בידי אדם בלבד." : "אין לך גישה למשימה הזו."}
+                        {workDetail ? t("detail.noAi") : t("detail.noAccess")}
                       </p>
                     )}
                   </div>
                 </>
               ) : (
                 <>
-                  <p className="mt-1 text-xs text-app-text-tertiary">פותח משימה למופע הזה, ומשם קדם עם קלוד והפעלת טיימר.</p>
+                  <p className="mt-1 text-xs text-app-text-tertiary">{t("detail.startWorkHint")}</p>
                   <form action={startWorkOnImportantDateAction} className="mt-3">
                     <input type="hidden" name="importantDateId" value={date.id} />
                     <input type="hidden" name="from" value={fromParam} />
                     <button type="submit" className="inline-flex items-center rounded-full bg-app-accent px-4 py-2.5 text-sm font-medium text-app-text-primary">
-                      התחלת עבודה
+                      {t("detail.startWork")}
                     </button>
                   </form>
                 </>
@@ -293,15 +302,15 @@ export default async function ImportantDateDetailPage(props: {
             </div>
 
             <div className="rounded-2xl border border-app-border bg-white p-6">
-              <h2 className="text-sm font-medium text-app-text-primary">סטטוס</h2>
+              <h2 className="text-sm font-medium text-app-text-primary">{t("detail.status")}</h2>
               <div className="mt-3">
                 <ImportantDateStatusSelect importantDateId={date.id} status={date.status} />
               </div>
             </div>
 
             <div className="rounded-2xl border border-app-border bg-white p-6">
-              <h2 className="text-sm font-medium text-app-text-primary">דחיית טיפול (Snooze)</h2>
-              <p className="mt-1 text-xs text-app-text-tertiary">דוחה את הטיפול מבלי לשנות את תאריך האירוע המקורי.</p>
+              <h2 className="text-sm font-medium text-app-text-primary">{t("detail.snooze")}</h2>
+              <p className="mt-1 text-xs text-app-text-tertiary">{t("detail.snoozeHint")}</p>
               <form action={snoozeImportantDateAction} className="mt-3 flex items-center gap-2">
                 <input type="hidden" name="importantDateId" value={date.id} />
                 <input
@@ -311,18 +320,18 @@ export default async function ImportantDateDetailPage(props: {
                   className="w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
                 />
                 <button type="submit" className="whitespace-nowrap rounded-full border border-app-border px-4 py-2 text-sm text-app-text-primary hover:border-gold">
-                  דחייה
+                  {t("detail.snoozeButton")}
                 </button>
               </form>
             </div>
 
             <div className="rounded-2xl border border-app-border bg-white p-6">
-              <h2 className="text-sm font-medium text-app-text-primary">מחיקה</h2>
-              <p className="mt-1 text-xs text-app-text-tertiary">מעביר לארכיון רך - ניתן לשחזר דרך בסיס הנתונים אם צריך.</p>
+              <h2 className="text-sm font-medium text-app-text-primary">{t("detail.delete")}</h2>
+              <p className="mt-1 text-xs text-app-text-tertiary">{t("detail.deleteHint")}</p>
               <form action={deleteImportantDateAction} className="mt-3">
                 <input type="hidden" name="importantDateId" value={date.id} />
                 <button type="submit" className="rounded-full border border-app-error/30 px-4 py-2 text-sm text-app-error hover:bg-app-error-soft">
-                  מחיקת מועד
+                  {t("detail.deleteButton")}
                 </button>
               </form>
             </div>

@@ -12,20 +12,11 @@ import { mineParam, type MineScope } from "@/app/(product)/app/(authenticated)/t
 export type CalendarView = "day" | "week" | "month";
 export type CalendarShow = "all" | "tasks" | "dates";
 
-export const CALENDAR_VIEWS: { view: CalendarView; label: string }[] = [
-  { view: "day", label: "יום" },
-  { view: "week", label: "שבוע" },
-  { view: "month", label: "חודש" },
-];
+/// In the order they sit on screen. Their names are calendar.views.<view>
+/// and calendar.shows.<show> in the dictionary (ADR 0006).
+export const CALENDAR_VIEWS: CalendarView[] = ["day", "week", "month"];
 
-export const CALENDAR_SHOWS: { show: CalendarShow; label: string }[] = [
-  { show: "all", label: "הכול" },
-  { show: "tasks", label: "משימות" },
-  { show: "dates", label: "מועדים" },
-];
-
-/// Sunday first: the Israeli week, and the week the rest of the app uses.
-export const WEEKDAY_LABELS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
+export const CALENDAR_SHOWS: CalendarShow[] = ["all", "tasks", "dates"];
 
 const KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -101,21 +92,27 @@ export function shiftAnchor(view: CalendarView, anchor: string, direction: 1 | -
   return addMonths(anchor, direction);
 }
 
-const MONTH_FMT = new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "UTC" });
-const DAY_FMT = new Intl.DateTimeFormat("he-IL", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-const SHORT_FMT = new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: "UTC" });
-
-/// The heading over the grid: "אוקטובר 2026", "18.10 עד 24.10", or the
-/// full day.
-export function rangeTitle(view: CalendarView, anchor: string): string {
-  if (view === "day") return DAY_FMT.format(keyToUtc(anchor));
-  if (view === "month") return MONTH_FMT.format(keyToUtc(anchor));
-  const days = visibleDays("week", anchor);
-  return `${SHORT_FMT.format(keyToUtc(days[0]))} עד ${SHORT_FMT.format(keyToUtc(days[6]))}`;
+/// A day key as the instant a formatter reads, to be formatted with
+/// `timeZone: "UTC"` (KEY_FORMAT): the key is already an Israel day, so
+/// formatting it in any other zone could show the day before. Names of
+/// months and weekdays follow the reader's language (ADR 0006).
+export function keyDate(key: string): Date {
+  return keyToUtc(key);
 }
 
-export function shortDate(key: string): string {
-  return SHORT_FMT.format(keyToUtc(key));
+/// Formats for a day key, for useFormatter / getFormatter. "UTC" here is
+/// calendar arithmetic, not a time zone: see keyDate.
+export const KEY_FORMAT = {
+  short: { day: "numeric", month: "numeric", timeZone: "UTC" },
+  month: { month: "long", year: "numeric", timeZone: "UTC" },
+  day: { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" },
+} as const satisfies Record<string, Intl.DateTimeFormatOptions>;
+
+/// The first and last day of the week on screen, for the heading over
+/// the grid ("18.10 עד 24.10"; the words around them are the dictionary's).
+export function weekBounds(anchor: string): { start: string; end: string } {
+  const days = visibleDays("week", anchor);
+  return { start: days[0], end: days[6] };
 }
 
 export function dayOfMonth(key: string): number {
