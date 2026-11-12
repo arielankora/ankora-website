@@ -12,8 +12,9 @@
 
 import type { MessageKeys, NestedKeyOf } from "next-intl";
 import type he from "@/messages/he.json";
-import type { ApprovalPreview } from "@/lib/approvals-preview";
-import type { StepOp } from "@/lib/next-steps";
+import type { ApprovalPreview, PreviewCheck } from "@/lib/approvals-preview";
+import type { NextStepText, StepOp } from "@/lib/next-steps";
+import type { ProcessStep } from "@/lib/process-rules";
 
 /// 22.10.2026: "process" holds a process's decisions (a date to link,
 /// duplicate tasks to close, a review), and "check" what an
@@ -131,6 +132,14 @@ export type ApprovalItem = {
   /// A field without a key here (a process decision's words, which come
   /// from lib/next-steps.ts) is shown as it is.
   screen?: ApprovalScreenText;
+  /// A process decision's lines as keys (lib/next-steps.ts), for the
+  /// screen to word in the reader's language. `detail`, `recommend`, the
+  /// approve label and `go` above keep the Hebrew of the same lines.
+  stepText?: NextStepText;
+  /// A procedure: what its preview and failing checks are made of, for
+  /// the screen to word (approvals/procedure-words.ts). `preview` and
+  /// `failing` keep the Hebrew.
+  procedureWords?: { steps: ProcessStep[]; systemName: Record<string, string>; checks: PreviewCheck[] };
   /// A knowledge batch: false when it waits on someone else (whoever sent
   /// it, the account manager). Out of the count and "היום", on screen
   /// under "של כולם" and with a client chosen (22.10.2026).

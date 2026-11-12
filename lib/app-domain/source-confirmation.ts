@@ -1,6 +1,7 @@
 import "server-only";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { DomainError } from "@/lib/domain-error";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
@@ -74,12 +75,12 @@ export async function loweredBySource(clientIds: string[]): Promise<LoweredSourc
 /// source, and marks the source a summary of a conversation with the
 /// client. Manager only. `note`: how it was confirmed, in one line.
 export async function confirmSourceWithClient(actor: User, clientId: string, code: string, note: string): Promise<{ confirmed: number }> {
-  if (!canManageClients(actor.role)) throw new Error("רק מנהל מאשר פריטים מול הלקוח בבת אחת.");
+  if (!canManageClients(actor.role)) throw new DomainError("sourceConfirmation.managerOnly", "רק מנהל מאשר פריטים מול הלקוח בבת אחת.");
   await assertClientAccess(actor, clientId);
   const how = note.trim();
-  if (!how) throw new Error("צריך לכתוב בשורה אחת איך זה אושר מול הלקוח.");
+  if (!how) throw new DomainError("sourceConfirmation.noteRequired", "צריך לכתוב בשורה אחת איך זה אושר מול הלקוח.");
   const source = await prisma.clientSource.findFirst({ where: { clientId, code, deletedAt: null } });
-  if (!source) throw new Error("המקור לא נמצא במרשם.");
+  if (!source) throw new DomainError("sourceConfirmation.sourceNotFound", "המקור לא נמצא במרשם.");
   const rows = (await lowered([clientId])).filter(({ row }) => uncertainOnlyForAnkora(row, code));
   const data = { knowledgeStatus: "CONFIRMED" as const, toResolve: null };
   const byTable = (t: Table) => rows.filter((r) => r.table === t).map((r) => r.row.id);

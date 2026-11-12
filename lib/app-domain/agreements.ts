@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { DomainError, type DomainErrorValues } from "@/lib/domain-error";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { ForbiddenError, assertCan } from "@/lib/app-auth/permissions";
 import { sendEmail } from "@/lib/email";
@@ -42,9 +43,15 @@ import type { AgreementChannel, AgreementKind, EmployeeAgreement, User, UserRole
 // message meant for the screen. Anything else is a bug and is left to
 // propagate.
 
-export class AgreementError extends Error {
-  constructor(message: string) {
-    super(message);
+//
+// ADR 0006: the refusals a staff screen shows (the user page) carry a code
+// under domainErrors.agreements, so the screen words them in the reader's
+// language. The rest have none (null): they are said on the signing
+// pages, which stay Hebrew for everyone, or to Claude over MCP, and keep
+// their message wherever they are shown.
+export class AgreementError extends DomainError {
+  constructor(code: string | null, message: string, values?: DomainErrorValues) {
+    super(code ?? "", message, values);
     this.name = "AgreementError";
   }
 }
@@ -77,13 +84,13 @@ function validateSignInput(
   input: SignInput
 ): string {
   if (input.version !== agreement.version) {
-    throw new AgreementError("נוסח המסמך עודכן מאז שנפתח. יש לטעון את הדף מחדש ולקרוא את הנוסח הנוכחי.");
+    throw new AgreementError(null, "נוסח המסמך עודכן מאז שנפתח. יש לטעון את הדף מחדש ולקרוא את הנוסח הנוכחי.");
   }
-  if (!input.consent) throw new AgreementError("יש לסמן שקראת את המסמך ושהוא מקובל עליך.");
+  if (!input.consent) throw new AgreementError(null, "יש לסמן שקראת את המסמך ושהוא מקובל עליך.");
   const typed = input.signedName.trim().replace(/\s+/g, " ");
-  if (!typed) throw new AgreementError("יש להקליד שם מלא.");
+  if (!typed) throw new AgreementError(null, "יש להקליד שם מלא.");
   if (!namesMatch(typed, signer.name)) {
-    throw new AgreementError(`השם שהוקלד אינו תואם לשם בחשבון (${signer.name}). יש להקליד את השם המלא כפי שהוא מופיע כאן.`);
+    throw new AgreementError(null, `השם שהוקלד אינו תואם לשם בחשבון (${signer.name}). יש להקליד את השם המלא כפי שהוא מופיע כאן.`);
   }
   return typed;
 }
@@ -197,7 +204,7 @@ export async function viewSignLink(raw: string): Promise<SignLinkView | null> {
 /// (unused and unexpired at that instant), so two submissions of the same
 /// link cannot both produce a row.
 export async function signWithLink(raw: string, input: SignInput): Promise<EmployeeAgreement> {
-  const invalid = new AgreementError("הקישור אינו זמין עוד. אפשר לפנות לאנקורה ולבקש קישור חדש.");
+  const invalid = new AgreementError(null, "הקישור אינו זמין עוד. אפשר לפנות לאנקורה ולבקש קישור חדש.");
   if (!raw) throw invalid;
 
   const link = await prisma.agreementSignLink.findUnique({
@@ -271,13 +278,13 @@ export async function issueDeletionDeclarationLink(
   assertAgreementAdmin(actor.role);
 
   const target = await prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
-  if (!target) throw new AgreementError("משתמש לא נמצא.");
-  if (target.role === "CLIENT_USER") throw new AgreementError("הצהרת מחיקה נשלחת רק לאנשי אנקורה.");
+  if (!target) throw new AgreementError("agreements.userNotFound", "משתמש לא נמצא.");
+  if (target.role === "CLIENT_USER") throw new AgreementError("agreements.deletionStaffOnly", "הצהרת מחיקה נשלחת רק לאנשי אנקורה.");
   if ((target.status === "ACTIVE" || target.status === "INVITED") && !opts.confirmActive) {
-    throw new AgreementError("המשתמש עדיין פעיל. יש לאשר שהשליחה מכוונת.");
+    throw new AgreementError("agreements.stillActive", "המשתמש עדיין פעיל. יש לאשר שהשליחה מכוונת.");
   }
   if (!target.personalEmail) {
-    throw new AgreementError("לא הוגדר מייל פרטי למשתמש. יש להוסיף אותו בעמוד המשתמש לפני השליחה.");
+    throw new AgreementError("agreements.noPersonalEmail", "לא הוגדר מייל פרטי למשתמש. יש להוסיף אותו בעמוד המשתמש לפני השליחה.");
   }
 
   const agreement = currentAgreement("DELETION_DECLARATION");
@@ -349,16 +356,16 @@ export async function recordPdfSignature(
   assertAgreementAdmin(actor.role);
 
   const target = await prisma.user.findFirst({ where: { id: input.userId, deletedAt: null } });
-  if (!target) throw new AgreementError("משתמש לא נמצא.");
-  if (target.role === "CLIENT_USER") throw new AgreementError("מסמכים אלה נחתמים רק על ידי אנשי אנקורה.");
+  if (!target) throw new AgreementError("agreements.userNotFound", "משתמש לא נמצא.");
+  if (target.role === "CLIENT_USER") throw new AgreementError("agreements.signedByStaffOnly", "מסמכים אלה נחתמים רק על ידי אנשי אנקורה.");
 
   const agreement = findAgreement(input.kind, input.version);
-  if (!agreement) throw new AgreementError(`הגרסה ${input.version} אינה קיימת למסמך הזה.`);
+  if (!agreement) throw new AgreementError("agreements.unknownVersion", `הגרסה ${input.version} אינה קיימת למסמך הזה.`, { version: input.version });
 
   const signedName = input.signedName.trim().replace(/\s+/g, " ");
-  if (!signedName) throw new AgreementError("יש לציין את השם שנחתם.");
+  if (!signedName) throw new AgreementError("agreements.signedNameRequired", "יש לציין את השם שנחתם.");
   if (Number.isNaN(input.signedAt.getTime()) || input.signedAt.getTime() > Date.now() + 60_000) {
-    throw new AgreementError("תאריך החתימה אינו תקין.");
+    throw new AgreementError("agreements.badSignedDate", "תאריך החתימה אינו תקין.");
   }
 
   const row = await prisma.employeeAgreement.create({
@@ -461,22 +468,22 @@ export async function recordPdfSignatureFromDocument(
   const expectedCode = agreementCode(input.kind, expected);
   const given = findAgreementByVersionOrCode(input.kind, input.version);
   if (!given || given.version !== expected) {
-    throw new AgreementError(
+    throw new AgreementError(null,
       `The current version of ${input.kind} is "${expected}" (code ${expectedCode}), not "${input.version}". Record only a PDF whose footer code is ${expectedCode}; a different version needs a person to decide.`
     );
   }
 
   const { resolveInternalClient } = await import("@/lib/app-domain/employee-lifecycle");
   const internal = await resolveInternalClient();
-  if (!internal) throw new AgreementError("The internal client (Ankora פנימי) was not found, so the PDF cannot be verified as filed there.");
+  if (!internal) throw new AgreementError(null, "The internal client (Ankora פנימי) was not found, so the PDF cannot be verified as filed there.");
 
   const doc = await prisma.clientDocument.findFirst({
     where: { id: input.documentId.trim(), deletedAt: null },
     select: { id: true, clientId: true, driveFileId: true },
   });
-  if (!doc) throw new AgreementError(`No document with id "${input.documentId}". File the signed PDF first, then pass its documentId.`);
+  if (!doc) throw new AgreementError(null, `No document with id "${input.documentId}". File the signed PDF first, then pass its documentId.`);
   if (doc.clientId !== internal.id) {
-    throw new AgreementError(`That document is not in the file of ${internal.name}. Signed agreements are filed there, never on a client.`);
+    throw new AgreementError(null, `That document is not in the file of ${internal.name}. Signed agreements are filed there, never on a client.`);
   }
 
   const existing = await prisma.employeeAgreement.findFirst({
@@ -547,7 +554,7 @@ export async function issueBlankAgreementTicket(actor: User, kind: AgreementKind
   assertCan(actor.role, "time_entry.edit_others");
   const { resolveInternalClient } = await import("@/lib/app-domain/employee-lifecycle");
   const internal = await resolveInternalClient();
-  if (!internal) throw new AgreementError("The internal client (Ankora פנימי) was not found, so no download address can be issued.");
+  if (!internal) throw new AgreementError(null, "The internal client (Ankora פנימי) was not found, so no download address can be issued.");
 
   const agreement = currentAgreement(kind);
   const code = agreementCode(kind, agreement.version);
@@ -601,7 +608,7 @@ export function kindFromBlankFileName(fileName: string | null): AgreementKind | 
 export async function issueAgreementUploadCode(actor: User, userId: string, kind: AgreementKind) {
   assertAgreementAdmin(actor.role);
   const target = await prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
-  if (!target || target.role === "CLIENT_USER") throw new AgreementError("No Ankora staff member with that id.");
+  if (!target || target.role === "CLIENT_USER") throw new AgreementError(null, "No Ankora staff member with that id.");
 
   const agreement = currentAgreement(kind);
   const uploadCode = newUploadCode();
@@ -711,7 +718,7 @@ export async function uploadSignedPdfWithLink(
 ): Promise<{ documentId: string; codeFound: boolean }> {
   const hash = legacyTokenHash(raw);
   const link = hash ? await findUploadLink(hash) : null;
-  if (!link) throw new AgreementError(INVALID_LINK_MESSAGE);
+  if (!link) throw new AgreementError(null, INVALID_LINK_MESSAGE);
   return uploadSignedPdf(link, file, { invalid: INVALID_LINK_MESSAGE, retry: "הקישור עדיין בתוקף" });
 }
 
@@ -723,7 +730,7 @@ export async function uploadSignedPdfWithCode(
 ): Promise<{ documentId: string; codeFound: boolean }> {
   const hash = hashUploadCode(code);
   const link = hash ? await findUploadLink(hash) : null;
-  if (!link) throw new AgreementError(INVALID_UPLOAD_CODE_MESSAGE);
+  if (!link) throw new AgreementError(null, INVALID_UPLOAD_CODE_MESSAGE);
   return uploadSignedPdf(link, file, { invalid: INVALID_UPLOAD_CODE_MESSAGE, retry: "הקוד עדיין בתוקף" });
 }
 
@@ -740,14 +747,14 @@ async function uploadSignedPdf(
   file: { content: Buffer; fileName: string },
   messages: { invalid: string; retry: string }
 ): Promise<{ documentId: string; codeFound: boolean }> {
-  const invalid = new AgreementError(messages.invalid);
+  const invalid = new AgreementError(null, messages.invalid);
   const agreement = findAgreement(link.kind, link.version)!;
 
-  if (file.content.byteLength === 0) throw new AgreementError("הקובץ ריק. יש לבחור את קובץ ה-PDF החתום.");
+  if (file.content.byteLength === 0) throw new AgreementError(null, "הקובץ ריק. יש לבחור את קובץ ה-PDF החתום.");
   if (file.content.byteLength > MAX_SIGNED_PDF_BYTES) {
-    throw new AgreementError("הקובץ גדול מ-4MB. אפשר לסרוק שוב באיכות נמוכה יותר ולנסות שוב.");
+    throw new AgreementError(null, "הקובץ גדול מ-4MB. אפשר לסרוק שוב באיכות נמוכה יותר ולנסות שוב.");
   }
-  if (!looksLikePdf(file.content)) throw new AgreementError("הקובץ אינו PDF. יש להעלות את הטופס החתום כקובץ PDF.");
+  if (!looksLikePdf(file.content)) throw new AgreementError(null, "הקובץ אינו PDF. יש להעלות את הטופס החתום כקובץ PDF.");
 
   const { resolveInternalClient, openLifecycleTaskId, onSignedPdfUploaded } = await import(
     "@/lib/app-domain/employee-lifecycle"
@@ -755,7 +762,7 @@ async function uploadSignedPdf(
   const internal = await resolveInternalClient();
   if (!internal) {
     console.error("[agreements] upload link used but the internal client was not found");
-    throw new AgreementError(`לא הצלחנו לשמור את הקובץ כרגע. אפשר לנסות שוב מאוחר יותר, ${messages.retry}.`);
+    throw new AgreementError(null, `לא הצלחנו לשמור את הקובץ כרגע. אפשר לנסות שוב מאוחר יותר, ${messages.retry}.`);
   }
 
   const now = new Date();
@@ -787,7 +794,7 @@ async function uploadSignedPdf(
   } catch (err) {
     console.error("[agreements] filing an uploaded PDF failed", err);
     await prisma.agreementSignLink.updateMany({ where: { id: link.id, documentId: null }, data: { usedAt: null } });
-    throw new AgreementError(`לא הצלחנו לשמור את הקובץ כרגע. אפשר לנסות שוב מאוחר יותר, ${messages.retry}.`);
+    throw new AgreementError(null, `לא הצלחנו לשמור את הקובץ כרגע. אפשר לנסות שוב מאוחר יותר, ${messages.retry}.`);
   }
 
   await prisma.agreementSignLink.update({ where: { id: link.id }, data: { documentId } });
@@ -873,17 +880,17 @@ async function markUploadReviewed(userId: string, documentId: string, reviewerId
 export async function dismissPdfUpload(actor: User, documentId: string, reason: string) {
   assertAgreementAdmin(actor.role);
   const why = reason.trim();
-  if (!why) throw new AgreementError("Say why the upload is dismissed (`reason`).");
+  if (!why) throw new AgreementError(null, "Say why the upload is dismissed (`reason`).");
 
   const link = await prisma.agreementSignLink.findFirst({
     where: { documentId: documentId.trim(), purpose: "PDF_UPLOAD" },
     select: { id: true, userId: true, kind: true, reviewedAt: true },
   });
-  if (!link) throw new AgreementError(`No uploaded agreement PDF with documentId "${documentId}". Use one from pendingPdfUploads.`);
-  if (link.reviewedAt) throw new AgreementError("This upload was already reviewed. Nothing was changed.");
+  if (!link) throw new AgreementError(null, `No uploaded agreement PDF with documentId "${documentId}". Use one from pendingPdfUploads.`);
+  if (link.reviewedAt) throw new AgreementError(null, "This upload was already reviewed. Nothing was changed.");
 
   const marked = await markUploadReviewed(link.userId, documentId.trim(), actor.id);
-  if (marked.count !== 1) throw new AgreementError("This upload was already reviewed. Nothing was changed.");
+  if (marked.count !== 1) throw new AgreementError(null, "This upload was already reviewed. Nothing was changed.");
 
   await recordAudit({
     actorId: actor.id,

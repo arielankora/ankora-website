@@ -39,6 +39,48 @@ import { taskAiExclusion } from "@/lib/ai-exclusion";
 import { listTaskPortalNotes } from "@/lib/app-domain/task-portal-notes";
 import { PortalNotesPanel } from "./PortalNotesPanel";
 
+/// The audit actions a task's thread names, by their dictionary key under
+/// tasks.detail.thread.events (the Hebrew is TASK_AUDIT_LABELS in
+/// lib/app-domain/tasks.ts). An action not here reads "events.other".
+const THREAD_EVENTS = {
+  "task.create": "create",
+  "task.update": "update",
+  "task.status_change": "statusChange",
+  "task.approve": "approve",
+  "task.comment": "comment",
+  "task.comment_delete": "commentDelete",
+  "task.steps_removed": "stepsRemoved",
+  "task.plan_saved": "planSaved",
+  "task.plan_approved": "planApproved",
+  "task.plan_steps_applied": "planStepsApplied",
+  "task.advance_prompt_copied": "advancePromptCopied",
+  "task.ai_excluded": "aiExcluded",
+  "task.ai_included": "aiIncluded",
+} as const;
+type ThreadEventKey = (typeof THREAD_EVENTS)[keyof typeof THREAD_EVENTS];
+
+/// The task fields a thread line names (tasks.detail.thread.fields).
+const THREAD_FIELDS = [
+  "title",
+  "description",
+  "priority",
+  "status",
+  "categoryId",
+  "assignedToId",
+  "supervisorId",
+  "requiresApproval",
+  "dueDate",
+  "clientVisible",
+  "clientTitle",
+  "blockedOn",
+  "blockedReason",
+  "clientOutcome",
+  "supplierName",
+  "supplierExperience",
+  "aiExcluded",
+] as const;
+const isThreadField = (key: string): key is (typeof THREAD_FIELDS)[number] => (THREAD_FIELDS as readonly string[]).includes(key);
+
 function planView(p: TaskPlanRow): PlanView {
   return {
     version: p.version,
@@ -89,6 +131,7 @@ export default async function TaskDetailPage(props: {
   const backText = viaApprovals?.label ?? backLabel(from, tList);
   const user = await requireUser();
   const t = await getTranslations("tasks.detail");
+  const tThread = await getTranslations("tasks.detail.thread");
 
   if (!can(user.role, "time_entry.create_self")) return <Forbidden />;
 
@@ -412,7 +455,20 @@ export default async function TaskDetailPage(props: {
           // either way, and only the paperclip has to explain itself.
           storageReady={clientDocumentsFolder() !== null}
           maxBytes={MAX_DOCUMENT_BYTES}
-          entries={thread.map((e) => ({ ...e, at: e.at.toISOString() }))}
+          entries={thread.map((e) => {
+            const at = e.at.toISOString();
+            if (e.kind !== "event") return { ...e, at };
+            // ADR 0006: the line in the reader's words, from the action
+            // and the fields' names (lib keeps the Hebrew for MCP).
+            const { action, changedKeys, ...rest } = e;
+            const key = (THREAD_EVENTS as Record<string, ThreadEventKey | undefined>)[action];
+            return {
+              ...rest,
+              at,
+              label: tThread(key ? `events.${key}` : "events.other"),
+              changed: changedKeys.filter(isThreadField).map((f) => tThread(`fields.${f}`)),
+            };
+          })}
         />
       </div>
     </div>

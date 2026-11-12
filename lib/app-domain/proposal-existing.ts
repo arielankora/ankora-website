@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { normalizeDomain, normalizeEmail, normalizePhone } from "@/lib/contact-normalize";
-import { normalizeForMatch, type ProposalFlag } from "@/lib/knowledge-proposals";
+import { DUPLICATE_MESSAGES, normalizeForMatch, type ProposalFlag } from "@/lib/knowledge-proposals";
 import { currentItem } from "@/lib/app-domain/proposal-updates";
 
 // "Already in the file", asked now and not when the proposal arrived
@@ -24,17 +24,6 @@ import { currentItem } from "@/lib/app-domain/proposal-updates";
 
 export type ExistingItem = { id: string; body: string };
 
-const DUPLICATE_MESSAGES: Record<string, string> = {
-  FACT: "אותו פריט כבר קיים בתיק.",
-  CONTACT: "איש קשר עם המייל או הטלפון הזה כבר בתיק.",
-  ORGANIZATION: "הארגון כבר בתיק.",
-  SYSTEM: "המערכת, באותו חשבון, כבר במפת המערכות.",
-  ENTITY: "ישות בשם הזה כבר בתיק.",
-  PROCESS: "תהליך בשם הזה כבר בתיק.",
-  DATE: "מועד בשם הזה כבר אצל הלקוח.",
-  DOMAIN: "הדומיין כבר בתיק.",
-  POLICY: "כלל עם אותו שם או אותו נוסח כבר בתיק.",
-};
 
 export function duplicateFlag(target: string): ProposalFlag {
   return { code: "DUPLICATE", message: DUPLICATE_MESSAGES[target] ?? "הפריט כבר בתיק." };

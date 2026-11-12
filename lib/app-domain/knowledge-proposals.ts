@@ -192,7 +192,7 @@ type PlannedSource =
 async function planSource(clientId: string, source: BatchSourceInput): Promise<PlannedSource> {
   if ("code" in source) {
     const found = await prisma.clientSource.findFirst({ where: { clientId, code: source.code.trim().toUpperCase(), deletedAt: null } });
-    if (!found) throw new Error(`המקור ${source.code} לא קיים במרשם של הלקוח.`);
+    if (!found) throw new DomainError("knowledgeProposals.sourceNotInRegister", `המקור ${source.code} לא קיים במרשם של הלקוח.`, { code: source.code });
     return { existing: true, ...found };
   }
   const ids = (source.externalIds ?? []).map((i) => i.trim()).filter(Boolean);
@@ -201,7 +201,7 @@ async function planSource(clientId: string, source: BatchSourceInput): Promise<P
     const same = existing.find((s) => Array.isArray(s.externalRefs) && (s.externalRefs as { id?: string }[]).some((r) => r?.id && ids.includes(r.id)));
     if (same) return { existing: true, ...same };
   }
-  if (!source.title.trim()) throw new Error("צריך שם למקור.");
+  if (!source.title.trim()) throw new DomainError("knowledgeProposals.sourceTitleRequired", "צריך שם למקור.");
   // The code it will most likely get, so a text that cites it is not
   // flagged as citing a code that is not in the register. The real code
   // is set once the source is registered.
@@ -338,8 +338,8 @@ export async function proposeKnowledge(
 ): Promise<ProposeResult> {
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
-  if (input.items.length === 0) throw new Error("אין פריטים באצווה.");
-  if (input.items.length > MAX_ITEMS) throw new Error(`עד ${MAX_ITEMS} פריטים באצווה. מחלקים לכמה אצוות.`);
+  if (input.items.length === 0) throw new DomainError("knowledgeProposals.emptyBatch", "אין פריטים באצווה.");
+  if (input.items.length > MAX_ITEMS) throw new DomainError("knowledgeProposals.batchTooLarge", `עד ${MAX_ITEMS} פריטים באצווה. מחלקים לכמה אצוות.`, { max: String(MAX_ITEMS) });
 
   const source = await planSource(input.clientId, input.source);
   // Ankora's own file: its documents are the client's word (R14 does not

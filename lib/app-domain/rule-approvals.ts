@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { DomainError } from "@/lib/domain-error";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
@@ -50,18 +51,22 @@ export async function canApproveForClient(actor: User, clientId: string): Promis
 export async function assertCanApproveForClient(actor: User, clientId: string) {
   if (!(await canApproveForClient(actor, clientId))) {
     const names = (await ruleApproversFor(clientId)).map((u) => u.name);
-    throw new Error(names.length ? `רק ${names.join(" או ")} מאשרים חריגות ומידע רגיש אצל הלקוח הזה.` : "אין עדיין מי שמאשר חריגות ומידע רגיש. נותנים את ההרשאה בדף המשתמש.");
+    const message = names.length ? `רק ${names.join(" או ")} מאשרים חריגות ומידע רגיש אצל הלקוח הזה.` : "";
+    // The screen words the names as a list in its own language (ADR 0006).
+    if (names.length === 1) throw new DomainError("ruleApprovals.onlyOne", message, { name: names[0] });
+    if (names.length > 1) throw new DomainError("ruleApprovals.onlySome", message, { names: names.slice(0, -1).join(", "), last: names[names.length - 1] });
+    throw new DomainError("ruleApprovals.noApprover", "אין עדיין מי שמאשר חריגות ומידע רגיש. נותנים את ההרשאה בדף המשתמש.");
   }
 }
 
 /// The client's own approvers. Empty clears them, and the permission
 /// decides again. A manager sets them, from what the client said.
 export async function setClientRuleApprovers(actor: User, clientId: string, userIds: string[]) {
-  if (!canManageClients(actor.role)) throw new Error("רק מנהל קובע מי מאשר אצל הלקוח.");
+  if (!canManageClients(actor.role)) throw new DomainError("ruleApprovals.managerSetsApprovers", "רק מנהל קובע מי מאשר אצל הלקוח.");
   await assertClientAccess(actor, clientId);
   const unique = [...new Set(userIds.filter(Boolean))];
   const found = await prisma.user.count({ where: { id: { in: unique }, deletedAt: null, role: { not: "CLIENT_USER" } } });
-  if (found !== unique.length) throw new Error("אפשר לבחור רק אנשי צוות של אנקורה.");
+  if (found !== unique.length) throw new DomainError("ruleApprovals.staffOnly", "אפשר לבחור רק אנשי צוות של אנקורה.");
   const before = await prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { ruleApproverIds: true } });
   await prisma.client.update({ where: { id: clientId }, data: { ruleApproverIds: unique } });
   await recordAudit({
@@ -80,7 +85,7 @@ export async function setClientRuleApprovers(actor: User, clientId: string, user
 export async function setUserCanApproveExceptions(actor: User, userId: string, value: boolean) {
   assertCan(actor.role, "user.manage");
   const before = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { canApproveExceptions: true, role: true } });
-  if (value && before.role === "CLIENT_USER") throw new Error("ההרשאה ניתנת רק לאנשי צוות של אנקורה.");
+  if (value && before.role === "CLIENT_USER") throw new DomainError("ruleApprovals.permissionStaffOnly", "ההרשאה ניתנת רק לאנשי צוות של אנקורה.");
   await prisma.user.update({ where: { id: userId }, data: { canApproveExceptions: value } });
   await recordAudit({
     actorId: actor.id,

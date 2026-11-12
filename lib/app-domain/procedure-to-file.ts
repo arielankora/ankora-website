@@ -1,4 +1,5 @@
 import "server-only";
+import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
 import type { TaskStatus } from "@prisma/client";
 import {
@@ -18,8 +19,11 @@ export type ProcedureReminder = {
   kind: ProcedureReminderKind;
   /// English, for Claude, in the tool result.
   forClaude: string;
-  /// Hebrew, for the banner on the task screen.
+  /// Hebrew, as it always was. The screens word it themselves from
+  /// `kind` and `misfiled` (procedureReminderForScreen, ADR 0006).
   forScreen: string;
+  /// The only procedure on the task was filed as another kind.
+  misfiled: boolean;
 };
 
 const CLOSING: readonly TaskStatus[] = ["DONE", "PENDING_APPROVAL"];
@@ -88,10 +92,12 @@ export async function procedureReminderFor(taskId: string, newStatus: TaskStatus
     kind,
     forClaude: reminderForClaude(kind, task.id, documentIds, { misfiled }),
     forScreen: reminderForScreen(kind, { misfiled }),
+    misfiled,
   };
 }
 
-/// What a screen shows after a close: the Hebrew sentence and where to go
+/// What a screen shows after a close: the sentence, in the reader's
+/// language (tasks.closeReminder, whose Hebrew is reminderForScreen's), and where to go
 /// to propose. Every screen that closes a task uses this one helper (the
 /// task screen, the list row, the board, the timer), so a new way to close
 /// a task has one line to add. A failed check is not allowed to make a
@@ -107,5 +113,8 @@ export async function procedureReminderForScreen(
     console.error("[procedure-to-file] closing check failed", err);
     return null;
   });
-  return reminder ? { text: reminder.forScreen, reviewHref: `/app/approvals?tab=knowledge&clientId=${encodeURIComponent(clientId)}` } : null;
+  if (!reminder) return null;
+  const t = await getTranslations("tasks.closeReminder");
+  const text = reminder.kind === "MAPPING" ? t("mapping") : reminder.misfiled ? t("procedureMisfiled") : t("procedure");
+  return { text, reviewHref: `/app/approvals?tab=knowledge&clientId=${encodeURIComponent(clientId)}` };
 }

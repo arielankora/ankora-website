@@ -14,6 +14,7 @@ import {
 } from "./actions";
 import { moveEntryIntoOpenBankAction } from "../../timer/actions";
 import { TaskManualEntry } from "./TaskManualEntry";
+import { waitingTitle } from "../waiting-title";
 import { MESSAGE_PRIORITY_LABELS, MESSAGE_STATUS_LABELS, TaskShare, type SharePerson } from "./TaskShare";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 import type { AiExclusionSource } from "@/lib/ai-exclusion";
@@ -1384,18 +1385,3 @@ function formatElapsed(totalSeconds: number): string {
   return [h, m, s].map((n) => String(n).padStart(2, "0")).join(":");
 }
 
-/// "ממתין ללקוח, 6 ימים", in the reader's language. The same rule as
-/// waitingTitle in lib/app-domain/portal-labels.ts, which stays Hebrew
-/// for the portal and the lists that still read it.
-function waitingTitle(
-  t: ReturnType<typeof useTranslations<"tasks.detail.block">>,
-  on: TaskBlocker,
-  since: string | null
-): string {
-  const label = t(`on.${on}`);
-  if (!since) return label;
-  const days = Math.floor((Date.now() - new Date(since).getTime()) / 86_400_000);
-  if (days < 1) return t("sinceToday", { label });
-  if (days === 1) return t("sinceYesterday", { label });
-  return t("sinceDays", { label, count: days });
-}

@@ -717,7 +717,42 @@
         "downloadFile": "Download {title}",
         "download": "Download",
         "clientSees": "Client sees this",
-        "internal": "Internal"
+        "internal": "Internal",
+        "events": {
+          "create": "Task opened",
+          "update": "Task updated",
+          "statusChange": "Status changed",
+          "approve": "Task approved",
+          "comment": "Comment added",
+          "commentDelete": "Comment deleted",
+          "stepsRemoved": "Steps removed from the task",
+          "planSaved": "Work plan updated",
+          "planApproved": "Work plan approved",
+          "planStepsApplied": "Work plan turned into steps",
+          "advancePromptCopied": "Prompt for Claude copied",
+          "aiExcluded": "Task marked no AI",
+          "aiIncluded": "No AI mark removed",
+          "other": "Task changed"
+        },
+        "fields": {
+          "title": "Title",
+          "description": "Description",
+          "priority": "Priority",
+          "status": "Status",
+          "categoryId": "Category",
+          "assignedToId": "Assignee",
+          "supervisorId": "Supervisor",
+          "requiresApproval": "Needs approval",
+          "dueDate": "Due date",
+          "clientVisible": "Shown to client",
+          "clientTitle": "Title for the client",
+          "blockedOn": "Waiting on",
+          "blockedReason": "Reason for waiting",
+          "clientOutcome": "Outcome line",
+          "supplierName": "Supplier",
+          "supplierExperience": "Experience with the supplier",
+          "aiExcluded": "No AI"
+        }
       },
       "steps": {
         "title": "Steps",
@@ -982,13 +1017,23 @@
       "removeFromPortal": "Remove from the portal",
       "showInPortal": "Show to the client in the portal",
       "visibleToClient": "Visible to the client",
-      "hiddenFromClient": "Not visible to the client"
+      "hiddenFromClient": "Not visible to the client",
+      "experience": {
+        "GOOD": "Recommended",
+        "OK": "Fine",
+        "AVOID": "Won't use again"
+      }
     },
     "errors": {
       "forbidden": "You don't have permission for this. The client isn't assigned to you.",
       "generic": "Something went wrong. Try again.",
       "clientRequired": "Choose a client.",
       "titleRequired": "Enter a task name."
+    },
+    "closeReminder": {
+      "mapping": "The task is closed, but what it mapped hasn't been proposed to the client file yet. Propose the findings, then approve them on the review screen.",
+      "procedure": "The task is closed, but the procedure filed on it hasn't been proposed to the client file yet. Propose it as a process, then approve it on the review screen.",
+      "procedureMisfiled": "The task is closed, but the procedure filed on it hasn't been proposed to the client file yet. Propose it as a process, then approve it on the review screen. The procedure was filed as another kind. You can change it to \"Procedure\" in the client file's document list."
     }
   },
   "messageClient": {
@@ -1639,7 +1684,12 @@
       "cannotRevert": "{reason, select, notApproved {Only an approved proposal can be undone.} alreadyReverted {The proposal was already undone.} notCreate {Undo is only possible for a proposal that added a new item, not for a change to an existing one.} nothingCreated {The proposal did not create a new item (it was already in the file), so there is nothing to undo.} other {Undo is only possible for a fact, contact, vendor or legal entity, not for {target, select, SYSTEM {a system} REQUEST_TYPE {a request type} POLICY {a client rule} NARRATIVE {an overview, background or our role} PROCESS {a process} DOMAIN {a domain} TASK {a task} DATE {a date} FACT {a fact} CONTACT {a contact} ORGANIZATION {a vendor or service provider} ENTITY {a legal entity} other {an item of this kind}}.}}",
       "alreadyReverted": "The proposal was already undone.",
       "notRemoved": "The item was not removed from the file: {error}",
-      "managersOnly": "Managers only."
+      "managersOnly": "Managers only.",
+      "updatedItemGone": "The item this proposal updates is no longer in the file. Reject the proposal.",
+      "sourceNotInRegister": "Source {code} isn't in the client's register.",
+      "sourceTitleRequired": "The source needs a name.",
+      "emptyBatch": "The batch has no items.",
+      "batchTooLarge": "Up to {max} items in a batch. Split it into several batches."
     },
     "batchAssignment": {
       "notWaiting": "The call was already assigned, or it was not found.",
@@ -1668,6 +1718,51 @@
       "approximateDayRange": "Possible days must be between 1 and 31.",
       "rangeEndBeforeStart": "The end of the period can't be before its start.",
       "titleRequired": "Title is required."
+    },
+    "agreements": {
+      "userNotFound": "User not found.",
+      "deletionStaffOnly": "A deletion declaration is sent only to Ankora staff.",
+      "stillActive": "This user is still active. Confirm that you mean to send it.",
+      "noPersonalEmail": "This user has no personal email. Add one on the user page before sending.",
+      "signedByStaffOnly": "These documents are signed only by Ankora staff.",
+      "unknownVersion": "Version {version} doesn't exist for this document.",
+      "signedNameRequired": "Enter the name that was signed.",
+      "badSignedDate": "The signing date isn't valid."
+    },
+    "ruleApprovals": {
+      "onlyOne": "Only {name} approves exceptions and sensitive information for this client.",
+      "onlySome": "Only {names} or {last} approve exceptions and sensitive information for this client.",
+      "noApprover": "Nobody approves exceptions and sensitive information yet. The permission is given on the user page.",
+      "managerSetsApprovers": "Only a manager decides who approves for a client.",
+      "staffOnly": "You can choose only Ankora staff.",
+      "permissionStaffOnly": "This permission is given only to Ankora staff."
+    },
+    "knowledgeItems": {
+      "sensitiveNotShown": "A sensitive item isn't shown to the client.",
+      "restrictedNotShown": "An item only part of the team can see isn't shown to the client.",
+      "doNotDiscloseNotShown": "This item has a \"do not tell\", so it isn't shown to the client.",
+      "ownerStaffOnly": "An item's owner has to be a member of Ankora staff.",
+      "toResolveRequired": "An \"uncertain\" or \"missing\" item needs a note on what would close it."
+    },
+    "sourceConfirmation": {
+      "managerOnly": "Only a manager confirms items with the client all at once.",
+      "noteRequired": "Write in one line how this was confirmed with the client.",
+      "sourceNotFound": "The source isn't in the register."
+    },
+    "portalSummary": {
+      "notFound": "Summary not found.",
+      "empty": "An empty summary can't be approved."
+    },
+    "clientMessages": {
+      "empty": "Nothing to save: the message is empty."
+    },
+    "internalClient": {
+      "clientNotFound": "Client not found.",
+      "internalOnly": "This kind of approval is only for Ankora's internal file. For a client, confirm it with them.",
+      "managerOnly": "Only a manager approves a rule.",
+      "ruleNotFound": "Rule not found.",
+      "onlyProposed": "Only a proposed rule can be approved.",
+      "uncertainOtherwise": "The rule is uncertain for another reason. Close what's missing in it first."
     }
   },
   "auditLog": {
@@ -5055,7 +5150,17 @@
         "interim": "Until approved",
         "why": "Why",
         "planSteps": "Steps the plan proposes"
-      }
+      },
+      "step": {
+        "businessDays": "{days} business days",
+        "removedSystem": "Removed system",
+        "upTo": "up to {amount}",
+        "via": "by {channel}",
+        "needsApproval": "needs approval",
+        "output": "Output: {output}",
+        "verification": "Check: {verification}"
+      },
+      "automatedSteps": "Steps {steps} and {last} are automated: write in each how a person makes sure the step happened."
     },
     "bulk": {
       "label": "Approve {client}'s {count} rules",
@@ -5550,6 +5655,83 @@
       "notRejected": "{count} not rejected: {error}",
       "managerSwitch": "Only a manager can turn automatic adding on or off.",
       "managerLift": "Only a manager can return something to automatic adding."
+    },
+    "flags": {
+      "fields": {
+        "body": "What",
+        "validUntilEvent": "Valid until event",
+        "decidedAt": "Decision date",
+        "interimStatement": "Until approved",
+        "toResolve": "What would close it",
+        "clientVisible": "Shown to client",
+        "date": "Date"
+      },
+      "r17": "The text cites {codes}, which {count, plural, one {isn't} other {aren't}} in the client's source register. Fix the code in the edit, or reject.",
+      "whyR17": "Every item in the file points to a source that can be opened, and a code that isn't in the register is most likely a typo.",
+      "completeInField": "{shape} Complete it in the edit, in the \"{field}\" field, or reject.",
+      "completeInEdit": "{shape} Complete it in the edit, or reject.",
+      "whyTemporary": "Without a date or an event when it ends, temporary information stays in the file forever.",
+      "whyDecision": "Without a date there is no way to know whether the decision still holds.",
+      "dateShape": {
+        "onceDate": "A one-off date needs a date.",
+        "annualDate": "An annual date needs a day and a month (date).",
+        "monthlyDay": "A monthly date needs a day of the month.",
+        "weeklyDay": "A weekly date needs a day of the week.",
+        "intervalMonthlyOnly": "\"Every few months\" is only for a monthly date.",
+        "pastDate": "The date has already passed."
+      },
+      "dateNoField": "{shape} The edit has no field for this: reject, and ask Claude to send the date again with its day.",
+      "whyDate": "Without the day the date falls on, the system doesn't know when to remind.",
+      "interimMissing": "An interim rule is missing: what to do until the rule is approved. Complete it with the suggested wording, or in the edit, in the \"{field}\" field, or reject.",
+      "whyInterim": "A proposed rule doesn't apply until it's approved, so it needs to say what to do in the meantime.",
+      "toResolveMissingField": "Marked uncertain or missing, with nothing on what would confirm it. Complete it with the suggested wording, or in the edit, in the \"{field}\" field, or reject.",
+      "toResolveMissing": "Marked uncertain or missing, with nothing on what would confirm it. Complete it with the suggested wording, or reject.",
+      "whyToResolve": "Without it nobody knows how to confirm the item, and it stays uncertain forever.",
+      "notShown": {
+        "sensitive": "A sensitive item isn't shown to the client.",
+        "doNotDisclose": "This item has a \"do not tell\", so it isn't shown to the client."
+      },
+      "visible": "{reason} Remove \"Shown to client\" with the suggested wording, or in the edit, in the \"{field}\" field, choose \"No\", or reject.",
+      "whyVisible": "The client sees in the portal only an item there is no reason to keep from them.",
+      "withoutVisible": "Without \"Shown to client\"",
+      "processCheck": "{check} (The process will enter as a draft, and the procedure won't be approved until this is fixed.)",
+      "automatedSteps": "Steps {steps} and {last} are automated: write in each how a person makes sure the step happened.",
+      "r3": "{steps} Complete it with the suggested wording, or after approval in the process's procedure, in the \"How a person makes sure it happened\" field of {count, plural, one {the step} other {each step}}. (The process will enter as a draft, and the procedure won't be approved until this is fixed.)",
+      "whyR3": "An automated action can fail silently, so a person needs a way to check it happened.",
+      "r14": "The source is an Ankora document, so the item will be saved as uncertain.",
+      "sensitive": "Sensitive information: only the people who approve sensitive information for this client see the item and decide on it.",
+      "policy": "On approval, the rule enters the file as proposed. A manager approves it separately for it to take effect.",
+      "narrativeReplaces": "On approval, this text replaces the version in the file (the previous one is kept in the history).",
+      "narrativeFirst": "On approval, this is the first version of the text.",
+      "process": {
+        "draft": "On approval, the process enters as a draft. The procedure runs only after a manager approves it on the processes screen.",
+        "combined": "On approval, the procedure is approved too if it passes the checks against the client's rules, and the process goes live. If not, the process enters as a draft, and the screen says what to fix.",
+        "separation": "On approval, the process enters as a draft. This client requires separation, so someone else approves the procedure separately."
+      },
+      "duplicate": {
+        "sameText": "This is already the text in the file.",
+        "other": "The item is already in the file.",
+        "FACT": "The same item is already in the file.",
+        "CONTACT": "A contact with this email or phone is already in the file.",
+        "ORGANIZATION": "The organization is already in the file.",
+        "SYSTEM": "The system, on the same account, is already in the systems map.",
+        "ENTITY": "An entity with this name is already in the file.",
+        "PROCESS": "A process with this name is already in the file.",
+        "DATE": "A date with this name already exists for the client.",
+        "DOMAIN": "The domain is already in the file.",
+        "POLICY": "A rule with the same name or wording is already in the file."
+      },
+      "kindAnswersQuestion": "The item in the file is an open question. On approval, this text is recorded as its answer and the question is closed.",
+      "kindNewItem": "The item in the file is {from}, and the proposal is {to}. On approval, it enters as a new item, and the item in the file stays.",
+      "otherKind": "another kind",
+      "similarSame": "\"{name}\" is already in the file. You can add the proposal to it instead of a second item.",
+      "similarMaybe": "This may be the existing \"{name}\". You can add the proposal to it instead of a new item.",
+      "similarDate": "This may be the existing \"{name}\": same day, almost the same name. If so, reject the proposal and complete the existing date.",
+      "ownerItem": "No single staff member is named \"{name}\". The item will enter without an owner, unless the name is fixed.",
+      "ownerTask": "No single staff member is named \"{name}\". The task will be opened for whoever approves, unless the name is fixed.",
+      "ownerDate": "No single staff member is named \"{name}\". Whoever approves will be responsible, unless the name is fixed.",
+      "link": "Not found in the file: {refs}. If it enters the file before approval, it will be linked. Otherwise the item enters without this link.",
+      "taskTitle": "The title is a question. On approval the task will open as \"{title}\". You can word it differently in the edit."
     }
   },
   "calendar": {

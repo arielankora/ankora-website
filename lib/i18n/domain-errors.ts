@@ -14,7 +14,9 @@ export async function domainText(key: string, values?: Record<string, string | n
 }
 
 export async function domainErrorText(err: unknown): Promise<string | null> {
-  if (!(err instanceof DomainError)) return null;
+  // A subclass may leave a refusal without a code (AgreementError on the
+  // signing pages): it keeps its message, like any other error.
+  if (!(err instanceof DomainError) || !err.code) return null;
   // The code is a dynamic key, so it is looked up from the root and not
   // type-checked; tests/unit/i18n-domain-errors.test.ts checks instead
   // that every code thrown exists in both dictionaries.

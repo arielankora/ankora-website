@@ -2,6 +2,7 @@ import { knowledgeBatchIsMine } from "@/lib/approvals";
 import Link from "next/link";
 import { getFormatter, getLocale, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
+import { flagWordsRenderer, type RootT } from "@/lib/knowledge-flag-words";
 import { listOpenBatches, proposalQuality } from "@/lib/app-domain/knowledge-proposals";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { DECISION_1_DAYS, qualityParts } from "@/lib/knowledge-proposals";
@@ -78,8 +79,11 @@ export async function KnowledgeReview({ searchParams, mineOnly = false }: { sear
     })(),
   };
 
+  // ADR 0006: the flags' keys reach across the dictionary (a fact's
+  // shape under domainErrors, a check under clients.processes).
+  const renderFlag = flagWordsRenderer((await getTranslations()) as unknown as RootT);
   const view = all.map((b) => {
-    const proposals = reviewProposals(b);
+    const proposals = reviewProposals(b, renderFlag);
     return { b, meta: { clientId: b.client.id, sourceKind: b.source?.kind ?? null, createdById: b.createdById, createdAt: b.createdAt }, proposals };
   });
 

@@ -1,5 +1,5 @@
 "use client";
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { updateClientAction } from "../actions";
 import { useActionForm } from "@/components/app/useActionForm";
 import { formatMinor } from "@/lib/money";
@@ -37,6 +37,7 @@ export function EditClientForm({
   noticeCheckedByName?: string | null;
 }) {
   const t = useTranslations("clients.page.edit");
+  const locale = useLocale();
   const tNotice = useTranslations("clients.subprocessors.notice");
   const format = useFormatter();
   const { onSubmit, pending, error, ok } = useActionForm(updateClientAction);
@@ -265,7 +266,7 @@ export function EditClientForm({
             />
             <span className="mt-1 block text-[11px] text-app-text-tertiary">
               {client.approvalCeilingMinor !== null
-                ? t("portal.ceilingNow", { amount: formatMinor(client.approvalCeilingMinor) ?? "" })
+                ? t("portal.ceilingNow", { amount: formatMinor(client.approvalCeilingMinor, locale) ?? "" })
                 : t("portal.ceilingEmpty")}
             </span>
           </label>

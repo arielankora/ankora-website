@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { ForbiddenError, assertCan } from "@/lib/app-auth/permissions";
@@ -234,11 +235,11 @@ export async function approvePortalSummary(actor: User, summaryId: string, edite
   assertCan(actor.role, "time_entry.create_self");
 
   const existing = await prisma.portalSummary.findUnique({ where: { id: summaryId } });
-  if (!existing) throw new Error("הסיכום לא נמצא.");
+  if (!existing) throw new DomainError("portalSummary.notFound", "הסיכום לא נמצא.");
   await assertClientAccess(actor, existing.clientId);
 
   const text = (edited ?? existing.draft).trim();
-  if (!text) throw new Error("אי אפשר לאשר סיכום ריק.");
+  if (!text) throw new DomainError("portalSummary.empty", "אי אפשר לאשר סיכום ריק.");
 
   const summary = await prisma.portalSummary.update({
     where: { id: summaryId },
@@ -262,7 +263,7 @@ export async function discardPortalSummary(actor: User, summaryId: string) {
   assertCan(actor.role, "time_entry.create_self");
 
   const existing = await prisma.portalSummary.findUnique({ where: { id: summaryId } });
-  if (!existing) throw new Error("הסיכום לא נמצא.");
+  if (!existing) throw new DomainError("portalSummary.notFound", "הסיכום לא נמצא.");
   await assertClientAccess(actor, existing.clientId);
 
   const summary = await prisma.portalSummary.update({

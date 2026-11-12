@@ -49,8 +49,9 @@ import { listClientEntities } from "@/lib/app-domain/client-entities";
 import { countPendingProposals, listOpenBatches } from "@/lib/app-domain/knowledge-proposals";
 import { ReviewBatch } from "../../knowledge/ReviewBatch";
 import { batchHeader, reviewProposals } from "../../knowledge/review-view";
+import { flagWordsRenderer, type RootT } from "@/lib/knowledge-flag-words";
 import { RequestTypesPanel } from "./RequestTypesPanel";
-import { paramsInForce, paramsSummary, readParams } from "@/lib/policy-params";
+import { readParams } from "@/lib/policy-params";
 import { readReviewReason, reviewDueAt, REVIEW_REASON_LABELS } from "@/lib/process-review";
 import { ControlLine } from "./ControlLine";
 import { PossibleDuplicates } from "./PossibleDuplicates";
@@ -73,7 +74,7 @@ import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { checkDueKey, checkEveryText, checkState, isRoutine } from "@/lib/process-checks";
 import { ProcessesPanel } from "./ProcessesPanel";
 import { canApproveForClient, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
-import { EXCEPTION_MAX_DAYS, ruleDatesLine, ruleReviewDue } from "@/lib/client-policies";
+import { EXCEPTION_MAX_DAYS, ruleReviewDue } from "@/lib/client-policies";
 import { ruleInForce } from "@/lib/client-policies";
 import { NarrativesPanel } from "./NarrativesPanel";
 import { listRequestTypes } from "@/lib/app-domain/request-types";
@@ -152,7 +153,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   const remembered: FileSection = tab === "file" ? resolveFileSection(sp?.section, (await cookies()).get(FILE_SECTION_COOKIE)?.value) : "all";
   // Back to the list as it was, search included (19.10.2026, lib/list-back.ts).
   // Opened from "אישורים": back there, to the same tab (22.10.2026).
-  const viaApprovals = approvalsBack(sp?.fromApprovals);
+  const viaApprovals = approvalsBack(sp?.fromApprovals, await getTranslations("approvals"));
   const backHref = viaApprovals?.href ?? listBackHref("/app/clients", CLIENTS_LIST_KEYS, sp?.from);
   const backLabel = viaApprovals?.label ?? clientsBackTitle(sp?.from, await getTranslations("clients.list"));
   const fromParam = [typeof sp?.from === "string" && sp.from ? `from=${encodeURIComponent(sp.from)}` : "", viaApprovals?.param ?? ""].filter(Boolean).join("&");
@@ -169,6 +170,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   const client = await getClient(params.clientId);
   if (!client) notFound();
   const t = await getTranslations("clients.page");
+  // ADR 0006: a review card's flags, worded across the dictionary.
+  const renderFlag = flagWordsRenderer((await getTranslations()) as unknown as RootT);
   const tControl = await getTranslations("clients.control");
   const format = await getFormatter();
 
@@ -489,7 +492,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                       </Link>
                     </div>
                     {openBatches.map((b) => (
-                      <ReviewBatch key={b.id} batchId={b.id} clientId={client.id} clientName={b.client.name} {...batchHeader(b)} proposals={reviewProposals(b)} staff={staff} meId={user.id} />
+                      <ReviewBatch key={b.id} batchId={b.id} clientId={client.id} clientName={b.client.name} {...batchHeader(b)} proposals={reviewProposals(b, renderFlag)} staff={staff} meId={user.id} />
                     ))}
                   </section>
                 )}
@@ -817,9 +820,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 interimParams: readParams(p.kind, p.interimParams),
                 effectiveFrom: p.effectiveFrom ? p.effectiveFrom.toISOString().slice(0, 10) : null,
                 reviewBy: p.reviewBy ? p.reviewBy.toISOString().slice(0, 10) : null,
-                datesLine: ruleDatesLine(p),
                 reviewDue: ruleReviewDue(p),
-                checked: paramsSummary(p.kind, paramsInForce(p), (id) => entityName.get(id) ?? t("removedEntity")),
                 approvedByName: p.approvedById ? staffName.get(p.approvedById) ?? null : null,
                 approvedAt: p.approvedAt ? p.approvedAt.toISOString() : null,
                 knowledgeStatus: effectiveStatus(p.knowledgeStatus, parseFieldStatus(p.fieldStatus)),
@@ -831,7 +832,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                   title: h.title,
                   statement: h.statement,
                   interimStatement: h.interimStatement,
-                  checked: POLICY_KINDS.includes(h.kind as PolicyKind) ? paramsSummary(h.kind as PolicyKind, readParams(h.kind as PolicyKind, h.params), (id) => entityName.get(id) ?? t("removedEntity")) : null,
+                  // What the server checked then, worded on the panel (ADR 0006).
+                  kind: POLICY_KINDS.includes(h.kind as PolicyKind) ? (h.kind as PolicyKind) : null,
+                  params: POLICY_KINDS.includes(h.kind as PolicyKind) ? readParams(h.kind as PolicyKind, h.params) : {},
                   approvedByName: h.approvedById ? staffName.get(h.approvedById) ?? null : null,
                   approvedAt: h.approvedAt,
                   until: h.until,

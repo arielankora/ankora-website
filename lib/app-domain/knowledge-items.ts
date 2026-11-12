@@ -1,6 +1,7 @@
 import "server-only";
 import { clientVisibleBlocker, parseFieldStatus, type FieldStatusMap } from "@/lib/knowledge";
 import { prisma } from "@/lib/prisma";
+import { DomainError } from "@/lib/domain-error";
 import { readSourceRefs, type SourceRef } from "@/lib/knowledge-sources";
 import { resolveItemSources } from "@/lib/app-domain/client-sources";
 import type { KnowledgeStatus, KnowledgeAudience, KnowledgeSensitivity, KnowledgeImportance, Prisma } from "@prisma/client";
@@ -93,6 +94,15 @@ function verified(status: KnowledgeStatus, sources: unknown, before?: Before): b
 
 type Before = { knowledgeStatus: KnowledgeStatus; sources: unknown; toResolve: string | null; clientVisible?: boolean; sensitivity?: string; audience?: KnowledgeAudience; doNotDisclose?: string | null };
 
+/// Why an item cannot be shown to the client, as a refusal with a code
+/// (ADR 0006). The same order clientVisibleBlocker checks in, and its
+/// sentence as the message.
+function clientVisibleError(item: Parameters<typeof clientVisibleBlocker>[0], message: string): DomainError {
+  if (item.sensitivity === "SENSITIVE") return new DomainError("knowledgeItems.sensitiveNotShown", message);
+  if (item.audience && item.audience !== "ALL_STAFF") return new DomainError("knowledgeItems.restrictedNotShown", message);
+  return new DomainError("knowledgeItems.doNotDiscloseNotShown", message);
+}
+
 /// Spec 3.1: who keeps the item, and whether the client may see it. Only
 /// the keys that change are returned: a key left out is left as it is (a
 /// process's owner is written by its own form).
@@ -105,7 +115,7 @@ async function visibilityAndOwner(input: KnowledgeInput, before?: Before): Promi
   };
   const blocker = clientVisibleBlocker(after);
   if (input.clientVisible === true) {
-    if (blocker) throw new Error(blocker);
+    if (blocker) throw clientVisibleError(after, blocker);
     out.clientVisible = true;
   } else if (input.clientVisible === false) {
     out.clientVisible = false;
@@ -116,7 +126,7 @@ async function visibilityAndOwner(input: KnowledgeInput, before?: Before): Promi
   if (input.ownerId !== undefined) {
     if (input.ownerId) {
       const ok = await prisma.user.count({ where: { id: input.ownerId, deletedAt: null, role: { not: "CLIENT_USER" } } });
-      if (!ok) throw new Error("הבעלים של פריט צריך להיות איש צוות של אנקורה.");
+      if (!ok) throw new DomainError("knowledgeItems.ownerStaffOnly", "הבעלים של פריט צריך להיות איש צוות של אנקורה.");
     }
     out.ownerId = input.ownerId || null;
   }
@@ -127,6 +137,6 @@ async function visibilityAndOwner(input: KnowledgeInput, before?: Before): Promi
 /// sentence is what turns a question mark into somebody's next step.
 export function assertResolvable(status: KnowledgeStatus | undefined, toResolve: string | null | undefined) {
   if ((status === "UNCERTAIN" || status === "MISSING") && !toResolve?.trim()) {
-    throw new Error('בפריט "לא ודאי" או "חסר" צריך לכתוב מה יסגור אותו.');
+    throw new DomainError("knowledgeItems.toResolveRequired", 'בפריט "לא ודאי" או "חסר" צריך לכתוב מה יסגור אותו.');
   }
 }
