@@ -1,9 +1,10 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
-import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
+import { type KnowledgeStatusLike } from "@/lib/knowledge";
 import { addClientEntityAction, updateClientEntityAction, removeClientEntityAction } from "../entity-actions";
 import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
 
@@ -42,15 +43,12 @@ export type PanelEntity = {
   sources: string[];
 };
 
-const FIELD_LABELS: Record<string, string> = {
-  legalName: "שם משפטי",
-  registrationNumber: "מספר רישום",
-  country: "מדינה",
-  currency: "מטבע",
-  billingAddress: "כתובת לחיוב",
-};
+const FIELDS = ["legalName", "registrationNumber", "country", "currency", "billingAddress"] as const;
+type EntityFieldKey = (typeof FIELDS)[number];
+const isField = (f: string): f is EntityFieldKey => (FIELDS as readonly string[]).includes(f);
 
 function MissingToggle({ field, missing, onChange }: { field: string; missing: boolean; onChange: (field: string, on: boolean) => void }) {
+  const t = useTranslations("clients.entities");
   return (
     <label className="mt-1 flex items-center gap-1.5 text-[11px] text-app-text-tertiary">
       <input
@@ -61,7 +59,7 @@ function MissingToggle({ field, missing, onChange }: { field: string; missing: b
         onChange={(e) => onChange(field, e.target.checked)}
         className="h-3.5 w-3.5 accent-gold"
       />
-      חסר
+      {t("missing")}
     </label>
   );
 }
@@ -77,15 +75,17 @@ function EntityForm({
   others: { id: string; name: string }[];
   existing?: PanelEntity;
 }) {
+  const t = useTranslations("clients.entities");
+  const tStatus = useTranslations("clients.page.knowledgeStatus");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(existing ? updateClientEntityAction : addClientEntityAction, close);
   const [status, setStatus] = useState<KnowledgeStatusLike>(existing?.ownStatus ?? "CONFIRMED");
   const [missing, setMissing] = useState<string[]>(existing?.missingFields ?? []);
   const toggle = (f: string, on: boolean) => setMissing((m) => (on ? [...m, f] : m.filter((x) => x !== f)));
 
-  const text = (name: keyof typeof FIELD_LABELS, props: { placeholder?: string; dir?: "ltr" } = {}) => (
+  const text = (name: EntityFieldKey, props: { placeholder?: string; dir?: "ltr" } = {}) => (
     <div>
-      <Field label={FIELD_LABELS[name]}>
+      <Field label={t(`fields.${name}`)}>
         <input
           name={name}
           disabled={missing.includes(name)}
@@ -103,12 +103,12 @@ function EntityForm({
       <input type="hidden" name="clientId" value={clientId} />
       {existing && <input type="hidden" name="id" value={existing.id} />}
       <div className="grid grid-cols-2 gap-3">
-        <Field label="שם קצר *">
+        <Field label={t("shortName")}>
           <input name="name" required defaultValue={existing?.name ?? ""} placeholder="Inc" className={INPUT} />
         </Field>
-        <Field label="ישות אם">
+        <Field label={t("parent")}>
           <select name="parentId" defaultValue={existing?.parentId ?? ""} className={INPUT}>
-            <option value="">אין</option>
+            <option value="">{t("noParent")}</option>
             {others.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.name}
@@ -127,27 +127,27 @@ function EntityForm({
         {text("billingAddress")}
       </div>
       {missing.length > 0 && (
-        <Field label="מה יסגור את השדות החסרים *">
-          <input name="missingToResolve" required defaultValue={existing?.missingToResolve ?? ""} placeholder="לבקש מהמנכ״ל את תעודת ההתאגדות" className={INPUT} />
+        <Field label={t("missingToResolve")}>
+          <input name="missingToResolve" required defaultValue={existing?.missingToResolve ?? ""} placeholder={t("missingToResolvePlaceholder")} className={INPUT} />
         </Field>
       )}
-      <Field label="סטטוס הישות">
+      <Field label={t("status")}>
         <select name="knowledgeStatus" value={status} onChange={(e) => setStatus(e.target.value as KnowledgeStatusLike)} className={INPUT}>
-          <option value="CONFIRMED">{KNOWLEDGE_STATUS_LABELS.CONFIRMED}</option>
-          <option value="UNCERTAIN">{KNOWLEDGE_STATUS_LABELS.UNCERTAIN}</option>
-          <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
+          <option value="CONFIRMED">{tStatus("CONFIRMED")}</option>
+          <option value="UNCERTAIN">{tStatus("UNCERTAIN")}</option>
+          <option value="MISSING">{tStatus("MISSING")}</option>
         </select>
       </Field>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} confirmedBefore={existing?.ownStatus === "CONFIRMED"} />
       <ItemExtras existing={existing} disclose audience />
       {status !== "CONFIRMED" && (
-        <Field label="מה יסגור את זה *">
+        <Field label={t("toResolve")}>
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
         </Field>
       )}
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : existing ? "שמירה" : "הוספה לתיק"}
+        {pending ? t("saving") : existing ? t("save") : t("add")}
       </button>
     </form>
   );
@@ -155,38 +155,39 @@ function EntityForm({
 
 export function EntitiesPanel({ clientId, entities, sourceOptions }: { clientId: string; entities: PanelEntity[]; sourceOptions: SourceOption[] }) {
   const { showToast } = useToast();
+  const t = useTranslations("clients.entities");
 
   async function remove(e: PanelEntity) {
     const result = await removeClientEntityAction(e.id, clientId);
-    if (result.error) showToast({ tone: "error", title: "ההסרה נכשלה", description: result.error });
-    else showToast({ tone: "info", title: "הוסר מהתיק", description: e.name });
+    if (result.error) showToast({ tone: "error", title: t("removeFailed"), description: result.error });
+    else showToast({ tone: "info", title: t("removed"), description: e.name });
   }
 
   return (
     <div className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <h2 className="text-sm font-medium text-app-text-primary">ישויות משפטיות ({entities.length})</h2>
-        <Drawer triggerLabel="+ ישות" title="ישות משפטית" variant="link">
+        <h2 className="text-sm font-medium text-app-text-primary">{t("title", { count: entities.length })}</h2>
+        <Drawer triggerLabel={t("addTrigger")} title={t("drawerTitle")} variant="link">
           <EntityForm clientId={clientId} sourceOptions={sourceOptions} others={entities.map((e) => ({ id: e.id, name: e.name }))} />
         </Drawer>
       </div>
       {entities.length === 0 ? (
-        <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין ישויות. ללקוח עם יותר מישות אחת, אנשים ומערכות משויכים לישות הנכונה.</p>
+        <p className="mt-2 text-sm text-app-text-tertiary">{t("empty")}</p>
       ) : (
         <ul className="mt-4 divide-y divide-app-border">
           {entities.map((e) => (
             <li key={e.id} id={`item-${e.id}`} className="flex flex-wrap items-start justify-between gap-3 py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
               <div className="min-w-0 flex-[1_1_18rem]">
                 <p className="text-sm font-medium text-app-text-primary">
-                  {e.name}
-                  {e.legalName && <span className="ms-2 text-xs font-normal text-app-text-secondary">{e.legalName}</span>}
+                  <span dir="auto">{e.name}</span>
+                  {e.legalName && <span dir="auto" className="ms-2 text-xs font-normal text-app-text-secondary">{e.legalName}</span>}
                 </p>
                 <p className="text-xs text-app-text-secondary">
                   {[
                     e.registrationNumber ? <span key="r" dir="ltr">{e.registrationNumber}</span> : null,
                     e.country,
                     e.currency,
-                    e.parentName ? `בת של ${e.parentName}` : null,
+                    e.parentName ? t("childOf", { name: e.parentName }) : null,
                   ]
                     .filter(Boolean)
                     .map((x, i) => (
@@ -196,10 +197,10 @@ export function EntitiesPanel({ clientId, entities, sourceOptions }: { clientId:
                       </span>
                     ))}
                 </p>
-                {e.billingAddress && <p className="mt-1 text-xs text-app-text-secondary">{e.billingAddress}</p>}
+                {e.billingAddress && <p dir="auto" className="mt-1 text-xs text-app-text-secondary">{e.billingAddress}</p>}
                 {e.missingFields.length > 0 && (
                   <p className="mt-1 text-xs text-app-error">
-                    חסר: {e.missingFields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}
+                    {t("missingList", { fields: e.missingFields.map((f) => (isField(f) ? t(`fields.${f}`) : f)).join(", ") })}
                     {e.missingToResolve && <span className="text-app-text-secondary"> · {e.missingToResolve}</span>}
                   </p>
                 )}
@@ -208,7 +209,7 @@ export function EntitiesPanel({ clientId, entities, sourceOptions }: { clientId:
                 <SourceCodes sources={e.sources} options={sourceOptions} />
               </div>
               <div className="flex shrink-0 items-center gap-3 text-xs">
-                <Drawer triggerLabel="עריכה" title={`עריכה: ${e.name}`} variant="link">
+                <Drawer triggerLabel={t("edit")} title={t("editTitle", { name: e.name })} variant="link">
                   <EntityForm
                     clientId={clientId}
                     sourceOptions={sourceOptions}
@@ -217,7 +218,7 @@ export function EntitiesPanel({ clientId, entities, sourceOptions }: { clientId:
                   />
                 </Drawer>
                 <button type="button" onClick={() => remove(e)} className="text-app-text-tertiary hover:text-app-error">
-                  הסרה
+                  {t("remove")}
                 </button>
               </div>
             </li>

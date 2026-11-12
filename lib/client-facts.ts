@@ -67,14 +67,29 @@ export type FactShape = {
 /// What each kind needs to be useful. A temporary fact without an end is
 /// a permanent one nobody will ever check; a decision without a date
 /// cannot be ordered against the one it replaced.
-export function factShapeError(fact: FactShape): string | null {
-  if (!fact.body?.trim()) return "צריך לכתוב את העובדה עצמה.";
-  if (fact.kind === "TEMPORARY" && !fact.validUntil && !fact.validUntilEvent?.trim()) {
-    return 'מידע זמני צריך תוקף: עד תאריך, או עד אירוע ("עד הצירוף לארגון").';
-  }
-  if (fact.kind === "ONE_OFF_DECISION" && !fact.decidedAt) return "החלטה חד-פעמית צריכה תאריך.";
+export type FactShapeProblem = "body" | "temporaryValidity" | "decisionDate";
+
+const FACT_SHAPE_MESSAGES: Record<FactShapeProblem, string> = {
+  body: "צריך לכתוב את העובדה עצמה.",
+  temporaryValidity: 'מידע זמני צריך תוקף: עד תאריך, או עד אירוע ("עד הצירוף לארגון").',
+  decisionDate: "החלטה חד-פעמית צריכה תאריך.",
+};
+
+export function factShapeProblem(fact: FactShape): FactShapeProblem | null {
+  if (!fact.body?.trim()) return "body";
+  if (fact.kind === "TEMPORARY" && !fact.validUntil && !fact.validUntilEvent?.trim()) return "temporaryValidity";
+  if (fact.kind === "ONE_OFF_DECISION" && !fact.decidedAt) return "decisionDate";
   return null;
 }
+
+export function factShapeError(fact: FactShape): string | null {
+  const problem = factShapeProblem(fact);
+  return problem ? FACT_SHAPE_MESSAGES[problem] : null;
+}
+
+/// What a question's "what would close it" is when nobody wrote one: the
+/// screen does not repeat it under the question.
+export const QUESTION_DEFAULT_TO_RESOLVE = "תשובה לשאלה.";
 
 /// A question is, by definition, something not yet known. It is stored as
 /// "missing", and what closes it is its answer.

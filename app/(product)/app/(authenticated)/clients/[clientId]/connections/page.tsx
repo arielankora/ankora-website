@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { PageBack } from "@/components/app/BackSlot";
 import { requireUser } from "@/lib/app-auth/session";
 import { canManageClients, ForbiddenError } from "@/lib/app-auth/permissions";
@@ -14,13 +15,15 @@ import { ConnectionsScreen } from "./ConnectionsScreen";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-const NOTICES: Record<string, string> = {
-  "connected=1": "החיבור נוסף.",
-  "error=not_configured": "החיבור ל-Google עוד לא מוגדר בסביבה הזו (חסרים פרטי לקוח OAuth).",
-  "error=denied": "החיבור בוטל במסך של Google.",
-  "error=no_token": "Google לא החזיר הרשאה קבועה. מנתקים את האפליקציה בהגדרות החשבון ב-Google ומנסים שוב.",
-  "error=failed": "החיבור נכשל. נסו שוב.",
-};
+/// The address the Google round trip comes back with, and the notice it
+/// means (keys under clients.connections.notices).
+const NOTICES = {
+  "connected=1": { key: "connected", error: false },
+  "error=not_configured": { key: "notConfigured", error: true },
+  "error=denied": { key: "denied", error: true },
+  "error=no_token": { key: "noToken", error: true },
+  "error=failed": { key: "failed", error: true },
+} as const;
 
 export default async function ConnectionsPage(props: { params: Promise<{ clientId: string }>; searchParams: Promise<Record<string, string>> }) {
   const { clientId } = await props.params;
@@ -35,10 +38,14 @@ export default async function ConnectionsPage(props: { params: Promise<{ clientI
     if (err instanceof ForbiddenError) notFound();
     throw err;
   }
-  const notice = Object.entries(sp).map(([k, v]) => NOTICES[`${k}=${v}`]).find(Boolean) ?? null;
+  const t = await getTranslations("clients.connections");
+  const found = Object.entries(sp)
+    .map(([k, v]) => NOTICES[`${k}=${v}` as keyof typeof NOTICES])
+    .find(Boolean);
+  const notice = found ? { text: t(`notices.${found.key}`), error: found.error } : null;
   return (
     <div className="mx-auto w-full max-w-appContent px-4 py-6">
-      <PageBack href={`/app/clients/${clientId}`} label="חזרה לתיק הלקוח" />
+      <PageBack href={`/app/clients/${clientId}`} label={t("back")} />
       <ConnectionsScreen
         clientId={clientId}
         clientName={client.name}

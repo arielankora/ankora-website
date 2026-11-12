@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import {
   addClientDocumentAction,
   approveSummaryAction,
@@ -70,6 +71,8 @@ export function DocumentsPanel({
   /// outside the code.
   storageReady: boolean;
 }) {
+  const t = useTranslations("clients.file.documents");
+  const tKind = useTranslations("clients.file.documentKinds");
   const { onSubmit, pending, error, ok } = useActionForm(addClientDocumentAction);
   const [busy, startTransition] = useTransition();
   const [rowError, setRowError] = useState<string | null>(null);
@@ -77,8 +80,8 @@ export function DocumentsPanel({
   return (
     <section className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-[15px] font-medium text-app-text-primary">מסמכים</h2>
-        <p className="text-[11.5px] text-app-text-tertiary">הלקוח מוריד אותם מהתיק שלו. אנחנו היחידים שמעלים.</p>
+        <h2 className="text-[15px] font-medium text-app-text-primary">{t("title")}</h2>
+        <p className="text-[11.5px] text-app-text-tertiary">{t("intro")}</p>
       </div>
 
       {documents.length > 0 && (
@@ -86,13 +89,13 @@ export function DocumentsPanel({
           {documents.map((d) => (
             <li key={d.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3">
               <span className="text-sm text-app-text-primary">
-                {d.title}
+                <span dir="auto">{d.title}</span>
                 <span className="text-app-text-secondary">
                   {" · "}
                   {/* 20.10.2026: the kind can be corrected after filing. A
                       procedure filed as "פוליסה" used to stay one. */}
                   <select
-                    aria-label={`סוג המסמך: ${d.title}`}
+                    aria-label={t("kindOf", { title: d.title })}
                     value={d.kind}
                     disabled={busy}
                     onChange={(e) => {
@@ -106,7 +109,7 @@ export function DocumentsPanel({
                   >
                     {(Object.keys(DOCUMENT_KIND_LABELS) as ClientDocumentKind[]).map((k) => (
                       <option key={k} value={k}>
-                        {DOCUMENT_KIND_LABELS[k]}
+                        {tKind(k)}
                       </option>
                     ))}
                   </select>
@@ -133,17 +136,17 @@ export function DocumentsPanel({
                       : "border-app-border bg-app-surface-sunken text-app-text-secondary"
                   }`}
                 >
-                  {d.clientVisible ? "הלקוח רואה" : "מוסתר"}
+                  {d.clientVisible ? t("visible") : t("hidden")}
                 </button>
                 {d.aiExcludedByTask ? (
                   <span className="rounded-full border border-app-border bg-app-surface-sunken px-2.5 py-1 text-app-text-secondary">
-                    בלי AI (מהמשימה)
+                    {t("aiExcludedByTask")}
                   </span>
                 ) : (
                   <button
                     type="button"
                     disabled={busy || (d.aiExcluded && !canClearAiExclusion)}
-                    title={d.aiExcluded && !canClearAiExclusion ? "רק מנהל יכול להסיר" : undefined}
+                    title={d.aiExcluded && !canClearAiExclusion ? t("managerOnly") : undefined}
                     onClick={() =>
                       startTransition(async () => {
                         const res = await setClientDocumentAiExcludedAction(d.id, !d.aiExcluded);
@@ -156,7 +159,7 @@ export function DocumentsPanel({
                         : "border-app-border text-app-text-tertiary"
                     }`}
                   >
-                    {d.aiExcluded ? "בלי AI" : "מותר ל-AI"}
+                    {d.aiExcluded ? t("aiExcluded") : t("aiAllowed")}
                   </button>
                 )}
                 <button
@@ -170,7 +173,7 @@ export function DocumentsPanel({
                   }
                   className="text-app-text-tertiary hover:text-app-error"
                 >
-                  הסרה
+                  {t("remove")}
                 </button>
               </span>
             </li>
@@ -182,8 +185,7 @@ export function DocumentsPanel({
 
       {!storageReady && (
         <p className="mt-4 rounded-[10px] border border-gold/40 bg-app-surface-sunken px-3 py-2.5 text-[12.5px] text-app-text-secondary">
-          אחסון המסמכים עדיין בפיתוח. הטופס למטה מוכן, ומה שנשאר הוא לפתוח את התיקייה המשותפת ולשתף אותה. עד אז אפשר
-          לשלוח מסמך בוואטסאפ כרגיל.
+          {t("storageNotReady")}
         </p>
       )}
 
@@ -191,17 +193,17 @@ export function DocumentsPanel({
         <input type="hidden" name="clientId" value={clientId} />
 
         <label className="block sm:col-span-2">
-          <span className="block text-xs font-medium text-app-text-secondary">שם המסמך</span>
+          <span className="block text-xs font-medium text-app-text-secondary">{t("name")}</span>
           <input
             name="title"
             required
-            placeholder="פוליסת רכב 2026"
+            placeholder={t("namePlaceholder")}
             className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </label>
 
         <label className="block">
-          <span className="block text-xs font-medium text-app-text-secondary">סוג</span>
+          <span className="block text-xs font-medium text-app-text-secondary">{t("kind")}</span>
           <select
             name="kind"
             defaultValue="OTHER"
@@ -209,14 +211,14 @@ export function DocumentsPanel({
           >
             {(Object.keys(DOCUMENT_KIND_LABELS) as ClientDocumentKind[]).map((k) => (
               <option key={k} value={k}>
-                {DOCUMENT_KIND_LABELS[k]}
+                {tKind(k)}
               </option>
             ))}
           </select>
         </label>
 
         <label className="block">
-          <span className="block text-xs font-medium text-app-text-secondary">קובץ (עד 4MB)</span>
+          <span className="block text-xs font-medium text-app-text-secondary">{t("file")}</span>
           <input
             type="file"
             name="file"
@@ -228,16 +230,16 @@ export function DocumentsPanel({
         <div className="flex items-center gap-4 sm:col-span-4">
           <label className="flex items-center gap-2 text-sm text-app-text-primary">
             <input type="checkbox" name="clientVisible" defaultChecked className="h-4 w-4 rounded border-app-border" />
-            הלקוח רואה את זה בתיק שלו
+            {t("clientVisible")}
           </label>
           {error && <p className="text-sm text-app-error">{error}</p>}
-          {ok && <p className="text-sm text-app-success">המסמך נוסף לתיק.</p>}
+          {ok && <p className="text-sm text-app-success">{t("added")}</p>}
           <button
             type="submit"
             disabled={pending}
             className="ms-auto rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
           >
-            {pending ? "מעלה..." : "צירוף מסמך"}
+            {pending ? t("uploading") : t("upload")}
           </button>
         </div>
       </form>
@@ -254,14 +256,15 @@ export function SummaryPanel({
   summaries: SummaryRow[];
   composer: ComposerProps | null;
 }) {
+  const t = useTranslations("clients.file.summary");
   const generate = useActionForm(generateSummaryAction);
   const latest = summaries[0];
 
   return (
     <section id="portal-summary" className="scroll-mt-24 rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-[15px] font-medium text-app-text-primary">סיכום חודשי</h2>
-        <p className="text-[11.5px] text-app-text-tertiary">נבנה מהרשומות. מגיע ללקוח רק אחרי שמישהו אישר.</p>
+        <h2 className="text-[15px] font-medium text-app-text-primary">{t("title")}</h2>
+        <p className="text-[11.5px] text-app-text-tertiary">{t("intro")}</p>
       </div>
 
       <form onSubmit={generate.onSubmit} className="mt-4 flex flex-wrap items-center gap-3">
@@ -271,7 +274,7 @@ export function SummaryPanel({
           disabled={generate.pending}
           className="rounded-full border border-app-border px-4 py-2 text-[13px] text-app-text-primary hover:border-gold disabled:opacity-50"
         >
-          {generate.pending ? "מפיק..." : "הפקת טיוטה לחודש הנוכחי"}
+          {generate.pending ? t("generating") : t("generate")}
         </button>
         {generate.error && <p className="text-sm text-app-error">{generate.error}</p>}
       </form>
@@ -285,10 +288,10 @@ export function SummaryPanel({
               <span className="font-medium text-app-text-secondary">{s.periodLabel}</span>
               {" · "}
               {s.status === "APPROVED"
-                ? `אושר על ידי ${s.approvedByName ?? "מנהל התיק"}`
+                ? t("approvedBy", { name: s.approvedByName ?? t("accountManager") })
                 : s.status === "DISCARDED"
-                  ? "בוטל"
-                  : "טיוטה"}
+                  ? t("discarded")
+                  : t("draft")}
             </li>
           ))}
         </ul>
@@ -311,6 +314,7 @@ function SummaryEditor({
   clientId: string;
   composer: ComposerProps | null;
 }) {
+  const t = useTranslations("clients.file.summary");
   const { onSubmit, pending, error, ok } = useActionForm(approveSummaryAction);
   const [busy, startTransition] = useTransition();
   const [discardError, setDiscardError] = useState<string | null>(null);
@@ -321,10 +325,10 @@ function SummaryEditor({
         <p className="text-[13px] font-medium text-app-text-primary">{summary.periodLabel}</p>
         <p className="text-[11.5px] text-app-text-tertiary">
           {summary.status === "APPROVED"
-            ? `אושר על ידי ${summary.approvedByName ?? "מנהל התיק"}`
+            ? t("approvedBy", { name: summary.approvedByName ?? t("accountManager") })
             : summary.status === "DISCARDED"
-              ? "בוטל, לא יגיע ללקוח"
-              : `טיוטה, נבנתה מ-${summary.sourceCount} רשומות`}
+              ? t("discardedLong")
+              : t("draftFrom", { count: summary.sourceCount })}
         </p>
       </div>
 
@@ -332,6 +336,7 @@ function SummaryEditor({
         <input type="hidden" name="summaryId" value={summary.id} />
         <textarea
           name="draft"
+          dir="auto"
           rows={4}
           defaultValue={summary.draft}
           className="w-full rounded-lg border border-app-border-strong bg-white px-3 py-2.5 text-sm leading-relaxed text-app-text-primary outline-none focus:border-gold"
@@ -340,7 +345,7 @@ function SummaryEditor({
         <div className="flex flex-wrap items-center gap-3">
           {error && <p className="text-sm text-app-error">{error}</p>}
           {discardError && <p className="text-sm text-app-error">{discardError}</p>}
-          {ok && <p className="text-sm text-app-success">אושר. הלקוח יראה את זה בדוח החודשי.</p>}
+          {ok && <p className="text-sm text-app-success">{t("approved")}</p>}
 
           <button
             type="button"
@@ -353,7 +358,7 @@ function SummaryEditor({
             }
             className="text-[13px] text-app-text-secondary hover:text-app-error"
           >
-            ביטול הטיוטה
+            {t("discard")}
           </button>
 
           {/* Only once it is published. Before that there is nothing to
@@ -362,7 +367,7 @@ function SummaryEditor({
           {summary.status === "APPROVED" && composer && (
             <MessageClient
               clientId={clientId}
-              buttonLabel="להודיע ללקוח"
+              buttonLabel={t("notify")}
               preselectKind="summary_ready"
               {...composer}
             />
@@ -376,7 +381,7 @@ function SummaryEditor({
             {/* Not "שליחה". Approving publishes the summary to the
                 portal; nothing leaves the building. The button beside
                 this one is how a client finds out. */}
-            {pending ? "מאשר..." : summary.status === "APPROVED" ? "שמירה ואישור מחדש" : "אישור ופרסום בפורטל"}
+            {pending ? t("approving") : summary.status === "APPROVED" ? t("reapprove") : t("approve")}
           </button>
         </div>
       </form>

@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -147,7 +148,7 @@ export async function updateClient(
       where: { id: notice.subprocessorNoticeDocumentId, clientId, deletedAt: null },
       select: { id: true },
     });
-    if (!doc) throw new Error("החוזה שנבחר לא נמצא בתיק של הלקוח הזה.");
+    if (!doc) throw new DomainError("clients.contractNotFound", "החוזה שנבחר לא נמצא בתיק של הלקוח הזה.");
   }
 
   const touchedPreferences =
@@ -162,7 +163,7 @@ export async function updateClient(
     const manager = await prisma.user.findFirst({
       where: { id: input.accountManagerId, deletedAt: null, role: { not: "CLIENT_USER" } },
     });
-    if (!manager) throw new Error("מנהל התיק שנבחר אינו משתמש פעיל של Ankora.");
+    if (!manager) throw new DomainError("clients.managerNotActive", "מנהל התיק שנבחר אינו משתמש פעיל של Ankora.");
   }
 
   // Archiving from the settings form is the same act as the archive

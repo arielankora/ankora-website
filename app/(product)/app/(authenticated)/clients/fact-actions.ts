@@ -1,7 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { parseSourceRefs, type SourceRef } from "@/lib/knowledge-sources";
 import {
   addClientFact,
@@ -15,6 +14,7 @@ import {
 } from "@/lib/app-domain/client-facts";
 import type { FactKind, FactTopic, KnowledgeAudience, KnowledgeStatus } from "@prisma/client";
 import { itemExtrasFrom } from "./item-extras";
+import { knowledgeErrorT, knowledgeErrorText, type KnowledgeErrorT } from "./knowledge-errors";
 
 // Org brain, phase 2: the facts panel on the client screen (spec 3.4).
 
@@ -24,12 +24,6 @@ const KINDS: FactKind[] = ["SCOPE_IN", "SCOPE_OUT", "PREFERENCE", "REQUIREMENT",
 const TOPICS: FactTopic[] = ["COMMUNICATION", "REPORTING", "DOCUMENTS", "AUTOMATION", "ADMINS", "PAYMENTS", "SUPPLIERS", "OTHER"];
 const STATUSES: KnowledgeStatus[] = ["CONFIRMED", "UNCERTAIN", "MISSING"];
 const AUDIENCES: KnowledgeAudience[] = ["ALL_STAFF", "ACCOUNT_TEAM", "RESTRICTED"];
-
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
-  if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
-}
 
 function pick<T extends string>(value: FormDataEntryValue | null, allowed: T[]): T | undefined {
   const v = String(value ?? "");
@@ -41,26 +35,26 @@ function text(formData: FormData, name: string): string | null {
 }
 
 /// A date field as UTC midnight, like every date-only value here.
-function day(formData: FormData, name: string): { error?: string; value: Date | null } {
+function day(formData: FormData, name: string, t: KnowledgeErrorT): { error?: string; value: Date | null } {
   const raw = text(formData, name);
   if (!raw) return { value: null };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return { error: "תאריך לא תקין.", value: null };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return { error: t("invalidDate"), value: null };
   return { value: new Date(`${raw}T00:00:00Z`) };
 }
 
-function sources(formData: FormData): { error?: string; refs: SourceRef[] } {
+function sources(formData: FormData, t: KnowledgeErrorT): { error?: string; refs: SourceRef[] } {
   const { refs, invalid } = parseSourceRefs(String(formData.get("sources") ?? ""));
-  if (invalid.length) return { error: `מקור לא מובן: ${invalid.join(", ")}. כותבים קוד ודקה, למשל S1 08:13.`, refs };
+  if (invalid.length) return { error: t("badSource", { entries: invalid.join(", ") }), refs };
   return { refs };
 }
 
-function parseFact(formData: FormData, selfId?: string): { error?: string; value?: Omit<ClientFactInput, "clientId"> } {
+function parseFact(formData: FormData, t: KnowledgeErrorT, selfId?: string): { error?: string; value?: Omit<ClientFactInput, "clientId"> } {
   const kind = pick(formData.get("kind"), KINDS);
-  if (!kind) return { error: "צריך לבחור סוג." };
-  const src = sources(formData);
+  if (!kind) return { error: t("factKindRequired") };
+  const src = sources(formData, t);
   if (src.error) return { error: src.error };
-  const validUntil = day(formData, "validUntil");
-  const decidedAt = day(formData, "decidedAt");
+  const validUntil = day(formData, "validUntil", t);
+  const decidedAt = day(formData, "decidedAt", t);
   if (validUntil.error || decidedAt.error) return { error: validUntil.error ?? decidedAt.error };
   // "contact:<id>" or "org:<id>" from one picker.
   const subject = String(formData.get("subject") ?? "");
@@ -94,7 +88,7 @@ async function run(clientId: string, fn: () => Promise<unknown>): Promise<FormSt
   try {
     await fn();
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
@@ -103,7 +97,7 @@ async function run(clientId: string, fn: () => Promise<unknown>): Promise<FormSt
 export async function addClientFactAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parseFact(formData, user.id);
+  const parsed = parseFact(formData, await knowledgeErrorT(), user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   return run(clientId, () => addClientFact(user, { ...parsed.value!, clientId }));
 }
@@ -111,7 +105,7 @@ export async function addClientFactAction(_prev: FormState | undefined, formData
 export async function supersedeClientFactAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parseFact(formData, user.id);
+  const parsed = parseFact(formData, await knowledgeErrorT(), user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   return run(clientId, () => supersedeClientFact(user, String(formData.get("id") ?? ""), parsed.value!));
 }
@@ -119,7 +113,7 @@ export async function supersedeClientFactAction(_prev: FormState | undefined, fo
 export async function confirmClientFactAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const src = sources(formData);
+  const src = sources(formData, await knowledgeErrorT());
   if (src.error) return { error: src.error };
   return run(clientId, () => confirmClientFact(user, String(formData.get("id") ?? ""), src.refs, formData.get("manualConfirm") === "1"));
 }
@@ -127,7 +121,7 @@ export async function confirmClientFactAction(_prev: FormState | undefined, form
 export async function answerClientQuestionAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const src = sources(formData);
+  const src = sources(formData, await knowledgeErrorT());
   if (src.error) return { error: src.error };
   return run(clientId, () =>
     answerClientQuestion(user, String(formData.get("id") ?? ""), { answer: String(formData.get("answer") ?? ""), sources: src.refs, manualConfirm: formData.get("manualConfirm") === "1" })

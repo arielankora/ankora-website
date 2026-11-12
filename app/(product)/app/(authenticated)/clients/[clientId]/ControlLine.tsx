@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import type { ControlDetail, ControlKey, ControlPart } from "@/lib/client-control";
 
 // The control line at the top of a client (spec 7.6): where the handover
@@ -31,13 +32,14 @@ export function ControlLine({
   clientId?: string;
   approvalsHref?: string;
 }) {
+  const t = useTranslations("clients.control");
   const [open, setOpen] = useState<ControlKey | null>(null);
   if (parts.length === 0) return null;
   const shown = open ? (details[open] ?? []) : [];
   const anchor = open ? SECTION[open] : undefined;
   return (
     <div>
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-app-text-secondary" aria-label="בקרה">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-app-text-secondary" aria-label={t("label")}>
         {parts.map((p, i) => {
           const names = p.key ? details[p.key] : undefined;
           const tone = p.warn ? "font-medium text-app-warning" : "";
@@ -64,7 +66,7 @@ export function ControlLine({
           <span className="flex items-center gap-x-2">
             <span className="text-app-text-tertiary">·</span>
             <a href={approvalsHref} className="text-app-text-accent hover:underline" data-testid="control-approvals">
-              לאישורים ולשאלות ללקוח
+              {t("toApprovalsAndQuestions")}
             </a>
           </span>
         )}
@@ -88,12 +90,12 @@ export function ControlLine({
           </ul>
           {clientId && (
             <a href={`/app/clients/${clientId}?tab=file${anchor ? `#${anchor}` : ""}`} className="mt-1.5 inline-block text-app-text-accent hover:underline">
-              לתיק הלקוח
+              {t("toFile")}
             </a>
           )}
           {approvalsHref && (
             <a href={approvalsHref} className="ms-3 mt-1.5 inline-block text-app-text-accent hover:underline">
-              לאישורים
+              {t("toApprovals")}
             </a>
           )}
         </div>

@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { ForbiddenError } from "@/lib/app-auth/permissions";
+import { badSourcesError, clientActionError as friendlyError } from "./action-errors";
 import { parseSourceRefs } from "@/lib/knowledge-sources";
 import {
   addClientEntity,
@@ -21,19 +21,14 @@ type FormState = { error?: string; ok?: boolean };
 
 const STATUSES: KnowledgeStatus[] = ["CONFIRMED", "UNCERTAIN", "MISSING"];
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
-  if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
-}
 
 function text(formData: FormData, name: string): string | null {
   return String(formData.get(name) ?? "").trim() || null;
 }
 
-function parseEntity(formData: FormData, selfId?: string): { error?: string; value?: Omit<ClientEntityInput, "clientId"> } {
+async function parseEntity(formData: FormData, selfId?: string): Promise<{ error?: string; value?: Omit<ClientEntityInput, "clientId"> }> {
   const { refs, invalid } = parseSourceRefs(String(formData.get("sources") ?? ""));
-  if (invalid.length) return { error: `מקור לא מובן: ${invalid.join(", ")}. כותבים קוד ודקה, למשל S1 08:13.` };
+  if (invalid.length) return { error: await badSourcesError(invalid) };
   const status = String(formData.get("knowledgeStatus") ?? "");
   return {
     value: {
@@ -62,12 +57,12 @@ function parseEntity(formData: FormData, selfId?: string): { error?: string; val
 export async function addClientEntityAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parseEntity(formData, user.id);
+  const parsed = await parseEntity(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   try {
     await addClientEntity(user, { ...parsed.value, clientId });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
@@ -76,12 +71,12 @@ export async function addClientEntityAction(_prev: FormState | undefined, formDa
 export async function updateClientEntityAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parseEntity(formData, user.id);
+  const parsed = await parseEntity(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   try {
     await updateClientEntity(user, String(formData.get("id") ?? ""), parsed.value);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
@@ -92,7 +87,7 @@ export async function removeClientEntityAction(id: string, clientId: string): Pr
   try {
     await removeClientEntity(user, id);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };

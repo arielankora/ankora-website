@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { assertCan, can, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -53,7 +54,7 @@ function cleanUrl(value: string | null | undefined): string | null {
     if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error();
     return u.toString();
   } catch {
-    throw new Error("כתובת המערכת לא תקינה.");
+    throw new DomainError("systemMap.invalidUrl", "כתובת המערכת לא תקינה.");
   }
 }
 
@@ -63,7 +64,7 @@ function cleanUrl(value: string | null | undefined): string | null {
 function cleanLast4(value: string | null | undefined): string | null {
   const v = clean(value);
   if (!v) return null;
-  if (!/^\d{4}$/.test(v)) throw new Error("רק ארבע הספרות האחרונות של הכרטיס.");
+  if (!/^\d{4}$/.test(v)) throw new DomainError("systemMap.lastFourOnly", "רק ארבע הספרות האחרונות של הכרטיס.");
   return v;
 }
 
@@ -74,7 +75,7 @@ function assertNoSecret(...values: (string | null | undefined)[]) {
   for (const v of values) {
     if (!v) continue;
     if (/(password|סיסמ|passwd|pwd)\s*[:=]/i.test(v)) {
-      throw new Error("סיסמאות נשמרות בכספת, לא במפת המערכות.");
+      throw new DomainError("systemMap.passwordInMap", "סיסמאות נשמרות בכספת, לא במפת המערכות.");
     }
   }
 }
@@ -82,13 +83,13 @@ function assertNoSecret(...values: (string | null | undefined)[]) {
 async function assertCredentialBelongs(clientId: string, credentialId: string | null | undefined) {
   if (!credentialId) return;
   const found = await prisma.clientCredential.count({ where: { id: credentialId, clientId, deletedAt: null } });
-  if (!found) throw new Error("הרשומה בכספת לא נמצאה אצל הלקוח.");
+  if (!found) throw new DomainError("systemMap.vaultEntryNotFound", "הרשומה בכספת לא נמצאה אצל הלקוח.");
 }
 
 function systemData(input: Partial<SystemAccessInput>) {
   const has = (k: keyof SystemAccessInput) => Object.prototype.hasOwnProperty.call(input, k);
   if (input.billingCostMinor != null && (!Number.isInteger(input.billingCostMinor) || input.billingCostMinor < 0)) {
-    throw new Error("עלות לא תקינה.");
+    throw new DomainError("systemMap.invalidCost", "עלות לא תקינה.");
   }
   return {
     systemName: has("systemName") ? clean(input.systemName) ?? undefined : undefined,
@@ -114,7 +115,7 @@ export async function addSystemAccess(actor: User, input: SystemAccessInput) {
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
   const systemName = clean(input.systemName);
-  if (!systemName) throw new Error("צריך שם מערכת.");
+  if (!systemName) throw new DomainError("systemMap.nameRequired", "צריך שם מערכת.");
   assertResolvable(input.knowledgeStatus, input.toResolve);
   assertNoSecret(input.accountUsed, input.notes, input.blocker);
   await assertCredentialBelongs(input.clientId, input.credentialId);
@@ -131,7 +132,7 @@ export async function addSystemAccess(actor: User, input: SystemAccessInput) {
       accountUsed: account ? { equals: account, mode: "insensitive" } : null,
     },
   });
-  if (duplicate) throw new Error(`${systemName}${account ? ` (${account})` : ""} כבר במפת המערכות.`);
+  if (duplicate) throw new DomainError("systemMap.duplicate", `${systemName}${account ? ` (${account})` : ""} כבר במפת המערכות.`, { name: `${systemName}${account ? ` (${account})` : ""}` });
 
   const sourced = await sourcedFields(input.clientId, input, [input.notes]);
   const row = await prisma.systemAccess.create({
@@ -158,9 +159,9 @@ export async function addSystemAccess(actor: User, input: SystemAccessInput) {
 export async function updateSystemAccess(actor: User, id: string, input: Partial<Omit<SystemAccessInput, "clientId">>) {
   assertCan(actor.role, "time_entry.create_self");
   const before = await prisma.systemAccess.findUnique({ where: { id } });
-  if (!before || before.deletedAt) throw new Error("המערכת לא נמצאה.");
+  if (!before || before.deletedAt) throw new DomainError("systemMap.notFound", "המערכת לא נמצאה.");
   await assertClientAccess(actor, before.clientId);
-  if (input.systemName !== undefined && !clean(input.systemName)) throw new Error("צריך שם מערכת.");
+  if (input.systemName !== undefined && !clean(input.systemName)) throw new DomainError("systemMap.nameRequired", "צריך שם מערכת.");
   assertResolvable(input.knowledgeStatus ?? before.knowledgeStatus, input.toResolve !== undefined ? input.toResolve : before.toResolve);
   assertNoSecret(input.accountUsed, input.notes, input.blocker);
   if (input.credentialId !== undefined) await assertCredentialBelongs(before.clientId, input.credentialId);
@@ -186,7 +187,7 @@ export async function updateSystemAccess(actor: User, id: string, input: Partial
 export async function removeSystemAccess(actor: User, id: string) {
   assertCan(actor.role, "time_entry.create_self");
   const row = await prisma.systemAccess.findUnique({ where: { id } });
-  if (!row || row.deletedAt) throw new Error("המערכת לא נמצאה.");
+  if (!row || row.deletedAt) throw new DomainError("systemMap.notFound", "המערכת לא נמצאה.");
   await assertClientAccess(actor, row.clientId);
   const removed = await prisma.systemAccess.update({ where: { id }, data: { deletedAt: new Date() } });
   await recordAudit({

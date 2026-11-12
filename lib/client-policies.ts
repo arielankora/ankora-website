@@ -81,13 +81,26 @@ export type PolicyShape = {
   interimStatement?: string | null;
 };
 
-export function policyShapeError(p: PolicyShape): string | null {
-  if (!p.title?.trim()) return "צריך שם לכלל.";
-  if (!p.statement?.trim()) return "צריך לכתוב את הכלל עצמו.";
-  if (p.status === "PROPOSED" && NEEDS_INTERIM.includes(p.kind) && !p.interimStatement?.trim()) {
-    return 'כלל מוצע מסוג זה צריך כלל ביניים: מה עושים עד שהוא מאושר ("כל הוצאה עוברת לאורן").';
-  }
+/// What is wrong with a rule's shape, by name (ADR 0006: the domain
+/// throws it with a code; policyShapeError words it as before).
+export type PolicyShapeProblem = "title" | "statement" | "interim";
+
+const POLICY_SHAPE_MESSAGES: Record<PolicyShapeProblem, string> = {
+  title: "צריך שם לכלל.",
+  statement: "צריך לכתוב את הכלל עצמו.",
+  interim: 'כלל מוצע מסוג זה צריך כלל ביניים: מה עושים עד שהוא מאושר ("כל הוצאה עוברת לאורן").',
+};
+
+export function policyShapeProblem(p: PolicyShape): PolicyShapeProblem | null {
+  if (!p.title?.trim()) return "title";
+  if (!p.statement?.trim()) return "statement";
+  if (p.status === "PROPOSED" && NEEDS_INTERIM.includes(p.kind) && !p.interimStatement?.trim()) return "interim";
   return null;
+}
+
+export function policyShapeError(p: PolicyShape): string | null {
+  const problem = policyShapeProblem(p);
+  return problem ? POLICY_SHAPE_MESSAGES[problem] : null;
 }
 
 /// What applies now. An approved rule applies as written. A proposed one
@@ -172,17 +185,30 @@ export const EXCEPTION_STATUS_LABELS: Record<"REQUESTED" | "APPROVED" | "REJECTE
   WITHDRAWN: "נמשכה",
 };
 
+export type ExceptionShapeProblem = "what" | "reason" | "noEnd" | "past" | "tooLong";
+
 /// `validUntil` is the last day it holds (UTC midnight of that day).
-export function exceptionShapeError(e: { what?: string | null; reason?: string | null; validUntil?: Date | null }, now: Date): string | null {
-  if (!e.what?.trim()) return "צריך לכתוב מה עושים אחרת.";
-  if (!e.reason?.trim()) return "צריך לכתוב למה.";
-  if (!e.validUntil || Number.isNaN(e.validUntil.getTime())) return "חריגה צריכה תאריך סיום.";
+export function exceptionShapeProblem(e: { what?: string | null; reason?: string | null; validUntil?: Date | null }, now: Date): ExceptionShapeProblem | null {
+  if (!e.what?.trim()) return "what";
+  if (!e.reason?.trim()) return "reason";
+  if (!e.validUntil || Number.isNaN(e.validUntil.getTime())) return "noEnd";
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  if (e.validUntil.getTime() < today) return "תאריך הסיום כבר עבר.";
-  if (e.validUntil.getTime() > today + EXCEPTION_MAX_DAYS * 24 * 60 * 60 * 1000) {
-    return `חריגה היא עד ${EXCEPTION_MAX_DAYS} יום. לתקופה ארוכה יותר משנים את הכלל עצמו.`;
-  }
+  if (e.validUntil.getTime() < today) return "past";
+  if (e.validUntil.getTime() > today + EXCEPTION_MAX_DAYS * 24 * 60 * 60 * 1000) return "tooLong";
   return null;
+}
+
+const EXCEPTION_SHAPE_MESSAGES: Record<ExceptionShapeProblem, string> = {
+  what: "צריך לכתוב מה עושים אחרת.",
+  reason: "צריך לכתוב למה.",
+  noEnd: "חריגה צריכה תאריך סיום.",
+  past: "תאריך הסיום כבר עבר.",
+  tooLong: `חריגה היא עד ${EXCEPTION_MAX_DAYS} יום. לתקופה ארוכה יותר משנים את הכלל עצמו.`,
+};
+
+export function exceptionShapeError(e: { what?: string | null; reason?: string | null; validUntil?: Date | null }, now: Date): string | null {
+  const problem = exceptionShapeProblem(e, now);
+  return problem ? EXCEPTION_SHAPE_MESSAGES[problem] : null;
 }
 
 /// Approved and its last day not yet over.

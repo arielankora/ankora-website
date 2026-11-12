@@ -1,16 +1,18 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { createClientAction } from "./actions";
 import { useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 
 function SubmitButton({ pending }: { pending: boolean }) {
+  const t = useTranslations("clients.create");
   return (
     <button
       type="submit"
       disabled={pending}
       className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
-      {pending ? "נוצר..." : "הוספת לקוח"}
+      {pending ? t("submitting") : t("submit")}
     </button>
   );
 }
@@ -21,13 +23,14 @@ function SubmitButton({ pending }: { pending: boolean }) {
 // action reports `ok: true` - this form previously just stayed open
 // and relied on the fresh row appearing in the (now-adjacent) table.
 export function CreateClientForm() {
+  const t = useTranslations("clients.create");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(createClientAction, close);
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">שם הלקוח *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("name")}</label>
         <input
           name="name"
           required
@@ -35,21 +38,21 @@ export function CreateClientForm() {
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">שם משפטי</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("legalName")}</label>
         <input
           name="legalName"
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">איש קשר</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("primaryContact")}</label>
         <input
           name="primaryContact"
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">אזור זמן</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("timezone")}</label>
         <input
           name="timezone"
           defaultValue="Asia/Jerusalem"
