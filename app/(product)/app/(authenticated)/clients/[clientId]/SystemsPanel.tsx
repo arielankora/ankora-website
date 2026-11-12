@@ -305,7 +305,7 @@ export function SystemsPanel({
                     </p>
                   ))}
                   <StatusLine status={s.status} toResolve={s.toResolve} />
-                  <ItemTags item={s} />
+                  <ItemTags item={s} missingTarget="SYSTEM" />
                   <SourceCodes sources={s.sources} options={sourceOptions} />
                 </div>
                 <div className="flex shrink-0 items-center gap-3 text-xs">

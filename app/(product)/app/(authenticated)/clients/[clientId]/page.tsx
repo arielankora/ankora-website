@@ -39,7 +39,7 @@ import { questionsDraft } from "@/lib/client-questions";
 import { ClientQuestions } from "./ClientQuestions";
 import { coveredTasksForClient } from "@/lib/app-domain/process-overlap";
 import { stepCandidates } from "@/lib/app-domain/process-next-steps";
-import { FIELD_LABELS } from "@/lib/process-rules";
+import { FIELD_LABELS, type KeyedCheck } from "@/lib/process-rules";
 import { listClientSources, listClientDomains } from "@/lib/app-domain/client-sources";
 import { formatSourceRef, readSourceRefs } from "@/lib/knowledge-sources";
 import { SystemsPanel } from "./SystemsPanel";
@@ -98,7 +98,16 @@ function approvalChecksOf(value: unknown) {
   if (!Array.isArray(value)) return null;
   return value
     .filter((c): c is Record<string, unknown> => !!c && typeof c === "object")
-    .map((c) => ({ code: String(c.code ?? ""), message: String(c.message ?? ""), severity: (c.severity === "BLOCK" ? "BLOCK" : "EXCEPTION") as "BLOCK" | "EXCEPTION", excepted: c.excepted === true }));
+    .map((c) => ({
+      code: String(c.code ?? ""),
+      message: String(c.message ?? ""),
+      severity: (c.severity === "BLOCK" ? "BLOCK" : "EXCEPTION") as "BLOCK" | "EXCEPTION",
+      excepted: c.excepted === true,
+      // ADR 0006: the keyed form, when the check was recorded with one, so
+      // the panel words it in the reader's language. Older approvals have
+      // only the Hebrew message, which is shown as it was stored.
+      keyed: c.keyed && typeof c.keyed === "object" && typeof (c.keyed as { key?: unknown }).key === "string" ? (c.keyed as KeyedCheck) : undefined,
+    }));
 }
 
 /// Spec 3.1: a contact's or a system's missing fields, for its form and
