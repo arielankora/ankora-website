@@ -376,11 +376,18 @@ jobs:
 
       # Always upload, especially on failure - the report is the artefact
       # worth reading, not the scrolled-past log.
+      #
+      # The attempt is in the name (12.11.2026, #468). "Re-run failed jobs"
+      # keeps the other shards' artefacts and adds the re-run shard's under
+      # the same name, and the download in `report` then took one of the two
+      # by name - the stale one: integration-3 passed on attempt 2 and the
+      # merge still reported attempt 1's overrun. With the attempt in the
+      # name both arrive, and qa/merge.mjs keeps the later by startedAt.
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: qa-report-level-${{ needs.level.outputs.value }}-${{ matrix.shard }}
+          name: qa-report-level-${{ needs.level.outputs.value }}-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
           path: qa/reports/
           retention-days: 30
 
@@ -444,11 +451,13 @@ jobs:
       - name: Merge the shard reports
         run: node qa/merge.mjs --level=${{ needs.level.outputs.value }} --dir=qa/shard-artifacts
 
+      # Per attempt for the same reason as the shard reports above: a re-run
+      # of this job would otherwise upload a second artefact of one name.
       - name: Upload the merged report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: qa-report-level-${{ needs.level.outputs.value }}
+          name: qa-report-level-${{ needs.level.outputs.value }}-merged-attempt-${{ github.run_attempt }}
           path: qa/reports/
           retention-days: 30
 
