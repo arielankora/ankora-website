@@ -16,6 +16,9 @@
 export const CLIENT_MESSAGE_PATHS = [
   "auth",
   "claude",
+  "comms",
+  "home.kpi.activeTimers",
+  "home.trend",
   "messageClient",
   "myTime.closedBank",
   "myTime.entry",
