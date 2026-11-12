@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { intlWrapper } from "../helpers/intl";
 
 // "סמן הודעות" (4.11.2026): the mark mode on the communications screen.
 // The server action is mocked; what is pinned here is the screen's side:
@@ -63,13 +64,13 @@ afterEach(() => {
 
 describe("message selection", () => {
   it("shows no checkboxes and no bar until the mode is on", () => {
-    render(<Screen />);
+    render(<Screen />, { wrapper: intlWrapper() });
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
     expect(screen.queryByRole("region", { name: "הודעות שסומנו" })).toBeNull();
   });
 
   it("counts what is checked, images apart, and clears when the mode ends", () => {
-    render(<Screen />);
+    render(<Screen />, { wrapper: intlWrapper() });
     fireEvent.click(screen.getByRole("button", { name: "סמן הודעות" }));
     const boxes = screen.getAllByRole("checkbox");
     expect(boxes).toHaveLength(2);
@@ -86,7 +87,7 @@ describe("message selection", () => {
   });
 
   it("hides the older task form while marking and offers two ways out (4.11.2026)", () => {
-    render(<Screen />);
+    render(<Screen />, { wrapper: intlWrapper() });
     expect(screen.getByRole("button", { name: "צור משימה מהשיחה" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "סמן הודעות" }));
@@ -107,7 +108,7 @@ describe("message selection", () => {
       { id: "t1", title: "תיאום פגישות · נובמבר", status: "IN_PROGRESS", clientVisible: true },
       { id: "t2", title: "פנימית", status: "OPEN", clientVisible: false },
     ]);
-    render(<Screen />);
+    render(<Screen />, { wrapper: intlWrapper() });
     fireEvent.click(screen.getByRole("button", { name: "סמן הודעות" }));
     fireEvent.click(screen.getAllByRole("checkbox")[0]);
     fireEvent.click(screen.getByRole("button", { name: "צרף למשימה קיימת" }));
@@ -126,7 +127,7 @@ describe("message selection", () => {
   });
 
   it("proposes each message as a step, an image alone unticked, and sends only the ticked lines (5.11.2026)", () => {
-    render(<Screen />);
+    render(<Screen />, { wrapper: intlWrapper() });
     fireEvent.click(screen.getByRole("button", { name: "סמן הודעות" }));
     const boxes = screen.getAllByRole("checkbox");
     fireEvent.click(boxes[0]);

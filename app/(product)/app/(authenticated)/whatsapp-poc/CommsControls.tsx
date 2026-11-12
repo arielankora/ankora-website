@@ -2,6 +2,7 @@
 import { useEffect, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLinkStatus } from "next/link";
+import { useTranslations } from "next-intl";
 import { ArrowDown, BarChart3, Link2, Loader2, Mail, MailOpen, User, X } from "lucide-react";
 import { markChatsReadAction } from "./actions";
 
@@ -30,6 +31,7 @@ function subscribeRail(onChange: () => void) {
 /// narrower screen the card sits under the conversation, open, as before.
 /// Open or closed is kept per browser.
 export function ContactRail(props: { unassigned: boolean; messages: number; children: ReactNode }) {
+  const t = useTranslations("comms.rail");
   const open = useSyncExternalStore(subscribeRail, () => railFallback ?? readRail(), () => false);
   const toggle = (next: boolean) => {
     try {
@@ -44,29 +46,29 @@ export function ContactRail(props: { unassigned: boolean; messages: number; chil
   const icon = "flex size-11 items-center justify-center rounded-xl text-app-text-primary hover:bg-app-surface-sunken";
   return (
     <aside
-      aria-label="איש קשר"
+      aria-label={t("contact")}
       className={`rounded-2xl border border-app-border bg-white lg:col-span-2 xl:col-span-1 ${open ? "xl:w-[17rem]" : "xl:w-16"}`}
     >
       {/* Closed, wide screens only: the icons. */}
       <div className={`${open ? "hidden" : "hidden xl:flex"} flex-col items-center gap-1 py-3`}>
-        <button type="button" onClick={() => toggle(true)} aria-label="פתיחת פרטי איש הקשר" aria-expanded={false} className={`${icon} bg-app-surface-sunken`}>
+        <button type="button" onClick={() => toggle(true)} aria-label={t("openDetails")} aria-expanded={false} className={`${icon} bg-app-surface-sunken`}>
           <User className="size-5" aria-hidden="true" />
         </button>
-        <span className="text-[11px] text-app-text-secondary">איש קשר</span>
-        <button type="button" onClick={() => toggle(true)} aria-label={props.unassigned ? "שיוך ללקוח: המספר לא משויך" : "הלקוח של המספר"} className={`relative mt-2 ${icon}`}>
+        <span className="text-[11px] text-app-text-secondary">{t("contact")}</span>
+        <button type="button" onClick={() => toggle(true)} aria-label={props.unassigned ? t("assignUnassigned") : t("numberClient")} className={`relative mt-2 ${icon}`}>
           <Link2 className="size-5" aria-hidden="true" />
           {props.unassigned ? <span aria-hidden="true" className="absolute start-2 top-2 size-2 rounded-full bg-app-warning" /> : null}
         </button>
-        <span className="text-[11px] text-app-text-secondary">שיוך</span>
-        <button type="button" onClick={() => toggle(true)} aria-label="פעילות ב-30 הימים האחרונים" className={`mt-2 ${icon}`}>
+        <span className="text-[11px] text-app-text-secondary">{t("assignShort")}</span>
+        <button type="button" onClick={() => toggle(true)} aria-label={t("activity")} className={`mt-2 ${icon}`}>
           <BarChart3 className="size-5" aria-hidden="true" />
         </button>
-        <span className="text-center text-[11px] text-app-text-secondary">{props.messages} הודעות</span>
+        <span className="text-center text-[11px] text-app-text-secondary">{t("messagesCount", { count: props.messages })}</span>
       </div>
       {/* Open (or any narrower screen): the whole card. */}
       <div className={`${open ? "block" : "xl:hidden"} space-y-5 p-4`}>
         <div className="hidden justify-end xl:flex">
-          <button type="button" onClick={() => toggle(false)} aria-label="סגירת פרטי איש הקשר" className="flex size-9 items-center justify-center rounded-lg text-app-text-secondary hover:bg-app-surface-sunken">
+          <button type="button" onClick={() => toggle(false)} aria-label={t("closeDetails")} className="flex size-9 items-center justify-center rounded-lg text-app-text-secondary hover:bg-app-surface-sunken">
             <X className="size-4" aria-hidden="true" />
           </button>
         </div>
@@ -90,6 +92,7 @@ export function RememberFilters({ filter, team }: { filter: string; team: string
 /// reads (design 5א). It opens at the latest message, or at the message a
 /// search found; a button brings the latest back after scrolling up.
 export function TimelineScroller({ targetId }: { targetId: string }) {
+  const t = useTranslations("comms.controls");
   const [away, setAway] = useState(false);
   useEffect(() => {
     const box = document.getElementById(targetId);
@@ -106,7 +109,7 @@ export function TimelineScroller({ targetId }: { targetId: string }) {
   return (
     <button
       type="button"
-      aria-label="קפיצה להודעה האחרונה"
+      aria-label={t("jumpLatest")}
       onClick={() => {
         const box = document.getElementById(targetId);
         box?.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
@@ -122,10 +125,11 @@ export function TimelineScroller({ targetId }: { targetId: string }) {
 /// conversation's header with its label, and as an icon on a list row.
 /// Only on a click; opening a chat never marks it.
 export function ReadToggle(props: { chats: Array<{ chatId: string; numberKey: string }>; unread: boolean; compact?: boolean }) {
+  const t = useTranslations("comms.controls");
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const label = props.unread ? "סמן כנקראה" : "סמן כלא נקראה";
+  const label = props.unread ? t("markRead") : t("markUnread");
   const Icon = props.unread ? MailOpen : Mail;
   const run = () =>
     start(async () => {
@@ -140,7 +144,7 @@ export function ReadToggle(props: { chats: Array<{ chatId: string; numberKey: st
         type="button"
         onClick={run}
         disabled={pending}
-        aria-label={error ? `${label}: ${error}` : label}
+        aria-label={error ? t("labelWithError", { label, error }) : label}
         title={error ?? label}
         className={`flex size-11 items-center justify-center rounded-lg border bg-white text-app-text-primary disabled:opacity-60 ${
           error ? "border-app-error" : "border-app-border-strong"
@@ -161,7 +165,7 @@ export function ReadToggle(props: { chats: Array<{ chatId: string; numberKey: st
         }`}
       >
         <Icon className="size-4" aria-hidden="true" />
-        {pending ? "מסמן..." : label}
+        {pending ? t("marking") : label}
       </button>
       {error ? (
         <span role="alert" className="text-xs text-app-error">
@@ -177,10 +181,11 @@ export function ReadToggle(props: { chats: Array<{ chatId: string; numberKey: st
 /// spinner, and `data-nav-pending` lets the timeline beside it show that it
 /// is loading (the `comms-grid` rule in page.tsx).
 export function RowPending() {
+  const t = useTranslations("comms.controls");
   const { pending } = useLinkStatus();
   if (!pending) return null;
   return (
-    <span data-nav-pending="" role="status" aria-label="טוען את השיחה" className="flex flex-none items-center">
+    <span data-nav-pending="" role="status" aria-label={t("rowLoading")} className="flex flex-none items-center">
       <Loader2 className="size-4 animate-spin text-app-text-secondary" aria-hidden="true" />
     </span>
   );

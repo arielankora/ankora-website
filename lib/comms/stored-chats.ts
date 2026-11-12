@@ -62,7 +62,8 @@ export async function listStoredChats(channel: CommsChannel, viewer: { id: strin
     })
     .map((c) => {
       const last = c.messages[0];
-      const preview = last ? last.text || (last.attachments[0]?.type === "audio" ? "הודעה קולית" : last.attachments.length ? "קובץ" : "") : "";
+      const kind = last && !last.text ? (last.attachments[0]?.type === "audio" ? "voice" : last.attachments.length ? "file" : null) : null;
+      const preview = last ? last.text || (kind === "voice" ? "הודעה קולית" : kind === "file" ? "קובץ" : "") : "";
       return {
         id: c.externalChatId,
         name: c.name,
@@ -71,6 +72,8 @@ export async function listStoredChats(channel: CommsChannel, viewer: { id: strin
         unreadCount: 0,
         lastMessageAt: c.lastMessageAt?.toISOString() ?? null,
         lastMessagePreview: preview,
+        // The screen words these itself (ADR 0006).
+        lastMessageKind: kind,
         groupClient: c.groupClientId ? { id: c.groupClientId, name: groupClientNames.get(c.groupClientId) ?? "" } : null,
       };
     });

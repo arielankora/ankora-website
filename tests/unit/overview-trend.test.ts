@@ -7,7 +7,7 @@ import { localDateKey } from "@/lib/timezone";
 // import time here with "@prisma/client did not initialize yet." Verified
 // by direct calculation instead and will run for real in any environment
 // with network access to generate the Prisma client.
-import { buildSeries, computeTrendWindows, topLegend, type EntryRow } from "@/lib/app-domain/overview-trend";
+import { buildSeries, computeTrendWindows, OTHER_KEY, topLegend, type EntryRow } from "@/lib/app-domain/overview-trend";
 
 describe("computeTrendWindows() - Overview hours-trend chart date math", () => {
   it("builds 14 day windows ending today, chronologically ordered, with today labeled", () => {
@@ -25,9 +25,11 @@ describe("computeTrendWindows() - Overview hours-trend chart date math", () => {
       expect(localDateKey(dayWindows[i].to)).toBe(localDateKey(new Date(dayWindows[i].from.getTime() + 24 * 3600_000)));
       if (i > 0) expect(dayWindows[i].from.getTime()).toBe(dayWindows[i - 1].to.getTime());
     }
-    expect(dayWindows[13].label).toContain("(היום)");
-    expect(dayWindows[0].label).not.toContain("(היום)");
-    expect(dayWindows[13].label).toContain("רביעי"); // Wednesday
+    // The label is data, said in the reader's language by the chart.
+    expect(dayWindows[13].label).toEqual({ kind: "day", weekday: 3, current: true }); // Wednesday, today
+    expect(dayWindows[0].label).toMatchObject({ kind: "day", current: false });
+    expect(dayWindows[13].firstDay).toBe("2026-03-04");
+    expect(dayWindows[13].lastDay).toBe("2026-03-04");
   });
 
   it("builds 6 complete Sun-Sat weeks and the current week, marked partial", () => {
@@ -38,17 +40,19 @@ describe("computeTrendWindows() - Overview hours-trend chart date math", () => {
 
     expect(weekWindows).toHaveLength(7);
     expect(localDateKey(weekWindows[6].from)).toBe("2026-03-01");
-    expect(weekWindows[6].label).toBe("השבוע");
+    expect(weekWindows[6].label).toEqual({ kind: "week", weeksAgo: 0 });
     expect(weekWindows[6].partial).toBe(true);
+    expect(weekWindows[6].firstDay).toBe("2026-03-01");
+    expect(weekWindows[6].lastDay).toBe("2026-03-04");
     expect(weekWindows[6].range).toBe("1.3 - 4.3");
     // Last complete week = Sun 2026-02-22 to Sun 2026-03-01 (exclusive end).
     expect(localDateKey(weekWindows[5].from)).toBe("2026-02-22");
     expect(localDateKey(weekWindows[5].to)).toBe("2026-03-01");
-    expect(weekWindows[5].label).toBe("שבוע שעבר");
+    expect(weekWindows[5].label).toEqual({ kind: "week", weeksAgo: 1 });
     expect(weekWindows[5].partial).toBe(false);
     // Oldest bucket = 6 weeks back.
     expect(localDateKey(weekWindows[0].from)).toBe("2026-01-18");
-    expect(weekWindows[0].label).toBe("לפני 6 שבועות");
+    expect(weekWindows[0].label).toEqual({ kind: "week", weeksAgo: 6 });
     // Every window is exactly 7 days and contiguous with the next.
     for (let i = 0; i < 7; i++) {
       expect(weekWindows[i].to.getTime() - weekWindows[i].from.getTime()).toBe(7 * 24 * 3600_000);
@@ -83,8 +87,10 @@ describe("computeTrendWindows() - date ranges under each bar", () => {
   it("gives each week its Sunday-to-Saturday dates", () => {
     // Friday 9.10.2026, Israel. Last week is Sun 27.9 to Sat 3.10.
     const { weekWindows } = computeTrendWindows(new Date("2026-10-09T09:00:00Z"));
-    expect(weekWindows[5].label).toBe("שבוע שעבר");
+    expect(weekWindows[5].label).toEqual({ kind: "week", weeksAgo: 1 });
     expect(weekWindows[5].range).toBe("27.9 - 3.10");
+    expect(weekWindows[5].firstDay).toBe("2026-09-27");
+    expect(weekWindows[5].lastDay).toBe("2026-10-03");
     expect(weekWindows[6].range).toBe("4.10 - 9.10");
     expect(weekWindows[0].range).toBe("23.8 - 29.8");
   });
@@ -101,14 +107,15 @@ describe("computeTrendWindows() - month windows", () => {
     // Friday 6.11.2026, Israel.
     const { monthWindows } = computeTrendWindows(new Date("2026-11-06T09:00:00Z"));
     expect(monthWindows).toHaveLength(7);
+    // May to November; months are 0-based (January is 0).
     expect(monthWindows.map((w) => w.label)).toEqual([
-      "מאי",
-      "יוני",
-      "יולי",
-      "אוגוסט",
-      "ספטמבר",
-      "אוקטובר",
-      "נובמבר (החודש)",
+      { kind: "month", month: 4, current: false },
+      { kind: "month", month: 5, current: false },
+      { kind: "month", month: 6, current: false },
+      { kind: "month", month: 7, current: false },
+      { kind: "month", month: 8, current: false },
+      { kind: "month", month: 9, current: false },
+      { kind: "month", month: 10, current: true },
     ]);
     expect(localDateKey(monthWindows[0].from)).toBe("2026-05-01");
     expect(localDateKey(monthWindows[6].from)).toBe("2026-11-01");
@@ -126,8 +133,8 @@ describe("computeTrendWindows() - month windows", () => {
     // 15.2.2027: the oldest month is August 2026.
     const { monthWindows } = computeTrendWindows(new Date("2027-02-15T09:00:00Z"));
     expect(localDateKey(monthWindows[0].from)).toBe("2026-08-01");
-    expect(monthWindows[4].label).toBe("דצמבר");
-    expect(monthWindows[5].label).toBe("ינואר");
+    expect(monthWindows[4].label).toEqual({ kind: "month", month: 11, current: false }); // December
+    expect(monthWindows[5].label).toEqual({ kind: "month", month: 0, current: false }); // January
     expect(localDateKey(monthWindows[5].from)).toBe("2027-01-01");
     expect(monthWindows[5].range).toBe("1.1 - 31.1");
     expect(monthWindows[6].range).toBe("1.2 - 15.2");
@@ -149,9 +156,11 @@ describe("topLegend() / buildSeries() - every hour is on the chart", () => {
   const window = {
     from: new Date("2026-09-27T00:00:00Z"),
     to: new Date("2026-10-04T00:00:00Z"),
-    label: "שבוע שעבר",
+    label: { kind: "week" as const, weeksAgo: 1 },
     range: "27.9 - 3.10",
     partial: false,
+    firstDay: "2026-09-27",
+    lastDay: "2026-10-03",
   };
   // Seven categories, the largest first: 7h, 6h, ... 1h.
   const entries: EntryRow[] = Array.from({ length: 7 }, (_, i) => ({
@@ -168,7 +177,8 @@ describe("topLegend() / buildSeries() - every hour is on the chart", () => {
   it("keeps the top five and folds the rest into a sixth 'אחר' slot", () => {
     const legend = topLegend(entries, "category");
     expect(legend).toHaveLength(6);
-    expect(legend[5].name).toBe("אחר");
+    // Named by the chart in the reader's language, found here by its key.
+    expect(legend[5].key).toBe(OTHER_KEY);
   });
 
   it("does not add 'אחר' when there are five or fewer series", () => {
@@ -181,7 +191,7 @@ describe("topLegend() / buildSeries() - every hour is on the chart", () => {
     const series = buildSeries(entries, "category", [window], topLegend(entries, "category"));
     const total = series.buckets[0].segments.reduce((sum, s) => sum + s.hours, 0);
     expect(total).toBe(28);
-    expect(series.buckets[0].segments.find((s) => s.name === "אחר")?.hours).toBe(3);
+    expect(series.buckets[0].segments.find((s) => s.key === OTHER_KEY)?.hours).toBe(3);
   });
 });
 
@@ -190,9 +200,11 @@ describe("buildSeries() - the total does not depend on how the bar is split", ()
     const window = {
       from: new Date("2026-09-27T00:00:00Z"),
       to: new Date("2026-10-04T00:00:00Z"),
-      label: "שבוע שעבר",
+      label: { kind: "week" as const, weeksAgo: 1 },
       range: "27.9 - 3.10",
       partial: false,
+      firstDay: "2026-09-27",
+      lastDay: "2026-10-03",
     };
     // Five entries of 1h 3m each (1.05h). Rounded per segment to 0.1 and
     // then summed: one segment gives 5.3, five segments give 5 x 1.1 = 5.5.
@@ -220,9 +232,11 @@ describe("buildSeries() - actual vs billable", () => {
   const window = {
     from: new Date("2026-09-27T00:00:00Z"),
     to: new Date("2026-10-04T00:00:00Z"),
-    label: "שבוע שעבר",
+    label: { kind: "week" as const, weeksAgo: 1 },
     range: "27.9 - 3.10",
     partial: false,
+    firstDay: "2026-09-27",
+    lastDay: "2026-10-03",
   };
   const base = {
     startAt: new Date("2026-09-28T08:00:00Z"),

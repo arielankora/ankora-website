@@ -1,6 +1,8 @@
 import "server-only";
 import { afterResponse } from "@/lib/after-response";
+import { DomainError, type DomainErrorValues } from "@/lib/domain-error";
 import { parseEmailList, parsePhoneList, parseSendMode, type SendMode } from "./access";
+import { NO_NAME } from "./inbox";
 
 // WhatsApp POC (31.10.2026): a thin, read-mostly client for the Unipile v2
 // API. Nothing is stored: every screen load reads the chats live, so the
@@ -69,6 +71,8 @@ export type PocChat = {
   unreadCount: number;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
+  /// Set when the preview is a word for an attachment (stored chats).
+  lastMessageKind?: "voice" | "file" | null;
   /// Unipile's is_readonly: WhatsApp will not take a message here (an
   /// announcement group where only admins write, for one).
   readOnly?: boolean;
@@ -110,6 +114,15 @@ export function rateLimitMessage(title: unknown): string {
   return `המכסה של Unipile לבקשה הזו נוצלה, והיא תתחדש בעוד כ-${n} ${unit}. אפשר עדיין לפתוח שיחה לפי מספר.`;
 }
 
+/// The same, as a code for the screen (ADR 0006): messages
+/// domainErrors.comms.unipileRateLimited and comms.unipileQuota.<unit>.
+function rateLimitCode(title: unknown): { code: string; values: DomainErrorValues } {
+  const t = typeof title === "string" ? title : "";
+  const m = /retry in (\d+)\s*(second|minute|hour|day)s?/i.exec(t);
+  if (!m) return { code: "comms.unipileRateLimited", values: {} };
+  return { code: `comms.unipileQuota.${m[2].toLowerCase()}`, values: { count: Number(m[1]) } };
+}
+
 export async function rateLimitError(response: Response): Promise<UnipileError> {
   let title: unknown = null;
   try {
@@ -117,15 +130,26 @@ export async function rateLimitError(response: Response): Promise<UnipileError> 
   } catch {
     // No body, or not JSON: the generic message stands.
   }
-  return new UnipileError(rateLimitMessage(title), 429);
+  const { code, values } = rateLimitCode(title);
+  return new UnipileError(rateLimitMessage(title), 429, code, values);
 }
 
-export class UnipileError extends Error {
+/// A refusal or fault from Unipile. The message stays the Hebrew sentence it
+/// always was; the code lets a screen word it in the reader's language
+/// (ADR 0006). Without a code, the status decides it: no answer, or the
+/// status Unipile returned.
+export class UnipileError extends DomainError {
   constructor(
     message: string,
     readonly status: number | null,
+    code?: string,
+    values?: DomainErrorValues,
   ) {
-    super(message);
+    super(
+      code ?? (status === null ? "comms.unipileNoAnswer" : "comms.unipileStatus"),
+      message,
+      values ?? (code || status === null ? {} : { status: String(status) }),
+    );
     this.name = "UnipileError";
   }
 }
@@ -182,7 +206,7 @@ export function toPocChat(raw: RawChat): PocChat | null {
   const type = str(raw.type) ?? "1to1";
   return {
     id,
-    name: str(raw.name) ?? str(raw.user?.display_name) ?? "ללא שם",
+    name: str(raw.name) ?? str(raw.user?.display_name) ?? NO_NAME,
     type,
     phone: type === "1to1" ? str(raw.user?.public_identifier) : null,
     unreadCount: typeof raw.unread_count === "number" ? raw.unread_count : 0,

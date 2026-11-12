@@ -37,7 +37,8 @@ export type WhatsappSources = {
   /// Chats whose messages are stored (read from here, not Unipile).
   stored: Set<string>;
   channels: Array<CommsChannel & { owner: { name: string | null } }>;
-  error: string | null;
+  /// The error itself, not its sentence: the screen words it (ADR 0006).
+  error: UnipileError | null;
 };
 
 function unipile(accountId: string): Unipile | null {
@@ -63,7 +64,7 @@ export async function loadWhatsapp(user: Pick<User, "id" | "email">, access: Com
     channels.map(async (ch) => {
       const info: ChannelInfo = { id: ch.id, accountId: ch.accountId, ownerUserId: ch.ownerUserId, label: multi ? (ch.owner.name ?? "") : "" };
       let list: PocChat[] = [];
-      let error: string | null = null;
+      let error: UnipileError | null = null;
       const stored = new Set<string>();
       if (ch.storeEnabled) {
         list = await listStoredChats(ch, user);
@@ -76,7 +77,7 @@ export async function loadWhatsapp(user: Pick<User, "id" | "email">, access: Com
           list = ch.storeEnabled ? await withLiveChats(ch, user, list, fromUnipile) : fromUnipile;
         } catch (err) {
           if (!(err instanceof UnipileError)) throw err;
-          error = err.message;
+          error = err;
         }
       }
       return { info, list, stored, error };
@@ -105,7 +106,7 @@ export async function loadWhatsapp(user: Pick<User, "id" | "email">, access: Com
         }
       } catch (err) {
         if (!(err instanceof UnipileError)) throw err;
-        out.error = err.message;
+        out.error = err;
       }
     }
   }
@@ -154,11 +155,11 @@ export async function loadMessages(
   chats: PocChat[],
   extra: { chat: PocChat; info: ChannelInfo } | null,
   before: Date | null = null,
-): Promise<{ messages: PageMessage[]; transcripts: Map<string, StoredTranscript>; error: string | null; hasOlder: boolean }> {
+): Promise<{ messages: PageMessage[]; transcripts: Map<string, StoredTranscript>; error: UnipileError | null; hasOlder: boolean }> {
   let hasOlder = false;
   const messages: PageMessage[] = [];
   const transcripts = new Map<string, StoredTranscript>();
-  let error: string | null = null;
+  let error: UnipileError | null = null;
   const targets: Array<{ chat: PocChat; info: ChannelInfo }> = chats
     .map((chat) => ({ chat, info: sources.channelOf.get(chat.id)! }))
     .filter((t) => t.info);
@@ -179,7 +180,7 @@ export async function loadMessages(
       for (const m of await listMessages(live, chat.id)) messages.push({ ...m, chatId: chat.id, channelLabel: info.label, numberKey: info.id ?? "-" });
     } catch (err) {
       if (!(err instanceof UnipileError)) throw err;
-      error = err.message;
+      error = err;
     }
   }
   messages.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));

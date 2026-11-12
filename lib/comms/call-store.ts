@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { downloadFileFromDrive, removeDriveFile, uploadLargeFileToDriveFolder } from "@/lib/google-drive";
 import { callSide, fetchRecording, fetchRecordingAudio, listRecordingPage, type Recording } from "@/lib/whatsapp-poc/recordings";
-import { TranscriptionError, transcribeHebrew } from "@/lib/whatsapp-poc/transcribe";
+import { NO_SPEECH_TRANSCRIPT, TranscriptionError, transcribeHebrew } from "@/lib/whatsapp-poc/transcribe";
 import { UnipileError, readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { mp3DurationSeconds } from "./mp3-duration";
 import { fetchVoiceNote } from "@/lib/whatsapp-poc/voice-notes";
@@ -173,11 +173,11 @@ export async function transcribeRecording(transcriptId: string): Promise<Transcr
 
   try {
     const audio = t.recording ? await storedRecordingAudio(t.recording) : await storedVoiceAudio(t.attachment!);
-    if (!audio) throw new TranscriptionError("קובץ השמע לא נמצא.");
+    if (!audio) throw new TranscriptionError("קובץ השמע לא נמצא.", null, "comms.transcription.audioNotFound");
     const { text, model } = await transcribeHebrew(audio);
     await prisma.transcript.update({
       where: { id: t.id },
-      data: { status: "DONE", text: text || "(לא זוהה דיבור)", model, doneAt: new Date(), lastError: null },
+      data: { status: "DONE", text: text || NO_SPEECH_TRANSCRIPT, model, doneAt: new Date(), lastError: null },
     });
     return "done";
   } catch (err) {

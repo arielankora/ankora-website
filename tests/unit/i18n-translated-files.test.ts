@@ -106,9 +106,33 @@ const TRANSLATED_FILES = [
   "app/(product)/app/(authenticated)/timer/actions.ts",
   "app/(product)/app/(authenticated)/timer/page.tsx",
   "components/app/MessageClient.tsx",
+  "app/(product)/app/(authenticated)/page.tsx",
+  "components/app/ActiveTimersList.tsx",
+  "components/app/HoursTrendChart.tsx",
+  "components/app/KpiCard.tsx",
+  "lib/app-domain/overview-trend.ts",
   // Not listed on purpose: tasks/[id]/TaskShare.tsx builds the Hebrew
   // message sent to a colleague (content, not interface); list-query.ts and
   // mine-scope.ts keep Hebrew fallbacks for the calendar, translated later.
+  // Communications (whatsapp-poc). Text written into records (a task's
+  // proposed title and details, a comment, a client file's source, a
+  // document title) is content and lives in lib/ in Hebrew.
+  "app/(product)/app/(authenticated)/whatsapp-poc/page.tsx",
+  "app/(product)/app/(authenticated)/whatsapp-poc/MessageSelection.tsx",
+  "app/(product)/app/(authenticated)/whatsapp-poc/CommsControls.tsx",
+  "app/(product)/app/(authenticated)/whatsapp-poc/ContactForms.tsx",
+  "app/(product)/app/(authenticated)/whatsapp-poc/TaskFromConversation.tsx",
+  "app/(product)/app/(authenticated)/whatsapp-poc/SendForm.tsx",
+  "app/(product)/app/(authenticated)/whatsapp-poc/ScrollToActive.tsx",
+  "app/(product)/app/(authenticated)/whatsapp-poc/actions.ts",
+  "app/(product)/app/(authenticated)/whatsapp-poc/select-actions.ts",
+  "app/(product)/app/(authenticated)/whatsapp-poc/calls/page.tsx",
+  "app/(product)/app/(authenticated)/whatsapp-poc/calls/RecordingPlayer.tsx",
+  "app/(product)/app/(authenticated)/whatsapp-poc/calls/TranscribeButton.tsx",
+  "app/(product)/app/(authenticated)/whatsapp-poc/calls/actions.ts",
+  "app/(product)/app/(authenticated)/whatsapp-poc/setup/page.tsx",
+  "app/(product)/app/(authenticated)/whatsapp-poc/setup/SetupForms.tsx",
+  "app/(product)/app/(authenticated)/whatsapp-poc/setup/actions.ts",
 ];
 
 describe("translated screens (ADR 0006)", () => {

@@ -30,11 +30,18 @@ export type TrendDimension = "employee" | "client" | "category";
 export type TrendBasis = "actual" | "billable";
 
 const TOP_N = 5;
-const OTHER_KEY = "__other__";
-const OTHER_LABEL = "אחר";
+/// The folded "everyone else" slot. Its name is left empty here: the
+/// chart names it in the reader's language (ADR 0006).
+export const OTHER_KEY = "__other__";
+const OTHER_LABEL = "";
 
-const WEEKDAY_LABELS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-const MONTH_LABELS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+/// What a bar is called, as data rather than words, so the chart can say
+/// it in the reader's language (ADR 0006). `weekday` is 0 for Sunday,
+/// `month` is 0 for January.
+export type TrendLabel =
+  | { kind: "day"; weekday: number; current: boolean }
+  | { kind: "week"; weeksAgo: number }
+  | { kind: "month"; month: number; current: boolean };
 
 export interface TrendSegment {
   /// Stable key so the client can assign the same color/legend slot to the
@@ -46,7 +53,7 @@ export interface TrendSegment {
 }
 
 export interface TrendBucket {
-  label: string;
+  label: TrendLabel;
   /// Calendar dates the bucket covers, "27.9 - 3.10" for a week and
   /// "9.10" for a day. A relative label alone ("לפני 4 שבועות") made
   /// people stop and count backwards to know which week they were
@@ -55,6 +62,10 @@ export interface TrendBucket {
   /// The bucket is still running (today, or this week so far). Drawn
   /// lighter so a half-finished week does not read as a slow one.
   partial: boolean;
+  /// First and last calendar day of the bucket as date keys, so the chart
+  /// can write `range` in the reader's date format.
+  firstDay: string;
+  lastDay: string;
   segments: TrendSegment[];
 }
 
@@ -115,7 +126,7 @@ export function buildSeries(
 ): TrendSeries {
   const legendKeySet = new Set(legendKeys.map((l) => l.key));
 
-  const buckets = windows.map(({ from, to, label, range, partial }) => {
+  const buckets = windows.map(({ from, to, label, range, partial, firstDay, lastDay }) => {
     const totals = new Map<string, { name: string; seconds: number }>();
     for (const e of entries) {
       if (e.startAt < from || e.startAt >= to) continue;
@@ -135,7 +146,7 @@ export function buildSeries(
       // (9.10.2026). The chart rounds once, at display time.
       hours: (totals.get(key)?.seconds ?? 0) / 3600,
     }));
-    return { label, range, partial, segments };
+    return { label, range, partial, firstDay, lastDay, segments };
   });
 
   return { legend: legendKeys, buckets };
@@ -170,9 +181,11 @@ export function topLegend(entries: EntryRow[], dimension: TrendDimension): { key
 export interface TrendWindow {
   from: Date;
   to: Date;
-  label: string;
+  label: TrendLabel;
   range: string;
   partial: boolean;
+  firstDay: string;
+  lastDay: string;
 }
 
 /// "2026-10-03" -> "3.10". Day and month only, the Israeli way, with no
@@ -204,9 +217,11 @@ export function computeTrendWindows(now: Date): {
   const dayWindows = dayKeys.map((dateKey, i) => ({
     from: localDateTimeToUtc(dateKey, "00:00", TIMEZONE),
     to: localDateTimeToUtc(addDaysToDateKey(dateKey, 1), "00:00", TIMEZONE),
-    label: i === DAY_WINDOW_LENGTH - 1 ? `${WEEKDAY_LABELS[weekdayOf(dateKey)]} (היום)` : WEEKDAY_LABELS[weekdayOf(dateKey)],
+    label: { kind: "day" as const, weekday: weekdayOf(dateKey), current: i === DAY_WINDOW_LENGTH - 1 },
     range: shortDate(dateKey),
     partial: i === DAY_WINDOW_LENGTH - 1,
+    firstDay: dateKey,
+    lastDay: dateKey,
   }));
 
   // --- Week windows: the 6 complete Sun-Sat weeks before this one, and
@@ -217,8 +232,7 @@ export function computeTrendWindows(now: Date): {
   // The running week is now shown, marked `partial` and drawn lighter. ---
   const todayWeekday = weekdayOf(todayKey);
   const startOfThisWeekKey = addDaysToDateKey(todayKey, -todayWeekday);
-  const weekLabels = ["לפני 6 שבועות", "לפני 5 שבועות", "לפני 4 שבועות", "לפני 3 שבועות", "לפני 2 שבועות", "שבוע שעבר", "השבוע"];
-  const weekWindows = weekLabels.map((label, i) => {
+  const weekWindows = Array.from({ length: 7 }, (_, i) => {
     const weeksAgo = 6 - i; // 6,5,4,3,2,1,0
     const startKey = addDaysToDateKey(startOfThisWeekKey, -7 * weeksAgo);
     const endKey = addDaysToDateKey(startKey, 7);
@@ -229,10 +243,12 @@ export function computeTrendWindows(now: Date): {
     return {
       from: localDateTimeToUtc(startKey, "00:00", TIMEZONE),
       to: localDateTimeToUtc(endKey, "00:00", TIMEZONE),
-      label,
+      label: { kind: "week" as const, weeksAgo },
       // Sunday to Saturday (or to today), both inclusive, as people read it.
       range: startKey === lastDayKey ? shortDate(startKey) : `${shortDate(startKey)} - ${shortDate(lastDayKey)}`,
       partial: isCurrent,
+      firstDay: startKey,
+      lastDay: lastDayKey,
     };
   });
 
@@ -252,9 +268,11 @@ export function computeTrendWindows(now: Date): {
     return {
       from: localDateTimeToUtc(startKey, "00:00", TIMEZONE),
       to: localDateTimeToUtc(endKey, "00:00", TIMEZONE),
-      label: isCurrent ? `${MONTH_LABELS[monthIndex]} (החודש)` : MONTH_LABELS[monthIndex],
+      label: { kind: "month" as const, month: monthIndex, current: isCurrent },
       range: startKey === lastDayKey ? shortDate(startKey) : `${shortDate(startKey)} - ${shortDate(lastDayKey)}`,
       partial: isCurrent,
+      firstDay: startKey,
+      lastDay: lastDayKey,
     };
   });
 

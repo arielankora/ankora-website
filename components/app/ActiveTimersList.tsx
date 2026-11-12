@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 export type ActiveTimerRow = {
   id: string;
@@ -16,6 +17,7 @@ function formatElapsed(totalSeconds: number): string {
 }
 
 function MiniRow({ row, longTimerHours }: { row: ActiveTimerRow; longTimerHours: number }) {
+  const t = useTranslations("home.kpi.activeTimers");
   const [elapsed, setElapsed] = useState<number | null>(null);
 
   useEffect(() => {
@@ -35,14 +37,17 @@ function MiniRow({ row, longTimerHours }: { row: ActiveTimerRow; longTimerHours:
       <div className="flex min-w-0 items-center gap-2">
         <span className="h-1.5 w-1.5 shrink-0 animate-pulse-dot rounded-full bg-app-success" aria-hidden="true" />
         <span className="truncate text-[12.5px] text-app-text-primary">
-          {row.userName}
-          <span className="text-app-text-tertiary"> · {row.clientName}</span>
+          <bdi>{row.userName}</bdi>
+          <span className="text-app-text-tertiary">
+            {" · "}
+            <bdi>{row.clientName}</bdi>
+          </span>
         </span>
       </div>
       <span
         dir="ltr"
         className={`shrink-0 font-jbmono text-[12.5px] ${isOverage ? "font-medium text-app-error" : "text-app-text-secondary"}`}
-        title={isOverage ? `רץ מעל ${longTimerHours} שעות ברצף` : undefined}
+        title={isOverage ? t("runningOver", { hours: longTimerHours }) : undefined}
       >
         {elapsed === null ? "" : formatElapsed(elapsed)}
       </span>
@@ -67,6 +72,7 @@ export function ActiveTimerMiniRows({
   total: number;
   longTimerHours: number;
 }) {
+  const t = useTranslations("home.kpi.activeTimers");
   if (rows.length === 0) return null;
   return (
     <div className="mt-2.5 border-t border-app-border pt-1.5">
@@ -75,7 +81,11 @@ export function ActiveTimerMiniRows({
       ))}
       {total > rows.length && (
         <p className="mt-1 text-[11.5px] text-app-text-accent">
-          {total - rows.length === 1 ? "ועוד טיימר אחד" : `ועוד ${total - rows.length} טיימרים`} ←
+          {t("more", { count: total - rows.length })}{" "}
+          {/* Points the reading direction: turned around left to right (ADR 0006). */}
+          <span aria-hidden="true" className="inline-block ltr:rotate-180">
+            ←
+          </span>
         </p>
       )}
     </div>

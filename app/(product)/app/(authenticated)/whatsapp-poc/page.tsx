@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { getFormatter, getTranslations } from "next-intl/server";
+import { useFormatter, useTranslations } from "next-intl";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { ArrowRight, ChevronDown, MessageCircle, MoreHorizontal, Phone, Search } from "lucide-react";
 import { ContactRail, ReadToggle, RememberFilters, RowPending, TimelineScroller } from "./CommsControls";
 import { ScrollToActive } from "./ScrollToActive";
@@ -17,6 +20,8 @@ import { matchPhones, type PhoneMatch } from "@/lib/whatsapp-poc/clients-by-phon
 import { normalizePhone } from "@/lib/contact-normalize";
 import {
   INBOX_FILTERS,
+  LINE_RECORDINGS_NAME,
+  NO_NAME,
   buildInbox,
   buildTimeline,
   chatPhone,
@@ -48,7 +53,7 @@ import { SendForm } from "./SendForm";
 import { AddNumberForm, AssignToClientForm, GroupClientForm } from "./ContactForms";
 import { TaskFromConversation } from "./TaskFromConversation";
 import { HideWhileSelecting, MessageSelectionProvider, SelectModeButton, SelectToggle } from "./MessageSelection";
-import { proposeSelectedTitle, type SelectedMessage } from "@/lib/whatsapp-poc/selected-messages";
+import { contentFileLabel, proposeSelectedTitle, type SelectedMessage } from "@/lib/whatsapp-poc/selected-messages";
 import { RecordingPlayer } from "./calls/RecordingPlayer";
 import { TranscribeButton, TranscriptText } from "./calls/TranscribeButton";
 import { prisma } from "@/lib/prisma";
@@ -107,27 +112,42 @@ function href(params: Href) {
   return s ? `${BASE}?${s}` : BASE;
 }
 
-function formatTime(iso: string) {
-  return new Intl.DateTimeFormat("he-IL", { timeStyle: "short", timeZone: "Asia/Jerusalem" }).format(new Date(iso));
+// ADR 0006: times are shown in the reader's language and time zone. Which
+// day a message belongs to (dayKey, "yesterday") stays Israel time.
+type Format = ReturnType<typeof useFormatter>;
+type T = ReturnType<typeof useTranslations<"comms">>;
+
+function formatTime(format: Format, iso: string) {
+  return format.dateTime(new Date(iso), { timeStyle: "short" });
 }
 
-function formatListTime(iso: string | null, now: Date) {
+function formatListTime(format: Format, t: T, iso: string | null, now: Date) {
   if (!iso) return "";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  if (dayKey(iso) === dayKey(now.toISOString())) return formatTime(iso);
-  if (dayKey(iso) === dayKey(new Date(now.getTime() - DAY_MS).toISOString())) return "אתמול";
-  return new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: "Asia/Jerusalem" }).format(date);
+  if (dayKey(iso) === dayKey(now.toISOString())) return formatTime(format, iso);
+  if (dayKey(iso) === dayKey(new Date(now.getTime() - DAY_MS).toISOString())) return t("list.yesterday");
+  return format.dateTime(date, { day: "numeric", month: "numeric" });
 }
 
-function formatDay(iso: string) {
-  return new Intl.DateTimeFormat("he-IL", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Jerusalem" }).format(
-    new Date(iso),
-  );
+function formatDay(format: Format, iso: string) {
+  return format.dateTime(new Date(iso), { weekday: "long", day: "numeric", month: "long" });
 }
 
-function formatDateTime(iso: string) {
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Jerusalem" }).format(new Date(iso));
+function formatDateTime(format: Format, iso: string) {
+  return format.dateTime(new Date(iso), { dateStyle: "short", timeStyle: "short" });
+}
+
+/// A name as the screen shows it: the words the system gives a nameless chat
+/// and the hand-sent recordings' row are the reader's (ADR 0006).
+function shownName(t: T, name: string) {
+  if (name === NO_NAME) return t("noName");
+  if (name === LINE_RECORDINGS_NAME) return t("calls.noOtherSide");
+  return name;
+}
+
+function shownPhone(t: T, phone: string | null | undefined) {
+  return displayPhone(phone, t("phone.whatsappId"));
 }
 
 function formatSize(bytes: number | null) {
@@ -136,21 +156,20 @@ function formatSize(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
-const DIRECTION_LABEL = { in: "שיחה נכנסת", out: "שיחה יוצאת", unknown: "שיחה" } as const;
-const DIRECTION_SHORT = { in: "נכנסת", out: "יוצאת", unknown: "" } as const;
-
-const ATTACHMENT_LABEL: Record<string, string> = {
-  img: "תמונה",
-  image: "תמונה",
-  video: "וידאו",
-  audio: "הודעה קולית",
-  file: "קובץ",
-  sticker: "מדבקה",
+const ATTACHMENT_KEY: Record<string, "image" | "video" | "voice" | "file" | "sticker"> = {
+  img: "image",
+  image: "image",
+  video: "video",
+  audio: "voice",
+  file: "file",
+  sticker: "sticker",
 };
 
-function attachmentLabel(a: PocMessage["attachments"][number]) {
-  if (a.voiceNote) return "הודעה קולית";
-  return ATTACHMENT_LABEL[a.type] ?? "קובץ";
+/// The word for a file on the screen. What goes into a task is
+/// contentFileLabel's Hebrew word (content, ADR 0006).
+function attachmentLabel(t: T, a: PocMessage["attachments"][number]) {
+  if (a.voiceNote) return t("message.attachment.voice");
+  return t(`message.attachment.${ATTACHMENT_KEY[a.type] ?? "file"}`);
 }
 
 function mediaHref(chatId: string, messageId: string, attachmentId: string, numberKey: string) {
@@ -174,8 +193,9 @@ function ChannelIcon({ channel }: { channel: "wa" | "call" }) {
 }
 
 function ClientTag({ clients }: { clients: Array<{ id: string; name: string }> }) {
+  const t = useTranslations("comms");
   if (clients.length === 0) {
-    return <span className="self-start rounded-full bg-app-warning-soft px-2 py-0.5 text-xs text-app-warning">לא משויך ללקוח</span>;
+    return <span className="self-start rounded-full bg-app-warning-soft px-2 py-0.5 text-xs text-app-warning">{t("filters.none")}</span>;
   }
   return (
     <span className="self-start truncate rounded-full bg-app-accent-soft px-2 py-0.5 text-xs text-app-text-accent">
@@ -206,7 +226,8 @@ function selectable(m: PageMessage, transcript?: StoredTranscript): SelectedMess
     text: m.text,
     mine: m.isSender,
     senderName: m.senderName,
-    files: m.attachments.flatMap((a) => (a.id ? [{ id: a.id, type: a.type, label: attachmentLabel(a) }] : [])),
+    // The label is written into the task's comment: content, in Hebrew.
+    files: m.attachments.flatMap((a) => (a.id ? [{ id: a.id, type: a.type, label: contentFileLabel(a) }] : [])),
     // 4.11.2026 (Ariel): a voice message goes into the task with its
     // transcript, when there is one.
     transcript: transcript?.status === "DONE" && transcript.text ? transcript.text : null,
@@ -214,6 +235,8 @@ function selectable(m: PageMessage, transcript?: StoredTranscript): SelectedMess
 }
 
 function MessageBubble({ m, chat, transcript, hit }: { m: PageMessage; chat: PocChat; transcript?: StoredTranscript; hit?: boolean }) {
+  const t = useTranslations("comms");
+  const format = useFormatter();
   const mine = m.isSender;
   return (
     <li data-hit={hit ? "" : undefined} className={`flex items-center gap-1 ${mine ? "justify-end" : "justify-start"} ${hit ? "rounded-2xl ring-2 ring-gold ring-offset-4" : ""}`}>
@@ -223,30 +246,30 @@ function MessageBubble({ m, chat, transcript, hit }: { m: PageMessage; chat: Poc
           mine ? "rounded-2xl rounded-ee-md bg-navy text-white" : "rounded-2xl rounded-es-md border border-app-border bg-white text-app-text-primary"
         }`}
       >
-        {!mine && chat.type === "group" && m.senderName ? <p className="text-xs font-medium text-app-text-secondary">{m.senderName}</p> : null}
+        {!mine && chat.type === "group" && m.senderName ? <p dir="auto" className="text-xs font-medium text-app-text-secondary">{m.senderName}</p> : null}
         {m.isDeleted ? (
-          <p className={`italic ${mine ? "text-white/70" : "text-app-text-secondary"}`}>ההודעה נמחקה</p>
+          <p className={`italic ${mine ? "text-white/70" : "text-app-text-secondary"}`}>{t("message.deleted")}</p>
         ) : !m.text && m.attachments.length === 0 ? (
           // Unipile returns some WhatsApp kinds (a poll, a location, a
           // contact card, some stickers) with neither text nor attachment.
-          <p className={`italic ${mine ? "text-white/70" : "text-app-text-secondary"}`}>[הודעה שאינה טקסט, לא מוצגת כאן]</p>
+          <p className={`italic ${mine ? "text-white/70" : "text-app-text-secondary"}`}>{t("message.unsupported")}</p>
         ) : m.text ? (
-          <p className="whitespace-pre-wrap break-words leading-relaxed">{m.text}</p>
+          <p dir="auto" className="whitespace-pre-wrap break-words leading-relaxed">{m.text}</p>
         ) : null}
         {m.attachments.map((a, i) =>
           a.type === "audio" && a.id ? (
             <div key={i} className="min-w-64 space-y-2 rounded-xl bg-white p-2 text-app-text-primary">
               <p className="text-xs text-app-text-secondary">
-                {attachmentLabel(a)}
+                {attachmentLabel(t, a)}
                 {a.duration ? ` · ${formatDuration(a.duration)}` : ""}
               </p>
               <RecordingPlayer src={`/api/whatsapp-poc/voice/${encodeURIComponent(m.chatId)}/${encodeURIComponent(m.id)}?n=${encodeURIComponent(m.numberKey)}`} />
               {transcript?.status === "DONE" && transcript.text ? (
                 <TranscriptText text={transcript.text} />
               ) : transcript?.status === "PENDING" ? (
-                <p className="text-xs text-app-text-secondary">התמלול בתור.</p>
+                <p className="text-xs text-app-text-secondary">{t("calls.pendingShort")}</p>
               ) : transcript?.status === "SKIPPED" ? (
-                <p className="text-xs text-app-text-secondary">לא מתומלל: הלקוח מסומן &quot;בלי AI&quot;.</p>
+                <p className="text-xs text-app-text-secondary">{t("calls.skipped")}</p>
               ) : (
                 <TranscribeButton kind="voice" chatId={m.chatId} messageId={m.id} numberKey={m.numberKey} />
               )}
@@ -254,23 +277,23 @@ function MessageBubble({ m, chat, transcript, hit }: { m: PageMessage; chat: Poc
           ) : a.id && (a.type === "img" || a.type === "image") ? (
             <a key={i} href={mediaHref(m.chatId, m.id, a.id, m.numberKey)} target="_blank" rel="noopener noreferrer" className="block">
               {/* eslint-disable-next-line @next/next/no-img-element -- a private, per-request file; next/image would cache it */}
-              <img src={mediaHref(m.chatId, m.id, a.id, m.numberKey)} alt={attachmentLabel(a)} loading="lazy" className="max-h-72 max-w-full rounded-lg" />
+              <img src={mediaHref(m.chatId, m.id, a.id, m.numberKey)} alt={attachmentLabel(t, a)} loading="lazy" className="max-h-72 max-w-full rounded-lg" />
             </a>
           ) : a.id && a.type === "video" ? (
             <video key={i} controls preload="none" className="max-h-72 max-w-full rounded-lg" src={mediaHref(m.chatId, m.id, a.id, m.numberKey)} />
           ) : a.id ? (
             <a key={i} href={mediaHref(m.chatId, m.id, a.id, m.numberKey)} className="inline-flex min-h-11 items-center text-xs underline">
-              הורדת {attachmentLabel(a)}
+              {t("message.download", { label: attachmentLabel(t, a) })}
             </a>
           ) : (
             <p key={i} className="text-xs opacity-80">
-              [{attachmentLabel(a)}]
+              [{attachmentLabel(t, a)}]
             </p>
           ),
         )}
         <p className={`text-[11px] ${mine ? "text-white/75" : "text-app-text-secondary"}`}>
-          {formatTime(m.timestamp)}
-          {mine ? " · נשלח" : ""}
+          {formatTime(format, m.timestamp)}
+          {mine ? ` · ${t("message.sent")}` : ""}
         </p>
       </div>
     </li>
@@ -290,22 +313,23 @@ type PageCall = InboxCall & {
 /// What sits under a recording's player: the stored transcript, its state,
 /// or (for one read live, or a failed one) the button.
 function CallTranscript({ call, canTranscribe }: { call: PageCall; canTranscribe: boolean }) {
-  const t = call.transcript;
-  if (t?.status === "DONE" && t.text) return <TranscriptText text={t.text} />;
-  if (t?.status === "SKIPPED") return <p className="text-sm text-app-text-secondary">לא מתומלל: הלקוח מסומן &quot;בלי AI&quot;.</p>;
-  if (t?.status === "PENDING") return <p className="text-sm text-app-text-secondary">התמלול בתור, ויופיע כאן כשיסתיים.</p>;
+  const t = useTranslations("comms");
+  const tr = call.transcript;
+  if (tr?.status === "DONE" && tr.text) return <TranscriptText text={tr.text} />;
+  if (tr?.status === "SKIPPED") return <p className="text-sm text-app-text-secondary">{t("calls.skipped")}</p>;
+  if (tr?.status === "PENDING") return <p className="text-sm text-app-text-secondary">{t("calls.pendingLong")}</p>;
   if (!canTranscribe) return null;
   return (
     <div className="space-y-1">
-      {t?.status === "FAILED" ? <p className="text-sm text-app-error">התמלול נכשל שלוש פעמים.</p> : null}
-      <TranscribeButton kind="recording" emailId={call.emailId} label={t?.status === "FAILED" ? "לנסות שוב" : "תמלול"} />
+      {tr?.status === "FAILED" ? <p className="text-sm text-app-error">{t("calls.failed")}</p> : null}
+      <TranscribeButton kind="recording" emailId={call.emailId} label={tr?.status === "FAILED" ? t("calls.retry") : t("calls.transcribe")} />
     </div>
   );
 }
 
-function callMeta(call: PageCall) {
+function callMeta(t: T, call: PageCall) {
   const parts: string[] = [];
-  if (call.durationSec) parts.push(`${formatDuration(call.durationSec)} דק׳`);
+  if (call.durationSec) parts.push(t("calls.minutes", { duration: formatDuration(call.durationSec) }));
   else if (call.sizeBytes) parts.push(formatSize(call.sizeBytes));
   return parts.length ? ` · ${parts.join(" · ")}` : "";
 }
@@ -316,6 +340,9 @@ type CallTaskContext = { contactName: string; phone: string | null; clients: Arr
 /// transcript in the details. The header's "צור משימה מהשיחה" proposes only
 /// the latest call, and the calls list had no way to start a task at all.
 function CallTaskButton({ call, ctx }: { call: PageCall; ctx: CallTaskContext }) {
+  const t = useTranslations("comms");
+  // The proposed title and details are written into a task: content, in
+  // Hebrew (ADR 0006).
   const proposal = proposeTask({
     name: ctx.contactName,
     phone: ctx.phone,
@@ -326,7 +353,7 @@ function CallTaskButton({ call, ctx }: { call: PageCall; ctx: CallTaskContext })
   return (
     <TaskFromConversation
       key={`call-task-${call.emailId}`}
-      label="משימה מהשיחה הזו"
+      label={t("calls.taskFromCall")}
       clients={ctx.clients}
       defaultClientId={ctx.defaultClientId}
       title={proposal.title}
@@ -336,22 +363,25 @@ function CallTaskButton({ call, ctx }: { call: PageCall; ctx: CallTaskContext })
 }
 
 function CallCard({ call, transcribe, task }: { call: PageCall; transcribe: boolean; task?: CallTaskContext }) {
+  const t = useTranslations("comms");
+  const format = useFormatter();
   return (
     <li className="space-y-3 rounded-xl border border-app-info-soft bg-white p-4 ring-1 ring-app-border">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <ChannelIcon channel="call" />
           <div>
-            <p className="text-[15px] font-medium text-app-text-primary">{DIRECTION_LABEL[call.direction]}</p>
+            <p className="text-[15px] font-medium text-app-text-primary">{t(`calls.direction.${call.direction}`)}</p>
             <p className="text-xs text-app-text-secondary">
-              {formatTime(call.callAt)} · הקו של אנקורה{callMeta(call)}
+              {formatTime(format, call.callAt)} · {t("calls.ankoraLine")}
+              {callMeta(t, call)}
             </p>
           </div>
         </div>
         {task ? <CallTaskButton call={call} ctx={task} /> : null}
       </div>
       {call.audioRemoved ? (
-        <p className="text-sm text-app-text-secondary">קובץ השמע נמחק אחרי 12 חודשים. התמלול נשמר.</p>
+        <p className="text-sm text-app-text-secondary">{t("calls.audioRemoved")}</p>
       ) : (
         <RecordingPlayer src={recordingHref(call.emailId)} />
       )}
@@ -378,6 +408,10 @@ export default async function CommunicationsPage(props: {
   }>;
 }) {
   const searchParams = await props.searchParams;
+  const t = await getTranslations("comms");
+  const format = await getFormatter();
+  // A refusal from Unipile, in the reader's language (ADR 0006).
+  const errorText = async (err: UnipileError | null) => (err ? ((await domainErrorText(err)) ?? err.message) : null);
   const user = await requireUser();
   const config = readPocConfig();
   const access = await commsAccess(user);
@@ -415,7 +449,7 @@ export default async function CommunicationsPage(props: {
     }),
   ]);
   const chats = wa.chats;
-  let waError: string | null = wa.error;
+  let waError: string | null = await errorText(wa.error);
   const waReady = Boolean(config.apiKey);
   const accounts = lookupAccounts(wa, user, access);
 
@@ -443,7 +477,7 @@ export default async function CommunicationsPage(props: {
       ({ recordings, stale: callsStale } = await listRecordingsCached(mailConfig));
     } catch (err) {
       if (!(err instanceof UnipileError)) throw err;
-      callsError = err.message;
+      callsError = await errorText(err);
     }
     calls = recordings.map((r) => {
       const side = callSide(r, config.lineNumbers);
@@ -508,7 +542,7 @@ export default async function CommunicationsPage(props: {
         chat = found?.chat ?? null;
       } catch (err) {
         if (!(err instanceof UnipileError)) throw err;
-        waError = err.message;
+        waError = await errorText(err);
       }
     }
   } else if (selectedKey && "chatId" in selectedKey) {
@@ -521,7 +555,7 @@ export default async function CommunicationsPage(props: {
         chat = found?.chat ?? null;
       } catch (err) {
         if (!(err instanceof UnipileError)) throw err;
-        waError = err.message;
+        waError = await errorText(err);
       }
     }
     selectedPhone = chat ? chatPhone(chat) : null;
@@ -534,7 +568,7 @@ export default async function CommunicationsPage(props: {
     : { messages: [] as PageMessage[], transcripts: new Map<string, StoredTranscript>(), error: null, hasOlder: false };
   const messages = loaded.messages;
   const voiceTranscripts = loaded.transcripts;
-  if (loaded.error) waError = loaded.error;
+  if (loaded.error) waError = await errorText(loaded.error);
   // The open chat's number: where the block button and the reply act.
   const chatInfo: ChannelInfo | null = chat ? (wa.channelOf.get(chat.id) ?? found?.info ?? null) : null;
 
@@ -548,7 +582,7 @@ export default async function CommunicationsPage(props: {
   // for what it is, and the line is never offered for a client's file.
   for (const line of config.lineNumbers) {
     if (calls.some((c) => c.other === line)) {
-      owners.set(line, { personName: "הקלטות בלי מספר הצד השני", clients: [], phones: [line], contacts: [] });
+      owners.set(line, { personName: LINE_RECORDINGS_NAME, clients: [], phones: [line], contacts: [] });
     }
   }
   // "צוות" (5.11.2026, Ariel): a chat belongs to its number's owner, a
@@ -569,9 +603,9 @@ export default async function CommunicationsPage(props: {
   const team = teamParam === "me" ? user.id : teamNames.has(teamParam) ? teamParam : null;
   const teamValue = teamParam === "me" ? "me" : team ?? "all";
   const teamMembers = [...teamNames]
-    .map(([id, name]) => ({ id, name: name || "ללא שם", count: rows.filter((r) => r.teamIds.includes(id)).length }))
+    .map(([id, name]) => ({ id, name: name || t("noName"), count: rows.filter((r) => r.teamIds.includes(id)).length }))
     .sort((a, b) => a.name.localeCompare(b.name, "he"));
-  const teamLabel = teamValue === "me" ? "שלי" : team ? (teamNames.get(team) || "ללא שם") : "כל הצוות";
+  const teamLabel = teamValue === "me" ? t("team.me") : team ? (teamNames.get(team) || t("noName")) : t("team.all");
   const visible = filterInbox(rows, filter, inMessages ? "" : query, team);
 
   // "חיפוש בתוך ההודעות" (5.11.2026): stored conversations only.
@@ -620,12 +654,12 @@ export default async function CommunicationsPage(props: {
   const noReplyReason = !chat
     ? ""
     : chat.readOnly
-      ? "WhatsApp לא מאפשר לכתוב בשיחה הזו."
+      ? t("noReply.readOnly")
       : replyAs === null
-        ? `אפשר לענות רק מהמספר שלך. השיחה הזו על המספר של ${chatInfo?.label || "מישהו אחר"}.`
+        ? t("noReply.notYours", { owner: chatInfo?.label || t("noReply.someoneElse") })
         : config.sendMode === "test"
-          ? "השליחה במצב בדיקה: רק לשיחה אישית עם מספר שברשימת הבדיקה."
-          : "אפשר לענות רק בשיחה אישית או בקבוצה.";
+          ? t("noReply.testMode")
+          : t("noReply.kinds");
 
   const accessible = isOpen || filter === "call" ? await listAccessibleClients(user) : [];
   const clientOptions = accessible.map((c) => ({ id: c.id, name: c.name }));
@@ -693,28 +727,28 @@ export default async function CommunicationsPage(props: {
   );
 
   const typeMenu = menu({
-    label: "סוג",
-    value: INBOX_FILTERS.find((f) => f.id === filter)?.label ?? "הכל",
+    label: t("filters.label"),
+    value: t(`filters.${filter}`),
     active: filter !== "all",
     align: "start",
     items: INBOX_FILTERS.map((f) => ({
-      id: f.id,
-      name: f.label,
-      href: href({ filter: f.id, team: teamValue, q: query, inMessages, c: callsTable || f.id === "call" ? null : openKey }),
-      current: filter === f.id,
+      id: f,
+      name: t(`filters.${f}`),
+      href: href({ filter: f, team: teamValue, q: query, inMessages, c: callsTable || f === "call" ? null : openKey }),
+      current: filter === f,
     })),
   });
 
   const teamMenu =
     teamMembers.length > 0
       ? menu({
-          label: "צוות",
+          label: t("team.label"),
           value: teamLabel,
           active: teamValue !== "all",
           align: "end",
           items: [
-            { id: "all", name: "כל הצוות", count: rows.length },
-            ...(teamNames.has(user.id) ? [{ id: "me", name: "רק השיחות שלי", count: rows.filter((r) => r.teamIds.includes(user.id)).length }] : []),
+            { id: "all", name: t("team.all"), count: rows.length },
+            ...(teamNames.has(user.id) ? [{ id: "me", name: t("team.onlyMine"), count: rows.filter((r) => r.teamIds.includes(user.id)).length }] : []),
             ...teamMembers.filter((m) => m.id !== user.id || !teamNames.has(user.id)),
           ].map((m) => ({
             ...m,
@@ -725,7 +759,7 @@ export default async function CommunicationsPage(props: {
       : null;
 
   const filterRow = (
-    <div className="flex gap-2" role="group" aria-label="סינון">
+    <div className="flex gap-2" role="group" aria-label={t("list.filtersAria")}>
       {typeMenu}
       {teamMenu}
     </div>
@@ -742,7 +776,7 @@ export default async function CommunicationsPage(props: {
         inMessages ? "border-navy bg-navy font-medium text-white" : "border-app-border-strong bg-app-surface-sunken text-app-text-primary"
       }`}
     >
-      גם בתוך ההודעות
+      {t("list.inMessages")}
     </Link>
   );
 
@@ -751,11 +785,11 @@ export default async function CommunicationsPage(props: {
       <RememberFilters filter={filter} team={teamValue} />
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div>
-          <h1 className="text-xl font-medium text-app-text-primary">תקשורת עם לקוחות</h1>
-          <p className="mt-0.5 hidden text-sm text-app-text-secondary sm:block">WhatsApp ושיחות טלפון במקום אחד. עונים מהמספר שלכם.</p>
+          <h1 className="text-xl font-medium text-app-text-primary">{t("page.title")}</h1>
+          <p className="mt-0.5 hidden text-sm text-app-text-secondary sm:block">{t("page.subtitle")}</p>
           <div className="flex flex-wrap items-center gap-x-3">
             <Link prefetch={false} href="/app/whatsapp-poc/setup" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
-              שמירת שיחות WhatsApp: מספרים ורשימת חסימה
+              {t("page.setupLink")}
             </Link>
             {toReview > 0 ? (
               <Link
@@ -763,18 +797,18 @@ export default async function CommunicationsPage(props: {
                 href="/app/whatsapp-poc/setup"
                 className="inline-flex min-h-9 items-center rounded-full border border-app-warning bg-app-warning-soft px-3 text-[13px] font-medium text-app-warning"
               >
-                {toReview === 1 ? "שיחה חדשה אחת לבדיקה" : `${toReview} שיחות חדשות לבדיקה`}
+                {t("page.toReview", { count: toReview })}
               </Link>
             ) : null}
           </div>
         </div>
         {/* On a phone the box folds away, so the list starts near the top. */}
         <details className="w-full sm:hidden" open={badPhone || undefined}>
-          <summary className="flex min-h-11 cursor-pointer items-center text-sm text-app-text-primary underline">פתיחה לפי מספר</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center text-sm text-app-text-primary underline">{t("page.openByNumber")}</summary>
           <form method="get" action={BASE} className="flex flex-wrap items-end gap-2 pb-2">
           <div>
             <label htmlFor="open-phone-m" className="block text-xs font-medium text-app-text-secondary">
-              פתיחה לפי מספר
+              {t("page.openByNumber")}
             </label>
             <input
               id="open-phone-m"
@@ -787,14 +821,14 @@ export default async function CommunicationsPage(props: {
             />
           </div>
           <button type="submit" className="min-h-11 rounded-lg bg-navy px-4 text-sm font-medium text-white">
-            פתיחה
+            {t("page.open")}
           </button>
         </form>
         </details>
         <form method="get" action={BASE} className="hidden flex-wrap items-end gap-2 sm:flex">
           <div>
             <label htmlFor="open-phone" className="block text-xs font-medium text-app-text-secondary">
-              פתיחה לפי מספר
+              {t("page.openByNumber")}
             </label>
             <input
               id="open-phone"
@@ -807,23 +841,23 @@ export default async function CommunicationsPage(props: {
             />
           </div>
           <button type="submit" className="min-h-11 rounded-lg bg-navy px-4 text-sm font-medium text-white">
-            פתיחה
+            {t("page.open")}
           </button>
         </form>
       </header>
 
-      {badPhone ? <Banner tone="error">המספר לא תקין.</Banner> : null}
-      {waError ? <Banner tone="error">WhatsApp: {waError}</Banner> : null}
-      {callsError ? <Banner tone="error">שיחות טלפון: {callsError}</Banner> : null}
-      {callsStale ? <Banner tone="info">רשימת השיחות מוצגת מהטעינה הקודמת, כי Unipile לא ענה כרגע.</Banner> : null}
+      {badPhone ? <Banner tone="error">{t("page.badPhone")}</Banner> : null}
+      {waError ? <Banner tone="error">{t("page.waError", { error: waError })}</Banner> : null}
+      {callsError ? <Banner tone="error">{t("page.callsError", { error: callsError })}</Banner> : null}
+      {callsStale ? <Banner tone="info">{t("page.callsStale")}</Banner> : null}
 
       {callsTable ? (
-        <section aria-label="שיחות טלפון" className="space-y-3">
+        <section aria-label={t("filters.call")} className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="w-full max-w-sm">{filterRow}</div>
-            <p className="text-sm text-app-text-secondary">ההקלטות מגיעות אוטומטית מ-Aloha. שם איש הקשר פותח את ציר הזמן שלו.</p>
+            <p className="text-sm text-app-text-secondary">{t("calls.intro")}</p>
           </div>
-          {!config.hasOpenAiKey ? <Banner tone="info">התמלול עוד לא מוגדר בסביבה הזו. ההאזנה עובדת.</Banner> : null}
+          {!config.hasOpenAiKey ? <Banner tone="info">{t("calls.noTranscription")}</Banner> : null}
           <ul className="space-y-3">
             {calls.filter((call) => !team || lineOwnerOf(call.line) === team).map((call) => {
               const o = owners.get(call.other);
@@ -835,16 +869,16 @@ export default async function CommunicationsPage(props: {
                       <ChannelIcon channel="call" />
                       <div className="min-w-0">
                         <Link prefetch={false} href={href({ c: phoneKey(call.other), filter: "call", team: teamValue })} className="font-medium text-app-text-primary underline-offset-2 hover:underline">
-                          <bdi>{name === call.other ? displayPhone(call.other) : name}</bdi>
+                          <bdi>{name === call.other ? shownPhone(t, call.other) : shownName(t, name)}</bdi>
                         </Link>
                         <p className="text-xs text-app-text-secondary">
-                          {DIRECTION_SHORT[call.direction] ? `${DIRECTION_SHORT[call.direction]} · ` : ""}
-                          {formatDateTime(call.callAt)}
-                          {callMeta(call)}
+                          {call.direction !== "unknown" ? `${t(`calls.directionShort.${call.direction}`)} · ` : ""}
+                          {formatDateTime(format, call.callAt)}
+                          {callMeta(t, call)}
                         </p>
                         {o?.personName ? (
                           <p dir="ltr" className="text-end text-xs text-app-text-secondary">
-                            {displayPhone(call.other)}
+                            {shownPhone(t, call.other)}
                           </p>
                         ) : null}
                       </div>
@@ -857,7 +891,7 @@ export default async function CommunicationsPage(props: {
                           href={href({ c: phoneKey(call.other), filter: "call", team: teamValue, assign: true })}
                           className="inline-flex min-h-11 items-center rounded-full border border-dashed border-app-warning px-3 text-xs text-app-warning"
                         >
-                          שיוך ללקוח
+                          {t("calls.assign")}
                         </Link>
                       )}
                       <CallTaskButton
@@ -872,7 +906,7 @@ export default async function CommunicationsPage(props: {
                     </div>
                   </div>
                   {call.audioRemoved ? (
-                    <p className="text-sm text-app-text-secondary">קובץ השמע נמחק אחרי 12 חודשים. התמלול נשמר.</p>
+                    <p className="text-sm text-app-text-secondary">{t("calls.audioRemoved")}</p>
                   ) : (
                     <RecordingPlayer src={recordingHref(call.emailId)} />
                   )}
@@ -880,14 +914,14 @@ export default async function CommunicationsPage(props: {
                 </li>
               );
             })}
-            {calls.length === 0 && !callsError ? <li className="text-sm text-app-text-secondary">אין הקלטות.</li> : null}
+            {calls.length === 0 && !callsError ? <li className="text-sm text-app-text-secondary">{t("calls.empty")}</li> : null}
           </ul>
         </section>
       ) : (
         <div className="comms-grid grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[20rem_minmax(0,1fr)_auto]">
           {/* The list. On a phone it gives way to the open conversation. */}
           <nav
-            aria-label="אנשי קשר"
+            aria-label={t("list.aria")}
             className={`${isOpen ? "hidden lg:flex" : "flex"} max-h-[78vh] w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-app-border bg-white`}
           >
             <div className="space-y-3 border-b border-app-border p-3">
@@ -896,7 +930,7 @@ export default async function CommunicationsPage(props: {
                 <input type="hidden" name="team" value={teamValue} />
                 {inMessages ? <input type="hidden" name="in" value="msg" /> : null}
                 <label htmlFor="inbox-q" className="sr-only">
-                  חיפוש
+                  {t("list.search")}
                 </label>
                 <div className="flex min-w-0 flex-1 items-center gap-1 rounded-lg border border-app-border-strong bg-white pe-1 focus-within:border-gold">
                   <input
@@ -904,12 +938,12 @@ export default async function CommunicationsPage(props: {
                     name="q"
                     type="search"
                     defaultValue={query}
-                    placeholder={inMessages ? "מילה בתוך ההודעות" : "שם, מספר או לקוח"}
+                    placeholder={inMessages ? t("list.placeholderMessages") : t("list.placeholder")}
                     className="min-w-0 flex-1 rounded-lg bg-transparent px-3 py-2 text-sm text-app-text-primary outline-none"
                   />
                   {searchScope}
                 </div>
-                <button type="submit" aria-label="חיפוש" className="flex size-11 flex-none items-center justify-center rounded-lg border border-app-border-strong text-app-text-primary">
+                <button type="submit" aria-label={t("list.search")} className="flex size-11 flex-none items-center justify-center rounded-lg border border-app-border-strong text-app-text-primary">
                   <Search className="size-4" aria-hidden="true" />
                 </button>
               </form>
@@ -919,8 +953,8 @@ export default async function CommunicationsPage(props: {
               <ul className="flex-1 divide-y divide-app-border overflow-y-auto">
                 <li className="px-3 py-2 text-xs text-app-text-secondary">
                   {query.trim().length < 2
-                    ? "כתבו לפחות שתי אותיות."
-                    : `${hits.length >= 40 ? "40 התוצאות האחרונות" : `${hits.length} הודעות`}. החיפוש כולל רק מספרים ששומרים את השיחות.`}
+                    ? t("list.minChars")
+                    : t("list.hitsNote", { found: hits.length >= 40 ? t("list.hitsLast40") : t("list.hits", { count: hits.length }) })}
                 </li>
                 {hits.map((h) => {
                   const part = snippetAround(h.text, query);
@@ -945,14 +979,14 @@ export default async function CommunicationsPage(props: {
                         className={`flex flex-col gap-1 px-3 py-3 ${hitId === h.messageId ? "bg-app-accent-soft" : "hover:bg-app-surface-sunken"}`}
                       >
                         <span className="flex items-baseline justify-between gap-2">
-                          <span className="truncate text-[15px] font-medium text-app-text-primary"><bdi>{name}</bdi></span>
+                          <span className="truncate text-[15px] font-medium text-app-text-primary"><bdi>{shownName(t, name)}</bdi></span>
                           <span className="flex flex-none items-center gap-1.5">
                             <RowPending />
-                            <span className="text-xs text-app-text-secondary">{formatListTime(h.at, now)}</span>
+                            <span className="text-xs text-app-text-secondary">{formatListTime(format, t, h.at, now)}</span>
                           </span>
                         </span>
-                        <span className="line-clamp-2 text-[13px] text-app-text-primary">
-                          {h.isSender ? "אנחנו: " : ""}
+                        <span dir="auto" className="line-clamp-2 text-[13px] text-app-text-primary">
+                          {h.isSender ? `${t("list.we")} ` : ""}
                           {part.before}
                           <mark className="rounded bg-gold/30 px-0.5 text-inherit">{part.match}</mark>
                           {part.after}
@@ -979,18 +1013,20 @@ export default async function CommunicationsPage(props: {
                       <ChannelIcon channel={row.channel} />
                       <span className="flex min-w-0 flex-1 flex-col gap-1">
                         <span className="flex items-baseline justify-between gap-2">
-                          <span className={`truncate text-[15px] text-app-text-primary ${unread ? "font-semibold" : "font-medium"}`}><bdi>{row.name}</bdi></span>
+                          <span className={`truncate text-[15px] text-app-text-primary ${unread ? "font-semibold" : "font-medium"}`}><bdi>{shownName(t, row.name)}</bdi></span>
                           <span className="flex flex-none items-center gap-1.5">
                             <RowPending />
-                            <span className={`text-xs ${unread ? "font-medium text-app-text-accent" : "text-app-text-secondary"}`}>{formatListTime(row.at, now)}</span>
+                            <span className={`text-xs ${unread ? "font-medium text-app-text-accent" : "text-app-text-secondary"}`}>{formatListTime(format, t, row.at, now)}</span>
                           </span>
                         </span>
                         <span className="flex items-center justify-between gap-2">
-                          <span className={`truncate text-[13px] ${unread ? "text-app-text-primary" : "text-app-text-secondary"}`}>{row.preview}</span>
+                          <span dir="auto" className={`truncate text-[13px] ${unread ? "text-app-text-primary" : "text-app-text-secondary"}`}>
+                            {row.previewKind ? t(`preview.${row.previewKind}`) : row.preview}
+                          </span>
                           {row.unreadCount > 0 ? (
                             <span className="flex-none rounded-full bg-gold px-2 text-xs text-white">{row.unreadCount}</span>
                           ) : unread ? (
-                            <span role="img" aria-label="סומנה כלא נקראה" className="size-2.5 flex-none rounded-full bg-gold" />
+                            <span role="img" aria-label={t("list.markedUnread")} className="size-2.5 flex-none rounded-full bg-gold" />
                           ) : null}
                         </span>
                         {row.phone ? <ClientTag clients={row.clients} /> : null}
@@ -1009,10 +1045,10 @@ export default async function CommunicationsPage(props: {
               {visible.length === 0 ? (
                 <li className="p-4 text-sm text-app-text-secondary">
                   {filter === "wa" && waError
-                    ? "WhatsApp לא זמין כרגע, ולכן אין כאן שיחות. הסיבה מופיעה בראש המסך."
+                    ? t("list.waUnavailable")
                     : query || filter !== "all"
-                      ? "אין תוצאות."
-                      : "אין שיחות."}
+                      ? t("list.noResults")
+                      : t("list.empty")}
                 </li>
               ) : null}
             </ul>
@@ -1022,7 +1058,7 @@ export default async function CommunicationsPage(props: {
 
           {/* The timeline of the open contact. */}
           <section
-            aria-label="ציר זמן"
+            aria-label={t("timeline.aria")}
             className={`${isOpen ? "flex" : "hidden lg:flex"} relative h-[78vh] min-h-[24rem] flex-col overflow-hidden rounded-2xl border border-app-border bg-app-surface-page`}
           >
             {/* While a row's conversation loads (RowPending in that row). */}
@@ -1032,7 +1068,7 @@ export default async function CommunicationsPage(props: {
             >
               <span className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-app-text-secondary shadow">
                 <span className="size-4 animate-spin rounded-full border-2 border-app-border-strong border-t-navy" />
-                טוען את השיחה...
+                {t("timeline.loading")}
               </span>
             </div>
             {isOpen ? (
@@ -1050,18 +1086,18 @@ export default async function CommunicationsPage(props: {
                   <div className="flex min-w-0 items-center gap-2">
                     <Link prefetch={false}
                       href={href({ filter, team: teamValue, q: query, inMessages })}
-                      aria-label="חזרה לרשימה"
+                      aria-label={t("timeline.back")}
                       className="flex size-11 flex-none items-center justify-center rounded-lg text-app-text-primary lg:hidden"
                     >
                       <ArrowRight className="size-5 ltr:rotate-180" aria-hidden="true" />
                     </Link>
                     <div className="min-w-0">
                       <h2 className="truncate text-lg font-medium text-app-text-primary">
-                        <bdi>{contactName}</bdi>
+                        <bdi>{shownName(t, contactName)}</bdi>
                       </h2>
                       {selectedPhone ? (
                         <p dir="ltr" className="text-end text-xs text-app-text-secondary">
-                          {displayPhone(selectedPhone)}
+                          {shownPhone(t, selectedPhone)}
                         </p>
                       ) : null}
                     </div>
@@ -1073,7 +1109,7 @@ export default async function CommunicationsPage(props: {
                         href={`/app/clients/${c.id}`}
                         className="inline-flex min-h-9 items-center rounded-lg bg-app-accent-soft px-3 text-[13px] font-medium text-app-text-accent"
                       >
-                        לקוח: {c.name}
+                        {t("timeline.client", { name: c.name })}
                       </Link>
                     ))}
                     {/* "סמן כנקראה" (design 7): only on a click, never on opening. */}
@@ -1099,7 +1135,7 @@ export default async function CommunicationsPage(props: {
                     {chatInfo?.id && chat ? (
                       <details className="relative">
                         <summary
-                          aria-label="עוד פעולות"
+                          aria-label={t("timeline.moreActions")}
                           className="flex size-11 cursor-pointer list-none items-center justify-center rounded-lg border border-app-border-strong bg-white text-app-text-primary"
                         >
                           <MoreHorizontal className="size-5" aria-hidden="true" />
@@ -1130,7 +1166,7 @@ export default async function CommunicationsPage(props: {
                         href={href({ c: openKey, filter, team: teamValue, q: query, inMessages, before: messages[0].timestamp })}
                         className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline"
                       >
-                        הודעות קודמות
+                        {t("timeline.older")}
                       </Link>
                     </li>
                   ) : null}
@@ -1140,7 +1176,7 @@ export default async function CommunicationsPage(props: {
                     const newDay = !prev || dayKey(prev.at) !== dayKey(item.at);
                     const day = newDay ? (
                       <li key={`d-${item.at}`} className="flex justify-center">
-                        <span className="rounded-full bg-app-surface-sunken px-3 py-1 text-xs text-app-text-secondary">{formatDay(item.at)}</span>
+                        <span className="rounded-full bg-app-surface-sunken px-3 py-1 text-xs text-app-text-secondary">{formatDay(format, item.at)}</span>
                       </li>
                     ) : null;
                     if (item.kind === "message") {
@@ -1160,11 +1196,11 @@ export default async function CommunicationsPage(props: {
                           }}
                         />] : day;
                   })}
-                  {timeline.length === 0 ? <li className="text-sm text-app-text-secondary">אין הודעות או שיחות להצגה.</li> : null}
+                  {timeline.length === 0 ? <li className="text-sm text-app-text-secondary">{t("timeline.empty")}</li> : null}
                   {beforeParam ? (
                     <li className="flex justify-center">
                       <Link prefetch={false} href={href({ c: openKey, filter, team: teamValue, q: query, inMessages })} className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
-                        חזרה להודעות האחרונות
+                        {t("timeline.latest")}
                       </Link>
                     </li>
                   ) : null}
@@ -1185,19 +1221,19 @@ export default async function CommunicationsPage(props: {
                 ) : selectedPhone && waReady ? (
                   <div className="border-t border-app-border bg-white p-4 text-sm text-app-text-secondary">
                     {lookedUp && waError ? (
-                      `לא היה אפשר לבדוק אם יש שיחת WhatsApp עם המספר: ${waError}`
+                      t("timeline.lookupFailed", { error: waError })
                     ) : lookedUp ? (
-                      "לא נמצאה שיחת WhatsApp עם המספר הזה."
+                      t("timeline.notFound")
                     ) : (
                       <Link prefetch={false} href={href({ c: phoneKey(selectedPhone), filter, team: teamValue, q: query, wa: true })} className="inline-flex min-h-11 items-center text-app-text-primary underline">
-                        חיפוש שיחת WhatsApp עם המספר הזה
+                        {t("timeline.lookup")}
                       </Link>
                     )}
                   </div>
                 ) : null}
               </MessageSelectionProvider>
             ) : (
-              <p className="m-auto p-6 text-sm text-app-text-secondary">בחרו איש קשר מהרשימה, או פתחו לפי מספר.</p>
+              <p className="m-auto p-6 text-sm text-app-text-secondary">{t("timeline.pick")}</p>
             )}
           </section>
 
@@ -1205,46 +1241,46 @@ export default async function CommunicationsPage(props: {
           {isOpen ? (
             <ContactRail unassigned={Boolean(selectedPhone) && !(owner && owner.clients.length > 0)} messages={countSince(messages, (m) => m.timestamp, since30)}>
               <section className="space-y-1.5">
-                <h3 className="text-xs font-medium text-app-text-secondary">איש קשר</h3>
+                <h3 className="text-xs font-medium text-app-text-secondary">{t("rail.contact")}</h3>
                 <p className="font-medium text-app-text-primary">
-                  <bdi>{contactName}</bdi>
+                  <bdi>{shownName(t, contactName)}</bdi>
                 </p>
                 {owner && owner.clients.length > 0 ? (
                   <ul className="space-y-1">
                     {owner.clients.map((c) => (
                       <li key={c.id}>
                         <Link prefetch={false} href={`/app/clients/${c.id}`} className="inline-flex min-h-9 items-center text-sm text-app-text-accent underline">
-                          לתיק הלקוח: {c.name}
+                          {t("rail.toClientFile", { name: c.name })}
                         </Link>
                       </li>
                     ))}
                   </ul>
                 ) : selectedPhone ? (
-                  <p className="text-sm text-app-text-secondary">המספר לא מופיע באף תיק לקוח.</p>
+                  <p className="text-sm text-app-text-secondary">{t("rail.notInFile")}</p>
                 ) : null}
               </section>
 
               <section className="space-y-2">
-                <h3 className="text-xs font-medium text-app-text-secondary">ב-30 הימים האחרונים</h3>
+                <h3 className="text-xs font-medium text-app-text-secondary">{t("rail.last30")}</h3>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg bg-app-surface-sunken p-2.5">
                     <p className="text-xl font-medium text-app-text-primary">{countSince(messages, (m) => m.timestamp, since30)}</p>
-                    <p className="text-xs text-app-text-secondary">הודעות</p>
+                    <p className="text-xs text-app-text-secondary">{t("rail.messages")}</p>
                   </div>
                   <div className="rounded-lg bg-app-surface-sunken p-2.5">
                     <p className="text-xl font-medium text-app-text-primary">{countSince(contactCalls, (c) => c.callAt, since30)}</p>
-                    <p className="text-xs text-app-text-secondary">שיחות</p>
+                    <p className="text-xs text-app-text-secondary">{t("rail.calls")}</p>
                   </div>
                 </div>
                 <p className="text-xs text-app-text-tertiary">
-                  {chat ? "ההודעות: מתוך 40 האחרונות שנטענו. " : waError ? "WhatsApp לא נטען, ולכן ההודעות לא נספרו. " : ""}
-                  {stored.length > 0 ? "השיחות: מכל ההקלטות השמורות." : "השיחות: מתוך ההקלטות האחרונות שנטענו."}
+                  {chat ? `${t("rail.messagesLoaded")} ` : waError ? `${t("rail.messagesNotCounted")} ` : ""}
+                  {stored.length > 0 ? t("rail.callsStored") : t("rail.callsLoaded")}
                 </p>
               </section>
 
               {chat && chat.type === "group" && chatInfo?.id && wa.stored.has(chat.id) ? (
                 <section className="space-y-2">
-                  <h3 className="text-xs font-medium text-app-text-secondary">שיוך הקבוצה ללקוח</h3>
+                  <h3 className="text-xs font-medium text-app-text-secondary">{t("rail.groupClient")}</h3>
                   <GroupClientForm
                     key={`group-${openKey}`}
                     channelId={chatInfo.id}
@@ -1257,25 +1293,25 @@ export default async function CommunicationsPage(props: {
 
               {selectedPhone ? (
                 <section className="space-y-2">
-                  <h3 className="text-xs font-medium text-app-text-secondary">מספרים מוכרים</h3>
+                  <h3 className="text-xs font-medium text-app-text-secondary">{t("rail.knownNumbers")}</h3>
                   <ul dir="ltr" className="space-y-0.5 text-end text-sm text-app-text-primary">
                     {(owner?.phones.length ? owner.phones : [selectedPhone]).map((p) => (
-                      <li key={p}>{displayPhone(p)}</li>
+                      <li key={p}>{shownPhone(t, p)}</li>
                     ))}
                   </ul>
                   {config.lineNumbers.includes(selectedPhone) ? (
                     <p className="text-xs text-app-text-secondary">
-                      זה מספר של אנקורה. ההקלטות כאן נשלחו מאלוהה בלי המספר של הצד השני, ולכן אי אפשר לשייך אותן לתיק לקוח.
+                      {t("rail.ankoraLine")}
                     </p>
                   ) : owner && owner.contacts.length > 0 ? (
                     <AddNumberForm key={`add-${openKey}`} contactId={owner.contacts[0].id} />
                   ) : !isPlausiblePhone(selectedPhone) ? (
-                    <p className="text-xs text-app-text-secondary">ל-WhatsApp אין כאן מספר טלפון, אלא מזהה פנימי, ולכן אי אפשר לשייך אותו לתיק לקוח.</p>
+                    <p className="text-xs text-app-text-secondary">{t("rail.whatsappId")}</p>
                   ) : (
                     <AssignToClientForm
                       key={`assign-${openKey}`}
                       phone={selectedPhone}
-                      defaultName={chat?.name && chat.name !== "ללא שם" ? chat.name : ""}
+                      defaultName={chat?.name && chat.name !== NO_NAME ? chat.name : ""}
                       clients={clientOptions}
                       defaultOpen={searchParams.assign === "1"}
                     />

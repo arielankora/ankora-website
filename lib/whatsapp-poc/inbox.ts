@@ -12,12 +12,18 @@ import { normalizePhone } from "@/lib/contact-normalize";
 
 export type InboxFilter = "all" | "wa" | "call" | "none";
 
-export const INBOX_FILTERS: Array<{ id: InboxFilter; label: string }> = [
-  { id: "all", label: "הכל" },
-  { id: "wa", label: "WhatsApp" },
-  { id: "call", label: "שיחות טלפון" },
-  { id: "none", label: "לא משויך ללקוח" },
-];
+/// The type menu's choices, in order. Their labels are the screen's
+/// (messages/*.json, comms.filters).
+export const INBOX_FILTERS: InboxFilter[] = ["all", "wa", "call", "none"];
+
+/// The row of recordings Aloha sent by hand for one of our lines, with no
+/// other side (page.tsx). Like NO_NAME, the screen shows its own word.
+export const LINE_RECORDINGS_NAME = "הקלטות בלי מספר הצד השני";
+
+/// The name a chat gets when WhatsApp gives none (lib/whatsapp-poc/unipile.ts).
+/// It is stored with the chat and compared on, so it stays as it is; a screen
+/// shows its own word for it (ADR 0006).
+export const NO_NAME = "ללא שם";
 
 export function parseFilter(raw: string | undefined | null): InboxFilter {
   return raw === "wa" || raw === "call" || raw === "none" ? raw : "all";
@@ -33,6 +39,9 @@ export type InboxChat = {
   unreadCount: number;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
+  /// Set when the preview is a word for an attachment, not text someone
+  /// wrote (lib/comms/stored-chats.ts).
+  lastMessageKind?: "voice" | "file" | null;
   groupClient?: { id: string; name: string } | null;
 };
 
@@ -43,6 +52,8 @@ export type InboxCall = {
   /// The number on the other side, in E.164.
   other: string;
 };
+
+export type PreviewKind = "callIn" | "callOut" | "call" | "voice" | "file";
 
 export type ClientRef = { id: string; name: string };
 export type PhoneOwner = { personName: string | null; clients: ClientRef[] };
@@ -59,6 +70,10 @@ export type InboxRow = {
   hasWhatsapp: boolean;
   hasCalls: boolean;
   preview: string;
+  /// What the preview stands for when it is not a message's own text, so a
+  /// screen can word it in the reader's language (ADR 0006). `preview`
+  /// keeps the Hebrew word.
+  previewKind: PreviewKind | null;
   at: string | null;
   unreadCount: number;
   clients: ClientRef[];
@@ -130,9 +145,10 @@ export function isPlausiblePhone(phone: string | null | undefined): boolean {
 }
 
 /// A number as the screens show it: the number, or a plain word for an id.
-export function displayPhone(phone: string | null | undefined): string {
+/// A translated screen passes its own word (ADR 0006).
+export function displayPhone(phone: string | null | undefined, notAPhone = "מזהה WhatsApp (לא מספר טלפון)"): string {
   if (!phone) return "";
-  return isPlausiblePhone(phone) ? phone : "מזהה WhatsApp (לא מספר טלפון)";
+  return isPlausiblePhone(phone) ? phone : notAPhone;
 }
 
 export function formatDuration(seconds: number | null | undefined): string {
@@ -149,6 +165,7 @@ function mergeUnread(a: number, b: number): number {
 }
 
 const CALL_PREVIEW = { in: "שיחה נכנסת", out: "שיחה יוצאת", unknown: "שיחה" } as const;
+const CALL_PREVIEW_KIND = { in: "callIn", out: "callOut", unknown: "call" } as const;
 
 function later(a: string | null, b: string | null): boolean {
   if (!b) return false;
@@ -184,6 +201,7 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
       hasWhatsapp: true,
       hasCalls: false,
       preview: chat.lastMessagePreview ?? "",
+      previewKind: chat.lastMessageKind ?? null,
       at: chat.lastMessageAt,
       unreadCount: seen ? mergeUnread(seen.unreadCount, chat.unreadCount) : chat.unreadCount,
       // A group has no number; it belongs to a client only when assigned.
@@ -210,6 +228,7 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
         hasWhatsapp: false,
         hasCalls: true,
         preview,
+        previewKind: CALL_PREVIEW_KIND[call.direction],
         at: call.callAt,
         unreadCount: 0,
         clients: owner?.clients ?? [],
@@ -224,6 +243,7 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
     if (later(existing.at, call.callAt)) {
       existing.at = call.callAt;
       existing.preview = preview;
+      existing.previewKind = CALL_PREVIEW_KIND[call.direction];
       existing.channel = "call";
     }
   }
@@ -232,7 +252,7 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
   // someone whose WhatsApp profile has no name.
   for (const row of rows.values()) {
     const ownerName = row.phone ? owners.get(row.phone)?.personName : null;
-    if (ownerName && (row.name === row.phone || row.name === "ללא שם")) row.name = ownerName;
+    if (ownerName && (row.name === row.phone || row.name === NO_NAME)) row.name = ownerName;
   }
 
   return [...rows.values()].sort((a, b) => {

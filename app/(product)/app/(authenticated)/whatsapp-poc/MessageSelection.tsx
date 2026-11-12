@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { createContext, useActionState, useContext, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import {
   MAX_SELECTED_MESSAGES,
   MAX_STEP_TITLE,
@@ -45,6 +46,7 @@ export function MessageSelectionProvider(props: {
   defaultClientId: string | null;
   proposedTitle: string;
 }) {
+  const t = useTranslations("comms.select");
   const [on, setOn] = useState(false);
   const [selected, setSelected] = useState<Map<string, SelectedMessage>>(new Map());
   const [dialog, setDialog] = useState<"existing" | "new" | null>(null);
@@ -93,12 +95,12 @@ export function MessageSelectionProvider(props: {
         <div
           className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center justify-between gap-3 border-t border-app-border bg-navy px-4 py-3 text-white shadow-lg sm:px-6"
           role="region"
-          aria-label="הודעות שסומנו"
+          aria-label={t("barAria")}
         >
           <p className="text-sm" aria-live="polite">
-            <strong>{list.length === 1 ? "הודעה אחת נבחרה" : `${list.length} הודעות נבחרו`}</strong>
-            {images > 0 ? ` · ${images === 1 ? "תמונה אחת" : `${images} תמונות`}` : ""}
-            {list.length >= MAX_SELECTED_MESSAGES ? ` · עד ${MAX_SELECTED_MESSAGES} בפעם אחת` : ""}
+            <strong>{t("selected", { count: list.length })}</strong>
+            {images > 0 ? ` · ${t("images", { count: images })}` : ""}
+            {list.length >= MAX_SELECTED_MESSAGES ? ` · ${t("max", { max: MAX_SELECTED_MESSAGES })}` : ""}
           </p>
           <div className="flex flex-wrap gap-2">
             <button
@@ -107,7 +109,7 @@ export function MessageSelectionProvider(props: {
               onClick={() => setDialog("existing")}
               className="min-h-11 rounded-lg bg-gold px-4 text-sm font-medium text-navy disabled:opacity-50"
             >
-              צרף למשימה קיימת
+              {t("attachExisting")}
             </button>
             <button
               type="button"
@@ -115,13 +117,13 @@ export function MessageSelectionProvider(props: {
               onClick={() => setDialog("new")}
               className="min-h-11 rounded-lg border border-white px-4 text-sm text-white disabled:opacity-50"
             >
-              משימה חדשה
+              {t("newTask")}
             </button>
             <button type="button" onClick={ctx.clear} disabled={list.length === 0} className="min-h-11 px-3 text-sm text-white underline disabled:opacity-50">
-              ניקוי
+              {t("clear")}
             </button>
             <button type="button" onClick={() => ctx.setOn(false)} className="min-h-11 rounded-lg border border-white/60 px-4 text-sm text-white">
-              יציאה מסימון
+              {t("exit")}
             </button>
           </div>
         </div>
@@ -151,6 +153,7 @@ export function HideWhileSelecting({ children }: { children: ReactNode }) {
 
 /// The header button that turns the mark mode on and off.
 export function SelectModeButton() {
+  const t = useTranslations("comms.select");
   const ctx = useSelection();
   if (!ctx) return null;
   return (
@@ -162,13 +165,14 @@ export function SelectModeButton() {
         ctx.on ? "border-navy bg-navy text-white" : "border-app-border-strong bg-white text-app-text-primary"
       }`}
     >
-      {ctx.on ? "סיום סימון" : "סמן הודעות"}
+      {ctx.on ? t("modeOn") : t("modeOff")}
     </button>
   );
 }
 
 /// The checkbox beside one message. Renders nothing outside the mark mode.
 export function SelectToggle({ message }: { message: SelectedMessage }) {
+  const t = useTranslations("comms.select");
   const ctx = useSelection();
   if (!ctx?.on) return null;
   const checked = ctx.selected.has(message.id);
@@ -178,7 +182,7 @@ export function SelectToggle({ message }: { message: SelectedMessage }) {
         type="checkbox"
         checked={checked}
         onChange={() => ctx.toggle(message)}
-        aria-label={message.text ? `סימון ההודעה: ${message.text.slice(0, 40)}` : "סימון ההודעה"}
+        aria-label={message.text ? t("toggleWithText", { text: message.text.slice(0, 40) }) : t("toggle")}
         className="size-5 accent-navy"
       />
     </label>
@@ -199,6 +203,9 @@ function AttachDialog(props: {
   onClose: () => void;
   onDone: () => void;
 }) {
+  const t = useTranslations("comms.select");
+  const tf = useTranslations("comms.message.attachment");
+  const format = useFormatter();
   const [state, action, pending] = useActionState<AttachState | undefined, FormData>(attachSelectedMessagesAction, undefined);
   const [clientId, setClientId] = useState(props.defaultClientId ?? (props.clients.length === 1 ? props.clients[0].id : ""));
   const [q, setQ] = useState("");
@@ -211,18 +218,18 @@ function AttachDialog(props: {
   // than one message; one message is usually context, not a checklist.
   const [stepsOn, setStepsOn] = useState(props.messages.length > 1);
   const [keepComment, setKeepComment] = useState(true);
-  const [rows, setRows] = useState<StepRow[]>(() => initialRows(props.messages, props.contactName));
+  const [rows, setRows] = useState<StepRow[]>(() => initialRows(props.messages, props.contactName, t, format));
 
   useEffect(() => {
     if (props.mode !== "existing" || !clientId) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       startLoading(async () => {
         const found = await listTasksForMessagesAction({ clientId, q });
         setTasks(found);
         setTaskId((cur) => (found.some((f) => f.id === cur) ? cur : ""));
       });
     }, 250);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [props.mode, clientId, q]);
 
   useEffect(() => {
@@ -239,7 +246,7 @@ function AttachDialog(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the dialog's own lifetime
   }, []);
 
-  const chosen = tasks?.find((t) => t.id === taskId) ?? null;
+  const chosen = tasks?.find((task) => task.id === taskId) ?? null;
   const portalAllowed = props.mode === "new" ? newVisible : Boolean(chosen?.clientVisible);
   const count = props.messages.length;
   const stepLines = stepsOn ? rows.filter((r) => r.on).map((r) => r.text.replace(/\s+/g, " ").trim()).filter(Boolean) : [];
@@ -247,12 +254,12 @@ function AttachDialog(props: {
 
   if (state?.done) {
     return (
-      <Shell title="נשמר" onClose={props.onClose}>
+      <Shell title={t("savedTitle")} closeLabel={t("close")} onClose={props.onClose}>
         <p className="text-sm text-app-success" role="status">
-          {state.done.created ? "המשימה נוצרה" : "ההודעות צורפו למשימה"}: {state.done.title}.
-          {state.done.steps > 0 ? ` ${state.done.steps === 1 ? "נוסף שלב אחד" : `נוספו ${state.done.steps} שלבים`}.` : ""}
-          {state.done.images > 0 ? ` ${state.done.images === 1 ? "תמונה אחת תויקה" : `${state.done.images} תמונות תויקו`} במשימה.` : ""}
-          {state.done.portalLine ? " השורה ללקוח נוספה לפורטל." : ""}
+          {state.done.created ? t("doneCreated", { title: state.done.title }) : t("doneAttached", { title: state.done.title })}
+          {state.done.steps > 0 ? ` ${t("doneSteps", { count: state.done.steps })}` : ""}
+          {state.done.images > 0 ? ` ${t("doneImages", { count: state.done.images })}` : ""}
+          {state.done.portalLine ? ` ${t("donePortal")}` : ""}
         </p>
         {state.warnings?.map((w) => (
           <p key={w} className="text-sm text-app-text-primary">
@@ -261,10 +268,10 @@ function AttachDialog(props: {
         ))}
         <div className="flex gap-2">
           <Link href={`/app/tasks/${state.done.taskId}`} className="inline-flex min-h-11 items-center rounded-lg bg-navy px-4 text-sm font-medium text-white">
-            לפתיחת המשימה
+            {t("openTask")}
           </Link>
           <button type="button" onClick={props.onClose} className="min-h-11 rounded-lg border border-app-border-strong bg-white px-4 text-sm text-app-text-primary">
-            סגירה
+            {t("close")}
           </button>
         </div>
       </Shell>
@@ -272,7 +279,7 @@ function AttachDialog(props: {
   }
 
   return (
-    <Shell title={props.mode === "new" ? `משימה חדשה מ-${count === 1 ? "הודעה אחת" : `${count} הודעות`}` : `צירוף ${count === 1 ? "הודעה אחת" : `${count} הודעות`} למשימה קיימת`} onClose={props.onClose}>
+    <Shell title={props.mode === "new" ? t("titleNew", { count }) : t("titleExisting", { count })} closeLabel={t("close")} onClose={props.onClose}>
       <form action={action} className="space-y-4">
         <input type="hidden" name="mode" value={props.mode} />
         <input type="hidden" name="messages" value={JSON.stringify(props.messages)} />
@@ -283,14 +290,14 @@ function AttachDialog(props: {
         <input type="hidden" name="steps" value={JSON.stringify(stepLines)} />
         {stepLines.length > 0 && keepComment ? <input type="hidden" name="keepComment" value="on" /> : null}
 
-        <div role="group" aria-label="לאן" className="flex gap-2">
+        <div role="group" aria-label={t("whereAria")} className="flex gap-2">
           <button
             type="button"
             aria-pressed={props.mode === "existing"}
             onClick={() => props.setMode("existing")}
             className={`min-h-11 flex-1 rounded-lg border px-3 text-sm ${props.mode === "existing" ? "border-navy bg-navy text-white" : "border-app-border-strong bg-white text-app-text-primary"}`}
           >
-            משימה קיימת
+            {t("existingTask")}
           </button>
           <button
             type="button"
@@ -298,17 +305,17 @@ function AttachDialog(props: {
             onClick={() => props.setMode("new")}
             className={`min-h-11 flex-1 rounded-lg border px-3 text-sm ${props.mode === "new" ? "border-navy bg-navy text-white" : "border-app-border-strong bg-white text-app-text-primary"}`}
           >
-            משימה חדשה
+            {t("newTask")}
           </button>
         </div>
 
         <div>
           <label htmlFor="sel-client" className={label}>
-            לקוח
+            {t("client")}
           </label>
           <select id="sel-client" name="clientId" required value={clientId} onChange={(e) => setClientId(e.target.value)} className={input}>
             <option value="" disabled>
-              בחירת לקוח
+              {t("pickClient")}
             </option>
             {props.clients.map((c) => (
               <option key={c.id} value={c.id}>
@@ -321,26 +328,26 @@ function AttachDialog(props: {
         {props.mode === "existing" ? (
           <div className="space-y-2">
             <label htmlFor="sel-q" className={label}>
-              חיפוש משימה
+              {t("searchTask")}
             </label>
-            <input id="sel-q" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="למשל: תיאום פגישות" className={input} />
+            <input id="sel-q" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("searchPlaceholder")} className={input} />
             <fieldset className="max-h-56 space-y-1.5 overflow-y-auto">
-              <legend className="sr-only">משימות פתוחות של הלקוח</legend>
+              <legend className="sr-only">{t("openTasksLegend")}</legend>
               {!clientId ? (
-                <p className="text-sm text-app-text-secondary">קודם בוחרים לקוח.</p>
+                <p className="text-sm text-app-text-secondary">{t("clientFirst")}</p>
               ) : loading && !tasks ? (
-                <p className="text-sm text-app-text-secondary">טוען משימות...</p>
+                <p className="text-sm text-app-text-secondary">{t("loadingTasks")}</p>
               ) : tasks && tasks.length === 0 ? (
-                <p className="text-sm text-app-text-secondary">אין משימות פתוחות שמתאימות. אפשר לעבור ל&quot;משימה חדשה&quot;.</p>
+                <p className="text-sm text-app-text-secondary">{t("noTasks")}</p>
               ) : (
-                tasks?.map((t) => (
+                tasks?.map((task) => (
                   <label
-                    key={t.id}
-                    className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm ${t.id === taskId ? "border-navy bg-app-accent-soft" : "border-app-border"}`}
+                    key={task.id}
+                    className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm ${task.id === taskId ? "border-navy bg-app-accent-soft" : "border-app-border"}`}
                   >
-                    <input type="radio" name="taskId" value={t.id} checked={t.id === taskId} onChange={() => setTaskId(t.id)} className="size-5 accent-navy" />
-                    <span className="min-w-0 flex-1 truncate">{t.title}</span>
-                    {t.clientVisible ? <span className="text-xs text-app-text-secondary">מוצגת ללקוח</span> : null}
+                    <input type="radio" name="taskId" value={task.id} checked={task.id === taskId} onChange={() => setTaskId(task.id)} className="size-5 accent-navy" />
+                    <span dir="auto" className="min-w-0 flex-1 truncate">{task.title}</span>
+                    {task.clientVisible ? <span className="text-xs text-app-text-secondary">{t("shownToClient")}</span> : null}
                   </label>
                 ))
               )}
@@ -350,20 +357,20 @@ function AttachDialog(props: {
           <div className="space-y-3">
             <div>
               <label htmlFor="sel-title" className={label}>
-                שם המשימה
+                {t("taskName")}
               </label>
-              <input id="sel-title" name="title" required defaultValue={props.proposedTitle} maxLength={200} className={input} />
+              <input id="sel-title" name="title" required defaultValue={props.proposedTitle} maxLength={200} dir="auto" className={input} />
             </div>
             <label className="flex min-h-11 items-center gap-2 text-sm text-app-text-primary">
               <input type="checkbox" name="clientVisible" checked={newVisible} onChange={(e) => setNewVisible(e.target.checked)} className="size-5" />
-              להציג את המשימה ללקוח בפורטל
+              {t("showInPortal")}
             </label>
           </div>
         )}
 
         <label className="flex min-h-11 items-center gap-2 text-sm text-app-text-primary">
           <input type="checkbox" checked={stepsOn} onChange={(e) => setStepsOn(e.target.checked)} className="size-5 accent-navy" />
-          להוסיף את ההודעות כשלבים במשימה
+          {t("addAsSteps")}
         </label>
 
         {stepsOn ? (
@@ -374,26 +381,26 @@ function AttachDialog(props: {
           <label className="flex items-start gap-2 border-t border-app-border pt-3 text-sm text-app-text-primary">
             <input type="checkbox" checked={keepComment} onChange={(e) => setKeepComment(e.target.checked)} className="mt-0.5 size-5 flex-none accent-navy" />
             <span>
-              לשמור גם את ההודעות המלאות כהערה פנימית
-              <span className="block text-xs text-app-text-secondary">המקור נשאר במשימה, עם השעות והשולח. תמונות מתויקות במשימה, מוסתרות מהלקוח.</span>
+              {t("keepComment")}
+              <span className="block text-xs text-app-text-secondary">{t("keepCommentHint")}</span>
             </span>
           </label>
         ) : (
           <div className="space-y-1 rounded-lg border border-app-border bg-app-surface-page p-3 text-sm">
-            <p className="text-xs text-app-text-secondary">ייכנס למשימה כהערה פנימית. תמונות יתויקו כמסמך במשימה, מוסתר מהלקוח.</p>
+            <p className="text-xs text-app-text-secondary">{t("commentPreview")}</p>
             <ul className="space-y-0.5">
               {props.messages
                 .slice()
                 .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
                 .map((m) => (
-                  <li key={m.id} className="truncate">
-                    {m.mine ? "אנחנו" : m.senderName || props.contactName}:{" "}
+                  <li key={m.id} dir="auto" className="truncate">
+                    {m.mine ? t("we") : m.senderName || props.contactName}:{" "}
                     {m.text ||
                       (m.transcript
-                        ? `[${m.files[0]?.label || "הודעה קולית"}] ${m.transcript}`
-                        : m.files[0]?.label
-                          ? `[${m.files[0].label}${m.files[0].type === "audio" ? ", לא תומללה" : ""}]`
-                          : "[הודעה שאינה טקסט]")}
+                        ? `[${m.files[0] ? fileWord(tf, m.files[0]) : tf("voice")}] ${m.transcript}`
+                        : m.files[0]
+                          ? `[${m.files[0].type === "audio" ? t("notTranscribed", { label: fileWord(tf, m.files[0]) }) : fileWord(tf, m.files[0])}]`
+                          : t("nonText"))}
                   </li>
                 ))}
             </ul>
@@ -410,21 +417,22 @@ function AttachDialog(props: {
               onChange={(e) => setPortalOn(e.target.checked)}
               className="size-5"
             />
-            להוסיף שורה לרשימה שהלקוח רואה בפורטל
+            {t("portalLine")}
           </label>
           {!portalAllowed ? (
-            <p className="text-xs text-app-text-secondary">אפשרי רק במשימה שמוצגת ללקוח.</p>
+            <p className="text-xs text-app-text-secondary">{t("portalOnlyVisible")}</p>
           ) : portalOn ? (
             <div>
               <label htmlFor="sel-portal" className={label}>
-                השורה שהלקוח יראה (בלי תוכן ההודעות)
+                {t("portalLineLabel")}
               </label>
               <input
                 id="sel-portal"
                 name="portalLine"
                 required
                 maxLength={MAX_PORTAL_NOTE_LENGTH}
-                placeholder="למשל: רותם כהן · פגישה ברביעי 11.11 ב-11:00"
+                placeholder={t("portalPlaceholder")}
+                dir="auto"
                 className={input}
               />
             </div>
@@ -442,10 +450,10 @@ function AttachDialog(props: {
             disabled={pending || !clientId || (props.mode === "existing" && !taskId) || tooManySteps}
             className="min-h-11 rounded-lg bg-navy px-5 text-sm font-medium text-white disabled:opacity-60"
           >
-            {pending ? "שומר..." : submitLabel(props.mode, stepLines.length)}
+            {pending ? t("saving") : submitLabel(t, props.mode, stepLines.length)}
           </button>
           <button type="button" onClick={props.onClose} className="min-h-11 rounded-lg border border-app-border-strong bg-white px-4 text-sm text-app-text-primary">
-            ביטול
+            {t("cancel")}
           </button>
         </div>
       </form>
@@ -453,7 +461,7 @@ function AttachDialog(props: {
   );
 }
 
-function Shell({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+function Shell({ title, closeLabel, onClose, children }: { title: string; closeLabel: string; onClose: () => void; children: ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
       <section
@@ -464,7 +472,7 @@ function Shell({ title, onClose, children }: { title: string; onClose: () => voi
       >
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-medium text-app-text-primary">{title}</h2>
-          <button type="button" onClick={onClose} aria-label="סגירה" className="flex size-11 items-center justify-center rounded-lg text-xl text-app-text-secondary">
+          <button type="button" onClick={onClose} aria-label={closeLabel} className="flex size-11 items-center justify-center rounded-lg text-xl text-app-text-secondary">
             ×
           </button>
         </div>
@@ -476,29 +484,40 @@ function Shell({ title, onClose, children }: { title: string; onClose: () => voi
 
 type StepRow = { key: string; text: string; on: boolean; meta: string; edited: boolean };
 
-const stepTime = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hour12: false });
+type T = ReturnType<typeof useTranslations<"comms.select">>;
+type FileT = ReturnType<typeof useTranslations<"comms.message.attachment">>;
+
+/// A file's word on the screen, in the reader's language. The task's comment
+/// gets the Hebrew label the file carries (content, ADR 0006).
+function fileWord(tf: FileT, f: { type: string }): string {
+  if (f.type === "audio") return tf("voice");
+  if (f.type === "img" || f.type === "image") return tf("image");
+  if (f.type === "video") return tf("video");
+  if (f.type === "sticker") return tf("sticker");
+  return tf("file");
+}
 
 /// One row per message, in the order they were written. A message with
 /// nothing to read (an image alone) is listed unticked, so it is visible
 /// and can still be written in by hand.
-function initialRows(messages: SelectedMessage[], contactName: string): StepRow[] {
+function initialRows(messages: SelectedMessage[], contactName: string, t: T, format: ReturnType<typeof useFormatter>): StepRow[] {
   return messages
     .slice()
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
     .map((m) => {
       const text = proposeStepText(m);
-      const who = m.mine ? "אנחנו" : m.senderName || contactName || "איש קשר";
+      const who = m.mine ? t("we") : m.senderName || contactName || t("contactFallback");
       const hasImage = m.files.some((f) => f.type === "img" || f.type === "image");
-      const parts = [stepTime.format(new Date(m.at)), who];
-      if (!text) parts.push("הודעה בלי טקסט");
-      if (hasImage) parts.push("התמונה תתויק במשימה");
+      const parts = [format.dateTime(new Date(m.at), { hour: "2-digit", minute: "2-digit", hour12: false }), who];
+      if (!text) parts.push(t("metaNoText"));
+      if (hasImage) parts.push(t("metaImage"));
       return { key: m.id, text, on: Boolean(text), meta: parts.join(" · "), edited: false };
     });
 }
 
-function submitLabel(mode: "existing" | "new", steps: number): string {
-  if (mode === "new") return steps === 0 ? "יצירת משימה" : steps === 1 ? "יצירת משימה עם שלב אחד" : `יצירת משימה עם ${steps} שלבים`;
-  return steps === 0 ? "צירוף" : steps === 1 ? "צירוף ושלב אחד" : `צירוף ו-${steps} שלבים`;
+function submitLabel(t: T, mode: "existing" | "new", steps: number): string {
+  if (mode === "new") return steps === 0 ? t("submit.new") : t("submit.newSteps", { count: steps });
+  return steps === 0 ? t("submit.attach") : t("submit.attachSteps", { count: steps });
 }
 
 const smallButton =
@@ -512,6 +531,7 @@ function StepsEditor(props: {
   count: number;
   existing: boolean;
 }) {
+  const t = useTranslations("comms.select.steps");
   const [added, setAdded] = useState(0);
   const update = (key: string, patch: Partial<StepRow>) =>
     props.setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -526,23 +546,22 @@ function StepsEditor(props: {
   const over = props.count > MAX_STEPS_FROM_MESSAGES;
 
   return (
-    <section aria-label="שלבים במשימה" className="space-y-2">
+    <section aria-label={t("heading")} className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-medium text-app-text-primary">
-          שלבים במשימה <span className="font-normal text-app-text-secondary">· {props.count === 1 ? "שלב אחד" : `${props.count} שלבים`}</span>
+          {t("heading")} <span className="font-normal text-app-text-secondary">· {t("count", { count: props.count })}</span>
         </h3>
         <div className="flex gap-1">
           <button type="button" onClick={() => props.setRows((prev) => prev.map((r) => ({ ...r, on: Boolean(r.text.trim()) })))} className="min-h-9 px-2 text-sm text-app-text-accent underline">
-            סימון הכול
+            {t("selectAll")}
           </button>
           <button type="button" onClick={() => props.setRows((prev) => prev.map((r) => ({ ...r, on: false })))} className="min-h-9 px-2 text-sm text-app-text-accent underline">
-            ניקוי
+            {t("clear")}
           </button>
         </div>
       </div>
       <p className="text-xs text-app-text-secondary">
-        כל הודעה היא שורה. אפשר לערוך, להוריד סימון, לשנות סדר או להוסיף שלב. רק השורות המסומנות נשמרות
-        {props.existing ? ", אחרי השלבים שכבר במשימה" : ""}.
+        {props.existing ? t("hintExisting") : t("hint")}
       </p>
       <ol className="space-y-1.5">
         {props.rows.map((r, i) => (
@@ -552,7 +571,7 @@ function StepsEditor(props: {
                 type="checkbox"
                 checked={r.on}
                 onChange={(e) => update(r.key, { on: e.target.checked })}
-                aria-label={`לכלול את שלב ${i + 1}`}
+                aria-label={t("include", { n: i + 1 })}
                 className="size-5 accent-navy"
               />
             </label>
@@ -561,27 +580,28 @@ function StepsEditor(props: {
                 rows={2}
                 value={r.text}
                 maxLength={MAX_STEP_TITLE}
-                aria-label={`שלב ${i + 1}`}
-                placeholder="כתיבת השלב"
+                aria-label={t("step", { n: i + 1 })}
+                placeholder={t("placeholder")}
+                dir="auto"
                 onChange={(e) => update(r.key, { text: e.target.value, edited: true, on: r.on || Boolean(e.target.value.trim()) })}
                 className={`w-full resize-none rounded-lg border bg-white px-2.5 py-1.5 text-sm leading-snug text-app-text-primary outline-none focus:border-gold ${r.edited ? "border-gold" : "border-app-border"}`}
               />
               {r.meta || r.edited ? (
-                <p className="text-xs text-app-text-tertiary">{[r.meta, r.edited ? "נערך" : ""].filter(Boolean).join(" · ")}</p>
+                <p className="text-xs text-app-text-tertiary">{[r.meta, r.edited ? t("edited") : ""].filter(Boolean).join(" · ")}</p>
               ) : null}
             </div>
             <div className="flex flex-none flex-col">
-              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label={`הזזת שלב ${i + 1} למעלה`} className={smallButton}>
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label={t("up", { n: i + 1 })} className={smallButton}>
                 ↑
               </button>
-              <button type="button" onClick={() => move(i, 1)} disabled={i === props.rows.length - 1} aria-label={`הזזת שלב ${i + 1} למטה`} className={smallButton}>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === props.rows.length - 1} aria-label={t("down", { n: i + 1 })} className={smallButton}>
                 ↓
               </button>
             </div>
             <button
               type="button"
               onClick={() => props.setRows((prev) => prev.filter((x) => x.key !== r.key))}
-              aria-label={`הסרת שלב ${i + 1}`}
+              aria-label={t("remove", { n: i + 1 })}
               className={`${smallButton} text-lg`}
             >
               ×
@@ -598,11 +618,11 @@ function StepsEditor(props: {
         className="flex min-h-11 items-center gap-1.5 rounded-lg border border-dashed border-app-border-strong bg-white px-3.5 text-sm text-app-text-primary"
       >
         <Plus aria-hidden="true" className="size-4" />
-        הוספת שלב
+        {t("add")}
       </button>
       {over ? (
         <p role="alert" className="text-sm text-app-error">
-          עד {MAX_STEPS_FROM_MESSAGES} שלבים בפעם אחת. סומנו {props.count}.
+          {t("over", { max: MAX_STEPS_FROM_MESSAGES, count: props.count })}
         </p>
       ) : null}
     </section>
