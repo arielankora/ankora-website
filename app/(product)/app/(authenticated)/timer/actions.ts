@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { procedureReminderForScreen } from "@/lib/app-domain/procedure-to-file";
 import {
@@ -16,18 +18,24 @@ import {
   EditWindowExpiredError,
 } from "@/lib/app-domain/time-entries";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
-import { stoppedAcrossClosureMessage } from "@/lib/app-domain/closed-bank-guard";
+import { stoppedAcrossClosureText } from "../my-time/entry-errors";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { updateTask } from "@/lib/app-domain/tasks";
 
-function friendlyError(err: unknown): string {
-  if (err instanceof SameClientTimerError) return "כבר רץ טיימר על הלקוח הזה. יש לעצור אותו קודם.";
-  if (err instanceof TimerLimitError) return `אפשר להריץ עד ${MAX_PARALLEL_TIMERS} טיימרים במקביל. יש לעצור אחד קודם.`;
-  if (err instanceof ParallelTimerConfirmationRequiredError) return "כבר רץ טיימר אחר. יש לאשר הפעלה במקביל.";
-  if (err instanceof EditWindowExpiredError) return "חלון העריכה העצמית הסתיים; נדרשת הרשאת מנהל.";
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
+/// ADR 0006: in the reader's language. The two refusals every time-entry
+/// write shares are worded once, under timeEntries.errors.
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("timer.errors");
+  const shared = await getTranslations("timeEntries.errors");
+  if (err instanceof SameClientTimerError) return t("sameClient");
+  if (err instanceof TimerLimitError) return t("limit", { max: MAX_PARALLEL_TIMERS });
+  if (err instanceof ParallelTimerConfirmationRequiredError) return t("parallelConfirmation");
+  if (err instanceof EditWindowExpiredError) return shared("editWindowExpired");
+  if (err instanceof ForbiddenError) return shared("forbidden");
+  const text = await domainErrorText(err);
+  if (text) return text;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return shared("generic");
 }
 
 export async function startTimerAction(input: {
@@ -61,10 +69,10 @@ export async function startTimerAction(input: {
         ok: false as const,
         needsConfirmation: true as const,
         runningClientNames: err.running.map((t) => t.clientName),
-        error: friendlyError(err),
+        error: await friendlyError(err),
       };
     }
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -83,9 +91,9 @@ export async function stopTimerAction(input: { timeEntryId: string; note?: strin
     // 3.11.2026: a timer still running when its bank closed always stops;
     // the person is then asked whether to move it into the open bank.
     const crossed = await closedBankForStoppedEntry(entry);
-    return { ok: true as const, entry, closedBank: crossed ? { message: stoppedAcrossClosureMessage(crossed) } : null };
+    return { ok: true as const, entry, closedBank: crossed ? { message: await stoppedAcrossClosureText(crossed) } : null };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -98,7 +106,7 @@ export async function moveEntryIntoOpenBankAction(input: { timeEntryId: string }
     revalidatePath("/app/my-time");
     return { ok: true as const, entry };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -113,7 +121,7 @@ export async function reopenTimerAction(input: { timeEntryId: string }) {
     revalidatePath("/app/timer");
     return { ok: true as const, entry };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -129,7 +137,7 @@ export async function discardActiveTimerAction(input: { timeEntryId: string }) {
     revalidatePath("/app/timer");
     return { ok: true as const };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -144,7 +152,7 @@ export async function updateActiveTimerNoteAction(input: { timeEntryId: string; 
     await updateActiveTimerNote(user, input.timeEntryId, input.note);
     return { ok: true as const };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -191,6 +199,6 @@ export async function recordPromiseStageAction(input: {
     const procedureReminder = await procedureReminderForScreen(updated.id, updated.clientId, updated.status);
     return { ok: true as const, status: updated.status, procedureReminder };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }

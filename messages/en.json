@@ -102,6 +102,26 @@
     "copy": {
       "copy": "Copy",
       "copied": "Copied"
+    },
+    "forbidden": {
+      "title": "You don't have permission to view this page",
+      "currentRole": "Your current role: {role}"
+    },
+    "states": {
+      "loading": "Loading…",
+      "notFound": {
+        "title": "Page not found",
+        "description": "The record may have been deleted, or the link is wrong.",
+        "back": "Back to home"
+      },
+      "serverError": {
+        "title": "Something went wrong",
+        "body": "The screen didn't load. Try again, or contact support with the code below.",
+        "retry": "Try again"
+      }
+    },
+    "actionForm": {
+      "failed": "Something went wrong. Try again."
     }
   },
   "profile": {
@@ -407,6 +427,884 @@
     "section": {
       "allUsers": "All users",
       "howTo": "How to do it"
+    }
+  },
+  "tasks": {
+    "common": {
+      "status": {
+        "OPEN": "Open",
+        "IN_PROGRESS": "In progress",
+        "PENDING_APPROVAL": "Awaiting approval",
+        "DONE": "Done",
+        "ARCHIVED": "Archived"
+      },
+      "priority": {
+        "LOW": "Low",
+        "NORMAL": "Normal",
+        "HIGH": "High",
+        "URGENT": "Urgent"
+      }
+    },
+    "detail": {
+      "notFound": {
+        "title": "Task not found",
+        "description": "The task may have been deleted, or it belongs to a client you are not assigned to."
+      },
+      "noAiNotice": "No AI: \"Advance with Claude\" is off for this task. It is handled by people only.",
+      "credentials": {
+        "summary": "System logins for {client} ({count})",
+        "open": "Open"
+      },
+      "errors": {
+        "sameClientTimer": "A timer is already running for this client. Stop it first.",
+        "timerLimit": "You can run up to {max} timers at once. Stop one first.",
+        "parallelConfirmation": "Another timer is already running. Confirm running both at once.",
+        "forbidden": "You don't have permission for this. The client isn't assigned to you.",
+        "generic": "Something went wrong. Please try again.",
+        "taskNotFound": "Task not found.",
+        "noCategory": "This task has no category, and a time entry needs one. Choose a category and try again.",
+        "stopTargetGone": "The timer you asked to stop is no longer running. Refresh and try again.",
+        "runningTimerNeedsNote": "The running timer has no task and no note, so it can't be stopped this way. Add a short note to it on the timer screen, then come back to this task.",
+        "dateAndTimesRequired": "Fill in the date and times.",
+        "missingTaskId": "Task ID is missing.",
+        "noFile": "No file selected.",
+        "fileTooLarge": "The file is larger than 4MB."
+      },
+      "header": {
+        "share": "Share",
+        "manualEntry": "Manual entry",
+        "reportedSoFar": "<num>{duration}</num> hours reported so far",
+        "nothingReported": "No time reported yet"
+      },
+      "fields": {
+        "status": "Status",
+        "priority": "Priority",
+        "assignee": "Assignee",
+        "noAssignee": "Unassigned",
+        "category": "Category",
+        "noCategory": "No category",
+        "dueDate": "Due date"
+      },
+      "toast": {
+        "updateFailed": "Update failed",
+        "status": "Status: {label}",
+        "completed": "Task completed",
+        "sentForApproval": "Sent for approval",
+        "titleUpdated": "Title updated",
+        "priority": "Priority: {label}",
+        "urgentMessaged": "{name} was sent a message with a link to the task.",
+        "assigneeFallback": "The assignee",
+        "assignedTo": "Task assigned to {name}",
+        "unassigned": "Assignee removed",
+        "categoryUpdated": "Category updated",
+        "dueDateUpdated": "Due date updated",
+        "dueDateRemoved": "Due date removed",
+        "mappingOn": "Marked as a mapping task",
+        "mappingOff": "No longer a mapping task",
+        "mappingHint": "What a mapping task learns is proposed to the client file before it closes.",
+        "aiOn": "Task marked \"No AI\"",
+        "aiOff": "\"No AI\" mark removed",
+        "aiOnHint": "The task, its steps and its documents will not go through any AI system.",
+        "descriptionUpdated": "Description updated",
+        "descriptionRemoved": "Description removed"
+      },
+      "mapping": {
+        "label": "Mapping task: findings are proposed to the client file before closing"
+      },
+      "ai": {
+        "inherited": "No AI: {source}. Handled by people only.",
+        "label": "No AI: this task is handled by people only",
+        "managerOnly": "(only a manager can remove this)",
+        "source": {
+          "CLIENT": "set on the client",
+          "PARENT_TASK": "set on the task this step belongs to"
+        }
+      },
+      "description": {
+        "title": "Description",
+        "edit": "Edit",
+        "add": "Add description",
+        "placeholder": "What needs doing, an address, a reference number, what's been tried.",
+        "markdownHint": "You can use **bold**, *italic*, `code`, lists with - or 1. and links [text](address).",
+        "save": "Save",
+        "cancel": "Cancel",
+        "fromCommentBy": "From {name}'s comment",
+        "fromFirstComment": "From the first comment",
+        "empty": "No description. Whatever lives in WhatsApp today belongs here."
+      },
+      "procedureReminder": {
+        "title": "Not in the client file yet",
+        "review": "Go to review",
+        "dismiss": "Got it"
+      },
+      "supervision": {
+        "title": "Supervision and approval",
+        "supervisor": "Supervisor",
+        "noSupervisor": "No supervisor",
+        "supervisorSet": "{name} is supervising this task",
+        "supervisorRemoved": "Supervisor removed",
+        "approvalRequired": "Task will require approval",
+        "approvalNotRequired": "Task doesn't require approval",
+        "requiresApproval": "Requires approval before closing",
+        "pickSupervisorHint": "Choose a supervisor to require approval.",
+        "awaitingYou": "This task is waiting for your approval.",
+        "approveAndClose": "Approve and close",
+        "backToProgress": "Send back to in progress",
+        "awaitingNamed": "Waiting for approval from {name}.",
+        "awaiting": "Waiting for approval.",
+        "cancelSubmission": "Withdraw",
+        "submit": "Submit for approval",
+        "approvedBy": "Approved by {name} on {date}",
+        "system": "the system"
+      },
+      "timestamps": {
+        "created": "Opened",
+        "started": "Started",
+        "completed": "Completed"
+      },
+      "block": {
+        "title": "Waiting on something?",
+        "resumed": "Task is back in progress",
+        "notWaitingAnymore": "No longer waiting",
+        "cancel": "Cancel",
+        "mark": "Mark as waiting",
+        "noReason": "No reason given. Whoever opens this task next week won't know why it stopped.",
+        "closed": "A completed task isn't waiting on anyone.",
+        "notWaiting": "Not waiting on anyone. If work stopped because you're waiting for an answer, mark it: the stuck promises measure separates what's stuck with us from what's stuck with them.",
+        "reasonLabel": "Reason for waiting",
+        "reasonPlaceholder": "Why we stopped, in one sentence. Optional, and worth it.",
+        "clientHint": "The reason stays internal. What the client sees under \"Waiting for you\" is written in \"What the client sees\", in the \"What we need from the client\" field.",
+        "save": "Save",
+        "on": {
+          "CLIENT": "Waiting on client",
+          "SUPPLIER": "Waiting on supplier",
+          "INTERNAL": "Waiting on someone internal",
+          "OTHER": "Waiting"
+        },
+        "sinceToday": "{label}, since today",
+        "sinceYesterday": "{label}, since yesterday",
+        "sinceDays": "{label}, {count} days"
+      },
+      "client": {
+        "title": "What the client sees",
+        "hiddenToast": "Task removed from the portal",
+        "shownToast": "Task is now shown to the client",
+        "visible": "Shown in portal",
+        "internal": "Internal",
+        "titleLabel": "Title the client reads",
+        "titleUpdated": "Client title updated",
+        "requestLabel": "What we need from the client (shown under \"Waiting for you\")",
+        "requestUpdated": "Client request updated",
+        "requestPlaceholder": "One sentence, straight to the client: what to do, where, and how long it takes.",
+        "outcomeLabel": "Outcome sentence",
+        "outcomeLabelRequired": "Outcome sentence (required to close)",
+        "outcomeUpdated": "Outcome sentence updated",
+        "outcomePlaceholder": "One sentence, in the client's language: what actually happened.",
+        "beforeClose": "Before closing: what actually happened?",
+        "beforeSubmit": "Before submitting for approval: what actually happened?",
+        "outcomeExplainer": "This sentence is what the client reads in the portal and what goes into the monthly summary.",
+        "outcomeBeforeCloseLabel": "Outcome sentence before closing",
+        "closeTask": "Close task",
+        "submit": "Submit for approval",
+        "cancel": "Cancel"
+      },
+      "timer": {
+        "startFailed": "Timer didn't start",
+        "runningParallel": "Timer running alongside the other",
+        "running": "Timer running",
+        "stopFailed": "Couldn't stop the timer",
+        "stopped": "Timer stopped",
+        "moveQuestion": "Move it?",
+        "move": "Move",
+        "keep": "Keep",
+        "moveFailed": "Move failed",
+        "moved": "Entry moved",
+        "movedHint": "The note says when the work was done.",
+        "sameClientTitle": "A timer is already running for this client",
+        "sameClientDescription": "A client runs one timer at a time. You can stop it and start here.",
+        "sameClientQuestion": "Stop the client's timer and start on this task?",
+        "stopAndStartHere": "Stop and start here",
+        "keepAsIs": "Leave it running",
+        "manyRunning": "{count} timers running",
+        "manyRunningDescription": "To start here, stop one of them.",
+        "whichToStop": "Which timer should stop?",
+        "stopClient": "Stop {client}",
+        "keepAll": "Leave them running",
+        "otherRunning": "A timer is running for {client}",
+        "parallelDescription": "Running both counts the full time for each client.",
+        "parallelQuestion": "Run both at once, or stop it and start here?",
+        "runParallel": "Run both",
+        "cancel": "Cancel",
+        "stop": "Stop",
+        "start": "Start timer"
+      },
+      "share": {
+        "recipient": "To",
+        "noRecipient": "No recipient (I'll choose)",
+        "note": "Note (optional)",
+        "notePlaceholder": "For example: passed this to you, the client expects an answer by Thursday",
+        "close": "Close",
+        "gmail": "Draft in Gmail",
+        "whatsapp": "WhatsApp",
+        "noWhatsapp": "{name} has no WhatsApp number on their profile. Send by email, or choose \"No recipient\" and pick a contact in WhatsApp itself. Everyone adds their own number on the profile screen.",
+        "copy": "Copy message",
+        "feedback": {
+          "gmail": "The draft opened in Gmail in a new tab. Didn't open? The browser probably blocked a pop-up: copy the message instead.",
+          "copied": "Message copied, including the link to the task. Paste it into any email or chat.",
+          "copyFailed": "The browser didn't allow copying. Try the Gmail button."
+        },
+        "rtlHint": "Draft text aligned left? Gmail takes no direction from the link. To align it right: click in the email body, select all (Cmd+A or Ctrl+A), open the formatting bar (the Aa icon) and click the right-to-left button.",
+        "rtlSetting": "No such button? Turn it on once: in Gmail settings, See all settings, General tab, Right-to-left editing support, choose ON and save at the bottom of the page."
+      },
+      "manualEntry": {
+        "saved": "Time entry saved",
+        "date": "Date",
+        "from": "From",
+        "to": "To",
+        "note": "Note",
+        "notePlaceholder": "What was done for the client?",
+        "cancel": "Cancel",
+        "saving": "Saving...",
+        "save": "Save entry"
+      },
+      "plan": {
+        "approvedToast": "Plan approved",
+        "stepsUpdated": "Steps updated from the plan",
+        "keptSteps": "{count} steps that were done or had time reported stayed as they were.",
+        "savedVersion": "Version {version} saved",
+        "stepsAddedToEmpty": "The task had no steps, so the plan's steps were added to it.",
+        "title": "Work plan",
+        "changeNote": "What changed: {note}",
+        "draftNotice": "This plan is still a draft and hasn't been approved.",
+        "approve": "Approve plan",
+        "body": "Plan",
+        "stepsLabel": "Proposed steps, one per line",
+        "saving": "Saving...",
+        "saveVersion": "Save as new version",
+        "cancel": "Cancel",
+        "collapse": "Show less",
+        "expand": "Show full plan",
+        "proposedSteps": "Proposed steps ({count})",
+        "appliedOn": "Copied to the task's steps on {date}.",
+        "reapply": "Copy to steps again",
+        "apply": "Turn into task steps",
+        "edit": "Edit",
+        "confirmReplace": "This replaces the {count} existing steps with the plan's steps. Steps that were done or had time reported stay.",
+        "updating": "Updating...",
+        "continue": "Continue",
+        "history": "Earlier versions ({count})",
+        "meta": {
+          "version": "Version {version}",
+          "approvedBy": "Approved by {name}, {date}",
+          "approved": "Approved, {date}",
+          "draftBy": "Draft by {name}, {date}",
+          "draft": "Draft, {date}",
+          "withClaude": "Written with Claude",
+          "inApp": "Edited in Ankora"
+        },
+        "new": {
+          "saved": "Work plan saved",
+          "stepsAdded": "The plan's steps were added to the task.",
+          "open": "or write a plan by hand",
+          "title": "New work plan",
+          "hint": "Bold with **asterisks**, lists with a dash or a number. Saved as version 1, approved in your name.",
+          "placeholder": "**Goal**\n...\n\n**Steps**\n1. ...\n2. ...",
+          "stepsLabel": "Proposed steps, one per line (optional)",
+          "save": "Save"
+        }
+      },
+      "thread": {
+        "notSaved": "Comment not saved",
+        "added": "Comment added",
+        "tooLarge": "File is too large",
+        "tooLargeHint": "Up to {mb}MB. Try compressing it or scanning at a lower quality.",
+        "notAttached": "File not attached",
+        "attached": "File attached",
+        "deleteFailed": "Delete failed",
+        "deleted": "Comment deleted",
+        "title": "Thread",
+        "newComment": "New comment",
+        "placeholder": "What happened, what was tried, what they answered. Whatever would have gone to WhatsApp.",
+        "add": "Add comment",
+        "attach": "Attach file",
+        "storageNotReady": "File storage isn't connected yet.",
+        "markdownHint": "You can use **bold**, *italic*, `code`, lists and links.",
+        "empty": "Nothing in the thread yet.",
+        "system": "System",
+        "noComments": "Nobody has written here yet. What you see above is what the system recorded.",
+        "deleteComment": "Delete comment",
+        "delete": "Delete",
+        "downloadFile": "Download {title}",
+        "download": "Download",
+        "clientSees": "Client sees this",
+        "internal": "Internal"
+      },
+      "steps": {
+        "title": "Steps",
+        "empty": "You can break the task into steps. Each step can have its own assignee, due date and timer.",
+        "sentForApproval": "Sent for approval",
+        "approverNotified": "{name} was notified.",
+        "approved": "Approved",
+        "markDone": "Mark step {title} as done",
+        "awaitingApprovalOf": "Waiting for approval from {name}",
+        "requiresApprovalOf": "Requires approval from {name}",
+        "newStep": "New step",
+        "placeholder": "What needs to happen",
+        "adding": "Adding...",
+        "add": "Add",
+        "fromBook": "From the procedures book",
+        "close": "Close",
+        "bookHint": "The steps are added to what's already here, not instead of it."
+      },
+      "advance": {
+        "plan": "Advance with Claude",
+        "lessons": "Summary and lessons with Claude",
+        "hintLessons": "Copies a prompt with the closed task's details. Claude writes a summary and lessons with you and saves them as an internal comment",
+        "hintWithPlan": "Copies a prompt with the task's details and the current plan, to update it or carry it out in Claude",
+        "hintNoPlan": "Copies a prompt with all the task's details. Claude builds a work plan with you and saves it here",
+        "timerHint": "{hint}. Also starts a timer on the task right now, so time counts from the click",
+        "timerPlan": "Advance with Claude and start timer",
+        "timerLessons": "Summary and lessons with Claude and start timer",
+        "startingTimer": "Starting timer...",
+        "copied": "Prompt copied. Paste it into a new chat in Ankora's organization account in Claude.",
+        "openClaude": "Open Claude",
+        "manual": "The browser didn't allow automatic copying. The text is selected: copy it from here and paste it into Ankora's organization account in Claude.",
+        "promptLabel": "Prompt for Claude",
+        "copy": "Copy",
+        "close": "Close",
+        "notice": {
+          "started": "Timer started on the task.",
+          "runningOnClient": "A timer is already running for this client, so no other timer was started.",
+          "otherClient": "A timer is running for another client, so no timer was started. Claude will ask what to do.",
+          "noCategory": "The task has no category, so no timer was started. Claude will ask about the timer.",
+          "error": "Timer didn't start. Claude will ask about the timer.",
+          "errorWithReason": "Timer didn't start: {error} Claude will ask about the timer."
+        }
+      },
+      "vendor": {
+        "notSaved": "Not saved",
+        "opened": "P8 run opened",
+        "existing": "Recorded in the vendor's existing run",
+        "notVendorSaved": "Recorded as not a new vendor",
+        "title": "Looks like connecting a new vendor",
+        "body": "Detected: {matched}. If the vendor will access client data through the app or the service, a P8 run (adding a subprocessor) opens. With no answer within a business day, the run opens on its own.",
+        "name": "Vendor name",
+        "openRun": "Open P8 run",
+        "notVendor": "Not a new vendor"
+      },
+      "portalNotes": {
+        "title": "Lines the client sees in the portal",
+        "hint": "Shown under the task in the portal, in order. No message content, only what is written here.",
+        "remove": "Remove",
+        "empty": "No lines yet.",
+        "newLine": "New line",
+        "placeholder": "For example: Rotem Cohen · meeting Wednesday 11.11 at 11:00",
+        "add": "Add"
+      },
+      "lesson": {
+        "notSaved": "Not saved",
+        "sentToOwner": "Comment sent to the process owner",
+        "heldSaved": "Recorded that the procedure held",
+        "question": "Was anything in the procedure wrong or missing?",
+        "body": "This run was opened from the {process} procedure. What you write goes to the process owner, for the next version of the procedure.",
+        "placeholder": "For example: step 2 should start one working day earlier, because Ayala doesn't answer on Fridays.",
+        "send": "Send to owner",
+        "held": "The procedure held"
+      },
+      "time": {
+        "title": "Hours on this task",
+        "empty": "No time reported on this task yet.",
+        "running": "{count, plural, one {One timer is running on this task now, and its time will count when it stops.} other {# timers are running on this task now, and their time will count when they stop.}}"
+      }
+    },
+    "list": {
+      "title": "Tasks",
+      "subtitle": "Open and recent tasks, by client, category and status.",
+      "newTaskTrigger": "Task",
+      "newTaskTitle": "New task",
+      "pills": {
+        "ACTIVE": "Active",
+        "OPEN": "Open",
+        "IN_PROGRESS": "In progress",
+        "PENDING_APPROVAL": "Awaiting approval",
+        "DONE": "Done"
+      },
+      "mine": {
+        "involved": "Mine",
+        "assigned": "To do",
+        "supervising": "Supervising",
+        "all": "Everyone"
+      },
+      "supervisingPending": "{label}, {count} awaiting your approval",
+      "groupByClient": "By client",
+      "doneWindow": "Showing tasks completed in the last {days} days.",
+      "showAllHistory": "Show all history",
+      "view": {
+        "list": "List",
+        "board": "Board"
+      },
+      "back": {
+        "toCalendar": "Back to calendar",
+        "toTasks": "Back to tasks",
+        "calendar": "Calendar",
+        "tasks": "Tasks"
+      },
+      "empty": {
+        "search": {
+          "title": "No tasks found",
+          "description": "No task has \"{q}\" in its title, description, thread or client name. Clear the search or remove a filter."
+        },
+        "involved": {
+          "title": "No open tasks for you",
+          "description": "Tasks assigned to you or waiting for your approval appear here. \"Everyone\" shows all tasks."
+        },
+        "assigned": {
+          "title": "Nothing for you to do",
+          "description": "Tasks assigned to you appear here. \"Everyone\" shows all tasks."
+        },
+        "supervising": {
+          "title": "No tasks under your supervision",
+          "description": "Tasks you supervise appear here. \"Everyone\" shows all tasks."
+        },
+        "all": {
+          "title": "No tasks yet",
+          "description": "Your first task will appear here, under the client and category you choose."
+        }
+      },
+      "sort": {
+        "label": "Sort",
+        "default": "Default",
+        "columns": {
+          "client": "Client",
+          "title": "Task",
+          "category": "Category",
+          "due": "Date",
+          "assignee": "Assignee",
+          "status": "Status",
+          "supervisor": "Supervisor"
+        },
+        "ascending": {
+          "date": "earliest first",
+          "status": "open first",
+          "text": "A to Z"
+        },
+        "descending": {
+          "date": "latest first",
+          "status": "done first",
+          "text": "Z to A"
+        },
+        "sortedAscending": "{label}, sorted ascending",
+        "sortedDescending": "{label}, sorted descending",
+        "sortBy": "Sort by {label}"
+      }
+    },
+    "create": {
+      "submit": "Add task",
+      "submitting": "Creating...",
+      "client": "Client *",
+      "chooseClient": "Choose a client",
+      "category": "Category",
+      "noCategory": "No category",
+      "title": "Task name *",
+      "description": "Details",
+      "descriptionPlaceholder": "What someone needs to know to start: what was asked, by whom, and what is already done",
+      "assignee": "Assignee",
+      "noAssignee": "No assignee",
+      "supervisor": "Supervisor",
+      "noSupervisor": "No supervisor",
+      "loading": "Loading...",
+      "urgent": "Urgent",
+      "urgentNotice": "{name} will get a message now, with a link to the task.",
+      "digestNotice": "{name} will see it in tomorrow morning's digest.",
+      "clientVisible": "Show to the client in the portal",
+      "clientTitle": "Title for the client",
+      "clientTitlePlaceholder": "What the client will see. Defaults to the task name"
+    },
+    "filters": {
+      "searchLabel": "Search tasks",
+      "searchPlaceholder": "Search titles, descriptions, threads and client names",
+      "clearSearch": "Clear search",
+      "client": "Client",
+      "allClients": "All clients",
+      "category": "Category",
+      "allCategories": "All categories"
+    },
+    "board": {
+      "columns": {
+        "OPEN": "Open",
+        "IN_PROGRESS": "In progress",
+        "PENDING_APPROVAL": "Awaiting approval",
+        "DONE": "Done"
+      },
+      "moveFailed": "The task was not moved",
+      "procedureReminder": "Not in the client file yet",
+      "procedureReview": "Review",
+      "beforeClosing": "Before closing",
+      "outcomeQuestion": "What do we tell the client happened?",
+      "outcomeClose": "Done",
+      "outcomeLabel": "In one sentence, in the client's language",
+      "outcomePlaceholder": "One sentence, in their language",
+      "outcomeCancel": "Cancel",
+      "more": "{count} more. Narrow the board with the search or the client filter.",
+      "empty": "Empty",
+      "assignee": "Assignee: {name}",
+      "supervisor": "Supervisor: {name}"
+    },
+    "row": {
+      "updateFailed": "Update failed",
+      "changeUndone": "Change undone",
+      "markUndone": "Undone",
+      "shownToClient": "The task is shown to the client",
+      "removedFromPortal": "The task was removed from the portal",
+      "markedWaiting": "Marked as waiting on the client",
+      "backInProgress": "The task is back in progress",
+      "clientTitleUpdated": "Client title updated",
+      "clientTitleRemoved": "Client title removed",
+      "supplierRecorded": "Recorded in the client file",
+      "supplierRemoved": "Supplier removed from the file",
+      "outcomeUpdated": "Outcome updated",
+      "markedDone": "Task marked as done",
+      "statusChanged": "Status changed to {status}",
+      "procedureReminder": "Not in the client file yet",
+      "procedureReview": "Review",
+      "dueUpdated": "Due date updated",
+      "dueRemoved": "Due date removed",
+      "categoryChanged": "Category changed to {category}",
+      "categoryRemoved": "Category removed",
+      "markOpen": "Mark as open",
+      "markDone": "Mark as done",
+      "priority": "Priority: {priority}",
+      "clientTitlePlaceholder": "What the client will see",
+      "addClientTitle": "Add a title for the client",
+      "outcomeQuestion": "What do we tell the client happened?",
+      "outcomePlaceholder": "One sentence, in their language",
+      "outcomeClose": "Done",
+      "outcomeCancel": "Cancel",
+      "outcomeEditPlaceholder": "What actually happened, in the client's language",
+      "addOutcome": "Add an outcome",
+      "supplierPlaceholder": "Who did the work",
+      "supplierClear": "Remove",
+      "supplierAsk": "Who did the work?",
+      "category": "Category",
+      "changeCategory": "Change category",
+      "noCategory": "No category",
+      "dueAria": "Due {date}, change",
+      "addDue": "Add a due date",
+      "changeDue": "Change due date",
+      "assigneePrefix": "Assignee:",
+      "noAssignee": "No assignee",
+      "status": "Status",
+      "supervisorPrefix": "Supervisor:",
+      "noSupervisor": "No supervisor",
+      "stopWaiting": "No longer waiting",
+      "markWaiting": "Mark as waiting on the client",
+      "notWaiting": "Not waiting on anyone",
+      "removeFromPortal": "Remove from the portal",
+      "showInPortal": "Show to the client in the portal",
+      "visibleToClient": "Visible to the client",
+      "hiddenFromClient": "Not visible to the client"
+    },
+    "errors": {
+      "forbidden": "You don't have permission for this. The client isn't assigned to you.",
+      "generic": "Something went wrong. Try again.",
+      "clientRequired": "Choose a client.",
+      "titleRequired": "Enter a task name."
+    }
+  },
+  "messageClient": {
+    "button": "Message client",
+    "dialog": "Message to {client}",
+    "close": "Close",
+    "never": "Never: {text}",
+    "whatHappened": "What happened?",
+    "body": "Message text",
+    "bracketsHint": "Fill in anything in square brackets before sending.",
+    "recorded": "Recorded. The message was saved on the client.",
+    "recordedWithTask": "Recorded. The message was saved on the client and on the task.",
+    "whatsapp": "Open in WhatsApp",
+    "copy": "Copy",
+    "email": "Send by email",
+    "otherDraft": "Different draft"
+  },
+  "timer": {
+    "page": {
+      "tabTimer": "Timer",
+      "tabMine": "My time",
+      "tabsLabel": "Timer and my time",
+      "title": "Timer",
+      "subtitle": "Running timers, client and category, recent combinations."
+    },
+    "widget": {
+      "parallelTitle": "A timer is running for {names}",
+      "parallelDescription": "The full time will count for both clients: {names} and {client}.",
+      "newClientFallback": "the new client",
+      "parallelQuestion": "Run the timers in parallel?",
+      "parallelConfirm": "Run in parallel",
+      "cancel": "Cancel",
+      "startFailed": "Couldn't start the timer",
+      "started": "Timer started",
+      "startedParallel": "Timer started in parallel",
+      "startedNoNote": "Timer started without a note",
+      "startedParallelNoNote": "Timer started in parallel, without a note",
+      "startedNoNoteHint": "{client} · {category}. You can add a note now or when you stop.",
+      "pickClientAndCategory": "Choose a client and a category before starting the timer.",
+      "missingClientOrCategory": "Client or category is missing.",
+      "start": "Start timer",
+      "startParallel": "Start in parallel",
+      "idle": "No timer running",
+      "idleHint": "Choose a client and category, or start a recent combination in one click.",
+      "addTitle": "Another timer, for a different client",
+      "addHint": "Both timers will run in parallel, and each client is billed for its full time.",
+      "addButton": "Start another timer",
+      "limitReached": "{count, plural, one {# timer is} other {# timers are}} running. To start another, stop one.",
+      "quickStart": "Quick start",
+      "quickStartHint": "A short note now saves reconstructing it at month end, and it goes into the client report.",
+      "quickStartPlaceholder": "What are you working on? (recommended)",
+      "alreadyRunning": "A timer is already running for this client",
+      "lastUsed": "Last: {when}",
+      "lastUsedToday": "Today {time}",
+      "lastUsedYesterday": "Yesterday {time}",
+      "today": "Today",
+      "todaySummary": "{count, plural, one {# entry} other {# entries}} · {total} total",
+      "todayParallel": " · {parallel} of it in parallel",
+      "todayEmpty": "No completed time entries today yet."
+    },
+    "card": {
+      "active": "Timer running",
+      "clientFallback": "Client",
+      "categoryFallback": "Category",
+      "longRunning": "This timer has run for over {hours} hours, worth a check",
+      "noteLabel": "Note, saved as you work",
+      "noteLabelRequired": "Note, required before stopping. Saved as you work",
+      "notePlaceholder": "What are you working on now?",
+      "noteRequiredError": "Write a short note before stopping: what was done for the client.",
+      "stopFailed": "Couldn't stop the timer",
+      "saved": "Time entry saved · {duration}",
+      "moveQuestion": "Move it?",
+      "move": "Move",
+      "keep": "Keep",
+      "moveFailed": "Couldn't move the entry",
+      "moved": "Entry moved",
+      "movedHint": "The note says when the work was done.",
+      "stageQuestion": "Where does it stand now?",
+      "stageInProgress": "In progress",
+      "stageWaiting": "Waiting on client",
+      "stageDone": "Done",
+      "outcomeLabel": "What should we tell the client happened?",
+      "outcomePlaceholder": "One sentence, in their words",
+      "stageFailed": "Update failed",
+      "clientUpdated": "Client updated",
+      "notInFileYet": "Not in the client file yet",
+      "toReview": "Go to review",
+      "reopenFailed": "Couldn't restore the timer",
+      "reopened": "Timer restored",
+      "resumesFrom": "Continuing from {duration}",
+      "discardFailed": "Couldn't delete the timer",
+      "discarded": "Timer deleted without saving",
+      "discardedHint": "No time entry was created.",
+      "stop": "Stop and save",
+      "stopping": "Stopping...",
+      "discard": "Delete without saving",
+      "discarding": "Deleting...",
+      "stopHint": "Stopping saves right away. You can undo from the message that appears."
+    },
+    "fields": {
+      "client": "Client",
+      "pickClient": "Choose a client",
+      "category": "Category",
+      "pickCategory": "Choose a category",
+      "pickClientFirst": "Choose a client first",
+      "promise": "Client commitment",
+      "unlinked": "Not linked",
+      "note": "Task / note",
+      "notePlaceholder": "For example: weekly report update",
+      "starting": "Starting..."
+    },
+    "errors": {
+      "sameClient": "A timer is already running for this client. Stop it first.",
+      "limit": "You can run up to {max} timers in parallel. Stop one first.",
+      "parallelConfirmation": "Another timer is already running. Confirm to run them in parallel."
+    }
+  },
+  "myTime": {
+    "view": {
+      "title": "My time",
+      "subtitle": "The week at a glance, a one-line time entry, and a list by day.",
+      "prevWeek": "Previous week",
+      "nextWeek": "Next week",
+      "weekRange": "{start} - {end}",
+      "weekTotal": "This week <mono>{total}</mono> · target {target}:00",
+      "dayShort": "{weekday} {dayMonth}",
+      "active": "Running",
+      "billable": "Billable <mono>{amount}</mono>",
+      "empty": "No time entries this week yet."
+    },
+    "form": {
+      "title": "Add a time entry, one line",
+      "date": "Date",
+      "from": "From",
+      "to": "To",
+      "client": "Client *",
+      "category": "Category *",
+      "categoryAria": "Category",
+      "pick": "Choose",
+      "pickClientFirst": "Choose a client first",
+      "note": "Note *",
+      "notePlaceholder": "What was done for the client?",
+      "saving": "Saving...",
+      "submit": "Add entry",
+      "saved": "Time entry saved",
+      "backdateLabel": "Entry for an earlier day, a reason is required",
+      "backdatePlaceholder": "For example: forgot to log it on time"
+    },
+    "overlap": {
+      "message": "There is already a time entry at this time for {client} ({range}). Parallel entries are only allowed for different clients. If that is the case, you can save anyway.",
+      "timeRange": "{start}-{end}",
+      "timeRangeRunning": "{start} (timer running)",
+      "saveAnyway": "Save anyway",
+      "cancel": "Cancel"
+    },
+    "closedBank": {
+      "moveToOpen": "Record in the open bank",
+      "overrideAnyway": "Change the closed bank anyway",
+      "cancel": "Cancel",
+      "reasonLabel": "Reason (required, recorded in the audit log)",
+      "confirm": "Yes, make the change",
+      "back": "Back"
+    },
+    "entry": {
+      "date": "Date",
+      "start": "Start",
+      "end": "End",
+      "note": "Note",
+      "editReason": "Reason for edit (recommended)",
+      "saving": "Saving...",
+      "save": "Save",
+      "cancel": "Cancel",
+      "edited": "Edited",
+      "overlapConfirmed": "Overlap confirmed",
+      "timer": "Timer",
+      "active": "Running",
+      "billable": "Billable <mono>{amount}</mono>",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "deleteFailed": "Delete failed.",
+      "genericError": "Something went wrong. Please try again."
+    },
+    "errors": {
+      "missingFields": "Fill in the date, times, client and category.",
+      "missingData": "Some details are missing."
+    }
+  },
+  "timeEntries": {
+    "errors": {
+      "overlapSameClient": "This time overlaps an existing entry for the same client: {conflict}.",
+      "overlapConflict": "{client} · {category} · {range}",
+      "overlapRange": "{start} to {end}",
+      "overlapRangeRunning": "{start}, timer still running",
+      "conflict": "Someone else updated this entry in the meantime. Refresh the page and try again.",
+      "editWindowExpired": "The self-edit window has ended. A manager needs to make this change.",
+      "backdateReasonRequired": "Give a reason for an entry on an earlier day.",
+      "futureEntry": "You can't log time in the future.",
+      "forbidden": "You don't have permission to do this.",
+      "generic": "Something went wrong. Please try again."
+    }
+  },
+  "domainErrors": {
+    "tasks": {
+      "notFound": "Task not found.",
+      "parentOtherClient": "A task can only be split into steps within the same client.",
+      "parentIsSubtask": "A step can't be split into steps. Add it to the task itself.",
+      "parentClosed": "This task is already closed, so steps can't be added to it.",
+      "templateNotFound": "This template doesn't exist.",
+      "categoryNotFound": "Category not found.",
+      "categoryOtherClient": "This category doesn't belong to the selected client.",
+      "categoryInactive": "This category is inactive.",
+      "titleRequired": "Task title is required.",
+      "titleEmpty": "Task title can't be empty.",
+      "approvalWithoutSupervisor": "To require approval, choose a supervisor. Without one, nobody can approve it and the task will never close.",
+      "noOutcome": "A task the client can see can't close without an outcome line. Write one sentence, in the client's language, about what actually happened.",
+      "needsApproval": "This task requires approval. Send it for approval and the supervisor will close it.",
+      "blockOnClosed": "A completed task isn't waiting on anyone. If something is still pending, reopen it.",
+      "aiExclusionOnStep": "A step inherits the \"No AI\" mark from its task. To mark it, mark the task.",
+      "stepAwaitingApproval": "The step \"{title}\" is waiting for approval from {supervisor}. Once it's approved, the task can be closed.",
+      "stepAwaitingApprovalNoSupervisor": "The step \"{title}\" is waiting for approval. Once it's approved, the task can be closed.",
+      "commentEmpty": "Nothing to save: the comment is empty.",
+      "commentTooLong": "The comment is longer than {max} characters. You can split it in two.",
+      "commentNotFound": "Comment not found.",
+      "stepAlreadyPending": "This step is already waiting for approval from {supervisor}.",
+      "stepAlreadyPendingNoSupervisor": "This step is already waiting for approval."
+    },
+    "timeEntries": {
+      "overlap": "This time range overlaps an existing entry.",
+      "sameClientTimer": "A timer is already running for this client. Stop it first.",
+      "timerLimit": "Up to {max} timers can run at the same time. Stop one first.",
+      "parallelTimerConfirmation": "Another timer is running. Confirm to run both in parallel.",
+      "editWindowExpired": "The window for editing this entry yourself has passed. A manager needs to make this change.",
+      "backdateReasonRequired": "Add a reason when reporting time for a previous day.",
+      "noteRequired": "An entry that isn't linked to a task needs a short note: what was done for the client.",
+      "futureEntry": "Time can't be reported in the future.",
+      "conflict": "Someone else updated this entry in the meantime. Refresh the page and try again.",
+      "inactiveTarget": "This client or category is inactive.",
+      "categoryOtherClient": "This category doesn't belong to the selected client.",
+      "taskNotFound": "Task not found.",
+      "taskOtherClient": "That task belongs to a different client than this time entry.",
+      "invalidRange": "Start time must be before end time.",
+      "notStoppedAcrossClosure": "This entry wasn't running when the package or cycle closed, so it can't be moved.",
+      "openBankTooRecentToMove": "The open package started less time ago than this entry lasts, so it doesn't fit yet. You can move it later.",
+      "openBankTooRecentToRecord": "The open package started less time ago than this entry lasts, so it doesn't fit yet. You can record it later.",
+      "activeTimerNotFound": "Active timer not found."
+    },
+    "closedBank": {
+      "closedNoOpen": "{kind, select, PREPAID {The package from {start} closed on {end}.} other {The cycle from {start} closed on {end}.}} The client has no open package or cycle right now, so this time can't be recorded.",
+      "closedMoveToOpen": "{kind, select, PREPAID {The package from {start} closed on {end}.} other {The cycle from {start} closed on {end}.}} Record the time in the {openKind, select, PREPAID {open package} other {open cycle}} instead?",
+      "closedChange": "{kind, select, PREPAID {The package from {start} closed on {end}.} other {The cycle from {start} closed on {end}.}} An entry in a closed package or cycle can't be changed.",
+      "stoppedAcrossClosure": "{kind, select, PREPAID {The package from {start} closed on {end}.} other {The cycle from {start} closed on {end}.}} The timer was running when it closed, so the time was recorded there. Move the entry to the {openKind, select, PREPAID {open package} other {open cycle}}?",
+      "overrideReasonRequired": "Changing a closed package or cycle requires a reason.",
+      "overrideWarning": "You're about to change a closed package or cycle. Are you sure you want to make this change?"
+    },
+    "taskPlans": {
+      "empty": "Nothing to save: the plan is empty.",
+      "tooLong": "The plan is longer than {max} characters. Shorten the reasoning and keep the steps.",
+      "tooManySteps": "Up to {max} steps. A task that needs more than that is several tasks.",
+      "onStep": "A step has no work plan of its own. The plan is saved on the task the step belongs to.",
+      "onClosed": "The task is already closed, so its plan stays as it was. Reopen the task to update it.",
+      "noPlan": "This task doesn't have a work plan yet.",
+      "notApproved": "The plan is still a draft. Only an approved plan can be turned into steps.",
+      "noSteps": "This plan has no steps to copy.",
+      "notLatest": "This isn't the latest version of the plan. Refresh and try again.",
+      "alreadyApproved": "This plan is already approved.",
+      "versionConflict": "A newer version of the plan was saved in the meantime (version {version}). Read it, add your changes to it and save again."
+    },
+    "taskPortalNotes": {
+      "taskNotFound": "Task not found.",
+      "empty": "The line for the client is empty.",
+      "tooLong": "The line for the client is longer than {max} characters.",
+      "taskNotVisible": "The client can't see this task, so there's nowhere to add a line. Show it on the portal first, then add the line.",
+      "taskArchived": "The task is archived.",
+      "noteNotFound": "Line not found."
+    },
+    "processLessons": {
+      "taskNotFound": "Task not found.",
+      "notARun": "Only a process run is asked about the procedure.",
+      "runNotDone": "The procedure question comes only after the run is finished.",
+      "empty": "Write what was wrong or missing, or choose \"The procedure was right\".",
+      "tooLong": "Up to {max} characters.",
+      "containsSecret": "The text contains a password, key or card number. Secrets go in the vault, not in the procedure.",
+      "alreadyAnswered": "This question was already answered for this run.",
+      "lessonNotFound": "Remark not found.",
+      "notOwner": "Only the process owner or a manager decides on a remark about the procedure.",
+      "alreadyResolved": "This remark was already decided.",
+      "appliedNeedsWhere": "Write where it went in, for example \"version 4, step 2\".",
+      "dismissedNeedsWhy": "Write why it doesn't belong in the procedure."
+    },
+    "vendorDetections": {
+      "noP8": "No P8 process was found in the internal file, or it has no approved procedure.",
+      "notFound": "Detection not found.",
+      "noAccess": "You don't have access to this task.",
+      "alreadyDecided": "This detection was already decided.",
+      "vendorNameRequired": "Opening a P8 run needs the vendor's name."
     }
   }
 }

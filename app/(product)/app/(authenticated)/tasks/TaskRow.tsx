@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { Check, Eye, EyeOff, Hourglass } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import {
   toggleTaskDoneAction,
   updateTaskCategoryAction,
@@ -13,16 +14,9 @@ import { useToast } from "@/components/app/toast/ToastProvider";
 import { SUPPLIER_EXPERIENCE_LABELS, waitingTitle } from "@/lib/app-domain/portal-labels";
 import type { SupplierExperience, TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 
-// Mirrors lib/app-domain/tasks.ts's TASK_STATUS_LABELS - duplicated
-// (rather than imported) because that module starts with `import
-// "server-only"`, which a "use client" component can never pull in.
-const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  OPEN: "פתוחה",
-  IN_PROGRESS: "בביצוע",
-  PENDING_APPROVAL: "ממתינה לאישור",
-  DONE: "הושלמה",
-  ARCHIVED: "בארכיון",
-};
+// Status and priority names come from the dictionary,
+// tasks.common.status.<TaskStatus> and tasks.common.priority.<TaskPriority>
+// (ADR 0006), the same words lib/app-domain/tasks.ts's labels hold.
 
 const STATUS_TAG_CLASSES: Record<TaskStatus, string> = {
   OPEN: "bg-app-neutral-soft text-app-text-secondary",
@@ -44,12 +38,6 @@ const STATUS_OPTIONS: TaskStatus[] = ["OPEN", "IN_PROGRESS", "PENDING_APPROVAL",
 // nothing at all, so the mark only appears where it means something. A
 // pill on every row would cost the list its scannability to say "this one
 // is ordinary", which is not news.
-const PRIORITY_LABELS: Record<TaskPriority, string> = {
-  LOW: "נמוכה",
-  NORMAL: "רגילה",
-  HIGH: "גבוהה",
-  URGENT: "דחופה",
-};
 
 const PRIORITY_DOTS: Record<TaskPriority, string> = {
   LOW: "bg-app-border-strong",
@@ -100,6 +88,9 @@ export function TaskRow({
   // Outside the tasks screen there is no provider
   // and this is empty, so the row links to the task plainly.
   const { listQuery, categories } = useTaskList();
+  const t = useTranslations("tasks.row");
+  const tc = useTranslations("tasks.common");
+  const format = useFormatter();
   const { showToast } = useToast();
   const [status, setStatus] = useState(task.status);
   const [pending, setPending] = useState(false);
@@ -160,7 +151,7 @@ export function TaskRow({
       setSupplierName(task.supplierName ?? "");
       setSupplierExperience(task.supplierExperience);
       setClientOutcome(task.clientOutcome ?? "");
-      showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
+      showToast({ tone: "error", title: t("updateFailed"), description: result.error });
       return;
     }
     setClientVisible(result.clientVisible);
@@ -186,7 +177,7 @@ export function TaskRow({
     await writePortal(
       { clientVisible: next, ...(next ? {} : { waitingOnClient: false }) },
       {
-        title: next ? "המשימה מוצגת ללקוח" : "המשימה הוסרה מהפורטל",
+        title: next ? t("shownToClient") : t("removedFromPortal"),
         description: clientTitle || task.title,
         undo: () => toggleVisible(),
       }
@@ -207,7 +198,7 @@ export function TaskRow({
     await writePortal(
       { waitingOnClient: next },
       {
-        title: next ? "סומן כמחכה ללקוח" : "המשימה חזרה לטיפול",
+        title: next ? t("markedWaiting") : t("backInProgress"),
         description: clientTitle || task.title,
         undo: () => toggleWaiting(),
       }
@@ -219,7 +210,7 @@ export function TaskRow({
     if ((task.clientTitle ?? "") === clientTitle.trim()) return;
     await writePortal(
       { clientTitle: clientTitle.trim() || null },
-      { title: clientTitle.trim() ? "הכותרת ללקוח עודכנה" : "הכותרת ללקוח הוסרה", description: task.title }
+      { title: clientTitle.trim() ? t("clientTitleUpdated") : t("clientTitleRemoved"), description: task.title }
     );
   }
 
@@ -230,7 +221,7 @@ export function TaskRow({
     setSupplierExperience(experience);
     await writePortal(
       { supplierName: name, supplierExperience: experience },
-      { title: "נרשם בתיק הלקוח", description: `${name} · ${SUPPLIER_EXPERIENCE_LABELS[experience]}` }
+      { title: t("supplierRecorded"), description: `${name} · ${SUPPLIER_EXPERIENCE_LABELS[experience]}` }
     );
   }
 
@@ -238,7 +229,7 @@ export function TaskRow({
     setEditingSupplier(false);
     setSupplierName("");
     setSupplierExperience(null);
-    await writePortal({ supplierName: null }, { title: "הספק הוסר מהתיק", description: task.title });
+    await writePortal({ supplierName: null }, { title: t("supplierRemoved"), description: task.title });
   }
 
   /// Save the outcome sentence and close in the same call.
@@ -271,7 +262,7 @@ export function TaskRow({
     }
     await writePortal(
       { clientOutcome: clientOutcome.trim() || null },
-      { title: "שורת התוצאה עודכנה", description: clientOutcome.trim() || task.title }
+      { title: t("outcomeUpdated"), description: clientOutcome.trim() || task.title }
     );
   }
 
@@ -293,18 +284,18 @@ export function TaskRow({
     setPending(false);
     if (!result.ok) {
       setStatus(previousStatus);
-      showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
+      showToast({ tone: "error", title: t("updateFailed"), description: result.error });
       return;
     }
     if (isUndo) {
-      showToast({ tone: "info", title: "הסימון בוטל", description: task.title });
+      showToast({ tone: "info", title: t("markUndone"), description: task.title });
       return;
     }
     if (outcome !== undefined) setClientOutcome(result.clientOutcome ?? outcome);
     if (nextStatus === "DONE") {
       showToast({
         tone: "success",
-        title: "המשימה סומנה כהושלמה",
+        title: t("markedDone"),
         // The sentence the client will read, shown back at the moment it
         // is saved. This is the only place it is confirmed, and a person
         // who sees their own wording here catches a bad one immediately.
@@ -314,7 +305,7 @@ export function TaskRow({
     } else {
       showToast({
         tone: "info",
-        title: `הסטטוס עודכן ל${TASK_STATUS_LABELS[nextStatus]}`,
+        title: t("statusChanged", { status: tc(`status.${nextStatus}`) }),
         description: task.title,
         undo: () => changeStatus(previousStatus, true),
       });
@@ -325,9 +316,9 @@ export function TaskRow({
     if (result.procedureReminder) {
       showToast({
         tone: "warning",
-        title: "עוד לא בתיק הלקוח",
+        title: t("procedureReminder"),
         description: result.procedureReminder.text,
-        link: { label: "למסך הבדיקה", href: result.procedureReminder.reviewHref },
+        link: { label: t("procedureReview"), href: result.procedureReminder.reviewHref },
       });
     }
   }
@@ -362,17 +353,17 @@ export function TaskRow({
     setDuePending(false);
     if (!result.ok) {
       setDueDate(previous);
-      showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
+      showToast({ tone: "error", title: t("updateFailed"), description: result.error });
       return;
     }
     setDueDate(result.dueDate);
     if (isUndo) {
-      showToast({ tone: "info", title: "השינוי בוטל", description: task.title });
+      showToast({ tone: "info", title: t("changeUndone"), description: task.title });
       return;
     }
     showToast({
       tone: "success",
-      title: value ? "תאריך היעד עודכן" : "תאריך היעד הוסר",
+      title: value ? t("dueUpdated") : t("dueRemoved"),
       description: task.title,
       undo: () => changeDueDate(previous ? previous.slice(0, 10) : null, true),
     });
@@ -402,27 +393,23 @@ export function TaskRow({
     setCategoryPending(false);
     if (!result.ok) {
       setCategory(previous);
-      showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
+      showToast({ tone: "error", title: t("updateFailed"), description: result.error });
       return;
     }
     setCategory({ id: result.categoryId, name: result.categoryName });
     if (isUndo) {
-      showToast({ tone: "info", title: "השינוי בוטל", description: task.title });
+      showToast({ tone: "info", title: t("changeUndone"), description: task.title });
       return;
     }
     showToast({
       tone: "success",
-      title: result.categoryName ? `הקטגוריה עודכנה ל${result.categoryName}` : "הקטגוריה הוסרה",
+      title: result.categoryName ? t("categoryChanged", { category: result.categoryName }) : t("categoryRemoved"),
       description: task.title,
       undo: () => changeCategory(previous.id, true),
     });
   }
 
-  const dueLabel = dueDate
-    ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: "Asia/Jerusalem" }).format(
-        new Date(dueDate)
-      )
-    : "-";
+  const dueLabel = dueDate ? format.dateTime(new Date(dueDate), { day: "numeric", month: "numeric" }) : "-";
 
   return (
     // `data-task` is the row's own handle, for the browser suite. The
@@ -472,7 +459,7 @@ export function TaskRow({
         type="button"
         role="checkbox"
         aria-checked={isDone}
-        aria-label={isDone ? "סימון כפתוחה" : "סימון כהושלמה"}
+        aria-label={isDone ? t("markOpen") : t("markDone")}
         disabled={pending}
         onClick={() => changeStatus(isDone ? "OPEN" : "DONE")}
         className={`flex h-5 w-5 shrink-0 items-center justify-center self-start rounded-[6px] border transition-colors [grid-area:check] disabled:opacity-50 xl:self-center ${
@@ -498,7 +485,7 @@ export function TaskRow({
         <div className="flex min-w-0 items-center gap-1.5">
           {task.priority !== "NORMAL" && (
             <span
-              title={`עדיפות ${PRIORITY_LABELS[task.priority]}`}
+              title={t("priority", { priority: tc(`priority.${task.priority}`) })}
               className={`h-1.5 w-1.5 shrink-0 rounded-full ${PRIORITY_DOTS[task.priority]}`}
             />
           )}
@@ -530,6 +517,7 @@ export function TaskRow({
             // back - which is most of what anyone opens "הושלמו" to do.
             // `overflow-wrap: anywhere` so a pasted link breaks inside the
             // row instead of running past it.
+            dir="auto"
             className={`min-w-0 text-[13.5px] leading-snug [overflow-wrap:anywhere] hover:underline xl:truncate ${isDone ? "text-app-text-tertiary" : "text-app-text-primary"}`}
           >
             {task.title}
@@ -569,7 +557,7 @@ export function TaskRow({
                     setEditingTitle(false);
                   }
                 }}
-                placeholder="איך זה ייקרא אצל הלקוח"
+                placeholder={t("clientTitlePlaceholder")}
                 className="mt-1.5 w-full rounded-[8px] border border-app-border bg-white px-2.5 py-1.5 text-[12px] text-app-text-primary outline-none focus:border-gold"
               />
             ) : (
@@ -579,7 +567,7 @@ export function TaskRow({
                 dir="auto"
               className="mt-1 block max-w-full truncate text-start text-[11.5px] text-app-text-accent hover:underline"
               >
-                {clientTitle || "הוספת כותרת ללקוח"}
+                {clientTitle || t("addClientTitle")}
               </button>
             ))}
 
@@ -593,7 +581,7 @@ export function TaskRow({
             <div className="mt-1.5">
               {closing ? (
                 <div className="rounded-[10px] border border-gold/40 bg-app-surface-sunken p-2.5">
-                  <p className="text-[11.5px] text-app-text-secondary">מה נגיד ללקוח שקרה?</p>
+                  <p className="text-[11.5px] text-app-text-secondary">{t("outcomeQuestion")}</p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     <input
                       autoFocus
@@ -604,7 +592,7 @@ export function TaskRow({
                         if (e.key === "Enter") void confirmClose();
                         if (e.key === "Escape") cancelClose();
                       }}
-                      placeholder="משפט אחד, בשפה שלו"
+                      placeholder={t("outcomePlaceholder")}
                       className="min-w-0 flex-1 rounded-[8px] border border-app-border-strong bg-white px-2.5 py-1.5 text-[12px] text-app-text-primary outline-none focus:border-gold"
                     />
                     <button
@@ -613,10 +601,10 @@ export function TaskRow({
                       onClick={() => void confirmClose()}
                       className="rounded-full bg-app-accent px-3 py-1.5 text-[11px] font-medium text-app-text-primary disabled:opacity-40"
                     >
-                      סיום
+                      {t("outcomeClose")}
                     </button>
                     <button type="button" onClick={cancelClose} className="text-[11px] text-app-text-tertiary hover:text-app-text-primary">
-                      ביטול
+                      {t("outcomeCancel")}
                     </button>
                   </div>
                 </div>
@@ -634,16 +622,17 @@ export function TaskRow({
                       setEditingOutcome(false);
                     }
                   }}
-                  placeholder="מה קרה בפועל, בשפה של הלקוח"
+                  placeholder={t("outcomeEditPlaceholder")}
                   className="w-full rounded-[8px] border border-app-border bg-white px-2.5 py-1.5 text-[12px] text-app-text-primary outline-none focus:border-gold"
                 />
               ) : (
                 <button
                   type="button"
                   onClick={() => setEditingOutcome(true)}
+                  dir="auto"
                   className="block max-w-full truncate text-start text-[11.5px] text-app-text-secondary hover:underline"
                 >
-                  {clientOutcome || "הוספת שורת תוצאה"}
+                  {clientOutcome || t("addOutcome")}
                 </button>
               )}
             </div>
@@ -667,7 +656,7 @@ export function TaskRow({
                         setEditingSupplier(false);
                       }
                     }}
-                    placeholder="מי ביצע בפועל"
+                    placeholder={t("supplierPlaceholder")}
                     className="w-40 max-w-full rounded-[8px] border border-app-border bg-white px-2.5 py-1.5 text-[12px] text-app-text-primary outline-none focus:border-gold"
                   />
                   {(Object.keys(SUPPLIER_EXPERIENCE_LABELS) as SupplierExperience[]).map((key) => (
@@ -688,7 +677,7 @@ export function TaskRow({
                       onClick={clearSupplier}
                       className="text-[11px] text-app-text-tertiary hover:text-app-error"
                     >
-                      הסרה
+                      {t("supplierClear")}
                     </button>
                   )}
                 </div>
@@ -696,11 +685,12 @@ export function TaskRow({
                 <button
                   type="button"
                   onClick={() => setEditingSupplier(true)}
+                  dir="auto"
                   className="block max-w-full truncate text-start text-[11.5px] text-app-text-accent hover:underline"
                 >
                   {supplierName
                     ? `${supplierName}${supplierExperience ? ` · ${SUPPLIER_EXPERIENCE_LABELS[supplierExperience]}` : ""}`
-                    : "מי ביצע בפועל?"}
+                    : t("supplierAsk")}
                 </button>
               )}
             </div>
@@ -720,15 +710,15 @@ export function TaskRow({
           <select
             value={category.id ?? ""}
             disabled={categoryPending}
-            aria-label="קטגוריה"
-            title="שינוי הקטגוריה"
+            aria-label={t("category")}
+            title={t("changeCategory")}
             onChange={(e) => changeCategory(e.target.value || null)}
             className={`-mx-1 w-full min-w-0 cursor-pointer truncate rounded-[6px] border-0 bg-transparent px-1 py-0.5 text-start text-xs outline-none hover:bg-app-surface-sunken focus-visible:ring-1 focus-visible:ring-gold disabled:opacity-50 ${
               category.id ? "text-app-text-secondary" : "text-app-text-tertiary"
             }`}
           >
             <option value="" className="bg-white text-app-text-primary">
-              ללא קטגוריה
+              {t("noCategory")}
             </option>
             {categoryOptions.map((c) => (
               <option key={c.id} value={c.id} className="bg-white text-app-text-primary">
@@ -738,7 +728,7 @@ export function TaskRow({
           </select>
         ) : (
           <span dir="auto" className="block truncate text-page-start text-xs text-app-text-secondary">
-            {category.name ?? <span className="text-app-text-tertiary">ללא קטגוריה</span>}
+            {category.name ?? <span className="text-app-text-tertiary">{t("noCategory")}</span>}
           </span>
         )}
       </span>
@@ -752,8 +742,8 @@ export function TaskRow({
             type="button"
             disabled={duePending}
             onClick={openDuePicker}
-            aria-label={dueDate ? `תאריך יעד ${dueLabel}, שינוי` : "הוספת תאריך יעד"}
-            title={dueDate ? "שינוי תאריך היעד" : "הוספת תאריך יעד"}
+            aria-label={dueDate ? t("dueAria", { date: dueLabel }) : t("addDue")}
+            title={dueDate ? t("changeDue") : t("addDue")}
             className="rounded-[6px] px-1 -mx-1 hover:bg-app-surface-sunken hover:text-app-text-primary disabled:opacity-50"
           >
             {dueLabel}
@@ -774,8 +764,8 @@ export function TaskRow({
           ·
         </span>
         <span data-cell="assignee" className="max-w-full truncate [grid-area:assignee] xl:min-w-0 xl:text-xs">
-          <span className="text-app-text-tertiary xl:hidden">אחראי: </span>
-          {task.assignedToName ?? <span className="text-app-text-tertiary">ללא אחראי</span>}
+          <span className="text-app-text-tertiary xl:hidden">{t("assigneePrefix")} </span>
+          {task.assignedToName ?? <span className="text-app-text-tertiary">{t("noAssignee")}</span>}
         </span>
       </div>
 
@@ -787,19 +777,19 @@ export function TaskRow({
         <select
           value={status}
           disabled={pending}
-          aria-label="סטטוס"
+          aria-label={t("status")}
           onChange={(e) => changeStatus(e.target.value as TaskStatus)}
           className={`shrink-0 justify-self-start rounded-full border-0 px-2.5 py-1 text-xs font-medium outline-none [grid-area:status] disabled:opacity-50 ${STATUS_TAG_CLASSES[status]}`}
         >
           {STATUS_OPTIONS.map((opt) => (
             <option key={opt} value={opt} className="bg-white text-app-text-primary">
-              {TASK_STATUS_LABELS[opt]}
+              {tc(`status.${opt}`)}
             </option>
           ))}
         </select>
         <span data-cell="supervisor" className="max-w-full truncate text-[12px] text-app-text-secondary [grid-area:supervisor] xl:min-w-0 xl:text-xs">
-          <span className="text-app-text-tertiary xl:hidden">מפקח: </span>
-          {task.supervisorName ?? <span className="text-app-text-tertiary">ללא מפקח</span>}
+          <span className="text-app-text-tertiary xl:hidden">{t("supervisorPrefix")} </span>
+          {task.supervisorName ?? <span className="text-app-text-tertiary">{t("noSupervisor")}</span>}
         </span>
       </div>
 
@@ -813,8 +803,8 @@ export function TaskRow({
           <button
             type="button"
             aria-pressed={blockedOn !== null}
-            aria-label={blockedOn ? "כבר לא ממתינים" : "סימון כמחכה ללקוח"}
-            title={blockedOn ? waitingTitle(blockedOn, blockedSince) : "לא ממתין לאף אחד"}
+            aria-label={blockedOn ? t("stopWaiting") : t("markWaiting")}
+            title={blockedOn ? waitingTitle(blockedOn, blockedSince) : t("notWaiting")}
             disabled={portalPending}
             onClick={toggleWaiting}
             className={`shrink-0 rounded-full border p-1.5 transition-colors disabled:opacity-50 ${
@@ -829,8 +819,8 @@ export function TaskRow({
         <button
           type="button"
           aria-pressed={clientVisible}
-          aria-label={clientVisible ? "הסרה מהפורטל" : "הצגה ללקוח בפורטל"}
-          title={clientVisible ? "מוצג ללקוח" : "לא מוצג ללקוח"}
+          aria-label={clientVisible ? t("removeFromPortal") : t("showInPortal")}
+          title={clientVisible ? t("visibleToClient") : t("hiddenFromClient")}
           disabled={portalPending}
           onClick={toggleVisible}
           className={`shrink-0 rounded-full border p-1.5 transition-colors disabled:opacity-50 ${

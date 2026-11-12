@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { intlWrapper } from "../helpers/intl";
 
 // 4.11.2026: the admin "דיווחי זמן" edit row, after the closed-bank notice.
 //
@@ -64,7 +65,8 @@ describe("admin edit row, closed hour bank", () => {
         <tbody>
           <AdminEntryRow entry={entry} selected={false} onToggleSelect={() => {}} />
         </tbody>
-      </table>
+      </table>,
+      { wrapper: intlWrapper() }
     );
     fireEvent.click(screen.getByText("עריכה"));
 

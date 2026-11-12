@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 // 3.11.2026, Ariel: "לא רושמים בחבילה סגורה". Shown when a write lands in a
 // closed hour bank. The person can record the time in the open bank
@@ -16,6 +17,7 @@ export type ClosedBankNoticeProps = {
 };
 
 export function ClosedBankNotice({ notice, onMoveToOpen, onOverride, onDismiss, moveLabel }: ClosedBankNoticeProps) {
+  const t = useTranslations("myTime.closedBank");
   const [confirming, setConfirming] = useState(false);
   const [reason, setReason] = useState("");
 
@@ -33,7 +35,7 @@ export function ClosedBankNotice({ notice, onMoveToOpen, onOverride, onDismiss, 
               onClick={onMoveToOpen}
               className="rounded-full border border-app-warning/45 px-3.5 py-1.5 text-[12px] font-medium text-app-warning hover:bg-app-warning-soft"
             >
-              {moveLabel ?? "לרשום בחבילה הפתוחה"}
+              {moveLabel ?? t("moveToOpen")}
             </button>
           )}
           {notice.canOverride && (
@@ -42,11 +44,11 @@ export function ClosedBankNotice({ notice, onMoveToOpen, onOverride, onDismiss, 
               onClick={() => setConfirming(true)}
               className="text-[12px] text-app-text-secondary underline hover:text-app-text-primary"
             >
-              לשנות את החבילה הסגורה בכל זאת
+              {t("overrideAnyway")}
             </button>
           )}
           <button type="button" onClick={onDismiss} className="text-[12px] text-app-text-secondary hover:text-app-text-primary">
-            ביטול
+            {t("cancel")}
           </button>
         </div>
       )}
@@ -54,7 +56,7 @@ export function ClosedBankNotice({ notice, onMoveToOpen, onOverride, onDismiss, 
         <div className="mt-2 space-y-2">
           <p className="font-medium">{notice.overrideWarning}</p>
           <label className="block">
-            <span className="mb-1 block text-[11px] text-app-text-secondary">סיבה (חובה, נרשמת ביומן הפעולות)</span>
+            <span className="mb-1 block text-[11px] text-app-text-secondary">{t("reasonLabel")}</span>
             <input
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -68,7 +70,7 @@ export function ClosedBankNotice({ notice, onMoveToOpen, onOverride, onDismiss, 
               onClick={() => onOverride(reason.trim())}
               className="rounded-full border border-app-warning/45 px-3.5 py-1.5 text-[12px] font-medium text-app-warning hover:bg-app-warning-soft disabled:opacity-40"
             >
-              כן, לבצע את השינוי
+              {t("confirm")}
             </button>
             <button
               type="button"
@@ -78,7 +80,7 @@ export function ClosedBankNotice({ notice, onMoveToOpen, onOverride, onDismiss, 
               }}
               className="text-[12px] text-app-text-secondary hover:text-app-text-primary"
             >
-              חזרה
+              {t("back")}
             </button>
           </div>
         </div>

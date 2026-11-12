@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { addTaskComment, applyTaskTemplate, createTask, deleteTaskComment, setStepDone, updateTask } from "@/lib/app-domain/tasks";
 import { procedureReminderForScreen } from "@/lib/app-domain/procedure-to-file";
@@ -18,7 +20,7 @@ import {
   NoteRequiredError,
 } from "@/lib/app-domain/time-entries";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
-import { ClosedBankError, stoppedAcrossClosureMessage } from "@/lib/app-domain/closed-bank-guard";
+import { ClosedBankError } from "@/lib/app-domain/closed-bank-guard";
 import { applyPlanSteps, approveTaskPlan, recordAdvancePromptCopied, saveTaskPlan } from "@/lib/app-domain/task-plans";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
@@ -28,6 +30,7 @@ import { decideVendorCheck } from "@/lib/app-domain/vendor-detections";
 import {
   friendlyError as entryError,
   closedBankNoticeFrom,
+  stoppedAcrossClosureText,
   closedBankOptionsFrom,
   overlapWarningFrom,
   type ManualEntryFormState,
@@ -43,13 +46,23 @@ import type { AdvanceTimerOutcome } from "@/lib/advance-timer";
 // parallel-timer rules all live in those modules, and a second
 // write path around them is how a rule quietly stops applying.
 
-function friendlyError(err: unknown): string {
-  if (err instanceof SameClientTimerError) return "כבר רץ טיימר על הלקוח הזה. יש לעצור אותו קודם.";
-  if (err instanceof TimerLimitError) return `אפשר להריץ עד ${MAX_PARALLEL_TIMERS} טיימרים במקביל. יש לעצור אחד קודם.`;
-  if (err instanceof ParallelTimerConfirmationRequiredError) return "כבר רץ טיימר אחר. יש לאשר הפעלה במקביל.";
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
+/// ADR 0006: every refusal in the reader's language. A DomainError is
+/// worded from its code; the typed errors here map to this screen's own
+/// keys; anything else keeps its message, as before.
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("tasks.detail.errors");
+  if (err instanceof SameClientTimerError) return t("sameClientTimer");
+  if (err instanceof TimerLimitError) return t("timerLimit", { max: MAX_PARALLEL_TIMERS });
+  if (err instanceof ParallelTimerConfirmationRequiredError) return t("parallelConfirmation");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  const domain = await domainErrorText(err);
+  if (domain) return domain;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
+}
+
+async function errorText() {
+  return getTranslations("tasks.detail.errors");
 }
 
 /// Everything the screen can change about the task itself.
@@ -149,7 +162,7 @@ export async function updateTaskDetailAction(input: {
       blockedSince: updated.blockedSince?.toISOString() ?? null,
     };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -185,15 +198,15 @@ export async function startTimerForTaskAction(input: {
       where: { id: input.taskId, deletedAt: null },
       select: { id: true, clientId: true, categoryId: true, title: true },
     });
-    if (!task) return { ok: false as const, error: "המשימה לא נמצאה." };
+    if (!task) return { ok: false as const, error: (await errorText())("taskNotFound") };
     if (!task.categoryId) {
-      return { ok: false as const, error: "למשימה אין קטגוריה, ודיווח זמן חייב קטגוריה. בחרו קטגוריה ונסו שוב." };
+      return { ok: false as const, error: (await errorText())("noCategory") };
     }
 
     if (input.stopTimerId) {
       const running = await getActiveTimers(user.id);
       const target = running.find((t) => t.id === input.stopTimerId);
-      if (!target) return { ok: false as const, error: "הטיימר שביקשת לעצור כבר לא רץ. רעננו ונסו שוב." };
+      if (!target) return { ok: false as const, error: (await errorText())("stopTargetGone") };
       // Stopped with no note and no task of its own: whatever that timer
       // was against, this call is not the place to guess it. The stop
       // keeps every field the entry already had.
@@ -206,8 +219,7 @@ export async function startTimerForTaskAction(input: {
         if (err instanceof NoteRequiredError) {
           return {
             ok: false as const,
-            error:
-              "לטיימר שרץ עכשיו אין משימה ואין הערה, ולכן אי אפשר לעצור אותו כך. כתבו בו הערה קצרה במסך הטיימר, ואז עברו למשימה.",
+            error: (await errorText())("runningTimerNeedsNote"),
           };
         }
         throw err;
@@ -231,7 +243,7 @@ export async function startTimerForTaskAction(input: {
     revalidatePath("/app");
     return { ok: true as const, timeEntryId: entry.id, startAt: entry.startAt.toISOString() };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -252,7 +264,7 @@ export async function startTimerFromAdvanceAction(input: {
       where: { id: input.taskId, deletedAt: null },
       select: { id: true, clientId: true, categoryId: true, title: true },
     });
-    if (!task) return { outcome: "error", error: "המשימה לא נמצאה." };
+    if (!task) return { outcome: "error", error: (await errorText())("taskNotFound") };
     if (!task.categoryId) return { outcome: "no_category" };
 
     await startTimer(user, {
@@ -274,7 +286,7 @@ export async function startTimerFromAdvanceAction(input: {
     if (err instanceof ParallelTimerConfirmationRequiredError || err instanceof TimerLimitError) {
       return { outcome: "other_client" };
     }
-    return { outcome: "error", error: friendlyError(err) };
+    return { outcome: "error", error: await friendlyError(err) };
   }
 }
 
@@ -296,7 +308,7 @@ export async function createTaskManualEntryAction(
   const startTime = String(formData.get("startTime") || "");
   const endTime = String(formData.get("endTime") || "");
   if (!taskId || !date || !startTime || !endTime) {
-    return { error: "יש למלא תאריך ושעות." };
+    return { error: (await errorText())("dateAndTimesRequired") };
   }
 
   try {
@@ -304,9 +316,9 @@ export async function createTaskManualEntryAction(
       where: { id: taskId, deletedAt: null },
       select: { id: true, clientId: true, categoryId: true },
     });
-    if (!task) return { error: "המשימה לא נמצאה." };
+    if (!task) return { error: (await errorText())("taskNotFound") };
     if (!task.categoryId) {
-      return { error: "למשימה אין קטגוריה, ודיווח זמן חייב קטגוריה. בחרו קטגוריה ונסו שוב." };
+      return { error: (await errorText())("noCategory") };
     }
 
     await createManualEntry(user, user.id, {
@@ -326,11 +338,12 @@ export async function createTaskManualEntryAction(
     revalidatePath("/app/timer");
     return { ok: true };
   } catch (err) {
-    if (err instanceof ClosedBankError) return { closedBank: closedBankNoticeFrom(err) };
+    if (err instanceof ClosedBankError) return { closedBank: await closedBankNoticeFrom(err) };
     if (err instanceof OverlapError && !err.sameClient) {
       return { overlapWarning: overlapWarningFrom(err) };
     }
-    return { error: entryError(err) };
+    // entryError is my-time's (async, in the reader's language).
+    return { error: (await domainErrorText(err)) ?? (await entryError(err)) };
   }
 }
 
@@ -349,9 +362,9 @@ export async function stopTimerForTaskAction(input: { taskId: string; timeEntryI
     revalidatePath("/app");
     // 3.11.2026: see stopTimerAction.
     const crossed = await closedBankForStoppedEntry(entry);
-    return { ok: true as const, closedBank: crossed ? { message: stoppedAcrossClosureMessage(crossed) } : null };
+    return { ok: true as const, closedBank: crossed ? { message: await stoppedAcrossClosureText(crossed) } : null };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -367,7 +380,7 @@ export async function addTaskCommentAction(input: { taskId: string; body: string
     revalidatePath(`/app/tasks/${input.taskId}`);
     return { ok: true as const };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -378,7 +391,7 @@ export async function deleteTaskCommentAction(input: { commentId: string }) {
     revalidatePath(`/app/tasks/${removed.taskId}`);
     return { ok: true as const };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -401,7 +414,7 @@ export async function addTaskStepAction(input: { taskId: string; clientId: strin
     revalidatePath("/app/tasks");
     return { ok: true as const };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -419,7 +432,7 @@ export async function setTaskStepDoneAction(input: { stepId: string; parentId: s
     revalidatePath("/app/tasks");
     return { ok: true as const, outcome };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -432,7 +445,7 @@ export async function applyTaskTemplateAction(input: { taskId: string; templateI
     revalidatePath("/app/tasks");
     return { ok: true as const, created };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -463,7 +476,7 @@ export async function saveTaskPlanAction(input: {
     if (saved.stepsAppliedAt || saved.taskStarted) revalidatePath("/app/tasks");
     return { ok: true as const, version: saved.version, stepsAdded: saved.stepsAppliedAt !== null };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -488,7 +501,7 @@ export async function approveTaskPlanAction(input: { taskId: string; version: nu
     if (approved.stepsAppliedAt || approved.taskStarted) revalidatePath("/app/tasks");
     return { ok: true as const };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -501,7 +514,7 @@ export async function applyPlanStepsAction(input: { taskId: string }) {
     revalidatePath("/app/tasks");
     return { ok: true as const, added: result.added.length, kept: result.kept.length, removed: result.removed.length };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -529,19 +542,19 @@ export async function attachFileToTaskAction(form: FormData) {
   try {
     const taskId = String(form.get("taskId") || "");
     const file = form.get("file");
-    if (!taskId) return { ok: false as const, error: "חסר מזהה משימה." };
+    if (!taskId) return { ok: false as const, error: (await errorText())("missingTaskId") };
     if (!(file instanceof File) || file.size === 0) {
-      return { ok: false as const, error: "לא נבחר קובץ." };
+      return { ok: false as const, error: (await errorText())("noFile") };
     }
     if (file.size > MAX_DOCUMENT_BYTES) {
-      return { ok: false as const, error: "הקובץ גדול מ-4MB." };
+      return { ok: false as const, error: (await errorText())("fileTooLarge") };
     }
 
     const task = await prisma.task.findFirst({
       where: { id: taskId, deletedAt: null },
       select: { id: true, clientId: true, clientVisible: true },
     });
-    if (!task) return { ok: false as const, error: "המשימה לא נמצאה." };
+    if (!task) return { ok: false as const, error: (await errorText())("taskNotFound") };
 
     await addClientDocument(user, {
       clientId: task.clientId,
@@ -563,7 +576,7 @@ export async function attachFileToTaskAction(form: FormData) {
     if (task.clientVisible) revalidatePath("/app/portal");
     return { ok: true as const };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -576,7 +589,7 @@ export async function recordRunLessonAction(input: { taskId: string; body: strin
     revalidatePath(`/app/tasks/${input.taskId}`);
     return { ok: true as const };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -590,7 +603,7 @@ export async function decideVendorCheckAction(input: { taskId: string; detection
     if (out.runTaskId) revalidatePath(`/app/tasks/${out.runTaskId}`);
     return { ok: true as const, status: out.status };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -604,7 +617,7 @@ export async function addTaskPortalNoteAction(input: { taskId: string; body: str
     revalidatePath("/app/portal");
     return { ok: true as const };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -616,6 +629,6 @@ export async function removeTaskPortalNoteAction(input: { taskId: string; noteId
     revalidatePath("/app/portal");
     return { ok: true as const };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }

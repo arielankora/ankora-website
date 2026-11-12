@@ -1,4 +1,5 @@
 import { ShieldAlert } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 // App redesign (handoff README, "19. מצבי מסך"): "403 ('אין לך הרשאה' +
 // התפקיד הנוכחי)". `roleLabel` is optional and kept backward compatible -
@@ -8,13 +9,14 @@ import { ShieldAlert } from "lucide-react";
 // touches every one of those files for a cosmetic detail. When a caller
 // does pass it, the current role is shown per spec.
 export function Forbidden({ roleLabel }: { roleLabel?: string }) {
+  const t = useTranslations("shell.forbidden");
   return (
     <div className="flex flex-col items-center gap-3 rounded-2xl border border-app-border bg-white px-6 py-14 text-center">
       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-app-error-soft">
         <ShieldAlert size={20} strokeWidth={1.75} className="text-app-error" />
       </span>
-      <p className="text-[15px] font-medium text-app-text-primary">אין לך הרשאה לצפות בעמוד זה</p>
-      {roleLabel && <p className="text-sm text-app-text-secondary">התפקיד הנוכחי שלך: {roleLabel}</p>}
+      <p className="text-[15px] font-medium text-app-text-primary">{t("title")}</p>
+      {roleLabel && <p className="text-sm text-app-text-secondary">{t("currentRole", { role: roleLabel })}</p>}
     </div>
   );
 }

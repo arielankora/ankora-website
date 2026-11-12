@@ -63,7 +63,7 @@ export async function adminCreateEntryAction(_prev: FormState | undefined, formD
       ...closedBankOptionsFrom(formData),
     }));
   } catch (err) {
-    if (err instanceof ClosedBankError) return { closedBank: closedBankNoticeFrom(err) };
+    if (err instanceof ClosedBankError) return { closedBank: await closedBankNoticeFrom(err) };
     return { error: friendlyError(err) };
   }
 
@@ -94,7 +94,7 @@ export async function adminUpdateEntryAction(_prev: FormState | undefined, formD
       closedBankOverride: closedBankOptionsFrom(formData).closedBankOverride,
     });
   } catch (err) {
-    if (err instanceof ClosedBankError) return { closedBank: closedBankNoticeFrom(err) };
+    if (err instanceof ClosedBankError) return { closedBank: await closedBankNoticeFrom(err) };
     return { error: friendlyError(err) };
   }
 
@@ -124,7 +124,7 @@ export async function deleteEntryAction(timeEntryId: string, closedBankOverrideR
     });
   } catch (err) {
     if (err instanceof ClosedBankError) {
-      return { ok: false as const, error: err.message, closedBank: closedBankNoticeFrom(err) };
+      return { ok: false as const, error: err.message, closedBank: await closedBankNoticeFrom(err) };
     }
     return { ok: false as const, error: friendlyError(err) };
   }

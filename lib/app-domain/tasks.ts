@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError, assertCan, can, canManageClients } from "@/lib/app-auth/permissions";
+import { DomainError } from "@/lib/domain-error";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { localDateTimeToUtc, TIMEZONE, localDateKey } from "@/lib/timezone";
@@ -733,10 +734,10 @@ async function assertParentUsable(actor: User, clientId: string, parentId: strin
     where: { id: parentId, deletedAt: null },
     select: { id: true, clientId: true, parentId: true, status: true },
   });
-  if (!parent) throw new Error("Task not found.");
-  if (parent.clientId !== clientId) throw new Error(PARENT_OTHER_CLIENT_MESSAGE);
-  if (parent.parentId) throw new Error(PARENT_IS_SUBTASK_MESSAGE);
-  if (!OPEN_STATUSES.includes(parent.status)) throw new Error(PARENT_CLOSED_MESSAGE);
+  if (!parent) throw new DomainError("tasks.notFound", "Task not found.");
+  if (parent.clientId !== clientId) throw new DomainError("tasks.parentOtherClient", PARENT_OTHER_CLIENT_MESSAGE);
+  if (parent.parentId) throw new DomainError("tasks.parentIsSubtask", PARENT_IS_SUBTASK_MESSAGE);
+  if (!OPEN_STATUSES.includes(parent.status)) throw new DomainError("tasks.parentClosed", PARENT_CLOSED_MESSAGE);
   // The actor's own access to that client, checked the same way every
   // other write here checks it. The caller has already checked it for
   // `clientId`, and this is the same id - but stating it costs one
@@ -771,13 +772,13 @@ export const TEMPLATE_NOT_FOUND_MESSAGE = "התבנית הזו לא קיימת."
 
 export async function applyTaskTemplate(actor: User, taskId: string, templateId: string) {
   const template = findTemplate(templateId);
-  if (!template) throw new Error(TEMPLATE_NOT_FOUND_MESSAGE);
+  if (!template) throw new DomainError("tasks.templateNotFound", TEMPLATE_NOT_FOUND_MESSAGE);
 
   const parent = await prisma.task.findFirst({
     where: { id: taskId, deletedAt: null },
     select: { id: true, clientId: true },
   });
-  if (!parent) throw new Error("Task not found.");
+  if (!parent) throw new DomainError("tasks.notFound", "Task not found.");
 
   const created = [];
   for (const step of template.steps) {
@@ -851,12 +852,12 @@ async function assertSupervisable(actor: User, clientId: string, supervisorId: s
 /// explicitly here rather than implied.
 async function assertCategoryUsable(actor: User, clientId: string, categoryId: string) {
   const category = await prisma.category.findUnique({ where: { id: categoryId } });
-  if (!category) throw new Error("Category not found.");
+  if (!category) throw new DomainError("tasks.categoryNotFound", "Category not found.");
   if (category.visibility === "CLIENT" && category.clientId !== clientId) {
-    throw new Error("This category does not belong to the selected client.");
+    throw new DomainError("tasks.categoryOtherClient", "This category does not belong to the selected client.");
   }
   if (!category.active && !can(actor.role, "category.manage")) {
-    throw new Error("This category is inactive.");
+    throw new DomainError("tasks.categoryInactive", "This category is inactive.");
   }
 }
 
@@ -912,14 +913,14 @@ export async function createTask(
     throw new ForbiddenError("You are not assigned to this client.");
   }
   const title = input.title.trim();
-  if (!title) throw new Error("Task title is required.");
+  if (!title) throw new DomainError("tasks.titleRequired", "Task title is required.");
 
   if (input.categoryId) await assertCategoryUsable(actor, input.clientId, input.categoryId);
   if (input.assignedToId) await assertAssignable(actor, input.clientId, input.assignedToId);
   if (input.supervisorId) await assertSupervisable(actor, input.clientId, input.supervisorId);
   // The same refusal updateTask makes, at the other end. A task created
   // needing an approval nobody can give is a task born unclosable.
-  if (input.requiresApproval && !input.supervisorId) throw new Error(APPROVAL_WITHOUT_SUPERVISOR_MESSAGE);
+  if (input.requiresApproval && !input.supervisorId) throw new DomainError("tasks.approvalWithoutSupervisor", APPROVAL_WITHOUT_SUPERVISOR_MESSAGE);
 
   if (input.parentId) await assertParentUsable(actor, input.clientId, input.parentId);
 
@@ -1113,7 +1114,7 @@ function assertClosable(
   // then blocked by this very rule at the moment they try - the refusal
   // would land on the one person who could not have prevented it.
   const claimsFinished = status === "DONE" || status === "PENDING_APPROVAL";
-  if (claimsFinished && visible && !outcome?.trim()) throw new Error(NO_OUTCOME_MESSAGE);
+  if (claimsFinished && visible && !outcome?.trim()) throw new DomainError("tasks.noOutcome", NO_OUTCOME_MESSAGE);
 }
 
 /// Tasks phase 2. Three refusals, and every one of them is stated on the
@@ -1157,7 +1158,7 @@ export function assertBlockable(
   const nextStatus = data.status ?? current.status;
   // Blocking something on its way out, or something already closed.
   // Both are the same sentence: finished work is not waiting.
-  if (nextStatus === "DONE" || nextStatus === "ARCHIVED") throw new Error(BLOCK_ON_CLOSED_MESSAGE);
+  if (nextStatus === "DONE" || nextStatus === "ARCHIVED") throw new DomainError("tasks.blockOnClosed", BLOCK_ON_CLOSED_MESSAGE);
 }
 
 /// Exported, and narrowed to the two fields of the actor it actually
@@ -1194,12 +1195,12 @@ export function assertApprovable(
   //    empty, and a task that can never reach DONE by any route on any
   //    screen. Refused at the moment it is created rather than
   //    discovered later by whoever tried to close it.
-  if (nextRequires && !nextSupervisor) throw new Error(APPROVAL_WITHOUT_SUPERVISOR_MESSAGE);
+  if (nextRequires && !nextSupervisor) throw new DomainError("tasks.approvalWithoutSupervisor", APPROVAL_WITHOUT_SUPERVISOR_MESSAGE);
 
   // 2. The gate itself. A task that needs approval reaches DONE through
   //    PENDING_APPROVAL and no other way.
   if (nextRequires && nextStatus === "DONE" && current.status !== "PENDING_APPROVAL") {
-    throw new Error(NEEDS_APPROVAL_MESSAGE);
+    throw new DomainError("tasks.needsApproval", NEEDS_APPROVAL_MESSAGE);
   }
 
   // 3. Who may sign, and who may waive. Both are the same decision seen
@@ -1221,7 +1222,7 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   assertCan(actor.role, "time_entry.create_self");
 
   const task = await prisma.task.findFirst({ where: { id: taskId, deletedAt: null } });
-  if (!task) throw new Error("Task not found.");
+  if (!task) throw new DomainError("tasks.notFound", "Task not found.");
 
   const accessible = await listAccessibleClients(actor);
   const taskClient = accessible.find((c) => c.id === task.clientId);
@@ -1247,7 +1248,7 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
 
   if (patch.title !== undefined) {
     const title = patch.title.trim();
-    if (!title) throw new Error("Task title cannot be empty.");
+    if (!title) throw new DomainError("tasks.titleEmpty", "Task title cannot be empty.");
     data.title = title;
   }
   if (patch.description !== undefined) data.description = patch.description?.trim() || null;
@@ -1258,7 +1259,7 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   // for that.
   else if (patch.description !== undefined && !task.parentId && isMappingTask(patch.description)) data.mappingTask = true;
   if (patch.aiExcluded !== undefined && patch.aiExcluded !== task.aiExcluded) {
-    if (task.parentId) throw new Error(AI_EXCLUSION_ON_STEP_MESSAGE);
+    if (task.parentId) throw new DomainError("tasks.aiExclusionOnStep", AI_EXCLUSION_ON_STEP_MESSAGE);
     if (!patch.aiExcluded && !can(actor.role, "client.manage")) throw new ForbiddenError(AI_EXCLUSION_CLEAR_FORBIDDEN_MESSAGE);
     data.aiExcluded = patch.aiExcluded;
   }
@@ -1424,7 +1425,11 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
       where: { parentId: taskId, deletedAt: null, requiresApproval: true, status: { in: OPEN_STATUSES } },
       select: { title: true, supervisor: { select: { name: true } } },
     });
-    if (waiting) throw new Error(`השלב "${waiting.title}" מחכה לאישור${waiting.supervisor ? ` של ${waiting.supervisor.name}` : ""}. אחרי שהוא מאושר, אפשר לסגור.`);
+    if (waiting) {
+      const message = `השלב "${waiting.title}" מחכה לאישור${waiting.supervisor ? ` של ${waiting.supervisor.name}` : ""}. אחרי שהוא מאושר, אפשר לסגור.`;
+      if (waiting.supervisor) throw new DomainError("tasks.stepAwaitingApproval", message, { title: waiting.title, supervisor: waiting.supervisor.name });
+      throw new DomainError("tasks.stepAwaitingApprovalNoSupervisor", message, { title: waiting.title });
+    }
   }
 
   const [updated, closedSteps] = await prisma.$transaction(async (tx) => {
@@ -1736,7 +1741,7 @@ export async function addTaskComment(actor: User, taskId: string, body: string) 
     where: { id: taskId, deletedAt: null },
     select: { id: true, clientId: true },
   });
-  if (!task) throw new Error("Task not found.");
+  if (!task) throw new DomainError("tasks.notFound", "Task not found.");
 
   const accessible = await listAccessibleClients(actor);
   if (!accessible.some((c) => c.id === task.clientId)) {
@@ -1744,9 +1749,9 @@ export async function addTaskComment(actor: User, taskId: string, body: string) 
   }
 
   const text = body.trim();
-  if (!text) throw new Error("אין מה לשמור: ההערה ריקה.");
+  if (!text) throw new DomainError("tasks.commentEmpty", "אין מה לשמור: ההערה ריקה.");
   if (text.length > MAX_COMMENT_LENGTH) {
-    throw new Error(`ההערה ארוכה מ-${MAX_COMMENT_LENGTH} תווים. אפשר לפצל אותה לשתיים.`);
+    throw new DomainError("tasks.commentTooLong", `ההערה ארוכה מ-${MAX_COMMENT_LENGTH} תווים. אפשר לפצל אותה לשתיים.`, { max: String(MAX_COMMENT_LENGTH) });
   }
 
   const comment = await prisma.taskComment.create({
@@ -1782,7 +1787,7 @@ export async function deleteTaskComment(actor: User, commentId: string) {
     where: { id: commentId, deletedAt: null },
     select: { id: true, authorId: true, task: { select: { id: true, clientId: true } } },
   });
-  if (!comment) throw new Error("ההערה לא נמצאה.");
+  if (!comment) throw new DomainError("tasks.commentNotFound", "ההערה לא נמצאה.");
 
   const accessible = await listAccessibleClients(actor);
   if (!accessible.some((c) => c.id === comment.task.clientId)) {
@@ -1824,7 +1829,7 @@ export async function removeTaskSteps(actor: User, parentId: string, stepIds: st
     where: { id: parentId, deletedAt: null, parentId: null },
     select: { id: true, clientId: true },
   });
-  if (!parent) throw new Error("Task not found.");
+  if (!parent) throw new DomainError("tasks.notFound", "Task not found.");
 
   const accessible = await listAccessibleClients(actor);
   if (!accessible.some((c) => c.id === parent.clientId)) {
@@ -2073,7 +2078,11 @@ export async function setStepDone(actor: User, stepId: string, done: boolean): P
     await updateTask(actor, stepId, { status: "DONE" });
     return "approved";
   }
-  if (step.status === "PENDING_APPROVAL") throw new Error(`השלב כבר מחכה לאישור של ${step.supervisor?.name ?? "המאשר"}.`);
+  if (step.status === "PENDING_APPROVAL") {
+    const message = `השלב כבר מחכה לאישור של ${step.supervisor?.name ?? "המאשר"}.`;
+    if (step.supervisor) throw new DomainError("tasks.stepAlreadyPending", message, { supervisor: step.supervisor.name });
+    throw new DomainError("tasks.stepAlreadyPendingNoSupervisor", message);
+  }
   await updateTask(actor, stepId, { status: "PENDING_APPROVAL" });
   await prisma.notification.create({
     data: {

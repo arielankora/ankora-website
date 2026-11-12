@@ -72,9 +72,44 @@ export function carriedListQuery(from?: string | null): string {
   return from ? clean(new URLSearchParams(from)) : "";
 }
 
+/// The words on the way back come from the dictionary (ADR 0006), under
+/// tasks.list: back.*, pills.* (the same words as the status pills),
+/// mine.* and view.board. A caller passes its translator for "tasks.list";
+/// one that does not (the unit tests, and any caller not yet translated)
+/// gets the Hebrew, which is the same text he.json holds for these keys.
+type StatusWord = "ACTIVE" | "OPEN" | "IN_PROGRESS" | "PENDING_APPROVAL" | "DONE";
+type MineWord = "all" | "assigned" | "supervising" | "involved";
+export type BackKey =
+  | "back.toCalendar"
+  | "back.toTasks"
+  | "back.calendar"
+  | "back.tasks"
+  | "view.board"
+  | `pills.${StatusWord}`
+  | `mine.${MineWord}`;
+export type BackWords = (key: BackKey) => string;
+
+const HEBREW: Record<BackKey, string> = {
+  "back.toCalendar": "חזרה ליומן",
+  "back.toTasks": "חזרה למשימות",
+  "back.calendar": "יומן",
+  "back.tasks": "משימות",
+  "view.board": "לוח",
+  "pills.ACTIVE": "פעילות",
+  "pills.OPEN": "פתוחות",
+  "pills.IN_PROGRESS": "בטיפול",
+  "pills.PENDING_APPROVAL": "ממתינות לאישור",
+  "pills.DONE": "הושלמו",
+  "mine.all": "כולם",
+  "mine.assigned": "לביצוע",
+  "mine.supervising": "בפיקוח",
+  "mine.involved": "שלי",
+};
+const hebrew: BackWords = (key) => HEBREW[key];
+
 /// The words on the way back: the calendar or the list.
-export function backLabel(from?: string | null): string {
-  return calendarBackHref(from) ? "חזרה ליומן" : "חזרה למשימות";
+export function backLabel(from?: string | null, t: BackWords = hebrew): string {
+  return t(calendarBackHref(from) ? "back.toCalendar" : "back.toTasks");
 }
 
 /// 19.10.2026: the words on the way back name the list as it was, so a
@@ -83,27 +118,26 @@ export function backLabel(from?: string | null): string {
 /// resolved against what this person may see (an id they cannot reach
 /// arrives as undefined and is left out, so the label never names a
 /// client the list itself would not show). Anything not set says nothing.
-export const STATUS_WORDS: Record<string, string> = {
-  ACTIVE: "פעילות",
-  OPEN: "פתוחות",
-  IN_PROGRESS: "בטיפול",
-  PENDING_APPROVAL: "ממתינות לאישור",
-  DONE: "הושלמו",
-};
-const MINE_WORDS: Record<string, string> = { "0": "כולם", assigned: "לביצוע", supervising: "בפיקוח" };
+export const STATUS_WORDS = ["ACTIVE", "OPEN", "IN_PROGRESS", "PENDING_APPROVAL", "DONE"] as const satisfies readonly StatusWord[];
+const MINE_WORDS: Record<string, MineWord> = { "0": "all", assigned: "assigned", supervising: "supervising" };
+const isStatusWord = (value: string): value is StatusWord => (STATUS_WORDS as readonly string[]).includes(value);
 
-export function backTitle(from: string | null | undefined, names: { client?: string; category?: string } = {}): string {
-  if (calendarBackHref(from)) return "יומן";
+export function backTitle(
+  from: string | null | undefined,
+  names: { client?: string; category?: string } = {},
+  t: BackWords = hebrew,
+): string {
+  if (calendarBackHref(from)) return t("back.calendar");
   const q = new URLSearchParams(from ? clean(new URLSearchParams(from)) : "");
-  const parts = ["משימות"];
+  const parts = [t("back.tasks")];
   const mine = q.get("mine");
-  parts.push(mine && MINE_WORDS[mine] ? MINE_WORDS[mine] : "שלי");
+  parts.push(t(`mine.${mine && MINE_WORDS[mine] ? MINE_WORDS[mine] : "involved"}`));
   const status = q.get("status");
-  if (status && STATUS_WORDS[status]) parts.push(STATUS_WORDS[status]);
+  if (status && isStatusWord(status)) parts.push(t(`pills.${status}`));
   if (q.get("clientId") && names.client) parts.push(names.client);
   if (q.get("categoryId") && names.category) parts.push(names.category);
   const text = q.get("q")?.trim();
   if (text) parts.push(`"${text.length > 40 ? `${text.slice(0, 40)}…` : text}"`);
-  if (q.get("view") === "board") parts.push("לוח");
+  if (q.get("view") === "board") parts.push(t("view.board"));
   return parts.join(" · ");
 }

@@ -5,9 +5,15 @@
 // pay for one. (Vitest 5 removed `environmentMatchGlobs`; the docblock is
 // what replaced it.)
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render as rtlRender, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { intlWrapper } from "../helpers/intl";
 import { useActionForm } from "@/components/app/useActionForm";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
+
+// Drawer and useActionForm word their own text (ADR 0006), so they render
+// inside the dictionary provider the app layout gives them.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: intlWrapper() });
 
 // Whether a screen refreshes itself after a write has now been the subject
 // of four investigations and roughly thirty CI rounds, and every one of

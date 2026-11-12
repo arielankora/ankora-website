@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { useToast } from "@/components/app/toast/ToastProvider";
-import { LESSON_QUESTION, MAX_LESSON } from "@/lib/process-lessons";
+import { MAX_LESSON } from "@/lib/process-lessons";
 import { recordRunLessonAction } from "./actions";
 
 // Learning from runs (spec 5.4). On a run that just closed, one question
@@ -11,6 +12,7 @@ import { recordRunLessonAction } from "./actions";
 // question.
 
 export function RunLessonCard({ taskId, processName }: { taskId: string; processName: string }) {
+  const t = useTranslations("tasks.detail.lesson");
   const { showToast } = useToast();
   const [body, setBody] = useState("");
   const [pending, setPending] = useState(false);
@@ -21,22 +23,23 @@ export function RunLessonCard({ taskId, processName }: { taskId: string; process
     const result = await recordRunLessonAction({ taskId, body: text });
     setPending(false);
     if (!result.ok) {
-      showToast({ tone: "error", title: "לא נשמר", description: result.error });
+      showToast({ tone: "error", title: t("notSaved"), description: result.error });
       return;
     }
-    showToast({ tone: "success", title: text ? "ההערה נשלחה לבעלים של התהליך" : "נרשם שהנוהל היה נכון" });
+    showToast({ tone: "success", title: text ? t("sentToOwner") : t("heldSaved") });
   }
 
   return (
     <section className="rounded-2xl border border-gold/40 bg-gold/[0.04] p-5" data-testid="run-lesson">
-      <h2 className="text-sm font-medium text-app-text-primary">{LESSON_QUESTION}</h2>
-      <p className="mt-1 text-xs text-app-text-secondary">הריצה הזו נפתחה מהנוהל של {processName}. מה שתכתבו מגיע לבעלים של התהליך, לגרסה הבאה של הנוהל.</p>
+      <h2 className="text-sm font-medium text-app-text-primary">{t("question")}</h2>
+      <p className="mt-1 text-xs text-app-text-secondary">{t("body", { process: processName })}</p>
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
         maxLength={MAX_LESSON}
         rows={3}
-        placeholder="למשל: שלב 2 צריך להתחיל יום עבודה קודם, כי איילה לא עונה בימי שישי."
+        dir="auto"
+        placeholder={t("placeholder")}
         className="mt-3 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
       />
       <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -46,10 +49,10 @@ export function RunLessonCard({ taskId, processName }: { taskId: string; process
           onClick={() => send(body)}
           className="rounded-full bg-app-accent px-5 py-2 text-sm font-medium text-app-text-primary disabled:opacity-50"
         >
-          שליחה לבעלים
+          {t("send")}
         </button>
         <button type="button" disabled={pending} onClick={() => send(null)} className="text-sm text-app-text-secondary hover:text-app-text-primary disabled:opacity-50">
-          הנוהל היה נכון
+          {t("held")}
         </button>
       </div>
     </section>

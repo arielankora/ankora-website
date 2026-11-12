@@ -42,7 +42,13 @@ export function mineFilters(
 }
 
 /// In the order they sit on screen, right to left: the default first,
-/// its two halves, then everyone's work.
+/// its two halves, then everyone's work. Their names are
+/// tasks.list.mine.<scope> in the dictionary (ADR 0006).
+export const MINE_SCOPES: MineScope[] = ["involved", "assigned", "supervising", "all"];
+
+/// The same four with their Hebrew names, for the calendar, which reads
+/// them as they are and is not translated yet. The tasks screen uses
+/// MINE_SCOPES and the dictionary.
 export const MINE_OPTIONS: { scope: MineScope; label: string }[] = [
   { scope: "involved", label: "שלי" },
   { scope: "assigned", label: "לביצוע" },

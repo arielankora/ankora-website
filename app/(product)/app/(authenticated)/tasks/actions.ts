@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { procedureReminderForScreen } from "@/lib/app-domain/procedure-to-file";
 import { assignableUsers, createTask, updateTask } from "@/lib/app-domain/tasks";
@@ -58,18 +60,25 @@ export type CreatedTaskRow = {
   stepsDone: number;
 };
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
+// ADR 0006: a refusal in the reader's language. A DomainError carries a
+// code the dictionary words; any other Error still shows its own message,
+// exactly as before, until the domain gives it a code too.
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("tasks.errors");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  const text = await domainErrorText(err);
+  if (text) return text;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
 }
 
 export async function createTaskAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
+  const t = await getTranslations("tasks.errors");
   const clientId = String(formData.get("clientId") || "");
   const title = String(formData.get("title") || "").trim();
-  if (!clientId) return { error: "יש לבחור לקוח." };
-  if (!title) return { error: "יש להזין שם משימה." };
+  if (!clientId) return { error: t("clientRequired") };
+  if (!title) return { error: t("titleRequired") };
   const assignedToId = String(formData.get("assignedToId") || "") || null;
   const supervisorId = String(formData.get("supervisorId") || "") || null;
 
@@ -93,7 +102,7 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
       priority: formData.get("urgent") === "on" ? "URGENT" : undefined,
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   // The two names the row shows and the row itself does not carry. Read
@@ -182,7 +191,7 @@ export async function listAssignablePeopleAction(
     const people = await assignableUsers(user, clientId);
     return { ok: true, people: people.map((p) => ({ id: p.id, name: p.name })) };
   } catch (err) {
-    return { ok: false, error: friendlyError(err) };
+    return { ok: false, error: await friendlyError(err) };
   }
 }
 
@@ -204,7 +213,7 @@ export async function toggleTaskDoneAction(input: {
     const procedureReminder = await procedureReminderForScreen(updated.id, updated.clientId, input.nextStatus);
     return { ok: true as const, status: updated.status, clientOutcome: updated.clientOutcome, procedureReminder };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -224,7 +233,7 @@ export async function updateTaskDueDateAction(input: { taskId: string; dueDate: 
     revalidatePath("/app");
     return { ok: true as const, dueDate: updated.dueDate?.toISOString() ?? null };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -244,7 +253,7 @@ export async function updateTaskCategoryAction(input: { taskId: string; category
     revalidatePath(`/app/tasks/${input.taskId}`);
     return { ok: true as const, categoryId: updated.categoryId, categoryName: category?.name ?? null };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -303,6 +312,6 @@ export async function updateTaskPortalAction(input: {
       clientOutcome: updated.clientOutcome,
     };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { BackdateReasonField, OverlapNotice, todayKey } from "../../my-time/ManualEntryParts";
@@ -24,6 +25,7 @@ export function TaskManualEntry({
   taskTitle: string;
   onDone: () => void;
 }) {
+  const t = useTranslations("tasks.detail.manualEntry");
   const { onSubmit, pending, result } = useActionForm(createTaskManualEntryAction);
   const { showToast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
@@ -45,7 +47,7 @@ export function TaskManualEntry({
       if (overrideReasonRef.current) overrideReasonRef.current.value = "";
     }
     if (!result?.ok) return;
-    showToast({ tone: "success", title: "הדיווח נשמר", description: taskTitle });
+    showToast({ tone: "success", title: t("saved"), description: taskTitle });
     onDone();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result]);
@@ -68,7 +70,7 @@ export function TaskManualEntry({
       <input ref={overrideReasonRef} type="hidden" name="closedBankOverrideReason" defaultValue="" />
       <div className="flex flex-wrap items-end gap-2.5">
         <label className="block" style={{ flex: "0 0 150px" }}>
-          <span className="mb-1.5 block text-[11px] text-app-text-secondary">תאריך</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">{t("date")}</span>
           <input
             type="date"
             name="date"
@@ -80,16 +82,16 @@ export function TaskManualEntry({
           />
         </label>
         <label className="block" style={{ flex: "0 0 108px" }}>
-          <span className="mb-1.5 block text-[11px] text-app-text-secondary">מ־</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">{t("from")}</span>
           <input type="time" name="startTime" required className={FIELD} />
         </label>
         <label className="block" style={{ flex: "0 0 108px" }}>
-          <span className="mb-1.5 block text-[11px] text-app-text-secondary">עד</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">{t("to")}</span>
           <input type="time" name="endTime" required className={FIELD} />
         </label>
         <label className="block min-w-0" style={{ flex: "1 1 200px" }}>
-          <span className="mb-1.5 block text-[11px] text-app-text-secondary">הערה</span>
-          <input name="note" defaultValue={taskTitle} placeholder="מה נעשה עבור הלקוח?" className={FIELD} />
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">{t("note")}</span>
+          <input name="note" dir="auto" defaultValue={taskTitle} placeholder={t("notePlaceholder")} className={FIELD} />
         </label>
         <div className="flex shrink-0 items-center gap-2" style={{ marginInlineStart: "auto" }}>
           <button
@@ -97,14 +99,14 @@ export function TaskManualEntry({
             onClick={onDone}
             className="rounded-full px-3 py-2.5 text-sm text-app-text-secondary hover:text-app-text-primary"
           >
-            ביטול
+            {t("cancel")}
           </button>
           <button
             type="submit"
             disabled={pending}
             className="rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
           >
-            {pending ? "שומר..." : "שמירת דיווח"}
+            {pending ? t("saving") : t("save")}
           </button>
         </div>
       </div>
