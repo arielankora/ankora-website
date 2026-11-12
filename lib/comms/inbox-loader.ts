@@ -28,13 +28,30 @@ export type ChannelInfo = { id: string | null; accountId: string; ownerUserId: s
 /// was connected. The audio and file routes take it as ?n= and check it.
 export type PageMessage = PocMessage & { chatId: string; channelLabel: string; numberKey: string };
 
+/// A chat as one of our numbers has it (12.11.2026). WhatsApp's chat id is
+/// the other person's id, the same on every number that talks to them, so
+/// Ariel's chat with Hadas and Anna's chat with Hadas share it. Until then
+/// the chat's number was looked up by its id alone, and the number read last
+/// won: Ariel's chat showed under Anna's name and with Anna's messages.
+export type WaChat = PocChat & { numberKey: string };
+
+export function numberKeyOf(info: Pick<ChannelInfo, "id">): string {
+  return info.id ?? "-";
+}
+
+/// One conversation's key: its number and its chat id.
+export function conversationKey(numberKey: string, chatId: string): string {
+  return `${numberKey} ${chatId}`;
+}
+
 type Unipile = { apiKey: string; accountId: string };
 
 export type WhatsappSources = {
-  chats: PocChat[];
-  /// Which number each chat belongs to, by chat id.
-  channelOf: Map<string, ChannelInfo>;
-  /// Chats whose messages are stored (read from here, not Unipile).
+  chats: WaChat[];
+  /// The numbers the chats came from, by numberKey.
+  numbers: Map<string, ChannelInfo>;
+  /// Conversations whose messages are stored (read from here, not
+  /// Unipile), by conversationKey.
   stored: Set<string>;
   channels: Array<CommsChannel & { owner: { name: string | null } }>;
   /// The error itself, not its sentence: the screen words it (ADR 0006).
@@ -53,7 +70,7 @@ function mayReadLive(channel: Pick<CommsChannel, "ownerUserId" | "excludedViewer
 
 export async function loadWhatsapp(user: Pick<User, "id" | "email">, access: CommsAccess): Promise<WhatsappSources> {
   const channels = await prisma.commsChannel.findMany({ include: { owner: { select: { name: true } } }, orderBy: { createdAt: "asc" } });
-  const out: WhatsappSources = { chats: [], channelOf: new Map(), stored: new Set(), channels, error: null };
+  const out: WhatsappSources = { chats: [], numbers: new Map(), stored: new Set(), channels, error: null };
   const multi = channels.length > 1;
 
   // 5.11.2026 (Ariel: opening a conversation took 2 to 4 seconds): the
@@ -84,12 +101,11 @@ export async function loadWhatsapp(user: Pick<User, "id" | "email">, access: Com
     }),
   );
   for (const { info, list, stored, error } of perChannel) {
-    for (const id of stored) out.stored.add(id);
+    const key = numberKeyOf(info);
+    for (const id of stored) out.stored.add(conversationKey(key, id));
     if (error) out.error = error;
-    for (const c of list) {
-      out.channelOf.set(c.id, info);
-      out.chats.push(c);
-    }
+    if (list.length > 0) out.numbers.set(key, info);
+    for (const c of list) out.chats.push({ ...c, numberKey: key });
   }
 
   // The configured account before it was connected as a channel: as before,
@@ -100,10 +116,9 @@ export async function loadWhatsapp(user: Pick<User, "id" | "email">, access: Com
     if (live) {
       try {
         const info: ChannelInfo = { id: null, accountId: config.accountId, ownerUserId: null, label: "" };
-        for (const c of (await loadMergedChats(live)).chats) {
-          out.channelOf.set(c.id, info);
-          out.chats.push(c);
-        }
+        const chats = (await loadMergedChats(live)).chats;
+        if (chats.length > 0) out.numbers.set(numberKeyOf(info), info);
+        for (const c of chats) out.chats.push({ ...c, numberKey: numberKeyOf(info) });
       } catch (err) {
         if (!(err instanceof UnipileError)) throw err;
         out.error = err;
@@ -111,7 +126,7 @@ export async function loadWhatsapp(user: Pick<User, "id" | "email">, access: Com
     }
   }
 
-  const time = (c: PocChat) => (c.lastMessageAt ? Date.parse(c.lastMessageAt) : 0);
+  const time = (c: WaChat) => (c.lastMessageAt ? Date.parse(c.lastMessageAt) : 0);
   out.chats.sort((a, b) => time(b) - time(a));
   return out;
 }
@@ -120,7 +135,7 @@ export async function loadWhatsapp(user: Pick<User, "id" | "email">, access: Com
 /// numbers they own, or all of them for the full viewers.
 export function lookupAccounts(sources: WhatsappSources, user: Pick<User, "id">, access: CommsAccess): ChannelInfo[] {
   const seen = new Map<string, ChannelInfo>();
-  for (const info of sources.channelOf.values()) seen.set(info.accountId, info);
+  for (const info of sources.numbers.values()) seen.set(info.accountId, info);
   for (const ch of sources.channels) {
     if (!seen.has(ch.accountId)) seen.set(ch.accountId, { id: ch.id, accountId: ch.accountId, ownerUserId: ch.ownerUserId, label: "" });
   }
@@ -148,11 +163,27 @@ export async function findChat(
   return null;
 }
 
+/// The number a chat in the lists was read from.
+export function infoOf(sources: Pick<WhatsappSources, "numbers">, chat: Pick<WaChat, "numberKey">): ChannelInfo | null {
+  return sources.numbers.get(chat.numberKey) ?? null;
+}
+
+export function isStored(sources: Pick<WhatsappSources, "stored">, chat: Pick<WaChat, "id" | "numberKey">): boolean {
+  return sources.stored.has(conversationKey(chat.numberKey, chat.id));
+}
+
+/// The open contact's chats, the person's own number first: the reply, the
+/// block button and the rail act on the first (12.11.2026).
+export function ownFirst(sources: Pick<WhatsappSources, "numbers">, chats: WaChat[], userId: string): WaChat[] {
+  const own = (c: WaChat) => (infoOf(sources, c)?.ownerUserId === userId ? 0 : 1);
+  return [...chats].sort((a, b) => own(a) - own(b));
+}
+
 /// The messages of the open contact: one chat, or, for a number, every chat
 /// with that number across the numbers the person sees, put together.
 export async function loadMessages(
   sources: WhatsappSources,
-  chats: PocChat[],
+  chats: WaChat[],
   extra: { chat: PocChat; info: ChannelInfo } | null,
   before: Date | null = null,
 ): Promise<{ messages: PageMessage[]; transcripts: Map<string, StoredTranscript>; error: UnipileError | null; hasOlder: boolean }> {
@@ -160,24 +191,34 @@ export async function loadMessages(
   const messages: PageMessage[] = [];
   const transcripts = new Map<string, StoredTranscript>();
   let error: UnipileError | null = null;
-  const targets: Array<{ chat: PocChat; info: ChannelInfo }> = chats
-    .map((chat) => ({ chat, info: sources.channelOf.get(chat.id)! }))
+  const targets: Array<{ chat: PocChat; info: ChannelInfo; stored: boolean }> = chats
+    .map((chat) => ({ chat, info: infoOf(sources, chat)!, stored: isStored(sources, chat) }))
     .filter((t) => t.info);
-  if (extra && !targets.some((t) => t.chat.id === extra.chat.id)) targets.push(extra);
+  if (extra && !targets.some((t) => t.chat.id === extra.chat.id && t.info.accountId === extra.info.accountId)) {
+    targets.push({ ...extra, stored: false });
+  }
+  // A group with two of our numbers in it is one chat id on both, with the
+  // same messages: each is shown once, from the first number.
+  const seen = new Set<string>();
+  const add = (m: PocMessage, chatId: string, info: ChannelInfo) => {
+    if (seen.has(m.id)) return;
+    seen.add(m.id);
+    messages.push({ ...m, chatId, channelLabel: info.label, numberKey: numberKeyOf(info) });
+  };
 
-  for (const { chat, info } of targets) {
+  for (const { chat, info, stored } of targets) {
     const channel = info.id ? sources.channels.find((c) => c.id === info.id) : null;
-    if (channel && sources.stored.has(chat.id)) {
+    if (channel && stored) {
       const got = await listStoredMessages(channel, chat.id, 200, before);
       if (got.hasOlder) hasOlder = true;
-      for (const m of got.messages) messages.push({ ...m, chatId: chat.id, channelLabel: info.label, numberKey: info.id ?? "-" });
+      for (const m of got.messages) add(m, chat.id, info);
       for (const [k, v] of got.transcripts) transcripts.set(k, v);
       continue;
     }
     const live = unipile(info.accountId);
     if (!live) continue;
     try {
-      for (const m of await listMessages(live, chat.id)) messages.push({ ...m, chatId: chat.id, channelLabel: info.label, numberKey: info.id ?? "-" });
+      for (const m of await listMessages(live, chat.id)) add(m, chat.id, info);
     } catch (err) {
       if (!(err instanceof UnipileError)) throw err;
       error = err;
@@ -187,6 +228,6 @@ export async function loadMessages(
   return { messages, transcripts, error, hasOlder };
 }
 
-export function chatsWithPhone(sources: WhatsappSources, phone: string): PocChat[] {
+export function chatsWithPhone(sources: WhatsappSources, phone: string): WaChat[] {
   return sources.chats.filter((c) => chatPhone(c) === phone);
 }

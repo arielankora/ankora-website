@@ -68,7 +68,7 @@ describe("buildInbox", () => {
 describe("team and read state (5.11.2026)", () => {
   const owners = new Map<string, PhoneOwner>();
   const teamOf = {
-    chat: (id: string) => (id === "a1@lid" ? "u-ariel" : id === "a2@lid" ? "u-hadas" : null),
+    chat: (c: InboxChat) => (c.id === "a1@lid" ? "u-ariel" : c.id === "a2@lid" ? "u-hadas" : null),
     call: (c: InboxCall) => (c.emailId === "e-h" ? "u-hadas" : null),
   };
 
@@ -84,10 +84,36 @@ describe("team and read state (5.11.2026)", () => {
     );
     const a = rows.find((r) => r.key === `p:${A}`)!;
     expect(a.teamIds.sort()).toEqual(["u-ariel", "u-hadas"]);
-    expect(a.chatIds.sort()).toEqual(["a1@lid", "a2@lid"]);
+    expect(a.chats.map((c) => c.chatId).sort()).toEqual(["a1@lid", "a2@lid"]);
     expect(filterInbox(rows, "all", "", "u-ariel").map((r) => r.key)).toEqual([`p:${A}`]);
     expect(filterInbox(rows, "all", "", "u-hadas").map((r) => r.key).sort()).toEqual([`p:${A}`, `p:${B}`].sort());
     expect(filterInbox(rows, "all", "", null)).toHaveLength(2);
+  });
+
+  // 12.11.2026: a WhatsApp chat id is the other person's id, so two of our
+  // numbers talking to the same person have chats with the same id. Each
+  // keeps its own number: the row is on both people's team, and "סמן
+  // כנקראה" reaches both chats.
+  it("keeps two numbers' chats with the same id apart", () => {
+    const byNumber = { "n-ariel": "u-ariel", "n-anna": "u-anna" } as Record<string, string>;
+    const rows = buildInbox(
+      [
+        chat({ id: "same@lid", phone: A, numberKey: "n-ariel", lastMessageAt: "2026-11-12T16:11:00Z" }),
+        chat({ id: "same@lid", phone: A, numberKey: "n-anna", lastMessageAt: "2026-11-12T16:25:00Z" }),
+      ],
+      [],
+      owners,
+      { chat: (c) => (c.numberKey ? byNumber[c.numberKey] : null) },
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].teamIds.sort()).toEqual(["u-anna", "u-ariel"]);
+    expect(rows[0].chats).toEqual(
+      expect.arrayContaining([
+        { chatId: "same@lid", numberKey: "n-ariel" },
+        { chatId: "same@lid", numberKey: "n-anna" },
+      ]),
+    );
+    expect(filterInbox(rows, "all", "", "u-ariel")).toHaveLength(1);
   });
 
   it("keeps a row unread when a chat was marked unread by hand (-1)", () => {
