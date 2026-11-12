@@ -109,6 +109,19 @@ const TRANSLATED_FILES = [
   // Not listed on purpose: tasks/[id]/TaskShare.tsx builds the Hebrew
   // message sent to a colleague (content, not interface); list-query.ts and
   // mine-scope.ts keep Hebrew fallbacks for the calendar, translated later.
+  "app/(product)/app/(authenticated)/approvals/ApprovalRow.tsx",
+  "app/(product)/app/(authenticated)/approvals/BulkRules.tsx",
+  "app/(product)/app/(authenticated)/approvals/actions.ts",
+  "app/(product)/app/(authenticated)/approvals/page.tsx",
+  "app/(product)/app/(authenticated)/knowledge/AutoApplied.tsx",
+  "app/(product)/app/(authenticated)/knowledge/AwaitingAssignment.tsx",
+  "app/(product)/app/(authenticated)/knowledge/KnowledgeReview.tsx",
+  "app/(product)/app/(authenticated)/knowledge/ReviewBatch.tsx",
+  "app/(product)/app/(authenticated)/knowledge/ReviewFilters.tsx",
+  "app/(product)/app/(authenticated)/knowledge/actions.ts",
+  "app/(product)/app/(authenticated)/knowledge/labels.ts",
+  "app/(product)/app/(authenticated)/knowledge/page.tsx",
+  "app/(product)/app/(authenticated)/knowledge/review-view.ts",
 ];
 
 describe("translated screens (ADR 0006)", () => {

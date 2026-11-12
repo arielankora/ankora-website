@@ -293,7 +293,7 @@
       "send": "Send link",
       "sending": "Sending…",
       "submitted": "If an active account matches the details you entered, a password reset link valid for one hour has been sent to it.",
-      "devLink": "No email provider is connected yet (Phase 4). Test link:",
+      "devLink": "The link is also emailed. Development environment, test link:",
       "backToSignIn": "Back to sign in",
       "email": "Email",
       "privacyNote": "If the address exists in the system, an email will be sent. For security reasons we do not say whether it exists."
