@@ -16,7 +16,20 @@ import { canReplyTo } from "@/lib/whatsapp-poc/access";
 import { canSeeCall, commsAccess } from "@/lib/comms/access";
 import { storedCallLine } from "@/lib/comms/call-lines";
 import { lineOwnerEmails as lineOwnerEmailsFromGrants } from "@/lib/comms/grants";
-import { chatsWithPhone, findChat, loadMessages, loadWhatsapp, lookupAccounts, type ChannelInfo, type PageMessage } from "@/lib/comms/inbox-loader";
+import {
+  chatsWithPhone,
+  findChat,
+  infoOf,
+  isStored,
+  loadMessages,
+  loadWhatsapp,
+  lookupAccounts,
+  numberKeyOf,
+  ownFirst,
+  type ChannelInfo,
+  type PageMessage,
+  type WaChat,
+} from "@/lib/comms/inbox-loader";
 import { matchPhones, type PhoneMatch } from "@/lib/whatsapp-poc/clients-by-phone";
 import { normalizePhone } from "@/lib/contact-normalize";
 import {
@@ -39,6 +52,7 @@ import {
   snippetAround,
   chatKey,
   proposeTask,
+  type ChatRef,
   type InboxCall,
   type InboxFilter,
   type InboxRow,
@@ -528,13 +542,15 @@ export default async function CommunicationsPage(props: {
   // looked up at Unipile only when asked (the box, or the "find" link),
   // because every lookup counts against the quota.
   let chat: PocChat | null = null;
-  let openChats: PocChat[] = [];
+  // The person's own number first (12.11.2026): its chat is the one the
+  // reply, the block button and the rail act on.
+  let openChats: WaChat[] = [];
   let found: Awaited<ReturnType<typeof findChat>> = null;
   let selectedPhone: string | null = null;
   let lookedUp = false;
   if (selectedKey && "phone" in selectedKey) {
     selectedPhone = selectedKey.phone;
-    openChats = chatsWithPhone(wa, selectedPhone);
+    openChats = ownFirst(wa, chatsWithPhone(wa, selectedPhone), user.id);
     chat = openChats[0] ?? null;
     if (!chat && accounts.length > 0 && (phoneFromBox || searchParams.wa === "1")) {
       lookedUp = true;
@@ -548,9 +564,10 @@ export default async function CommunicationsPage(props: {
     }
   } else if (selectedKey && "chatId" in selectedKey) {
     const id = selectedKey.chatId;
-    chat = chats.find((c) => c.id === id) ?? null;
-    if (chat) openChats = [chat];
-    else if (accounts.length > 0) {
+    // A group with two of our numbers in it has the same id on both.
+    openChats = ownFirst(wa, chats.filter((c) => c.id === id), user.id);
+    chat = openChats[0] ?? null;
+    if (!chat && accounts.length > 0) {
       try {
         found = await findChat(accounts, { chatId: id });
         chat = found?.chat ?? null;
@@ -571,7 +588,7 @@ export default async function CommunicationsPage(props: {
   const voiceTranscripts = loaded.transcripts;
   if (loaded.error) waError = await errorText(loaded.error);
   // The open chat's number: where the block button and the reply act.
-  const chatInfo: ChannelInfo | null = chat ? (wa.channelOf.get(chat.id) ?? found?.info ?? null) : null;
+  const chatInfo: ChannelInfo | null = !chat ? null : openChats[0] ? infoOf(wa, openChats[0]) : (found?.info ?? null);
 
   const owners = await matchPhones([
     ...chats.map((c) => chatPhone(c)).filter((p): p is string => Boolean(p)),
@@ -595,11 +612,11 @@ export default async function CommunicationsPage(props: {
   const userByEmail = new Map(lineOwnerUsers.map((u) => [u.email.toLowerCase(), u]));
   const lineOwnerOf = (line: string | null) => (line ? (userByEmail.get(lineOwnerEmails.get(line) ?? "")?.id ?? null) : null);
   const rows = buildInbox(chats, calls, owners, {
-    chat: (id) => wa.channelOf.get(id)?.ownerUserId,
+    chat: (c) => (c.numberKey ? wa.numbers.get(c.numberKey)?.ownerUserId : null),
     call: (c) => lineOwnerOf((c as PageCall).line),
   });
   const teamNames = new Map<string, string>();
-  for (const ch of wa.channels) if ([...wa.channelOf.values()].some((i) => i.id === ch.id)) teamNames.set(ch.ownerUserId, ch.owner.name ?? "");
+  for (const ch of wa.channels) if ([...wa.numbers.values()].some((i) => i.id === ch.id)) teamNames.set(ch.ownerUserId, ch.owner.name ?? "");
   for (const u of lineOwnerUsers) if (calls.some((c) => lineOwnerOf(c.line) === u.id)) teamNames.set(u.id, u.name ?? u.email);
   const team = teamParam === "me" ? user.id : teamNames.has(teamParam) ? teamParam : null;
   const teamValue = teamParam === "me" ? "me" : team ?? "all";
@@ -610,20 +627,27 @@ export default async function CommunicationsPage(props: {
   const visible = filterInbox(rows, filter, inMessages ? "" : query, team);
 
   // "חיפוש בתוך ההודעות" (5.11.2026): stored conversations only.
-  const storedChannelIds = wa.channels.filter((c) => c.storeEnabled).map((c) => c.id);
-  const hits: MessageHit[] = inMessages && query ? await searchStoredMessages(storedChannelIds, wa.stored, query) : [];
-  const keyOfChat = (chatId: string) => {
-    const c = chats.find((x) => x.id === chatId);
+  // Each number with its own chats (12.11.2026): see searchStoredMessages.
+  const searchable = new Map<string, string[]>();
+  for (const c of chats) {
+    if (!isStored(wa, c)) continue;
+    const list = searchable.get(c.numberKey) ?? [];
+    list.push(c.id);
+    searchable.set(c.numberKey, list);
+  }
+  const hits: MessageHit[] = inMessages && query ? await searchStoredMessages(searchable, query) : [];
+  const keyOfChat = (chatId: string, numberKey: string) => {
+    const c = chats.find((x) => x.id === chatId && x.numberKey === numberKey);
     const p = c ? chatPhone(c) : null;
     return p ? phoneKey(p) : chatKey(chatId);
   };
   // Who may mark a chat read: its number's owner, or the full viewers.
-  const readTarget = (chatId: string) => {
-    const info = wa.channelOf.get(chatId);
+  const readTarget = ({ chatId, numberKey }: ChatRef) => {
+    const info = numberKey ? wa.numbers.get(numberKey) : null;
     if (!info || !(info.ownerUserId === user.id || access.full)) return null;
-    return { chatId, numberKey: info.id ?? "-" };
+    return { chatId, numberKey: numberKeyOf(info) };
   };
-  const readTargets = (ids: string[]) => ids.map(readTarget).filter((t): t is { chatId: string; numberKey: string } => t !== null);
+  const readTargets = (refs: ChatRef[]) => refs.map(readTarget).filter((t): t is { chatId: string; numberKey: string } => t !== null);
 
   const isOpen = Boolean(selectedKey) && (Boolean(chat) || Boolean(selectedPhone));
   const openKey = selectedPhone ? phoneKey(selectedPhone) : chat ? chatKey(chat.id) : null;
@@ -680,7 +704,7 @@ export default async function CommunicationsPage(props: {
       wa.channels.filter((c) => c.storeEnabled && (c.ownerUserId === user.id || access.manager)).map((c) => countChatsToReview(c)),
     )
   ).reduce((a, b) => a + b, 0);
-  const openTargets = readTargets(openChats.length > 0 ? openChats.map((c) => c.id) : chat ? [chat.id] : []);
+  const openTargets = readTargets(openChats.map((c) => ({ chatId: c.id, numberKey: c.numberKey })));
   const openUnread = openRow ? isUnread(openRow) : (chat?.unreadCount ?? 0) !== 0;
 
   // The list's filters (design 8ב, 5.11.2026): two menus side by side,
@@ -959,7 +983,7 @@ export default async function CommunicationsPage(props: {
                 </li>
                 {hits.map((h) => {
                   const part = snippetAround(h.text, query);
-                  const key = keyOfChat(h.chatId);
+                  const key = keyOfChat(h.chatId, h.channelId);
                   const name = rows.find((r) => r.key === key)?.name ?? h.name;
                   return (
                     <li key={`${h.channelId}-${h.messageId}`}>
@@ -1002,7 +1026,7 @@ export default async function CommunicationsPage(props: {
               {visible.map((row) => {
                 const active = row.key === openKey;
                 const unread = isUnread(row);
-                const targets = readTargets(row.chatIds);
+                const targets = readTargets(row.chats);
                 return (
                   <li key={row.key} className="group relative">
                     <Link prefetch={false}
@@ -1279,7 +1303,7 @@ export default async function CommunicationsPage(props: {
                 </p>
               </section>
 
-              {chat && chat.type === "group" && chatInfo?.id && wa.stored.has(chat.id) ? (
+              {chat && chat.type === "group" && chatInfo?.id && openChats[0] && isStored(wa, openChats[0]) ? (
                 <section className="space-y-2">
                   <h3 className="text-xs font-medium text-app-text-secondary">{t("rail.groupClient")}</h3>
                   <GroupClientForm

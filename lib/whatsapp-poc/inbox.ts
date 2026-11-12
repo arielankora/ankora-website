@@ -43,7 +43,16 @@ export type InboxChat = {
   /// wrote (lib/comms/stored-chats.ts).
   lastMessageKind?: "voice" | "file" | null;
   groupClient?: { id: string; name: string } | null;
+  /// Which connected number the chat was read from (lib/comms/inbox-loader.ts):
+  /// the channel id, or "-" for the configured number before it was
+  /// connected. 12.11.2026: a WhatsApp chat id is the other person's id, so
+  /// two of our numbers talking to the same person have chats with the same
+  /// id; only the id and the number together name one conversation.
+  numberKey?: string;
 };
+
+/// One conversation: a chat on one of our numbers.
+export type ChatRef = { chatId: string; numberKey: string | null };
 
 export type InboxCall = {
   emailId: string;
@@ -80,16 +89,22 @@ export type InboxRow = {
   /// The people whose number or line this row's chats and calls are on
   /// (5.11.2026, the "צוות" filter): user ids.
   teamIds: string[];
-  /// The WhatsApp chats behind the row, for "סמן כנקראה" (5.11.2026).
-  chatIds: string[];
+  /// The WhatsApp chats behind the row, for "סמן כנקראה" (5.11.2026), each
+  /// with its number (12.11.2026: the same chat id can be on two numbers).
+  chats: ChatRef[];
 };
 
 /// Who each chat and call belongs to, for the "צוות" filter. Optional: a
 /// list built without it has no team on any row.
 export type TeamOf = {
-  chat?: (chatId: string) => string | null | undefined;
+  /// By the chat itself, not its id: the same id can be on two numbers.
+  chat?: (chat: InboxChat) => string | null | undefined;
   call?: (call: InboxCall) => string | null | undefined;
 };
+
+function refOf(chat: InboxChat): ChatRef {
+  return { chatId: chat.id, numberKey: chat.numberKey ?? null };
+}
 
 function addTeam(row: InboxRow, id: string | null | undefined) {
   if (id && !row.teamIds.includes(id)) row.teamIds.push(id);
@@ -188,8 +203,8 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
     const seen = rows.get(key);
     if (seen && !later(seen.at, chat.lastMessageAt)) {
       seen.unreadCount = mergeUnread(seen.unreadCount, chat.unreadCount);
-      seen.chatIds.push(chat.id);
-      addTeam(seen, teamOf.chat?.(chat.id));
+      seen.chats.push(refOf(chat));
+      addTeam(seen, teamOf.chat?.(chat));
       continue;
     }
     const row: InboxRow = {
@@ -207,9 +222,9 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
       // A group has no number; it belongs to a client only when assigned.
       clients: owner?.clients ?? (chat.groupClient ? [chat.groupClient] : []),
       teamIds: seen ? [...seen.teamIds] : [],
-      chatIds: seen ? [...seen.chatIds, chat.id] : [chat.id],
+      chats: seen ? [...seen.chats, refOf(chat)] : [refOf(chat)],
     };
-    addTeam(row, teamOf.chat?.(chat.id));
+    addTeam(row, teamOf.chat?.(chat));
     rows.set(key, row);
   }
 
@@ -233,7 +248,7 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
         unreadCount: 0,
         clients: owner?.clients ?? [],
         teamIds: [],
-        chatIds: [],
+        chats: [],
       });
       addTeam(rows.get(key)!, teamOf.call?.(call));
       continue;

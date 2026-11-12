@@ -160,23 +160,29 @@ export type MessageHit = { chatId: string; channelId: string; messageId: string;
 
 /// "חיפוש בתוך ההודעות" (5.11.2026, Ariel): the text of stored messages,
 /// newest first. Only in the conversations the caller already found this
-/// person may see (`visible`, chat ids from listStoredChats), and never a
-/// message held by a block request or deleted. Conversations read live
-/// from Unipile cannot be searched: Unipile has no text search for them.
+/// person may see (`visible`: by channel id, the chat ids listStoredChats
+/// gave on that channel), and never a message held by a block request or
+/// deleted. Conversations read live from Unipile cannot be searched:
+/// Unipile has no text search for them.
+///
+/// 12.11.2026: each channel with its own chat ids. A chat id is the other
+/// person's id, the same on every number that talks to them, so ids across
+/// all channels together also matched another number's conversation with
+/// the same person, one this person may not see.
 export async function searchStoredMessages(
-  channelIds: string[],
-  visible: Set<string>,
+  visible: Map<string, string[]>,
   query: string,
   take = 40,
 ): Promise<MessageHit[]> {
   const q = query.trim();
-  if (q.length < 2 || channelIds.length === 0 || visible.size === 0) return [];
+  const scopes = [...visible].filter(([, chatIds]) => chatIds.length > 0);
+  if (q.length < 2 || scopes.length === 0) return [];
   const rows = await prisma.commsMessage.findMany({
     where: {
       held: false,
       isDeleted: false,
       text: { contains: q, mode: "insensitive" },
-      conversation: { channelId: { in: channelIds }, externalChatId: { in: [...visible] } },
+      OR: scopes.map(([channelId, chatIds]) => ({ conversation: { channelId, externalChatId: { in: chatIds } } })),
     },
     orderBy: { at: "desc" },
     take,
