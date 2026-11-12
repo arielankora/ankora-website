@@ -1,4 +1,4 @@
-import { RECEIPT_LABEL } from "@/lib/date-receipt";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { timed } from "@/lib/slow-log";
 import { can } from "@/lib/app-auth/permissions";
@@ -11,27 +11,14 @@ import { Drawer } from "@/components/app/Drawer";
 import { ImportantDateForm } from "./ImportantDateForm";
 import { IMPORTANT_DATES_LIST_KEYS, listQueryOf } from "@/lib/list-back";
 import { ImportantDateRow, type DateRow } from "./ImportantDateRow";
-import type { ImportantDateStatus, RecurrenceType } from "@prisma/client";
-import { formatDayAlternatives } from "@/lib/app-domain/important-dates-recurrence";
+import type { ImportantDateStatus } from "@prisma/client";
 
 export const metadata = { robots: { index: false, follow: false } };
 
 type Tab = "upcoming" | "all" | "done";
 
-const TABS: { value: Tab; label: string }[] = [
-  { value: "upcoming", label: "קרובים" },
-  { value: "all", label: "הכל" },
-  { value: "done", label: "טופלו" },
-];
-
-const RECURRENCE_LABEL: Record<RecurrenceType, string> = {
-  ONCE: "חד פעמי",
-  ANNUAL: "חוזר שנתי",
-  MONTHLY: "חוזר חודשי",
-  CUSTOM_INTERVAL: "חוזר במרווח קבוע",
-  WEEKLY: "חוזר שבועי",
-  BUSINESS_DAILY: "כל יום עסקים",
-};
+/// Their names are importantDates.list.tabs.<tab> (ADR 0006).
+const TABS: Tab[] = ["upcoming", "all", "done"];
 
 const STATUS_TONE: Record<ImportantDateStatus, DateRow["tone"]> = {
   ACTIVE: "gray",
@@ -41,21 +28,6 @@ const STATUS_TONE: Record<ImportantDateStatus, DateRow["tone"]> = {
   PAUSED: "gray",
   ARCHIVED: "gray",
 };
-
-const STATUS_LABEL: Record<ImportantDateStatus, string> = {
-  ACTIVE: "פעיל",
-  NEEDS_ATTENTION: "דחוף",
-  IN_PROGRESS: "בטיפול",
-  HANDLED_CURRENT: "טופל",
-  PAUSED: "מושהה",
-  ARCHIVED: "בארכיון",
-};
-
-function formatReminders(rules: { daysBefore: number }[]): string {
-  if (rules.length === 0) return "ללא תזכורות";
-  const days = [...new Set(rules.map((r) => r.daysBefore))].sort((a, b) => a - b);
-  return `תזכורת: ${days.join(", ")} ימים מראש`;
-}
 
 // App redesign (handoff README, screen 7 "מועדים חשובים"): "מתג: קרובים /
 // הכל / טופלו" - replaces the previous list/calendar toggle and the
@@ -78,6 +50,15 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
       </>
     );
   }
+
+  const t = await getTranslations("importantDates.list");
+  const format = await getFormatter();
+  // "תזכורת: 7, 1 ימים מראש", or "ללא תזכורות".
+  const formatReminders = (rules: { daysBefore: number }[]): string => {
+    if (rules.length === 0) return t("noReminders");
+    const days = [...new Set(rules.map((r) => r.daysBefore))].sort((a, b) => a - b);
+    return t("reminders", { days: days.join(", ") });
+  };
 
   const tab: Tab = searchParams.tab === "all" ? "all" : searchParams.tab === "done" ? "done" : "upcoming";
   // Carried to each date, so its way back returns to this tab (lib/list-back.ts).
@@ -109,19 +90,21 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
       title: d.title,
       // Org-brain spec 3.10: a date with an unknown day is a gap, and the
       // list says so instead of showing the day it was created.
-      day: d.precision === "UNKNOWN" ? "?" : new Intl.DateTimeFormat("he-IL", { day: "2-digit", timeZone: "Asia/Jerusalem" }).format(occurrence),
-      month: d.precision === "UNKNOWN" ? "חסר" : new Intl.DateTimeFormat("he-IL", { month: "short", timeZone: "Asia/Jerusalem" }).format(occurrence),
+      day: d.precision === "UNKNOWN" ? "?" : format.dateTime(occurrence, { day: "2-digit" }),
+      month: d.precision === "UNKNOWN" ? t("missingMonth") : format.dateTime(occurrence, { month: "short" }),
+      clientName: d.client.name,
       meta: [
-        d.client.name,
-        RECURRENCE_LABEL[d.recurrence],
-        d.precision === "APPROXIMATE" && d.dayAlternatives.length > 1 ? `משוער: ${formatDayAlternatives(d.dayAlternatives)}` : null,
-        d.precision === "UNKNOWN" ? "מועד חסר" : null,
-        d.conditionText ? "מותנה" : null,
-        d.expectsReceipt ? (d.expectedFrom ? `${RECEIPT_LABEL} מ-${d.expectedFrom}` : RECEIPT_LABEL) : null,
+        t(`recurrence.${d.recurrence}`),
+        d.precision === "APPROXIMATE" && d.dayAlternatives.length > 1
+          ? t("approximate", { days: format.list([...new Set(d.dayAlternatives)].sort((a, b) => a - b).map(String), { type: "disjunction" }) })
+          : null,
+        d.precision === "UNKNOWN" ? t("missing") : null,
+        d.conditionText ? t("conditional") : null,
+        d.expectsReceipt ? (d.expectedFrom ? t("receiptFrom", { from: d.expectedFrom }) : t("receipt")) : null,
       ]
         .filter(Boolean)
         .join(" · "),
-      tag: STATUS_LABEL[d.status],
+      tag: t(`status.${d.status}`),
       tone: STATUS_TONE[d.status],
       remind: formatReminders(d.reminderRules),
       status: d.status,
@@ -134,10 +117,10 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-medium text-app-text-primary">מועדים חשובים</h1>
-            <p className="mt-1 text-sm text-app-text-secondary">ימי הולדת, מסמכים, חידושים וחגים - לפי לקוח, עם תזכורות אוטומטיות.</p>
+            <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
+            <p className="mt-1 text-sm text-app-text-secondary">{t("subtitle")}</p>
           </div>
-          <Drawer triggerLabel="מועד חדש" title="מועד חשוב חדש">
+          <Drawer triggerLabel={t("newTrigger")} title={t("newTitle")}>
             {/* `users` is mapped down to the three fields the form declares,
                 not passed whole. ImportantDateForm is a client component, so
                 whatever reaches it is serialised into this page's HTML - and
@@ -156,15 +139,15 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-full border border-app-border bg-white p-[3px]">
-            {TABS.map((t) => (
+            {TABS.map((value) => (
               <a
-                key={t.value}
-                href={t.value === "upcoming" ? "/app/important-dates" : `/app/important-dates?tab=${t.value}`}
+                key={value}
+                href={value === "upcoming" ? "/app/important-dates" : `/app/important-dates?tab=${value}`}
                 className={`rounded-full px-4 py-2 text-[13px] transition-colors ${
-                  tab === t.value ? "bg-app-surface-nav text-cream font-medium" : "text-app-text-secondary hover:text-app-text-primary"
+                  tab === value ? "bg-app-surface-nav text-cream font-medium" : "text-app-text-secondary hover:text-app-text-primary"
                 }`}
               >
-                {t.label}
+                {t(`tabs.${value}`)}
               </a>
             ))}
           </div>
@@ -173,14 +156,14 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
         <div className="space-y-3">
           {rows.length === 0 ? (
             <p className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary">
-              אין מועדים להצגה בתצוגה הזו.
+              {t("empty")}
             </p>
           ) : (
             rows.map((row) => <ImportantDateRow key={row.id} date={row} listQuery={listQuery} />)
           )}
         </div>
 
-        <p className="text-xs text-app-text-tertiary">מועדים חוזרים מחושבים אוטומטית, כולל התאמה ללוח השנה העברי ולימי חג.</p>
+        <p className="text-xs text-app-text-tertiary">{t("footnote")}</p>
       </div>
     </>
   );

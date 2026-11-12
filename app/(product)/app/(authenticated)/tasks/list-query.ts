@@ -74,9 +74,8 @@ export function carriedListQuery(from?: string | null): string {
 
 /// The words on the way back come from the dictionary (ADR 0006), under
 /// tasks.list: back.*, pills.* (the same words as the status pills),
-/// mine.* and view.board. A caller passes its translator for "tasks.list";
-/// one that does not (the unit tests, and any caller not yet translated)
-/// gets the Hebrew, which is the same text he.json holds for these keys.
+/// mine.* and view.board. Every caller passes its translator for
+/// "tasks.list".
 type StatusWord = "ACTIVE" | "OPEN" | "IN_PROGRESS" | "PENDING_APPROVAL" | "DONE";
 type MineWord = "all" | "assigned" | "supervising" | "involved";
 export type BackKey =
@@ -89,26 +88,8 @@ export type BackKey =
   | `mine.${MineWord}`;
 export type BackWords = (key: BackKey) => string;
 
-const HEBREW: Record<BackKey, string> = {
-  "back.toCalendar": "חזרה ליומן",
-  "back.toTasks": "חזרה למשימות",
-  "back.calendar": "יומן",
-  "back.tasks": "משימות",
-  "view.board": "לוח",
-  "pills.ACTIVE": "פעילות",
-  "pills.OPEN": "פתוחות",
-  "pills.IN_PROGRESS": "בטיפול",
-  "pills.PENDING_APPROVAL": "ממתינות לאישור",
-  "pills.DONE": "הושלמו",
-  "mine.all": "כולם",
-  "mine.assigned": "לביצוע",
-  "mine.supervising": "בפיקוח",
-  "mine.involved": "שלי",
-};
-const hebrew: BackWords = (key) => HEBREW[key];
-
 /// The words on the way back: the calendar or the list.
-export function backLabel(from?: string | null, t: BackWords = hebrew): string {
+export function backLabel(from: string | null | undefined, t: BackWords): string {
   return t(calendarBackHref(from) ? "back.toCalendar" : "back.toTasks");
 }
 
@@ -124,8 +105,8 @@ const isStatusWord = (value: string): value is StatusWord => (STATUS_WORDS as re
 
 export function backTitle(
   from: string | null | undefined,
-  names: { client?: string; category?: string } = {},
-  t: BackWords = hebrew,
+  names: { client?: string; category?: string },
+  t: BackWords,
 ): string {
   if (calendarBackHref(from)) return t("back.calendar");
   const q = new URLSearchParams(from ? clean(new URLSearchParams(from)) : "");

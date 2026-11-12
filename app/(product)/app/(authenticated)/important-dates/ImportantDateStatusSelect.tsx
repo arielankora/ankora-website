@@ -1,21 +1,17 @@
 "use client";
 import { useRef, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { updateImportantDateStatusAction } from "./actions";
 import type { ImportantDateStatus } from "@prisma/client";
 
-const STATUS_OPTIONS: { value: ImportantDateStatus; label: string }[] = [
-  { value: "ACTIVE", label: "פעיל" },
-  { value: "NEEDS_ATTENTION", label: "דורש טיפול" },
-  { value: "IN_PROGRESS", label: "בטיפול" },
-  { value: "HANDLED_CURRENT", label: "טופל (מחזור נוכחי)" },
-  { value: "PAUSED", label: "מושהה" },
-  { value: "ARCHIVED", label: "בארכיון" },
-];
+/// Their names are importantDates.status.<status> (ADR 0006).
+const STATUS_OPTIONS: ImportantDateStatus[] = ["ACTIVE", "NEEDS_ATTENTION", "IN_PROGRESS", "HANDLED_CURRENT", "PAUSED", "ARCHIVED"];
 
 /// Inline status-change control for one ImportantDate row - auto-submits
 /// on selection, mirroring app/(product)/app/(authenticated)/tasks/
 /// TaskStatusSelect.tsx exactly.
 export function ImportantDateStatusSelect({ importantDateId, status }: { importantDateId: string; status: ImportantDateStatus }) {
+  const t = useTranslations("importantDates.status");
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, startTransition] = useTransition();
 
@@ -29,9 +25,9 @@ export function ImportantDateStatusSelect({ importantDateId, status }: { importa
         onChange={() => formRef.current?.requestSubmit()}
         className="rounded-lg border border-app-border-strong bg-white px-2 py-1 text-xs text-app-text-primary outline-none focus:border-gold disabled:opacity-50"
       >
-        {STATUS_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
+        {STATUS_OPTIONS.map((value) => (
+          <option key={value} value={value}>
+            {t(value)}
           </option>
         ))}
       </select>

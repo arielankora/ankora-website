@@ -1,6 +1,7 @@
 import "server-only";
 import { lockedCalendarFor } from "@/lib/app-domain/date-calendars";
 import { timed } from "@/lib/slow-log";
+import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError, assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -63,7 +64,7 @@ async function assertClientAccess(actor: User, clientId: string) {
 
 async function requireDate(id: string) {
   const date = await prisma.importantDate.findFirst({ where: { id, deletedAt: null } });
-  if (!date) throw new Error("Important date not found.");
+  if (!date) throw new DomainError("importantDates.notFound", "Important date not found.");
   return date;
 }
 
@@ -91,7 +92,8 @@ const PASSPORT_LIKE_PATTERN = /\b[A-Za-z]{1,2}\d{6,9}\b/; // heuristic: 1-2 lett
 export function assertNotesDoNotContainForbiddenData(notes: string | null | undefined): void {
   if (!notes) return;
   if (PASSPORT_LIKE_PATTERN.test(notes)) {
-    throw new Error(
+    throw new DomainError(
+      "importantDates.notesForbiddenData",
       "הערות לא יכולות לכלול מספרי דרכון/מסמך. אנא הסירו את המספר מהטקסט (מדיניות המערכת: לעולם לא לשמור מספרי מסמכים או פרטים רפואיים מפורטים)."
     );
   }
@@ -183,21 +185,21 @@ export function assertValidSchedule(s: {
   businessCalendar: string;
 }): void {
   if (s.recurrence === "WEEKLY") {
-    if (s.calendarType !== "GREGORIAN") throw new Error("מועד שבועי נקבע לפי הלוח הלועזי.");
+    if (s.calendarType !== "GREGORIAN") throw new DomainError("importantDates.weeklyGregorianOnly", "מועד שבועי נקבע לפי הלוח הלועזי.");
     if (s.weekday === null || !Number.isInteger(s.weekday) || s.weekday < 0 || s.weekday > 6) {
-      throw new Error("במועד שבועי צריך לבחור יום בשבוע.");
+      throw new DomainError("importantDates.weeklyNeedsWeekday", "במועד שבועי צריך לבחור יום בשבוע.");
     }
   }
-  if (s.recurrence === "BUSINESS_DAILY" && s.calendarType !== "GREGORIAN") throw new Error("מועד של כל יום עסקים נקבע לפי הלוח הלועזי.");
+  if (s.recurrence === "BUSINESS_DAILY" && s.calendarType !== "GREGORIAN") throw new DomainError("importantDates.businessDailyGregorianOnly", "מועד של כל יום עסקים נקבע לפי הלוח הלועזי.");
   if (s.intervalMonths !== null && s.intervalMonths !== 1) {
     if (s.recurrence !== "MONTHLY" || s.calendarType !== "GREGORIAN") {
-      throw new Error('"כל כמה חודשים" רלוונטי רק למועד חודשי בלוח הלועזי.');
+      throw new DomainError("importantDates.intervalMonthsMonthlyOnly", '"כל כמה חודשים" רלוונטי רק למועד חודשי בלוח הלועזי.');
     }
     if (!ALLOWED_INTERVAL_MONTHS.includes(s.intervalMonths)) {
-      throw new Error("אפשר לבחור כל חודש, חודשיים, שלושה, ארבעה או שישה חודשים.");
+      throw new DomainError("importantDates.intervalMonthsInvalid", "אפשר לבחור כל חודש, חודשיים, שלושה, ארבעה או שישה חודשים.");
     }
   }
-  if (!isBusinessCalendarKey(s.businessCalendar)) throw new Error("לוח ימי העבודה לא מוכר.");
+  if (!isBusinessCalendarKey(s.businessCalendar)) throw new DomainError("importantDates.unknownBusinessCalendar", "לוח ימי העבודה לא מוכר.");
 }
 
 /// Precision, its alternatives and the stored day, settled together.
@@ -212,17 +214,17 @@ export function resolvePrecision(s: {
 }): { precision: DatePrecisionLike; dayAlternatives: number[]; day: number } {
   if (s.precision !== "APPROXIMATE") return { precision: s.precision, dayAlternatives: [], day: s.day };
   if (s.recurrence === "ONCE" || s.recurrence === "WEEKLY" || s.recurrence === "BUSINESS_DAILY" || s.recurrence === "CUSTOM_INTERVAL") {
-    throw new Error("מועד משוער אפשרי רק במועד שנתי או חודשי.");
+    throw new DomainError("importantDates.approximateRecurrence", "מועד משוער אפשרי רק במועד שנתי או חודשי.");
   }
   const days = Array.from(new Set(s.dayAlternatives.filter((d) => Number.isInteger(d)))).sort((a, b) => a - b);
-  if (days.length < 2) throw new Error('במועד משוער צריך לפחות שני ימים אפשריים, למשל "8, 9".');
-  if (days.some((d) => d < 1 || d > 31)) throw new Error("ימים אפשריים צריכים להיות בין 1 ל-31.");
+  if (days.length < 2) throw new DomainError("importantDates.approximateTwoDays", 'במועד משוער צריך לפחות שני ימים אפשריים, למשל "8, 9".');
+  if (days.some((d) => d < 1 || d > 31)) throw new DomainError("importantDates.approximateDayRange", "ימים אפשריים צריכים להיות בין 1 ל-31.");
   return { precision: "APPROXIMATE", dayAlternatives: days, day: days[0] };
 }
 
 export function assertValidRange(rangeStart: Date | null, rangeEnd: Date | null): void {
   if (rangeStart && rangeEnd && rangeEnd.getTime() < rangeStart.getTime()) {
-    throw new Error("סוף התקופה לא יכול להיות לפני תחילתה.");
+    throw new DomainError("importantDates.rangeEndBeforeStart", "סוף התקופה לא יכול להיות לפני תחילתה.");
   }
 }
 
@@ -355,7 +357,7 @@ async function createImportantDateInner(actor: User, input: ImportantDateInput) 
   assertNotesDoNotContainForbiddenData(input.notes);
 
   const title = input.title.trim();
-  if (!title) throw new Error("כותרת היא שדה חובה.");
+  if (!title) throw new DomainError("importantDates.titleRequired", "כותרת היא שדה חובה.");
 
   const calendarType = input.calendarType ?? "GREGORIAN";
   const recurrence = input.recurrence ?? "ANNUAL";

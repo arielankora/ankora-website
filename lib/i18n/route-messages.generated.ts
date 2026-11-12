@@ -31,6 +31,9 @@ export const AREA_MESSAGE_PATHS = {
     "approvals",
     "knowledge",
   ],
+  "calendar": [
+    "calendar",
+  ],
   "categories": [
     "categories.create",
     "categories.edit",
@@ -85,6 +88,7 @@ export const AREA_MESSAGE_PATHS = {
     "hourBanks.policy",
   ],
   "important-dates": [
+    "importantDates",
     "tasks.detail.advance",
   ],
   "integrations": [

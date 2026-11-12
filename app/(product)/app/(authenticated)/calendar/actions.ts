@@ -4,6 +4,8 @@ import { requireUser } from "@/lib/app-auth/session";
 import { updateTask } from "@/lib/app-domain/tasks";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { isDayKey } from "@/lib/calendar-keys";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 
 // The calendar's one write: a task's due date, from a drag.
 //
@@ -19,12 +21,15 @@ export async function setTaskDueDateAction(input: {
   dueDate: string | null;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await requireUser();
-  if (input.dueDate !== null && !isDayKey(input.dueDate)) return { ok: false, error: "תאריך לא תקין." };
+  const t = await getTranslations("calendar.errors");
+  if (input.dueDate !== null && !isDayKey(input.dueDate)) return { ok: false, error: t("invalidDate") };
   try {
     await updateTask(user, input.taskId, { dueDate: input.dueDate ? new Date(input.dueDate) : null });
   } catch (err) {
-    if (err instanceof ForbiddenError) return { ok: false, error: "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך." };
-    return { ok: false, error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
+    if (err instanceof ForbiddenError) return { ok: false, error: t("forbidden") };
+    const text = await domainErrorText(err);
+    if (text) return { ok: false, error: text };
+    return { ok: false, error: err instanceof Error ? err.message : t("generic") };
   }
   revalidatePath("/app/calendar");
   revalidatePath("/app/tasks");

@@ -1,33 +1,39 @@
 import { describe, expect, it } from "vitest";
 import { backTitle } from "@/app/(product)/app/(authenticated)/tasks/list-query";
 import { clientsBackTitle, importantDatesBackTitle } from "@/lib/list-back";
+import { createTranslator } from "next-intl";
+import he from "@/messages/he.json";
+
+// The Hebrew dictionary, as the screens pass it (ADR 0006).
+const tList = createTranslator({ locale: "he-IL", messages: he, namespace: "tasks.list" });
+const tDates = createTranslator({ locale: "he-IL", messages: he, namespace: "importantDates.list" });
 
 // The words on the way back (19.10.2026): they name the list a detail
 // screen returns to, so a person sees where "back" leads before using it.
 describe("backTitle (tasks)", () => {
   it("names the default list", () => {
-    expect(backTitle(undefined)).toBe("משימות · שלי");
+    expect(backTitle(undefined, {}, tList)).toBe("משימות · שלי");
   });
 
   it("names every filter that is set, with the names it was given", () => {
     const from = new URLSearchParams({ mine: "0", status: "OPEN", clientId: "c1", categoryId: "k1", q: "חוזה", view: "board" }).toString();
-    expect(backTitle(from, { client: "בן-דוד ושות׳", category: "ניהול משרד" })).toBe(
+    expect(backTitle(from, { client: "בן-דוד ושות׳", category: "ניהול משרד" }, tList)).toBe(
       'משימות · כולם · פתוחות · בן-דוד ושות׳ · ניהול משרד · "חוזה" · לוח',
     );
   });
 
   it("leaves out a client or category the caller could not name", () => {
     const from = new URLSearchParams({ clientId: "not-mine", categoryId: "k9" }).toString();
-    expect(backTitle(from, {})).toBe("משימות · שלי");
+    expect(backTitle(from, {}, tList)).toBe("משימות · שלי");
   });
 
   it("ignores keys that are not the list's, and shortens a long search", () => {
-    expect(backTitle("evil=1&status=NOPE")).toBe("משימות · שלי");
-    expect(backTitle(`q=${"א".repeat(60)}`)).toBe(`משימות · שלי · "${"א".repeat(40)}…"`);
+    expect(backTitle("evil=1&status=NOPE", {}, tList)).toBe("משימות · שלי");
+    expect(backTitle(`q=${"א".repeat(60)}`, {}, tList)).toBe(`משימות · שלי · "${"א".repeat(40)}…"`);
   });
 
   it("says the calendar when it came from the calendar", () => {
-    expect(backTitle("calendar:view=week")).toBe("יומן");
+    expect(backTitle("calendar:view=week", {}, tList)).toBe("יומן");
   });
 });
 
@@ -39,8 +45,8 @@ describe("clients and important dates", () => {
   });
 
   it("names the important-dates tab", () => {
-    expect(importantDatesBackTitle("tab=done")).toBe("מועדים חשובים · טופלו");
-    expect(importantDatesBackTitle("tab=upcoming")).toBe("מועדים חשובים");
-    expect(importantDatesBackTitle(null)).toBe("מועדים חשובים");
+    expect(importantDatesBackTitle("tab=done", tDates)).toBe("מועדים חשובים · טופלו");
+    expect(importantDatesBackTitle("tab=upcoming", tDates)).toBe("מועדים חשובים");
+    expect(importantDatesBackTitle(null, tDates)).toBe("מועדים חשובים");
   });
 });

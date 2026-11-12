@@ -249,6 +249,20 @@ const TRANSLATED_FILES = [
   // map that the client file's change log (and Claude) read, beside the
   // dictionary the screen uses (tests/unit/audit-labels.test.ts keeps them
   // identical); reports/page.tsx builds the Hebrew client-activity prompt.
+  // mine-scope.ts used to keep Hebrew fallbacks for the calendar; listed below since phase 7.
+  "app/(product)/app/(authenticated)/calendar/CalendarClientSelect.tsx",
+  "app/(product)/app/(authenticated)/calendar/CalendarGrid.tsx",
+  "app/(product)/app/(authenticated)/calendar/actions.ts",
+  "app/(product)/app/(authenticated)/calendar/page.tsx",
+  "app/(product)/app/(authenticated)/important-dates/ImportantDateForm.tsx",
+  "app/(product)/app/(authenticated)/important-dates/ImportantDateRow.tsx",
+  "app/(product)/app/(authenticated)/important-dates/ImportantDateStatusSelect.tsx",
+  "app/(product)/app/(authenticated)/important-dates/[id]/page.tsx",
+  "app/(product)/app/(authenticated)/important-dates/actions.ts",
+  "app/(product)/app/(authenticated)/important-dates/page.tsx",
+  "app/(product)/app/(authenticated)/tasks/list-query.ts",
+  "app/(product)/app/(authenticated)/tasks/mine-scope.ts",
+  "lib/calendar-keys.ts",
 ];
 
 describe("translated screens (ADR 0006)", () => {

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { withFrom } from "@/lib/list-back";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { setImportantDateStatusAction } from "./actions";
@@ -11,6 +12,8 @@ export type DateRow = {
   title: string;
   day: string;
   month: string;
+  /// The client's name, shown in its own direction (ADR 0006).
+  clientName: string;
   meta: string;
   tag: string;
   tone: "red" | "gold" | "gray" | "green";
@@ -35,6 +38,7 @@ const TONE_CLASSES: Record<DateRow["tone"], string> = {
 // than just rewinding local state.
 export function ImportantDateRow({ date, listQuery }: { date: DateRow; listQuery?: string }) {
   const { showToast } = useToast();
+  const t = useTranslations("importantDates.row");
   const [status, setStatus] = useState(date.status);
   const [pending, setPending] = useState(false);
   const isHandled = status === "HANDLED_CURRENT";
@@ -47,16 +51,16 @@ export function ImportantDateRow({ date, listQuery }: { date: DateRow; listQuery
     setPending(false);
     if (!result.ok) {
       setStatus(previous);
-      showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
+      showToast({ tone: "error", title: t("updateFailed"), description: result.error });
       return;
     }
     if (isUndo) {
-      showToast({ tone: "info", title: "הפעולה בוטלה", description: date.title });
+      showToast({ tone: "info", title: t("undone"), description: date.title });
       return;
     }
     showToast({
       tone: next === "HANDLED_CURRENT" ? "success" : "info",
-      title: next === "HANDLED_CURRENT" ? "המועד סומן כטופל" : "המועד נפתח מחדש",
+      title: next === "HANDLED_CURRENT" ? t("markedHandled") : t("reopened"),
       description: date.title,
       undo: () => changeStatus(previous, true),
     });
@@ -69,13 +73,13 @@ export function ImportantDateRow({ date, listQuery }: { date: DateRow; listQuery
         <span className="block text-[10.5px]">{date.month}</span>
       </span>
       <div className="min-w-0 flex-1 basis-[220px]">
-        <Link href={withFrom(`/app/important-dates/${date.id}`, listQuery)} className="block truncate text-sm text-app-text-primary hover:text-app-text-accent">
+        <Link href={withFrom(`/app/important-dates/${date.id}`, listQuery)} dir="auto" className="block truncate text-sm text-app-text-primary hover:text-app-text-accent">
           {date.title}
         </Link>
-        <p className="mt-0.5 truncate text-[11.5px] text-app-text-tertiary">{date.meta}</p>
+        <p className="mt-0.5 truncate text-[11.5px] text-app-text-tertiary"><bdi>{date.clientName}</bdi> · {date.meta}</p>
       </div>
       <span className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium ${TONE_CLASSES[isHandled ? "green" : date.tone]}`}>
-        {isHandled ? "טופל" : date.tag}
+        {isHandled ? t("handled") : date.tag}
       </span>
       <span className="text-[11.5px] text-app-text-tertiary">{date.remind}</span>
       <button
@@ -84,7 +88,7 @@ export function ImportantDateRow({ date, listQuery }: { date: DateRow; listQuery
         onClick={() => changeStatus(isHandled ? date.previousStatus : "HANDLED_CURRENT")}
         className="rounded-full border border-app-border px-3.5 py-2 text-xs text-app-text-primary hover:border-gold disabled:opacity-50"
       >
-        {isHandled ? "פתיחה מחדש" : "סימון כטופל"}
+        {isHandled ? t("reopen") : t("markHandled")}
       </button>
     </div>
   );
