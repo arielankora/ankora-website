@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { NextIntlClientProvider } from "next-intl";
 import he from "@/messages/he.json";
+import { pickMessages } from "@/lib/i18n/client-messages";
 
 /// Pages that stay in Hebrew whatever the reader's language (ADR 0006):
 /// the agreements a person signs and the pages a client opens from a
@@ -15,7 +16,7 @@ import he from "@/messages/he.json";
 export function HebrewOnly({ children }: { children: ReactNode }) {
   return (
     <div lang="he" dir="rtl">
-      <NextIntlClientProvider locale="he-IL" messages={he}>
+      <NextIntlClientProvider locale="he-IL" messages={pickMessages(he)}>
         {children}
       </NextIntlClientProvider>
     </div>
