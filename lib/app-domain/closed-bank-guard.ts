@@ -23,6 +23,7 @@
 
 import type { HourBank, HourBankStatus, UserRole } from "@prisma/client";
 import { localDateKey } from "@/lib/timezone";
+import { DomainError } from "@/lib/domain-error";
 
 export type GuardBank = Pick<HourBank, "id" | "kind" | "cycleStart" | "cycleEnd" | "status">;
 
@@ -96,7 +97,21 @@ export function stoppedAcrossClosureMessage(hit: ClosedBankHit): string {
 }
 
 /// The warning a manager sees before overriding (Ariel's wording).
+/// A screen in the reader's language shows the dictionary key
+/// OVERRIDE_WARNING_KEY instead; this sentence stays for MCP.
 export const OVERRIDE_WARNING = "אתה עומד לשנות חבילה או מחזור סגורים. האם אתה בטוח שאתה רוצה לבצע שינוי כזה?";
+export const OVERRIDE_WARNING_KEY = "domainErrors.closedBank.overrideWarning";
+
+/// ADR 0006: the values every closedBank.* sentence takes. `kind` and
+/// `openKind` are HourBankKind ("PREPAID" or "CYCLE"; "none" when there
+/// is no open bank), chosen with an ICU select in the dictionary.
+export function closedBankValues(hit: ClosedBankHit): { kind: string; start: string; end: string; openKind: string } {
+  return { kind: hit.closed.kind, start: dayLabel(hit.closed.cycleStart), end: dayLabel(hit.closed.cycleEnd), openKind: hit.open?.kind ?? "none" };
+}
+
+/// The dictionary key for stoppedAcrossClosureMessage(hit), with
+/// closedBankValues(hit) as its values.
+export const STOPPED_ACROSS_CLOSURE_KEY = "domainErrors.closedBank.stoppedAcrossClosure";
 
 /// The line added to the note of an entry moved into the open bank.
 export function movedEntryNoteLine(originalStart: Date, closed: { kind: GuardBank["kind"]; cycleEnd: Date }): string {
@@ -121,16 +136,21 @@ export function movedRange(open: { cycleStart: Date }, startAt: Date, endAt: Dat
 /// Thrown by every time-entry write that lands in a closed bank.
 /// `canOverride` tells the caller whether to offer a manager the override,
 /// `canMoveToOpen` whether to offer recording it in the open bank instead.
-export class ClosedBankError extends Error {
+export class ClosedBankError extends DomainError {
   constructor(
     public readonly hit: ClosedBankHit,
     public readonly action: "create" | "change",
     public readonly canOverride: boolean
   ) {
+    // closedChange and closedNoOpen take {kind, start, end};
+    // closedMoveToOpen takes {openKind} too.
+    const { kind, start, end, openKind } = closedBankValues(hit);
     super(
+      action === "change" ? "closedBank.closedChange" : hit.open ? "closedBank.closedMoveToOpen" : "closedBank.closedNoOpen",
       action === "create"
         ? closedBankMessage(hit)
-        : `${closedSentence(hit)} אי אפשר לשנות רישום בחבילה או מחזור סגורים.`
+        : `${closedSentence(hit)} אי אפשר לשנות רישום בחבילה או מחזור סגורים.`,
+      action === "create" && hit.open ? { kind, start, end, openKind } : { kind, start, end }
     );
     this.name = "ClosedBankError";
   }
@@ -141,9 +161,9 @@ export class ClosedBankError extends Error {
 }
 
 /// Thrown when an override is asked for without a reason.
-export class ClosedBankOverrideReasonRequiredError extends Error {
+export class ClosedBankOverrideReasonRequiredError extends DomainError {
   constructor() {
-    super("שינוי בחבילה או מחזור סגורים דורש סיבה.");
+    super("closedBank.overrideReasonRequired", "שינוי בחבילה או מחזור סגורים דורש סיבה.");
     this.name = "ClosedBankOverrideReasonRequiredError";
   }
 }

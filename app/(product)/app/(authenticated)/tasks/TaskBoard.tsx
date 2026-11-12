@@ -1,6 +1,7 @@
 "use client";
 import { Hourglass } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { toggleTaskDoneAction } from "./actions";
 import { useTaskList } from "./TaskListProvider";
@@ -32,12 +33,10 @@ import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 //   - Approval required: the person may not be allowed to fix it at all,
 //     so the server answers and the card goes back.
 
-const COLUMNS: { status: TaskStatus; label: string }[] = [
-  { status: "OPEN", label: "פתוחות" },
-  { status: "IN_PROGRESS", label: "בביצוע" },
-  { status: "PENDING_APPROVAL", label: "ממתינות לאישור" },
-  { status: "DONE", label: "הושלמו" },
-];
+// The column names are tasks.board.columns.<status> in the dictionary.
+const COLUMNS = ["OPEN", "IN_PROGRESS", "PENDING_APPROVAL", "DONE"] as const satisfies readonly TaskStatus[];
+type ColumnStatus = (typeof COLUMNS)[number];
+const isColumn = (status: TaskStatus): status is ColumnStatus => (COLUMNS as readonly TaskStatus[]).includes(status);
 
 // ARCHIVED has no column, matching the status pills on the list. Archived
 // work is not a stage of anything; it is work somebody decided to stop
@@ -78,6 +77,7 @@ export type BoardCard = {
 };
 
 export function TaskBoard({ cards }: { cards: BoardCard[] }) {
+  const t = useTranslations("tasks.board");
   const { showToast } = useToast();
   const [local, setLocal] = useState(cards);
   const [over, setOver] = useState<TaskStatus | null>(null);
@@ -110,20 +110,20 @@ export function TaskBoard({ cards }: { cards: BoardCard[] }) {
 
     if (!result.ok) {
       setLocal((prev) => prev.map((c) => (c.id === card.id ? { ...c, status: from } : c)));
-      showToast({ tone: "error", title: "המשימה לא הוזזה", description: result.error });
+      showToast({ tone: "error", title: t("moveFailed"), description: result.error });
       return;
     }
     showToast({
       tone: "success",
-      title: `${card.title}: ${COLUMNS.find((c) => c.status === to)?.label ?? ""}`,
+      title: `${card.title}: ${isColumn(to) ? t(`columns.${to}`) : ""}`,
     });
     // 20.10.2026: see TaskRow, the same reminder after a drag to "הושלמו".
     if (result.procedureReminder) {
       showToast({
         tone: "warning",
-        title: "עוד לא בתיק הלקוח",
+        title: t("procedureReminder"),
         description: result.procedureReminder.text,
-        link: { label: "למסך הבדיקה", href: result.procedureReminder.reviewHref },
+        link: { label: t("procedureReview"), href: result.procedureReminder.reviewHref },
       });
     }
   }
@@ -139,17 +139,17 @@ export function TaskBoard({ cards }: { cards: BoardCard[] }) {
     if (to === "DONE" && card.clientVisible && !card.hasOutcome) {
       showToast({
         tone: "warning",
-        title: "לפני הסגירה",
+        title: t("beforeClosing"),
         description: card.title,
         ask: {
-          question: "מה נגיד ללקוח שקרה?",
+          question: t("outcomeQuestion"),
           choices: [
             {
               value: "close",
-              label: "סיום",
-              prompt: { label: "במשפט אחד, בשפה של הלקוח", placeholder: "משפט אחד, בשפה שלו" },
+              label: t("outcomeClose"),
+              prompt: { label: t("outcomeLabel"), placeholder: t("outcomePlaceholder") },
             },
-            { value: "cancel", label: "ביטול" },
+            { value: "cancel", label: t("outcomeCancel") },
           ],
           onAnswer: async (value, text) => {
             if (value !== "close" || !text) return;
@@ -164,7 +164,8 @@ export function TaskBoard({ cards }: { cards: BoardCard[] }) {
 
   return (
     <div className="flex gap-3 overflow-x-auto pb-2">
-      {COLUMNS.map((column) => {
+      {COLUMNS.map((status) => {
+        const column = { status, label: t(`columns.${status}`) };
         const rows = local.filter((c) => c.status === column.status);
         const shown = rows.slice(0, COLUMN_CAP);
         return (
@@ -200,11 +201,11 @@ export function TaskBoard({ cards }: { cards: BoardCard[] }) {
               ))}
               {rows.length > shown.length && (
                 <p className="px-1.5 py-1 text-[12px] text-app-text-tertiary">
-                  ועוד {rows.length - shown.length}. אפשר לצמצם עם החיפוש או עם מסנן הלקוח.
+                  {t("more", { count: rows.length - shown.length })}
                 </p>
               )}
               {rows.length === 0 && (
-                <p className="px-1.5 py-3 text-[12px] text-app-text-tertiary">ריק</p>
+                <p className="px-1.5 py-3 text-[12px] text-app-text-tertiary">{t("empty")}</p>
               )}
             </div>
           </section>
@@ -215,6 +216,8 @@ export function TaskBoard({ cards }: { cards: BoardCard[] }) {
 }
 
 function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
+  const t = useTranslations("tasks.board");
+  const format = useFormatter();
   const { listQuery } = useTaskList();
   const overdue =
     card.dueDate !== null && card.status !== "DONE" && new Date(card.dueDate).getTime() < Date.now();
@@ -244,13 +247,14 @@ function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
           // `overflow-wrap: anywhere`: a title that is one long link
           // (a pasted Facebook URL, 26.9.2026) has no space to break at,
           // and ran out of its card across the next column.
+          dir="auto"
           className="min-w-0 flex-1 text-[13.5px] leading-snug text-app-text-primary [overflow-wrap:anywhere] hover:text-app-text-secondary"
         >
           {card.title}
         </a>
       </div>
 
-      <p className="mt-1.5 truncate text-[12px] text-app-text-tertiary">{card.clientName}</p>
+      <p dir="auto" className="mt-1.5 truncate text-[12px] text-app-text-tertiary">{card.clientName}</p>
 
       {/* A line on the card, not a fifth column. A blocked task has not
           left the stage it is in - somebody is still on it, they are
@@ -267,23 +271,15 @@ function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
         <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px]">
           {/* Labelled, because there are two names on the card now and
               an unlabelled pair of names reads as two assignees. */}
-          {card.assignedToName && <span className="text-app-text-secondary">אחראי: {card.assignedToName}</span>}
-          {card.supervisorName && <span className="text-app-text-secondary">מפקח: {card.supervisorName}</span>}
+          {card.assignedToName && <span className="text-app-text-secondary">{t("assignee", { name: card.assignedToName })}</span>}
+          {card.supervisorName && <span className="text-app-text-secondary">{t("supervisor", { name: card.supervisorName })}</span>}
           {card.dueDate && (
             <span className={overdue ? "font-medium text-app-error" : "text-app-text-tertiary"}>
-              {formatDue(card.dueDate)}
+              {format.dateTime(new Date(card.dueDate), { day: "numeric", month: "numeric" })}
             </span>
           )}
         </div>
       )}
     </article>
   );
-}
-
-function formatDue(iso: string): string {
-  return new Intl.DateTimeFormat("he-IL", {
-    day: "numeric",
-    month: "numeric",
-    timeZone: "Asia/Jerusalem",
-  }).format(new Date(iso));
 }

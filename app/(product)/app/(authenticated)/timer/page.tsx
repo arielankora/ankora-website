@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { getActiveTimers, listRecentCombinations, listMyTimeEntries } from "@/lib/app-domain/time-entries";
@@ -39,17 +40,21 @@ async function loadTodayEntries(userId: string): Promise<TodayEntry[]> {
 // important screen on mobile (spec 6.2: "במובייל זהו המסך החשוב ביותר").
 // 19.10.2026: one screen for the clock and the week it fills, with
 // "הזמן שלי" as its second tab (canvas "Ankora App UI Round").
-const TIME_TABS = [
-  { key: "timer", label: "טיימר", href: "/app/timer" },
-  { key: "mine", label: "הזמן שלי", href: "/app/timer?tab=mine" },
-];
+function timeTabs(t: Awaited<ReturnType<typeof getTranslations<"timer.page">>>) {
+  return [
+    { key: "timer", label: t("tabTimer"), href: "/app/timer" },
+    { key: "mine", label: t("tabMine"), href: "/app/timer?tab=mine" },
+  ];
+}
 
 export default async function TimerPage(props: { searchParams: Promise<{ tab?: string; week?: string }> }) {
   const sp = await props.searchParams;
+  const t = await getTranslations("timer.page");
+  const TIME_TABS = timeTabs(t);
   if (sp.tab === "mine") {
     return (
       <div className="space-y-5">
-        <ViewTabs tabs={TIME_TABS} active="mine" label="טיימר והזמן שלי" />
+        <ViewTabs tabs={TIME_TABS} active="mine" label={t("tabsLabel")} />
         <MyTimeView searchParams={{ week: sp.week }} />
       </div>
     );
@@ -87,10 +92,10 @@ export default async function TimerPage(props: { searchParams: Promise<{ tab?: s
   return (
     <>
       <div className="space-y-6">
-        <ViewTabs tabs={TIME_TABS} active="timer" label="טיימר והזמן שלי" />
+        <ViewTabs tabs={TIME_TABS} active="timer" label={t("tabsLabel")} />
         <div>
-          <h1 className="text-xl font-medium text-app-text-primary">טיימר</h1>
-          <p className="mt-1 text-sm text-app-text-secondary">טיימרים פעילים, לקוח וקטגוריה, שילובים אחרונים.</p>
+          <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">{t("subtitle")}</p>
         </div>
 
         <TimerWidget

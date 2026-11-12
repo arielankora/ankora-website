@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { TASKS_VIEW_COOKIE, type TasksView } from "@/lib/tasks-view";
 
 // The list / board switch. A client component only so that the choice is
@@ -12,9 +13,10 @@ function remember(view: TasksView) {
 }
 
 export function TasksViewSwitch({ current, listHref, boardHref }: { current: TasksView; listHref: string; boardHref: string }) {
+  const t = useTranslations("tasks.list.view");
   const items: { view: TasksView; href: string; label: string }[] = [
-    { view: "list", href: listHref, label: "רשימה" },
-    { view: "board", href: boardHref, label: "לוח" },
+    { view: "list", href: listHref, label: t("list") },
+    { view: "board", href: boardHref, label: t("board") },
   ];
   return (
     <div className="flex rounded-full border border-app-border bg-white p-[3px]">

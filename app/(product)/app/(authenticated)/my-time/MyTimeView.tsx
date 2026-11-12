@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { listMyTimeEntries } from "@/lib/app-domain/time-entries";
@@ -46,22 +47,22 @@ function dateKey(date: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(date);
 }
 
-function formatDay(date: Date): string {
-  return new Intl.DateTimeFormat("he-IL", { weekday: "long", day: "numeric", month: "short", timeZone: TIMEZONE }).format(
-    date
-  );
+type Formatter = Awaited<ReturnType<typeof getFormatter>>;
+
+// ADR 0006: dates in the reader's locale and time zone. The days
+// themselves are still Israel's (each is noon there, see `days` below).
+function formatDay(format: Formatter, date: Date): string {
+  return format.dateTime(date, { weekday: "long", day: "numeric", month: "short" });
 }
 
-function formatDayShort(date: Date): { weekday: string; dayMonth: string } {
-  const weekday = new Intl.DateTimeFormat("he-IL", { weekday: "narrow", timeZone: TIMEZONE }).format(date);
-  const dayMonth = new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: TIMEZONE }).format(
-    date
-  );
+function formatDayShort(format: Formatter, date: Date): { weekday: string; dayMonth: string } {
+  const weekday = format.dateTime(date, { weekday: "narrow" });
+  const dayMonth = format.dateTime(date, { day: "numeric", month: "numeric" });
   return { weekday, dayMonth };
 }
 
-function formatDuration(seconds: number | null): string {
-  if (seconds === null) return "פעיל";
+function formatDuration(seconds: number | null, activeLabel: string): string {
+  if (seconds === null) return activeLabel;
   return formatClockMinutes(Math.round(seconds / 60));
 }
 
@@ -71,6 +72,9 @@ function formatDuration(seconds: number | null): string {
 // tab of /app/timer (see ../timer/page.tsx). Its week links stay on that tab.
 export async function MyTimeView({ searchParams }: { searchParams: { week?: string } }) {
   const user = await requireUser();
+  const t = await getTranslations("myTime.view");
+  const format = await getFormatter();
+  const active = t("active");
 
   if (!can(user.role, "time_entry.create_self")) {
     return (
@@ -116,8 +120,8 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-app-text-primary">הזמן שלי</h1>
-          <p className="mt-1 text-sm text-app-text-secondary">רצועת השבוע, הוספת דיווח בשורה אחת, ורשימה לפי יום.</p>
+          <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">{t("subtitle")}</p>
         </div>
 
         {/* App redesign (handoff README, screen 3): "פס שבוע" - nav +
@@ -128,26 +132,28 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
             <div className="flex items-center gap-2.5">
               <Link
                 href={`/app/timer?tab=mine&week=${prevWeek}`}
-                aria-label="שבוע קודם"
+                aria-label={t("prevWeek")}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-app-border text-app-text-primary hover:border-gold"
               >
                 ›
               </Link>
               <span className="text-[13.5px] font-medium text-app-text-primary">
-                {formatDay(days[0])} - {formatDay(days[6])}
+                {t("weekRange", { start: formatDay(format, days[0]), end: formatDay(format, days[6]) })}
               </span>
               <Link
                 href={`/app/timer?tab=mine&week=${nextWeek}`}
-                aria-label="שבוע הבא"
+                aria-label={t("nextWeek")}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-app-border text-app-text-primary hover:border-gold"
               >
                 ‹
               </Link>
             </div>
             <span className="text-[12.5px] text-app-text-secondary">
-              סה&quot;כ השבוע{" "}
-              <span className="font-jbmono text-sm text-app-text-primary">{formatDuration(weekTotalSeconds)}</span> · יעד{" "}
-              {WEEKLY_TARGET_HOURS}:00
+              {t.rich("weekTotal", {
+                total: formatDuration(weekTotalSeconds, active),
+                target: WEEKLY_TARGET_HOURS,
+                mono: (chunks) => <span className="font-jbmono text-sm text-app-text-primary">{chunks}</span>,
+              })}
             </span>
           </div>
 
@@ -159,7 +165,7 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
               const key = dateKey(day);
               const daySeconds = (byDay.get(key) ?? []).reduce((sum, e) => sum + (e.actualSeconds ?? 0), 0);
               const isToday = key === todayKeyStr;
-              const { weekday, dayMonth } = formatDayShort(day);
+              const { weekday, dayMonth } = formatDayShort(format, day);
               const intensity = Math.min(1, daySeconds / (FULL_DAY_HOURS * 3600));
               return (
                 <div
@@ -169,14 +175,14 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
                   }`}
                 >
                   <span className={`block text-[11px] ${isToday ? "text-app-text-accent" : "text-app-text-tertiary"}`}>
-                    {weekday}׳ {dayMonth}
+                    {t("dayShort", { weekday, dayMonth })}
                   </span>
                   <span
                     className={`mt-1.5 block font-jbmono text-sm ${
                       isToday ? "font-medium text-app-text-primary" : daySeconds > 0 ? "text-app-text-primary" : "text-app-text-tertiary"
                     }`}
                   >
-                    {daySeconds > 0 ? formatDuration(daySeconds) : "—"}
+                    {daySeconds > 0 ? formatDuration(daySeconds, active) : "—"}
                   </span>
                   <span
                     className="mt-2 block h-[3px] rounded-full"
@@ -219,12 +225,15 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
             return (
               <div key={key} className="rounded-2xl border border-app-border bg-white">
                 <div className="flex items-center justify-between border-b border-app-border bg-app-surface-page px-5 py-3">
-                  <p className="text-sm font-medium text-app-text-primary">{formatDay(day)}</p>
+                  <p className="text-sm font-medium text-app-text-primary">{formatDay(format, day)}</p>
                   <span className="text-sm text-app-text-primary">
-                    <span className="font-jbmono">{formatDuration(dayTotalSeconds)}</span>
+                    <span className="font-jbmono">{formatDuration(dayTotalSeconds, active)}</span>
                     {dayBillableSeconds !== dayClosedActualSeconds && (
                       <span className="ms-2 text-[12px] text-app-text-accent" data-testid="day-billable">
-                        לחיוב <span className="font-jbmono">{formatDuration(dayBillableSeconds)}</span>
+                        {t.rich("billable", {
+                          amount: formatDuration(dayBillableSeconds, active),
+                          mono: (chunks) => <span className="font-jbmono">{chunks}</span>,
+                        })}
                       </span>
                     )}
                   </span>
@@ -255,7 +264,7 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
           })}
           {entries.length === 0 && (
             <div className="rounded-2xl border border-app-border bg-white p-8 text-center">
-              <p className="text-sm text-app-text-tertiary">אין עדיין דיווחים השבוע.</p>
+              <p className="text-sm text-app-text-tertiary">{t("empty")}</p>
             </div>
           )}
         </div>

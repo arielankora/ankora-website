@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import {
   createManualEntry,
@@ -51,7 +52,8 @@ export async function createManualEntryAction(_prev: FormState | undefined, form
   const clientId = String(formData.get("clientId") || "");
   const categoryId = String(formData.get("categoryId") || "");
   if (!date || !startTime || !endTime || !clientId || !categoryId) {
-    return { error: "יש למלא תאריך, שעות, לקוח וקטגוריה." };
+    const t = await getTranslations("myTime.errors");
+    return { error: t("missingFields") };
   }
   const confirmOverlap = formData.get("confirmOverlap") === "true";
 
@@ -72,7 +74,7 @@ export async function createManualEntryAction(_prev: FormState | undefined, form
     if (err instanceof OverlapError && !err.sameClient) {
       return { overlapWarning: overlapWarningFrom(err) };
     }
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/timer");
@@ -86,7 +88,8 @@ export async function updateMyEntryAction(_prev: UpdateState | undefined, formDa
   const startTime = String(formData.get("startTime") || "");
   const endTime = String(formData.get("endTime") || "");
   if (!timeEntryId || !date || !startTime || !endTime) {
-    return { error: "נתונים חסרים." };
+    const t = await getTranslations("myTime.errors");
+    return { error: t("missingData") };
   }
 
   const expectedUpdatedAtRaw = String(formData.get("expectedUpdatedAt") || "");
@@ -108,7 +111,7 @@ export async function updateMyEntryAction(_prev: UpdateState | undefined, formDa
     if (err instanceof OverlapError && !err.sameClient) {
       return { overlapWarning: overlapWarningFrom(err) };
     }
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/timer");
@@ -133,14 +136,14 @@ export async function updateMyEntryAction(_prev: UpdateState | undefined, formDa
 /// refused delete looked exactly like a slow one.
 export async function deleteMyEntryAction(timeEntryId: string, closedBankOverrideReason?: string): Promise<FormState> {
   const user = await requireUser();
-  if (!timeEntryId) return { error: "נתונים חסרים." };
+  if (!timeEntryId) return { error: (await getTranslations("myTime.errors"))("missingData") };
   try {
     await deleteTimeEntry(user, timeEntryId, {
       closedBankOverride: closedBankOverrideReason?.trim() ? { reason: closedBankOverrideReason.trim() } : null,
     });
   } catch (err) {
     if (err instanceof ClosedBankError) return { closedBank: closedBankNoticeFrom(err) };
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath("/app/timer");
   return { ok: true };

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { ServerCrash, Copy, Check } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 // App redesign (handoff README, "19. מצבי מסך"): "500 (עם קוד שגיאה
 // להעתקה)". `errorCode` is meant to be something a support conversation can
@@ -15,6 +16,7 @@ export function ServerError({
   onRetry?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const t = useTranslations("shell.states.serverError");
 
   async function handleCopy() {
     if (!errorCode) return;
@@ -33,8 +35,8 @@ export function ServerError({
       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-app-error-soft">
         <ServerCrash size={20} strokeWidth={1.75} className="text-app-error" />
       </span>
-      <p className="text-[15px] font-medium text-app-text-primary">משהו השתבש</p>
-      <p className="max-w-sm text-sm text-app-text-secondary">אירעה שגיאה בטעינת המסך. אפשר לנסות שוב, או לפנות לתמיכה עם הקוד הבא.</p>
+      <p className="text-[15px] font-medium text-app-text-primary">{t("title")}</p>
+      <p className="max-w-sm text-sm text-app-text-secondary">{t("body")}</p>
       {errorCode && (
         <button
           type="button"
@@ -51,7 +53,7 @@ export function ServerError({
           onClick={onRetry}
           className="mt-2 rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary"
         >
-          ניסיון חוזר
+          {t("retry")}
         </button>
       )}
     </div>

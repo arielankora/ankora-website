@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { createManualEntryAction } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -10,6 +11,7 @@ type Client = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
 
 function SubmitButton({ pending }: { pending: boolean }) {
+  const t = useTranslations("myTime.form");
   return (
     <button
       type="submit"
@@ -17,7 +19,7 @@ function SubmitButton({ pending }: { pending: boolean }) {
       className="shrink-0 rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
       style={{ marginInlineStart: "auto" }}
     >
-      {pending ? "שומר..." : "הוספת דיווח"}
+      {pending ? t("saving") : t("submit")}
     </button>
   );
 }
@@ -40,6 +42,7 @@ function SubmitButton({ pending }: { pending: boolean }) {
 export function ManualEntryForm({ clients, categories }: { clients: Client[]; categories: Category[] }) {
   const { onSubmit, pending, result } = useActionForm(createManualEntryAction);
   const { showToast } = useToast();
+  const t = useTranslations("myTime.form");
   const formRef = useRef<HTMLFormElement>(null);
   const [clientId, setClientId] = useState("");
   const [date, setDate] = useState(todayKey());
@@ -72,7 +75,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
     formRef.current?.reset();
     setClientId("");
     setDate(todayKey());
-    showToast({ tone: "success", title: "הדיווח נשמר" });
+    showToast({ tone: "success", title: t("saved") });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result]);
 
@@ -100,10 +103,10 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
       <input ref={confirmOverlapRef} type="hidden" name="confirmOverlap" defaultValue="false" />
       <input ref={intoOpenBankRef} type="hidden" name="intoOpenBank" defaultValue="false" />
       <input ref={overrideReasonRef} type="hidden" name="closedBankOverrideReason" defaultValue="" />
-      <p className="mb-3 text-[13px] font-medium text-app-text-primary">הוספת דיווח - שורה אחת</p>
+      <p className="mb-3 text-[13px] font-medium text-app-text-primary">{t("title")}</p>
       <div className="flex flex-wrap items-end gap-2.5">
         <label className="block min-w-0" style={{ flex: "1 1 150px" }}>
-          <span className="mb-1.5 block text-[11px] text-app-text-secondary">תאריך</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">{t("date")}</span>
           <input
             type="date"
             name="date"
@@ -116,7 +119,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
         </label>
         <div className="flex min-w-0 gap-2.5" style={{ flex: "1 1 220px" }}>
         <label className="block min-w-0 flex-1">
-          <span className="mb-1.5 block text-[11px] text-app-text-secondary">משעה</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">{t("from")}</span>
           <input
             type="time"
             name="startTime"
@@ -125,7 +128,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
           />
         </label>
         <label className="block min-w-0 flex-1">
-          <span className="mb-1.5 block text-[11px] text-app-text-secondary">עד שעה</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">{t("to")}</span>
           <input
             type="time"
             name="endTime"
@@ -136,7 +139,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
         </div>
         <div className="flex min-w-0 gap-2.5" style={{ flex: "1 1 280px" }}>
         <label className="block min-w-0 flex-1">
-          <span className="mb-1.5 block text-[11px] text-app-text-secondary">לקוח *</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">{t("client")}</span>
           <select
             name="clientId"
             required
@@ -144,7 +147,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             onChange={(e) => setClientId(e.target.value)}
             className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           >
-            <option value="">בחירה</option>
+            <option value="">{t("pick")}</option>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -153,15 +156,15 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
           </select>
         </label>
         <label className="block min-w-0 flex-1">
-          <span className="mb-1.5 block text-[11px] text-app-text-secondary">קטגוריה *</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">{t("category")}</span>
           <select
             name="categoryId"
-            aria-label="קטגוריה"
+            aria-label={t("categoryAria")}
             required
             disabled={!clientId}
             className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
           >
-            <option value="">{clientId ? "בחירה" : "קודם בוחרים לקוח"}</option>
+            <option value="">{clientId ? t("pick") : t("pickClientFirst")}</option>
             {availableCategories.map((cat) => (
               <option key={cat.id} value={cat.id}>
                 {cat.name}
@@ -171,11 +174,11 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
         </label>
         </div>
         <label className="block min-w-0" style={{ flex: "1 1 200px" }}>
-          <span className="mb-1.5 block text-[11px] text-app-text-secondary">הערה *</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">{t("note")}</span>
           <input
             name="note"
             required
-            placeholder="מה נעשה עבור הלקוח?"
+            placeholder={t("notePlaceholder")}
             className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>

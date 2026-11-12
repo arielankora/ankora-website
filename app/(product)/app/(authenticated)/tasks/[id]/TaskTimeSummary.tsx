@@ -1,4 +1,5 @@
 import { Clock } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { formatDuration } from "@/lib/time-entry-format";
 
 // Tasks phase 1: what this task has cost, by person.
@@ -23,12 +24,13 @@ export function TaskTimeSummary({
     entryCount: number;
   };
 }) {
+  const t = useTranslations("tasks.detail.time");
   return (
     <section id="task-time" className="scroll-mt-24 rounded-2xl border border-app-border bg-white p-5">
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-sm font-medium text-app-text-secondary">
           <Clock size={15} strokeWidth={1.75} className="text-app-text-tertiary" />
-          שעות על המשימה
+          {t("title")}
         </h2>
         <span className="font-jbmono text-[22px] font-medium text-app-text-primary">
           {formatDuration(time.totalSeconds)}
@@ -36,7 +38,7 @@ export function TaskTimeSummary({
       </div>
 
       {time.entryCount === 0 ? (
-        <p className="mt-4 text-sm text-app-text-secondary">עדיין לא דווח זמן על המשימה הזו.</p>
+        <p className="mt-4 text-sm text-app-text-secondary">{t("empty")}</p>
       ) : (
         <ul className="mt-4 space-y-2">
           {time.byUser.map((row) => (
@@ -50,9 +52,7 @@ export function TaskTimeSummary({
 
       {time.runningCount > 0 && (
         <p className="mt-3 border-t border-app-border pt-3 text-[12.5px] text-app-warning">
-          {time.runningCount === 1
-            ? "טיימר אחד רץ על המשימה הזו כרגע, והזמן שלו ייספר בעצירה."
-            : `${time.runningCount} טיימרים רצים על המשימה הזו כרגע, והזמן שלהם ייספר בעצירה.`}
+          {t("running", { count: time.runningCount })}
         </p>
       )}
     </section>

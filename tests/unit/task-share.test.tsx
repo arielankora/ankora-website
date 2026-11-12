@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { TaskShare, type SharePerson } from "@/app/(product)/app/(authenticated)/tasks/[id]/TaskShare";
+import { intlWrapper } from "../helpers/intl";
 
 // "שיתוף" on a task (28.10.2026). Nothing is sent from the app: the two
 // links open a draft in the person's own mail or WhatsApp. So the property
@@ -29,7 +30,7 @@ afterEach(cleanup);
 
 describe("TaskShare", () => {
   it("opens WhatsApp and mail to the chosen colleague, with the task, its link and the note", () => {
-    render(<TaskShare task={TASK} url={URL} people={PEOPLE} defaultRecipientId="u1" onDone={vi.fn()} />);
+    render(<TaskShare task={TASK} url={URL} people={PEOPLE} defaultRecipientId="u1" onDone={vi.fn()} />, { wrapper: intlWrapper() });
     fireEvent.change(screen.getByPlaceholderText(/העברתי אלייך/), { target: { value: "העברתי אלייך" } });
 
     const wa = decoded("task-share-whatsapp");
@@ -45,7 +46,7 @@ describe("TaskShare", () => {
   });
 
   it("says whose number is missing instead of linking to nobody", () => {
-    render(<TaskShare task={TASK} url={URL} people={PEOPLE} defaultRecipientId="u2" onDone={vi.fn()} />);
+    render(<TaskShare task={TASK} url={URL} people={PEOPLE} defaultRecipientId="u2" onDone={vi.fn()} />, { wrapper: intlWrapper() });
 
     expect(screen.queryByTestId("task-share-whatsapp")).toBeNull();
     expect(screen.getByTestId("task-share-no-whatsapp").textContent).toContain("נועה כהן");
@@ -53,7 +54,7 @@ describe("TaskShare", () => {
   });
 
   it("with no recipient, lets WhatsApp pick the contact", () => {
-    render(<TaskShare task={TASK} url={URL} people={PEOPLE} defaultRecipientId={null} onDone={vi.fn()} />);
+    render(<TaskShare task={TASK} url={URL} people={PEOPLE} defaultRecipientId={null} onDone={vi.fn()} />, { wrapper: intlWrapper() });
 
     expect(decoded("task-share-whatsapp").startsWith("https://wa.me/?text=")).toBe(true);
     expect(decoded("task-share-mail")).toContain("&to=&su=");
@@ -63,7 +64,7 @@ describe("TaskShare", () => {
   // 31.10.2026: a click on "מייל" used to do nothing visible in a browser
   // with no mail app. Every action now says what happened.
   it("says what happened after the mail button is clicked", () => {
-    render(<TaskShare task={TASK} url={URL} people={PEOPLE} defaultRecipientId="u1" onDone={vi.fn()} />);
+    render(<TaskShare task={TASK} url={URL} people={PEOPLE} defaultRecipientId="u1" onDone={vi.fn()} />, { wrapper: intlWrapper() });
     expect(screen.queryByTestId("task-share-feedback")).toBeNull();
 
     expect(screen.queryByTestId("task-share-rtl-hint")).toBeNull();
@@ -86,7 +87,8 @@ describe("TaskShare", () => {
         defaultRecipientId="u1"
         senderEmail="ariel@ankora.co.il"
         onDone={vi.fn()}
-      />
+      />,
+      { wrapper: intlWrapper() }
     );
     expect(
       decoded("task-share-mail").startsWith("https://mail.google.com/mail/?authuser=ariel@ankora.co.il&view=cm&fs=1&to=hadas@example.com&su=")
@@ -96,7 +98,7 @@ describe("TaskShare", () => {
   it("copies the whole message and confirms it", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-    render(<TaskShare task={TASK} url={URL} people={PEOPLE} defaultRecipientId="u1" onDone={vi.fn()} />);
+    render(<TaskShare task={TASK} url={URL} people={PEOPLE} defaultRecipientId="u1" onDone={vi.fn()} />, { wrapper: intlWrapper() });
 
     fireEvent.click(screen.getByTestId("task-share-copy"));
     expect(await screen.findByText(/ההודעה הועתקה/)).toBeTruthy();

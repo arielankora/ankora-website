@@ -3,8 +3,9 @@ import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError, assertCan, can } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
+import { DomainError } from "@/lib/domain-error";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { checkPortalNote } from "@/lib/task-portal-note-text";
+import { checkPortalNote, MAX_PORTAL_NOTE_LENGTH } from "@/lib/task-portal-note-text";
 
 // Lines the client reads under a visible task on their portal (4.11.2026).
 // See TaskPortalNote in prisma/schema.prisma for why this is not a comment.
@@ -20,7 +21,7 @@ async function taskForNote(actor: User, taskId: string) {
     where: { id: taskId, deletedAt: null },
     select: { id: true, clientId: true, clientVisible: true, status: true },
   });
-  if (!task) throw new Error("המשימה לא נמצאה.");
+  if (!task) throw new DomainError("taskPortalNotes.taskNotFound", "המשימה לא נמצאה.");
   const accessible = await listAccessibleClients(actor);
   if (!accessible.some((c) => c.id === task.clientId)) {
     throw new ForbiddenError("You are not assigned to this client.");
@@ -31,13 +32,16 @@ async function taskForNote(actor: User, taskId: string) {
 export async function addTaskPortalNote(actor: User, taskId: string, body: string) {
   assertCan(actor.role, "time_entry.create_self");
   const checked = checkPortalNote(body);
-  if (!checked.ok) throw new Error(checked.error);
+  if (!checked.ok) {
+    if (!String(body ?? "").trim()) throw new DomainError("taskPortalNotes.empty", checked.error);
+    throw new DomainError("taskPortalNotes.tooLong", checked.error, { max: String(MAX_PORTAL_NOTE_LENGTH) });
+  }
 
   const task = await taskForNote(actor, taskId);
   if (!task.clientVisible) {
-    throw new Error("המשימה לא מוצגת ללקוח, ולכן אין לאן להוסיף שורה. אפשר להציג אותה בפורטל ואז להוסיף.");
+    throw new DomainError("taskPortalNotes.taskNotVisible", "המשימה לא מוצגת ללקוח, ולכן אין לאן להוסיף שורה. אפשר להציג אותה בפורטל ואז להוסיף.");
   }
-  if (task.status === "ARCHIVED") throw new Error("המשימה בארכיון.");
+  if (task.status === "ARCHIVED") throw new DomainError("taskPortalNotes.taskArchived", "המשימה בארכיון.");
 
   const note = await prisma.taskPortalNote.create({
     data: { taskId: task.id, body: checked.text, createdById: actor.id },
@@ -61,7 +65,7 @@ export async function removeTaskPortalNote(actor: User, noteId: string) {
     where: { id: noteId, deletedAt: null },
     select: { id: true, taskId: true, body: true, createdById: true },
   });
-  if (!note) throw new Error("השורה לא נמצאה.");
+  if (!note) throw new DomainError("taskPortalNotes.noteNotFound", "השורה לא נמצאה.");
   const task = await taskForNote(actor, note.taskId);
   if (note.createdById !== actor.id && !can(actor.role, "time_entry.edit_others")) {
     throw new ForbiddenError("אפשר להסיר רק שורות שכתבתם.");

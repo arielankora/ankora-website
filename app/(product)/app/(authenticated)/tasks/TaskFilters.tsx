@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 // Tasks phase 4: finding work.
 //
@@ -65,6 +66,7 @@ export function TaskFilters({
   clients: { id: string; name: string }[];
   categories: { id: string; name: string; clientId: string | null }[];
 }) {
+  const t = useTranslations("tasks.filters");
   const router = useRouter();
   const params = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
@@ -133,8 +135,8 @@ export function TaskFilters({
           name={text.trim() ? "q" : undefined}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          aria-label="חיפוש במשימות"
-          placeholder="חיפוש בכותרת, בתיאור, בשרשור ובשם הלקוח"
+          aria-label={t("searchLabel")}
+          placeholder={t("searchPlaceholder")}
           className="min-w-0 flex-1 bg-transparent text-[13.5px] text-app-text-primary outline-none placeholder:text-app-text-tertiary"
         />
         {text && (
@@ -159,7 +161,7 @@ export function TaskFilters({
           // inside - correct, tested, and half.
           <a
             href={clearedHref}
-            aria-label="ניקוי החיפוש"
+            aria-label={t("clearSearch")}
             // The box empties before the navigation lands, so the control
             // does not sit there still showing the word it is removing.
             onClick={() => setText("")}
@@ -171,10 +173,10 @@ export function TaskFilters({
       </div>
 
       <Select
-        label="לקוח"
+        label={t("client")}
         name="clientId"
         value={clientId}
-        options={[{ value: "", label: "כל הלקוחות" }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+        options={[{ value: "", label: t("allClients") }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
         // Changing the client clears the category with it. A
         // client-specific category left behind from the previous client
         // matches nothing, and an empty list with two filters set is a
@@ -192,10 +194,10 @@ export function TaskFilters({
         }}
       />
       <Select
-        label="קטגוריה"
+        label={t("category")}
         name="categoryId"
         value={params.get("categoryId") ?? ""}
-        options={[{ value: "", label: "כל הקטגוריות" }, ...available.map((c) => ({ value: c.id, label: c.name }))]}
+        options={[{ value: "", label: t("allCategories") }, ...available.map((c) => ({ value: c.id, label: c.name }))]}
         // Submits the form it sits in, so it travels the same reliable
         // path as Enter in the box.
         onChange={() => formRef.current?.requestSubmit()}

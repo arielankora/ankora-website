@@ -3,9 +3,10 @@ import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
+import { DomainError } from "@/lib/domain-error";
 import { findSecrets } from "@/lib/secret-scan";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
-import { lessonError } from "@/lib/process-lessons";
+import { lessonError, MAX_LESSON } from "@/lib/process-lessons";
 
 // Learning from runs (claude/org-brain-spec-2026-10-12.md, 5.4).
 //
@@ -24,9 +25,9 @@ async function findRun(actor: User, taskId: string) {
     where: { id: taskId },
     select: { id: true, title: true, clientId: true, parentId: true, status: true, deletedAt: true, processId: true, processVersionId: true },
   });
-  if (!task || task.deletedAt) throw new Error("המשימה לא נמצאה.");
+  if (!task || task.deletedAt) throw new DomainError("processLessons.taskNotFound", "המשימה לא נמצאה.");
   await assertClientAccess(actor, task.clientId);
-  if (task.parentId || !task.processId) throw new Error("רק ריצה של תהליך נשאלת על הנוהל.");
+  if (task.parentId || !task.processId) throw new DomainError("processLessons.notARun", "רק ריצה של תהליך נשאלת על הנוהל.");
   return task;
 }
 
@@ -34,13 +35,16 @@ async function findRun(actor: User, taskId: string) {
 export async function recordRunLesson(actor: User, taskId: string, body: string | null) {
   assertCan(actor.role, "time_entry.create_self");
   const task = await findRun(actor, taskId);
-  if (task.status !== "DONE") throw new Error("שואלים על הנוהל רק אחרי שהריצה הסתיימה.");
+  if (task.status !== "DONE") throw new DomainError("processLessons.runNotDone", "שואלים על הנוהל רק אחרי שהריצה הסתיימה.");
   const error = lessonError(body);
-  if (error) throw new Error(error);
+  if (error) {
+    if (!body?.trim()) throw new DomainError("processLessons.empty", error);
+    throw new DomainError("processLessons.tooLong", error, { max: String(MAX_LESSON) });
+  }
   const text = body?.trim() || null;
   // A lesson lives on the process and is read by others: no secrets (R4).
-  if (text && findSecrets(text).length > 0) throw new Error("יש בטקסט סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בנוהל.");
-  if (await prisma.processLesson.findUnique({ where: { taskId } })) throw new Error("כבר ענו על השאלה הזו לריצה הזו.");
+  if (text && findSecrets(text).length > 0) throw new DomainError("processLessons.containsSecret", "יש בטקסט סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בנוהל.");
+  if (await prisma.processLesson.findUnique({ where: { taskId } })) throw new DomainError("processLessons.alreadyAnswered", "כבר ענו על השאלה הזו לריצה הזו.");
 
   const [process, version] = await Promise.all([
     prisma.process.findUniqueOrThrow({ where: { id: task.processId! }, select: { id: true, code: true, title: true, ownerId: true, backupOwnerId: true } }),
@@ -113,12 +117,13 @@ export async function listLessons(processIds: string[]) {
 export async function resolveLesson(actor: User, lessonId: string, status: "APPLIED" | "DISMISSED", resolution: string) {
   assertCan(actor.role, "time_entry.create_self");
   const lesson = await prisma.processLesson.findUnique({ where: { id: lessonId }, include: { process: { select: { ownerId: true } } } });
-  if (!lesson) throw new Error("ההערה לא נמצאה.");
+  if (!lesson) throw new DomainError("processLessons.lessonNotFound", "ההערה לא נמצאה.");
   await assertClientAccess(actor, lesson.clientId);
-  if (!canManageClients(actor.role) && lesson.process.ownerId !== actor.id) throw new Error("רק הבעלים של התהליך או מנהל מחליטים על הערה לנוהל.");
-  if (lesson.status !== "OPEN") throw new Error("כבר הוחלט על ההערה הזו.");
+  if (!canManageClients(actor.role) && lesson.process.ownerId !== actor.id) throw new DomainError("processLessons.notOwner", "רק הבעלים של התהליך או מנהל מחליטים על הערה לנוהל.");
+  if (lesson.status !== "OPEN") throw new DomainError("processLessons.alreadyResolved", "כבר הוחלט על ההערה הזו.");
   const line = resolution.trim();
-  if (!line) throw new Error(status === "APPLIED" ? "כותבים איפה זה נכנס, למשל \"גרסה 4, שלב 2\"." : "כותבים למה זה לא נכנס לנוהל.");
+  if (!line && status === "APPLIED") throw new DomainError("processLessons.appliedNeedsWhere", "כותבים איפה זה נכנס, למשל \"גרסה 4, שלב 2\".");
+  if (!line) throw new DomainError("processLessons.dismissedNeedsWhy", "כותבים למה זה לא נכנס לנוהל.");
   const updated = await prisma.processLesson.update({
     where: { id: lessonId },
     data: { status, resolution: line.slice(0, 500), resolvedById: actor.id, resolvedAt: new Date() },

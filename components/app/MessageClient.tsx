@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { MessageSquare, X } from "lucide-react";
 import { recordClientMessageAction } from "@/app/(product)/app/(authenticated)/clients/message-actions";
 
@@ -50,7 +51,7 @@ export function MessageClient({
   emails,
   preference,
   never,
-  buttonLabel = "הודעה ללקוח",
+  buttonLabel,
   preselectKind,
 }: {
   clientId: string;
@@ -76,6 +77,10 @@ export function MessageClient({
   /// asking them to confirm what they just did.
   preselectKind?: string;
 }) {
+  // ADR 0006: the drawer's own labels are translated. The drafts (their
+  // labels and bodies) are built on the server by messageComposerProps
+  // and are what goes to the client, so they arrive and leave untouched.
+  const t = useTranslations("messageClient");
   const [open, setOpen] = useState(false);
   const [chosen, setChosen] = useState<MessageDraftChoice | null>(null);
   const [text, setText] = useState("");
@@ -128,16 +133,16 @@ export function MessageClient({
         className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
       >
         <MessageSquare size={14} strokeWidth={2} />
-        {buttonLabel}
+        {buttonLabel ?? t("button")}
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={`הודעה ל${clientName}`}>
-          <button type="button" aria-label="סגירה" onClick={dismiss} className="absolute inset-0 bg-app-surface-nav/30" />
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={t("dialog", { client: clientName })}>
+          <button type="button" aria-label={t("close")} onClick={dismiss} className="absolute inset-0 bg-app-surface-nav/30" />
           <div className="absolute inset-y-0 end-0 flex w-full max-w-md flex-col border-s border-app-border bg-white shadow-lg">
             <div className="flex items-center justify-between border-b border-app-border px-5 py-4">
-              <h2 className="text-base font-medium text-app-text-primary">הודעה ל{clientName}</h2>
-              <button type="button" aria-label="סגירה" onClick={dismiss} className="text-app-text-tertiary hover:text-app-text-primary">
+              <h2 className="text-base font-medium text-app-text-primary">{t("dialog", { client: clientName })}</h2>
+              <button type="button" aria-label={t("close")} onClick={dismiss} className="text-app-text-tertiary hover:text-app-text-primary">
                 <X size={18} />
               </button>
             </div>
@@ -149,14 +154,18 @@ export function MessageClient({
                 // written to, and `never` is the field that exists to
                 // stop exactly this moment going wrong.
                 <div className="rounded-xl border border-gold/40 bg-app-surface-sunken p-3 text-[12.5px] text-app-text-secondary">
-                  {preference && <p>{preference}</p>}
-                  {never && <p className={preference ? "mt-1" : ""}>לא: {never}</p>}
+                  {preference && <p dir="auto">{preference}</p>}
+                  {never && (
+                    <p dir="auto" className={preference ? "mt-1" : ""}>
+                      {t("never", { text: never })}
+                    </p>
+                  )}
                 </div>
               )}
 
               {!chosen ? (
                 <div>
-                  <p className="text-[12.5px] text-app-text-secondary">מה קרה?</p>
+                  <p className="text-[12.5px] text-app-text-secondary">{t("whatHappened")}</p>
                   <ul className="mt-2 space-y-1">
                     {drafts.map((d) => (
                       <li key={d.kind}>
@@ -176,17 +185,18 @@ export function MessageClient({
                   <textarea
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    aria-label="נוסח ההודעה"
+                    dir="auto"
+                    aria-label={t("body")}
                     rows={12}
                     className="w-full rounded-xl border border-app-border-strong bg-white p-3 text-[13.5px] leading-relaxed text-app-text-primary outline-none focus:border-gold"
                   />
                   <p className="text-[11.5px] text-app-text-tertiary">
-                    מה שבסוגריים מרובעים צריך להשלים לפני השליחה.
+                    {t("bracketsHint")}
                   </p>
 
                   {sent ? (
                     <p className="rounded-xl border border-app-success/30 bg-app-success-soft px-3 py-2 text-[12.5px] text-app-text-primary">
-                      נרשם. ההודעה נשמרה על הלקוח{taskId ? " ועל המשימה" : ""}.
+                      {taskId ? t("recordedWithTask") : t("recorded")}
                     </p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
@@ -198,7 +208,7 @@ export function MessageClient({
                           onClick={() => record("whatsapp")}
                           className="rounded-full bg-app-accent px-4 py-2 text-[12.5px] font-medium text-app-text-primary"
                         >
-                          פתיחה בוואטסאפ
+                          {t("whatsapp")}
                         </a>
                       )}
                       <button
@@ -216,7 +226,7 @@ export function MessageClient({
                         }}
                         className="rounded-full border border-app-border px-4 py-2 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold disabled:opacity-40"
                       >
-                        העתקה
+                        {t("copy")}
                       </button>
                       {emails.length > 0 && (
                         <button
@@ -225,7 +235,7 @@ export function MessageClient({
                           onClick={() => record("email")}
                           className="rounded-full border border-app-border px-4 py-2 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold disabled:opacity-40"
                         >
-                          שליחה במייל
+                          {t("email")}
                         </button>
                       )}
                       <button
@@ -237,7 +247,7 @@ export function MessageClient({
                             screen opened on one of them: somebody who
                             meant to write something else should not have
                             to close the drawer and find another button. */}
-                        נוסח אחר
+                        {t("otherDraft")}
                       </button>
                     </div>
                   )}

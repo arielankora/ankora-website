@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 // App redesign (handoff README, "19. מצבי מסך"): "מצב טעינה (שלד תוכן עם
 // ank-sweep, לא ספינר)". SkeletonBlock is the one primitive - a shimmering
 // bar/card shape - every loading.tsx and any screen with its own inline
@@ -14,8 +16,9 @@ export function SkeletonBlock({ className = "" }: { className?: string }) {
 
 /** Generic full-screen skeleton: title bar + KPI-card row + one large panel. */
 export function SkeletonScreen() {
+  const t = useTranslations("shell.states");
   return (
-    <div className="space-y-6" role="status" aria-label="טוען…">
+    <div className="space-y-6" role="status" aria-label={t("loading")}>
       <SkeletonBlock className="h-6 w-40" />
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
@@ -29,8 +32,9 @@ export function SkeletonScreen() {
 
 /** Table-shaped skeleton for list screens (Clients, Time Entries, Audit Log, ...). */
 export function SkeletonTable({ rows = 6 }: { rows?: number }) {
+  const t = useTranslations("shell.states");
   return (
-    <div className="space-y-2.5" role="status" aria-label="טוען…">
+    <div className="space-y-2.5" role="status" aria-label={t("loading")}>
       <SkeletonBlock className="h-6 w-32" />
       <div className="overflow-hidden rounded-2xl border border-app-border bg-white">
         {Array.from({ length: rows }).map((_, i) => (

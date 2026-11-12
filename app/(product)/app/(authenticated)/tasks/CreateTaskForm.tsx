@@ -4,6 +4,7 @@ import { createTaskAction, listAssignablePeopleAction } from "./actions";
 import { useDrawerClose } from "@/components/app/Drawer";
 import { useTaskList } from "./TaskListProvider";
 import { useActionForm } from "@/components/app/useActionForm";
+import { useTranslations } from "next-intl";
 
 type Client = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
@@ -13,13 +14,14 @@ const SELECT_CLASS =
   "mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-40";
 
 function SubmitButton({ pending }: { pending: boolean }) {
+  const t = useTranslations("tasks.create");
   return (
     <button
       type="submit"
       disabled={pending}
       className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
-      {pending ? "נוצרת..." : "הוספת משימה"}
+      {pending ? t("submitting") : t("submit")}
     </button>
   );
 }
@@ -42,6 +44,7 @@ export function CreateTaskForm({
   /// The client screen opens this form already pointed at its client.
   defaultClientId?: string;
 }) {
+  const t = useTranslations("tasks.create");
   const [clientId, setClientId] = useState(defaultClientId ?? "");
   const close = useDrawerClose();
   const { addCreated } = useTaskList();
@@ -101,7 +104,7 @@ export function CreateTaskForm({
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">לקוח *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("client")}</label>
         <select
           name="clientId"
           required
@@ -109,7 +112,7 @@ export function CreateTaskForm({
           onChange={(e) => setClientId(e.target.value)}
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
-          <option value="">בחירת לקוח</option>
+          <option value="">{t("chooseClient")}</option>
           {clients.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -118,13 +121,13 @@ export function CreateTaskForm({
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">קטגוריה</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("category")}</label>
         <select
           name="categoryId"
           disabled={!clientId}
           className={SELECT_CLASS}
         >
-          <option value="">ללא קטגוריה</option>
+          <option value="">{t("noCategory")}</option>
           {availableCategories.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -133,7 +136,7 @@ export function CreateTaskForm({
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">שם המשימה *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("title")}</label>
         <input
           name="title"
           required
@@ -144,13 +147,13 @@ export function CreateTaskForm({
           to start, not with a title and a comment hidden below it. */}
       <div>
         <label htmlFor="create-task-description" className="block text-xs font-medium text-app-text-secondary">
-          פרטים
+          {t("description")}
         </label>
         <textarea
           id="create-task-description"
           name="description"
           rows={3}
-          placeholder="מה צריך לדעת כדי להתחיל: מה ביקשו, ממי, ומה כבר נעשה"
+          placeholder={t("descriptionPlaceholder")}
           className="mt-1.5 w-full resize-y rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
@@ -161,7 +164,7 @@ export function CreateTaskForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="create-task-assignee" className="block text-xs font-medium text-app-text-secondary">
-            אחראי
+            {t("assignee")}
           </label>
           <select
             id="create-task-assignee"
@@ -171,7 +174,7 @@ export function CreateTaskForm({
             disabled={!clientId || peopleLoading}
             className={SELECT_CLASS}
           >
-            <option value="">{peopleLoading ? "טוען..." : "ללא אחראי"}</option>
+            <option value="">{peopleLoading ? t("loading") : t("noAssignee")}</option>
             {people.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -181,7 +184,7 @@ export function CreateTaskForm({
         </div>
         <div>
           <label htmlFor="create-task-supervisor" className="block text-xs font-medium text-app-text-secondary">
-            מפקח
+            {t("supervisor")}
           </label>
           <select
             id="create-task-supervisor"
@@ -191,7 +194,7 @@ export function CreateTaskForm({
             disabled={!clientId || peopleLoading}
             className={SELECT_CLASS}
           >
-            <option value="">{peopleLoading ? "טוען..." : "ללא מפקח"}</option>
+            <option value="">{peopleLoading ? t("loading") : t("noSupervisor")}</option>
             {people.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -214,13 +217,13 @@ export function CreateTaskForm({
             onChange={(e) => setUrgent(e.target.checked)}
             className="h-4 w-4 rounded border-app-border accent-gold"
           />
-          דחופה
+          {t("urgent")}
         </label>
         {assigneeName && (
           <p className="mt-1.5 text-xs text-app-text-secondary">
             {urgent
-              ? `${assigneeName} יקבל/תקבל הודעה עכשיו, עם קישור למשימה.`
-              : `${assigneeName} יראה/תראה אותה בתקציר הבוקר הבא.`}
+              ? t("urgentNotice", { name: assigneeName })
+              : t("digestNotice", { name: assigneeName })}
           </p>
         )}
       </div>
@@ -237,13 +240,13 @@ export function CreateTaskForm({
             name="clientVisible"
             className="h-4 w-4 rounded border-app-border accent-gold"
           />
-          הצגה ללקוח בפורטל
+          {t("clientVisible")}
         </label>
         <label className="mt-2.5 block">
-          <span className="block text-xs font-medium text-app-text-secondary">כותרת ללקוח</span>
+          <span className="block text-xs font-medium text-app-text-secondary">{t("clientTitle")}</span>
           <input
             name="clientTitle"
-            placeholder="איך זה ייקרא אצל הלקוח. ברירת מחדל: שם המשימה"
+            placeholder={t("clientTitlePlaceholder")}
             className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </label>

@@ -8,7 +8,8 @@ import {
 } from "@/lib/app-domain/time-entries";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { ClosedBankError, OVERRIDE_WARNING } from "@/lib/app-domain/closed-bank-guard";
-import { describeOverlapConflict } from "@/lib/time-entry-format";
+import { getFormatter, getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 
 // What a manual-entry write answers with, shared by "הזמן שלי" and the
 // task screen (28.10.2026). Outside actions.ts because a "use server"
@@ -62,17 +63,35 @@ export function closedBankOptionsFrom(formData: FormData): {
   };
 }
 
-export function friendlyError(err: unknown): string {
+/// ADR 0006: async, because the sentence is in the reader's language.
+/// Callers outside this folder (tasks/[id]/actions.ts) must await it.
+export async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("timeEntries.errors");
   if (err instanceof OverlapError)
-    return `טווח הזמן חופף לדיווח קיים אצל אותו לקוח: ${describeOverlapConflict(err.conflicting)}.`;
-  if (err instanceof ConflictError)
-    return "הרשומה הזו עודכנה בינתיים על ידי מישהו אחר. יש לרענן את הדף ולנסות שוב.";
-  if (err instanceof EditWindowExpiredError) return "חלון העריכה העצמית הסתיים; נדרשת הרשאת מנהל.";
-  if (err instanceof BackdateReasonRequiredError) return "יש לציין סיבה לדיווח עבור יום קודם.";
-  if (err instanceof FutureEntryError) return "לא ניתן לדווח על זמן בעתיד.";
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
+    return t("overlapSameClient", { conflict: await describeConflict(err.conflicting) });
+  if (err instanceof ConflictError) return t("conflict");
+  if (err instanceof EditWindowExpiredError) return t("editWindowExpired");
+  if (err instanceof BackdateReasonRequiredError) return t("backdateReasonRequired");
+  if (err instanceof FutureEntryError) return t("futureEntry");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  const text = await domainErrorText(err);
+  if (text) return text;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
+}
+
+/// The entry an overlap ran into, named by its client, category and time
+/// range (Hadas, 23.9.2026), in the reader's language and time zone. The
+/// same wording as lib/time-entry-format.ts's describeOverlapConflict,
+/// which the admin screen and its tests still use.
+async function describeConflict(conflict: OverlapError["conflicting"]): Promise<string> {
+  const t = await getTranslations("timeEntries.errors");
+  const format = await getFormatter();
+  const start = format.dateTime(conflict.startAt, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+  const range = conflict.endAt
+    ? t("overlapRange", { start, end: format.dateTime(conflict.endAt, { hour: "2-digit", minute: "2-digit" }) })
+    : t("overlapRangeRunning", { start });
+  return t("overlapConflict", { client: conflict.client.name, category: conflict.category.name, range });
 }
 
 export function overlapWarningFrom(err: OverlapError): OverlapWarning {

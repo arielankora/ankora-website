@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { createContext, startTransition, useContext, useEffect, useState, type ReactNode } from "react";
 import { Plus, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { OPEN_DRAWER_EVENT, OPEN_DRAWER_PARAM, PENDING_OPEN_KEY, type OpenDrawerDetail } from "./drawer-keys";
 
 // Redesign direction A: replaces the old pattern of an inline "add" form
@@ -81,6 +82,7 @@ export function Drawer({
   /// primary button.
   variant?: "primary" | "link";
 }) {
+  const tShell = useTranslations("shell");
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -183,7 +185,7 @@ export function Drawer({
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={title}>
           <button
             type="button"
-            aria-label="סגירה"
+            aria-label={tShell("close")}
             onClick={dismiss}
             className="absolute inset-0 bg-app-surface-nav/30"
           />
@@ -197,7 +199,7 @@ export function Drawer({
               <h2 className="text-base font-medium text-app-text-primary">{title}</h2>
               <button
                 type="button"
-                aria-label="סגירה"
+                aria-label={tShell("close")}
                 onClick={dismiss}
                 className="text-app-text-tertiary transition-colors hover:text-app-text-primary"
               >

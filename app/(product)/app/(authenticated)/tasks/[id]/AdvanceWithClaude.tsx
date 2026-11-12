@@ -1,9 +1,10 @@
 "use client";
 import { useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Check, Copy, ExternalLink, Sparkles, Timer } from "lucide-react";
 import { recordAdvancePromptCopiedAction, startTimerFromAdvanceAction } from "./actions";
 import { useActiveTimer } from "@/components/app/ActiveTimerProvider";
-import { ADVANCE_TIMER_LABELS, advanceTimerNotice } from "@/lib/advance-timer";
+import type { AdvanceTimerOutcome } from "@/lib/advance-timer";
 
 // "קדם עם קלוד" (10.10.2026): one press copies a prompt that carries the
 // whole task, and the conversation it starts in Claude ends with a work
@@ -41,6 +42,16 @@ import { ADVANCE_TIMER_LABELS, advanceTimerNotice } from "@/lib/advance-timer";
 
 const CLAUDE_NEW_CHAT = "https://claude.ai/new";
 
+// ADR 0006: the screen's own wording of lib/advance-timer.ts's
+// ADVANCE_TIMER_LABELS and advanceTimerNotice, in the reader's language.
+// The prompt itself is content for Claude and stays as the server built it.
+const NOTICE_KEY = {
+  started: "notice.started",
+  running_on_client: "notice.runningOnClient",
+  other_client: "notice.otherClient",
+  no_category: "notice.noCategory",
+} as const;
+
 export function AdvanceWithClaude({
   taskId,
   prompt,
@@ -52,6 +63,7 @@ export function AdvanceWithClaude({
   hasPlan: boolean;
   mode?: "plan" | "lessons";
 }) {
+  const t = useTranslations("tasks.detail.advance");
   const [state, setState] = useState<"idle" | "copied" | "manual">("idle");
   const [timerNotice, setTimerNotice] = useState<string | null>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
@@ -63,22 +75,23 @@ export function AdvanceWithClaude({
     void recordAdvancePromptCopiedAction({ taskId, mode });
   }
 
-  const label = mode === "lessons" ? "סיכום ולקחים עם קלוד" : "קדם עם קלוד";
-  const hint =
-    mode === "lessons"
-      ? "מעתיק פרומט עם נתוני המשימה הסגורה. קלוד כותב איתכם סיכום ולקחים ושומר אותם כהערה פנימית"
-      : hasPlan
-        ? "מעתיק פרומט עם נתוני המשימה והתוכנית הקיימת, כדי לעדכן אותה או לבצע אותה בקלוד"
-        : "מעתיק פרומט עם כל נתוני המשימה. קלוד בונה איתכם תוכנית עבודה ושומר אותה כאן";
+  const label = mode === "lessons" ? t("lessons") : t("plan");
+  const timerLabel = mode === "lessons" ? t("timerLessons") : t("timerPlan");
+  const hint = mode === "lessons" ? t("hintLessons") : hasPlan ? t("hintWithPlan") : t("hintNoPlan");
+
+  function notice(outcome: AdvanceTimerOutcome, error?: string | null): string {
+    if (outcome !== "error") return t(NOTICE_KEY[outcome]);
+    return error ? t("notice.errorWithReason", { error }) : t("notice.error");
+  }
 
   async function startTimer() {
-    setTimerNotice("מפעיל טיימר...");
+    setTimerNotice(t("startingTimer"));
     try {
       const result = await startTimerFromAdvanceAction({ taskId });
-      setTimerNotice(advanceTimerNotice(result.outcome, result.error));
+      setTimerNotice(notice(result.outcome, result.error));
       if (result.outcome === "started") announce();
     } catch {
-      setTimerNotice(advanceTimerNotice("error"));
+      setTimerNotice(notice("error"));
     }
   }
 
@@ -126,23 +139,23 @@ export function AdvanceWithClaude({
         <button
           type="button"
           onClick={() => void copy(true)}
-          title={`${hint}. בנוסף מפעיל טיימר על המשימה כבר עכשיו, כדי שהזמן ייספר מהלחיצה`}
+          title={t("timerHint", { hint })}
           data-testid="advance-with-claude-timer"
           className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
         >
           <Timer size={14} className="text-app-text-accent" />
-          {ADVANCE_TIMER_LABELS[mode]}
+          {timerLabel}
         </button>
         {state === "copied" && (
           <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-app-text-secondary" role="status">
-            הפרומט הועתק. הדביקו אותו בשיחה חדשה בחשבון הארגוני של אנקורה בקלוד.
+            {t("copied")}
             <a
               href={CLAUDE_NEW_CHAT}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 font-medium text-app-text-accent hover:text-app-text-primary"
             >
-              פתיחת קלוד
+              {t("openClaude")}
               <ExternalLink size={12} />
             </a>
           </p>
@@ -156,14 +169,14 @@ export function AdvanceWithClaude({
 
       {state === "manual" && (
         <div className="rounded-xl border border-app-border bg-cream/40 p-3">
-          <p className="text-[12.5px] text-app-text-secondary">הדפדפן לא אפשר העתקה אוטומטית. הטקסט מסומן, אפשר להעתיק אותו מכאן ולהדביק בחשבון הארגוני של אנקורה בקלוד.</p>
+          <p className="text-[12.5px] text-app-text-secondary">{t("manual")}</p>
           <textarea
             ref={boxRef}
             readOnly
             value={prompt}
             dir="rtl"
             rows={8}
-            aria-label="הפרומט לקלוד"
+            aria-label={t("promptLabel")}
             className="mt-2 w-full resize-y rounded-lg border border-app-border-strong bg-white p-2 font-jbmono text-[11.5px] leading-relaxed text-app-text-primary"
           />
           <div className="mt-2 flex items-center gap-2">
@@ -173,14 +186,14 @@ export function AdvanceWithClaude({
               className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
             >
               <Copy size={13} />
-              העתקה
+              {t("copy")}
             </button>
             <button
               type="button"
               onClick={() => setState("idle")}
               className="rounded-full px-3 py-1.5 text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
             >
-              סגירה
+              {t("close")}
             </button>
           </div>
         </div>

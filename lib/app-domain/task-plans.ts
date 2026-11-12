@@ -3,6 +3,7 @@ import { Prisma, type EntryOrigin, type User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError, assertCan, can } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
+import { DomainError } from "@/lib/domain-error";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { createTask, removeTaskSteps, updateTask } from "@/lib/app-domain/tasks";
 import { TaskPlanRuleError, normalizePlanBody, normalizePlanSteps, planVersionConflict } from "@/lib/task-plan-rules";
@@ -40,10 +41,12 @@ export const PLAN_ALREADY_APPROVED_MESSAGE = "התוכנית הזו כבר מא�
 /// Carries the version that is stored now, so the caller can show it (the
 /// screen) or hand it back to the model to merge (MCP) instead of saying
 /// only that something went wrong.
-export class PlanVersionConflictError extends Error {
+export class PlanVersionConflictError extends DomainError {
   constructor(public readonly latestVersion: number) {
     super(
-      `בינתיים נשמרה גרסה חדשה יותר של התוכנית (גרסה ${latestVersion}). יש לקרוא אותה, לשלב בה את השינויים ולשמור שוב.`
+      "taskPlans.versionConflict",
+      `בינתיים נשמרה גרסה חדשה יותר של התוכנית (גרסה ${latestVersion}). יש לקרוא אותה, לשלב בה את השינויים ולשמור שוב.`,
+      { version: String(latestVersion) }
     );
     this.name = "PlanVersionConflictError";
   }
@@ -85,8 +88,8 @@ async function writableTask(actor: User, taskId: string) {
   assertCan(actor.role, "time_entry.create_self");
   const task = await reachableTask(actor, taskId);
   if (!task) throw new ForbiddenError("You are not assigned to this client.");
-  if (task.parentId) throw new TaskPlanRuleError(PLAN_ON_STEP_MESSAGE);
-  if (task.status === "DONE" || task.status === "ARCHIVED") throw new TaskPlanRuleError(PLAN_ON_CLOSED_MESSAGE);
+  if (task.parentId) throw new TaskPlanRuleError("taskPlans.onStep", PLAN_ON_STEP_MESSAGE);
+  if (task.status === "DONE" || task.status === "ARCHIVED") throw new TaskPlanRuleError("taskPlans.onClosed", PLAN_ON_CLOSED_MESSAGE);
   return task;
 }
 
@@ -261,9 +264,9 @@ export async function approveTaskPlan(actor: User, taskId: string, version: numb
     orderBy: { version: "desc" },
     select: { id: true, version: true, status: true },
   });
-  if (!latest) throw new TaskPlanRuleError(NO_PLAN_MESSAGE);
-  if (latest.version !== version) throw new TaskPlanRuleError(PLAN_NOT_LATEST_MESSAGE);
-  if (latest.status === "APPROVED") throw new TaskPlanRuleError(PLAN_ALREADY_APPROVED_MESSAGE);
+  if (!latest) throw new TaskPlanRuleError("taskPlans.noPlan", NO_PLAN_MESSAGE);
+  if (latest.version !== version) throw new TaskPlanRuleError("taskPlans.notLatest", PLAN_NOT_LATEST_MESSAGE);
+  if (latest.status === "APPROVED") throw new TaskPlanRuleError("taskPlans.alreadyApproved", PLAN_ALREADY_APPROVED_MESSAGE);
 
   const approved = await prisma.taskPlan.update({
     where: { id: latest.id },
@@ -295,9 +298,9 @@ export async function applyPlanSteps(actor: User, taskId: string) {
     orderBy: { version: "desc" },
     select: { id: true, version: true, status: true, steps: true },
   });
-  if (!plan) throw new TaskPlanRuleError(NO_PLAN_MESSAGE);
-  if (plan.status !== "APPROVED") throw new TaskPlanRuleError(PLAN_NOT_APPROVED_MESSAGE);
-  if (plan.steps.length === 0) throw new TaskPlanRuleError(PLAN_HAS_NO_STEPS_MESSAGE);
+  if (!plan) throw new TaskPlanRuleError("taskPlans.noPlan", NO_PLAN_MESSAGE);
+  if (plan.status !== "APPROVED") throw new TaskPlanRuleError("taskPlans.notApproved", PLAN_NOT_APPROVED_MESSAGE);
+  if (plan.steps.length === 0) throw new TaskPlanRuleError("taskPlans.noSteps", PLAN_HAS_NO_STEPS_MESSAGE);
 
   const existing = await prisma.task.findMany({
     // subtasks-included: the-steps-to-replace. The steps of one parent,

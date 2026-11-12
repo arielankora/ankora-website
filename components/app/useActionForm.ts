@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { startTransition, useEffect, useState, useTransition, type FormEvent } from "react";
+import { useTranslations } from "next-intl";
 
 /// What a Server Action in this app answers with.
 export type ActionResult = { ok?: boolean; error?: string };
@@ -109,6 +110,7 @@ export function useActionForm<R extends ActionResult>(
   // still a transition - it is just no longer one this form waits inside.
   const [, startTransition] = useTransition();
   const router = useRouter();
+  const tFailed = useTranslations("shell.actionForm");
 
   /// Ask the screen behind this form to re-read itself.
   ///
@@ -150,7 +152,7 @@ export function useActionForm<R extends ActionResult>(
         // A Server Action that throws has already been logged on the
         // server; what this side owes the person is a form that works
         // again rather than one frozen mid-save.
-        setThrown("אירעה שגיאה. נסו שוב.");
+        setThrown(tFailed("failed"));
       } finally {
         setPending(false);
       }

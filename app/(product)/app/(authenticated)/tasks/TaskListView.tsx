@@ -1,11 +1,12 @@
 "use client";
 import { ArrowDown, ArrowUp, ListChecks } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { EmptyState } from "@/components/app/states/EmptyState";
 import { TaskRow } from "./TaskRow";
 import { TaskBoard } from "./TaskBoard";
 import { useTaskList, type ListRow } from "./TaskListProvider";
 import type { MineScope } from "./mine-scope";
-import { SORT_KEYS, SORT_LABELS, nextSort, parseSort, sortParam, type SortKey } from "./task-sort";
+import { SORT_KEYS, nextSort, parseSort, sortParam, type SortKey } from "./task-sort";
 
 // Everything below the filter bar on the tasks screen: the empty state,
 // the board, the grouped list and the flat list.
@@ -15,25 +16,8 @@ import { SORT_KEYS, SORT_LABELS, nextSort, parseSort, sortParam, type SortKey } 
 // page stay a Server Component while the rows themselves are held in the
 // browser and can gain one the moment it is created.
 
-/// The empty list, said in the terms of the filter that emptied it.
-const EMPTY: Record<MineScope, { title: string; description: string }> = {
-  involved: {
-    title: "אין משימות פתוחות עליך",
-    description: "כשמשימה תשויך אליך או תחכה לאישורך היא תופיע כאן. \"כולם\" מציג את כל המשימות.",
-  },
-  assigned: {
-    title: "אין משימות לביצוע שלך",
-    description: "כשמשימה תשויך אליך היא תופיע כאן. \"כולם\" מציג את כל המשימות.",
-  },
-  supervising: {
-    title: "אין משימות בפיקוחך",
-    description: "כשתוגדר כמפקח על משימה היא תופיע כאן. \"כולם\" מציג את כל המשימות.",
-  },
-  all: {
-    title: "אין עדיין משימות",
-    description: "הוספת משימה ראשונה תופיע כאן, לפי הלקוח והקטגוריה שבחרתם.",
-  },
-};
+/// The empty list, said in the terms of the filter that emptied it:
+/// tasks.list.empty.<scope>.title and .description in the dictionary.
 
 export function TaskListView({
   board,
@@ -46,6 +30,7 @@ export function TaskListView({
   mineScope: MineScope;
   q?: string;
 }) {
+  const t = useTranslations("tasks.list");
   const { rows } = useTaskList();
 
   if (rows.length === 0) {
@@ -56,11 +41,11 @@ export function TaskListView({
     return (
       <EmptyState
         icon={ListChecks}
-        title={q ? "לא נמצאו משימות" : EMPTY[mineScope].title}
+        title={q ? t("empty.search.title") : t(`empty.${mineScope}.title`)}
         description={
           q
-            ? `אין משימה שמכילה "${q}" בכותרת, בתיאור, בשרשור או בשם הלקוח. אפשר לנקות את החיפוש או לוותר על אחד המסננים.`
-            : EMPTY[mineScope].description
+            ? t("empty.search.description", { q })
+            : t(`empty.${mineScope}.description`)
         }
       />
     );
@@ -101,7 +86,7 @@ export function TaskListView({
         {groupByClient(rows).map(([clientName, inClient]) => (
           <section key={clientName}>
             <h2 className="text-sm font-medium text-app-text-primary">
-              {clientName}
+              <span dir="auto">{clientName}</span>
               <span className="ms-2 font-normal text-app-text-tertiary">{inClient.length}</span>
             </h2>
             <div className="mt-2 rounded-2xl border border-app-border bg-white">
@@ -142,23 +127,24 @@ export function TaskListView({
 /// same choice is a select. One value per column and direction, plus the
 /// default; from xl it is hidden and the header does the job.
 function SortSelect() {
+  const t = useTranslations("tasks.list.sort");
   const { sort, setSort } = useTaskList();
   return (
     <label className="flex w-fit items-center gap-2 rounded-full border border-app-border bg-white px-3 py-1.5 text-[13px] text-app-text-secondary xl:hidden">
-      מיון
+      {t("label")}
       <select
-        aria-label="מיון"
+        aria-label={t("label")}
         value={sortParam(sort) ?? ""}
         onChange={(e) => setSort(parseSort(e.target.value))}
         className="bg-transparent text-app-text-primary outline-none"
       >
-        <option value="">ברירת מחדל</option>
+        <option value="">{t("default")}</option>
         {SORT_KEYS.flatMap((key) => [
           <option key={key} value={key}>
-            {SORT_LABELS[key]}, {key === "due" ? "מהמוקדם" : key === "status" ? "מפתוחות" : "א-ת"}
+            {t(`columns.${key}`)}, {t(`ascending.${directionKind(key)}`)}
           </option>,
           <option key={`-${key}`} value={`-${key}`}>
-            {SORT_LABELS[key]}, {key === "due" ? "מהמאוחר" : key === "status" ? "מהושלמו" : "ת-א"}
+            {t(`columns.${key}`)}, {t(`descending.${directionKind(key)}`)}
           </option>,
         ])}
       </select>
@@ -194,8 +180,16 @@ function ColumnHeader() {
   );
 }
 
+/// What "up" and "down" mean for a column: dates run early to late,
+/// statuses open to done, and the rest alphabetically.
+function directionKind(key: SortKey): "date" | "status" | "text" {
+  return key === "due" ? "date" : key === "status" ? "status" : "text";
+}
+
 function SortButton({ column, end = false }: { column: SortKey; end?: boolean }) {
+  const t = useTranslations("tasks.list.sort");
   const { sort, setSort } = useTaskList();
+  const label = t(`columns.${column}`);
   const active = sort?.key === column;
   const Arrow = sort?.desc ? ArrowDown : ArrowUp;
   return (
@@ -203,13 +197,13 @@ function SortButton({ column, end = false }: { column: SortKey; end?: boolean })
       type="button"
       onClick={() => setSort(nextSort(sort, column))}
       aria-label={
-        active ? `${SORT_LABELS[column]}, ממוין ${sort.desc ? "בסדר יורד" : "בסדר עולה"}` : `מיון לפי ${SORT_LABELS[column]}`
+        active ? t(sort.desc ? "sortedDescending" : "sortedAscending", { label }) : t("sortBy", { label })
       }
       className={`flex min-w-0 items-center gap-1 hover:text-app-text-primary ${end ? "justify-self-end" : "justify-self-start"} ${
         active ? "text-app-text-primary" : ""
       }`}
     >
-      <span>{SORT_LABELS[column]}</span>
+      <span>{label}</span>
       {active && <Arrow size={12} strokeWidth={2} aria-hidden />}
     </button>
   );

@@ -1,4 +1,5 @@
 import { ChevronLeft } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { PageBack } from "@/components/app/BackSlot";
 import { backLabel, backTitle, carriedListQuery, tasksListHref } from "../list-query";
 import { approvalsBack } from "@/lib/approvals";
@@ -84,8 +85,10 @@ export default async function TaskDetailPage(props: {
   const viaApprovals = approvalsBack(sp.fromApprovals);
   const backHref = viaApprovals?.href ?? tasksListHref(from);
   const listQuery = carriedListQuery(from);
-  const backText = viaApprovals?.label ?? backLabel(from);
+  const tList = await getTranslations("tasks.list");
+  const backText = viaApprovals?.label ?? backLabel(from, tList);
   const user = await requireUser();
+  const t = await getTranslations("tasks.detail");
 
   if (!can(user.role, "time_entry.create_self")) return <Forbidden />;
 
@@ -97,8 +100,8 @@ export default async function TaskDetailPage(props: {
   if (!detail) {
     return (
       <NotFound
-        title="המשימה לא נמצאה"
-        description="ייתכן שהמשימה נמחקה, או שהיא שייכת ללקוח שאינו משויך אליך."
+        title={t("notFound.title")}
+        description={t("notFound.description")}
         backHref={backHref}
         backLabel={backText}
       />
@@ -123,7 +126,7 @@ export default async function TaskDetailPage(props: {
       backNames.category = category.name;
     }
   }
-  const backTitleText = viaApprovals?.label ?? backTitle(from, backNames);
+  const backTitleText = viaApprovals?.label ?? backTitle(from, backNames, tList);
 
   // Opening the task is reading what the bell said about it.
   await markTaskNotificationsRead(user.id, task.id);
@@ -232,7 +235,7 @@ export default async function TaskDetailPage(props: {
       <nav className="flex items-center gap-1.5 text-[13px] text-app-text-tertiary">
         <PageBack href={backHref} label={backTitleText} testId="task-back" />
         <ChevronLeft size={14} className="text-app-text-tertiary md:hidden ltr:rotate-180" />
-        <span className="truncate text-app-text-secondary">{task.client.name}</span>
+        <span dir="auto" className="truncate text-app-text-secondary">{task.client.name}</span>
       </nav>
 
       <TaskDetail
@@ -327,7 +330,7 @@ export default async function TaskDetailPage(props: {
           )}
           {aiExcluded && !isStep && (
             <p className="rounded-full border border-app-border bg-app-surface-sunken px-3 py-1.5 text-[13px] text-app-text-secondary">
-              בלי AI: אין &quot;קדם עם קלוד&quot; במשימה הזו. היא מטופלת בידי אדם בלבד.
+              {t("noAiNotice")}
             </p>
           )}
           {!isStep && !isClosed && !currentPlan && <NewPlanEditor taskId={task.id} />}
@@ -380,7 +383,7 @@ export default async function TaskDetailPage(props: {
       {credentials.length > 0 && (
         <details className="rounded-2xl border border-app-border bg-white p-5">
           <summary className="cursor-pointer text-sm font-medium text-app-text-primary">
-            גישות למערכות של {task.client.name} ({credentials.length})
+            {t("credentials.summary", { client: task.client.name, count: credentials.length })}
           </summary>
           <ul className="mt-4 space-y-4">
             {credentials.map((c) => (
@@ -389,7 +392,7 @@ export default async function TaskDetailPage(props: {
                   {c.systemName}
                   {c.url && (
                     <a href={c.url} target="_blank" rel="noopener noreferrer" className="ms-2 text-xs text-app-text-accent hover:underline">
-                      פתיחה
+                      {t("credentials.open")}
                     </a>
                   )}
                 </span>

@@ -1,22 +1,17 @@
 "use client";
 import { startTransition, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { updateMyEntryAction, deleteMyEntryAction, type SavedEntry } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { formatClockMinutes } from "@/lib/hours-format";
 import { ClosedBankNotice } from "./ClosedBankNotice";
+import { useTimeRange } from "./ManualEntryParts";
 import type { ClosedBankNoticeState } from "./entry-errors";
 
 function todayKey(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
-}
-
-function formatTimeRange(startIso: string, endIso: string | null): string {
-  const fmt = new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" });
-  const start = fmt.format(new Date(startIso));
-  if (!endIso) return `${start} (טיימר פעיל)`;
-  return `${start}–${fmt.format(new Date(endIso))}`;
 }
 
 type Entry = {
@@ -58,8 +53,8 @@ function dateKeyOf(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date(iso));
 }
 
-function formatDuration(seconds: number | null): string {
-  if (seconds === null) return "פעיל";
+function formatDuration(seconds: number | null, activeLabel: string): string {
+  if (seconds === null) return activeLabel;
   return formatClockMinutes(Math.round(seconds / 60));
 }
 
@@ -89,6 +84,9 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
   // wrote, and an accepted delete takes the row off the screen. The server
   // still decides: the moment it sends this entry again with a newer
   // version, that is what shows.
+  const t = useTranslations("myTime.entry");
+  const tOverlap = useTranslations("myTime.overlap");
+  const formatTimeRange = useTimeRange();
   const [saved, setSaved] = useState<SavedEntry | null>(null);
   const [removed, setRemoved] = useState(false);
   const entry: Entry =
@@ -124,9 +122,9 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
         : await deleteMyEntryAction(entry.id);
       if (answer.ok) setRemoved(true);
       else if (answer.closedBank) setDeleteClosed(answer.closedBank);
-      else setDeleteError(answer.error ?? "המחיקה נכשלה.");
+      else setDeleteError(answer.error ?? t("deleteFailed"));
     } catch {
-      setDeleteError("אירעה שגיאה. נסו שוב.");
+      setDeleteError(t("genericError"));
     } finally {
       setDeleting(false);
     }
@@ -171,7 +169,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
         <input ref={overrideReasonRef} type="hidden" name="closedBankOverrideReason" defaultValue="" />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
-            <label className="block text-xs font-medium text-app-text-secondary">תאריך</label>
+            <label className="block text-xs font-medium text-app-text-secondary">{t("date")}</label>
             <input
               type="date"
               name="date"
@@ -182,7 +180,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-app-text-secondary">התחלה</label>
+            <label className="block text-xs font-medium text-app-text-secondary">{t("start")}</label>
             <input
               type="time"
               name="startTime"
@@ -192,7 +190,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-app-text-secondary">סיום</label>
+            <label className="block text-xs font-medium text-app-text-secondary">{t("end")}</label>
             <input
               type="time"
               name="endTime"
@@ -202,7 +200,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-app-text-secondary">הערה</label>
+            <label className="block text-xs font-medium text-app-text-secondary">{t("note")}</label>
             <input
               name="note"
               defaultValue={entry.note ?? ""}
@@ -211,7 +209,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-app-text-secondary">סיבת עריכה (מומלץ)</label>
+          <label className="block text-xs font-medium text-app-text-secondary">{t("editReason")}</label>
           <input
             name="reason"
             className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold sm:w-1/2"
@@ -220,9 +218,10 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
         {result?.overlapWarning && !warningDismissed && (
           <div className="rounded-[10px] border border-app-warning/35 bg-app-warning-soft px-3 py-2.5 text-xs text-app-warning">
             <p>
-              קיים כבר דיווח בשעה זו עבור {result.overlapWarning.clientName} (
-              {formatTimeRange(result.overlapWarning.startAt, result.overlapWarning.endAt)}). דיווח מקביל אפשרי
-              רק כשמדובר בלקוחות שונים - אם אכן כך, אפשר לשמור בכל זאת.
+              {tOverlap("message", {
+                client: result.overlapWarning.clientName,
+                range: formatTimeRange(result.overlapWarning.startAt, result.overlapWarning.endAt),
+              })}
             </p>
             <div className="mt-2 flex items-center gap-3">
               <button
@@ -230,14 +229,14 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
                 onClick={saveAnyway}
                 className="rounded-full border border-app-warning/45 px-3 py-1 text-xs font-medium text-app-warning hover:bg-app-warning-soft"
               >
-                שמירה בכל זאת
+                {tOverlap("saveAnyway")}
               </button>
               <button
                 type="button"
                 onClick={() => setWarningDismissed(true)}
                 className="text-xs text-app-text-secondary hover:text-app-text-primary"
               >
-                ביטול
+                {tOverlap("cancel")}
               </button>
             </div>
           </div>
@@ -255,10 +254,10 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
             disabled={pending}
             className="rounded-full bg-app-accent px-4 py-2 text-xs font-medium text-app-text-primary disabled:opacity-50"
           >
-            {pending ? "שומר..." : "שמירה"}
+            {pending ? t("saving") : t("save")}
           </button>
           <button type="button" onClick={() => setEditing(false)} className="text-xs text-app-text-secondary hover:text-app-text-primary">
-            ביטול
+            {t("cancel")}
           </button>
           {error && <p className="text-xs text-app-error">{error}</p>}
         </div>
@@ -273,7 +272,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
     <div className="flex flex-wrap items-center gap-3.5 px-4 py-3.5">
       <span className="h-[34px] w-[3px] shrink-0 rounded-full bg-gold/60" aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13.5px] text-app-text-primary">
+        <p dir="auto" className="truncate text-[13.5px] text-app-text-primary">
           {entry.note || `${entry.clientName} · ${entry.categoryName}`}
         </p>
         <p className="mt-0.5 truncate text-[11.5px] text-app-text-tertiary">
@@ -282,14 +281,17 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2.5">
-        {entry.isEdited && <StatusBadge label="נערך" tone="amber" />}
-        {entry.isOverlapConfirmed && <StatusBadge label="חפיפה מאושרת" tone="amber" />}
-        {!entry.isManual && <StatusBadge label="טיימר" tone="gray" />}
+        {entry.isEdited && <StatusBadge label={t("edited")} tone="amber" />}
+        {entry.isOverlapConfirmed && <StatusBadge label={t("overlapConfirmed")} tone="amber" />}
+        {!entry.isManual && <StatusBadge label={t("timer")} tone="gray" />}
         <span className="flex flex-col items-end leading-tight">
-          <span className="font-jbmono text-[13.5px] text-app-text-primary">{formatDuration(entry.actualSeconds)}</span>
+          <span className="font-jbmono text-[13.5px] text-app-text-primary">{formatDuration(entry.actualSeconds, t("active"))}</span>
           {entry.endAt && entry.billableSeconds != null && entry.billableSeconds !== entry.actualSeconds && (
             <span className="mt-0.5 text-[11px] text-app-text-accent" data-testid="entry-billable">
-              לחיוב <span className="font-jbmono">{formatDuration(entry.billableSeconds)}</span>
+              {t.rich("billable", {
+                amount: formatDuration(entry.billableSeconds, t("active")),
+                mono: (chunks) => <span className="font-jbmono">{chunks}</span>,
+              })}
             </span>
           )}
         </span>
@@ -298,7 +300,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
           onClick={() => setEditing(true)}
           className="rounded-lg border border-app-border px-3 py-1.5 text-xs text-app-text-secondary hover:border-gold hover:text-app-text-primary"
         >
-          עריכה
+          {t("edit")}
         </button>
         <button
           type="button"
@@ -306,7 +308,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
           disabled={deleting}
           className="text-xs text-app-text-tertiary hover:text-app-error disabled:opacity-50"
         >
-          {deleting ? "מוחק..." : "מחיקה"}
+          {deleting ? t("deleting") : t("delete")}
         </button>
       </div>
       {deleteError && <p className="w-full text-xs text-app-error">{deleteError}</p>}
