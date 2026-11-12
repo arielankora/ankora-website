@@ -1,4 +1,5 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { saveNarrativeAction } from "../file-text-actions";
@@ -19,59 +20,56 @@ export type PanelNarrative = {
   history: { version: number; meta: string; html: string }[];
 };
 
-const TITLES: Record<PanelNarrative["kind"], { title: string; empty: string; placeholder: string }> = {
-  OVERVIEW: { title: "סקירת הלקוח", empty: "עוד לא נכתבה סקירה.", placeholder: "חברה, סטארטאפ AI. שתי ישויות: Inc בארה\"ב ו-LTD בישראל. [S1 08:13]" },
-  BACKGROUND: { title: "רקע", empty: "עוד לא נכתב רקע.", placeholder: "איך הגענו לכאן, מה היה לפנינו." },
-  OUR_ROLE: { title: "התפקיד שלנו", empty: "עוד לא נכתב מה התפקיד שלנו.", placeholder: "HR, שכר וספקים. לא הנהלת חשבונות." },
-};
 
 function NarrativeForm({ clientId, n }: { clientId: string; n: PanelNarrative }) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(saveNarrativeAction, close);
+  const t = useTranslations("clients.narratives");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="kind" value={n.kind} />
       <input type="hidden" name="baseVersion" value={n.version} />
-      <textarea name="body" rows={10} defaultValue={n.body} placeholder={TITLES[n.kind].placeholder} className={INPUT} />
-      <p className="-mt-2 text-[11px] text-app-text-tertiary">מקורות בסוגריים, למשל [S1 08:13]. קוד שלא קיים במרשם נחסם. הגרסה הקודמת נשמרת.</p>
+      <textarea name="body" rows={10} defaultValue={n.body} placeholder={t(`kinds.${n.kind}.placeholder`)} dir="auto" className={INPUT} />
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">{t("formHint")}</p>
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : "שמירת גרסה חדשה"}
+        {pending ? t("saving") : t("saveVersion")}
       </button>
     </form>
   );
 }
 
 export function NarrativesPanel({ clientId, narratives }: { clientId: string; narratives: PanelNarrative[] }) {
+  const t = useTranslations("clients.narratives");
   return (
     <div className="rounded-2xl border border-app-border bg-white p-6">
-      <h2 className="text-sm font-medium text-app-text-primary">סקירה, רקע ותפקידנו</h2>
+      <h2 className="text-sm font-medium text-app-text-primary">{t("heading")}</h2>
       <div className="mt-3 space-y-5">
         {narratives.map((n) => (
           <section key={n.kind}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium text-app-text-secondary">
-                {TITLES[n.kind].title}
+                {t(`kinds.${n.kind}.title`)}
                 {n.meta && <span className="ms-2 font-normal text-app-text-tertiary">{n.meta}</span>}
               </h3>
-              <Drawer triggerLabel={n.version ? "עריכה" : "כתיבה"} title={TITLES[n.kind].title} variant="link">
+              <Drawer triggerLabel={n.version ? t("edit") : t("write")} title={t(`kinds.${n.kind}.title`)} variant="link">
                 <NarrativeForm clientId={clientId} n={n} />
               </Drawer>
             </div>
             {n.version ? (
-              <div className="mt-1 text-sm leading-relaxed text-app-text-primary" dangerouslySetInnerHTML={{ __html: n.html }} />
+              <div className="mt-1 text-sm leading-relaxed text-app-text-primary" dir="auto" dangerouslySetInnerHTML={{ __html: n.html }} />
             ) : (
-              <p className="mt-1 text-sm text-app-text-tertiary">{TITLES[n.kind].empty}</p>
+              <p className="mt-1 text-sm text-app-text-tertiary">{t(`kinds.${n.kind}.empty`)}</p>
             )}
             {n.history.length > 0 && (
               <details className="mt-1.5">
-                <summary className="cursor-pointer text-[11px] text-app-text-tertiary">גרסאות קודמות ({n.history.length})</summary>
+                <summary className="cursor-pointer text-[11px] text-app-text-tertiary">{t("history", { count: n.history.length })}</summary>
                 <ul className="mt-1.5 space-y-2">
                   {n.history.map((h) => (
                     <li key={h.version} className="text-xs text-app-text-secondary">
                       <p className="text-[11px] text-app-text-tertiary">{h.meta}</p>
-                      <div dangerouslySetInnerHTML={{ __html: h.html }} />
+                      <div dir="auto" dangerouslySetInnerHTML={{ __html: h.html }} />
                     </li>
                   ))}
                 </ul>

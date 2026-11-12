@@ -91,33 +91,44 @@ export function hasParams(p: PolicyParams): boolean {
   return Object.keys(p).length > 0;
 }
 
-/// What is missing for the parameters to mean anything. Null when they are
-/// complete, or when there are none (a rule may be text only).
-export function paramsError(kind: PolicyKindLike, p: PolicyParams): string | null {
+/// What is missing for the parameters to mean anything, by name (ADR
+/// 0006: the domain throws it with a code). Null when they are complete,
+/// or when there are none (a rule may be text only).
+export type ParamsProblem = "threshold" | "tags" | "mustInclude" | "timing" | "communication" | "separation";
+
+const PARAMS_MESSAGES: Record<ParamsProblem, string> = {
+  threshold: "סף צריך סכום ומטבע.",
+  tags: "צריך לבחור על אילו פעולות הכלל חל.",
+  mustInclude: "צריך לכתוב מה חייב להופיע בשלבים.",
+  timing: "תזמון צריך מספר ימי עסקים, ועל אילו פעולות הוא חל.",
+  communication: "צריך ערוצים מותרים, או לאן חשבוניות מגיעות.",
+  separation: "הפרדה היא בין שתי ישויות לפחות.",
+};
+
+export function paramsProblem(kind: PolicyKindLike, p: PolicyParams): ParamsProblem | null {
   if (!hasParams(p)) return null;
   switch (kind) {
     case "THRESHOLD":
-      if (p.amountMinor === undefined || !p.currency) return "סף צריך סכום ומטבע.";
-      return null;
+      return p.amountMinor === undefined || !p.currency ? "threshold" : null;
     case "APPROVAL_REQUIRED":
     case "FORBIDDEN":
-      if (!p.appliesToTags?.length) return "צריך לבחור על אילו פעולות הכלל חל.";
-      return null;
+      return !p.appliesToTags?.length ? "tags" : null;
     case "REQUIRED_STEP":
-      if (!p.mustInclude) return "צריך לכתוב מה חייב להופיע בשלבים.";
-      return null;
+      return !p.mustInclude ? "mustInclude" : null;
     case "TIMING":
-      if (!p.leadBusinessDays || !p.appliesToTags?.length) return "תזמון צריך מספר ימי עסקים, ועל אילו פעולות הוא חל.";
-      return null;
+      return !p.leadBusinessDays || !p.appliesToTags?.length ? "timing" : null;
     case "COMMUNICATION":
-      if (!p.channels?.length && !p.invoiceTo?.length) return "צריך ערוצים מותרים, או לאן חשבוניות מגיעות.";
-      return null;
+      return !p.channels?.length && !p.invoiceTo?.length ? "communication" : null;
     case "SEPARATION":
-      if ((p.entityIds?.length ?? 0) < 2) return "הפרדה היא בין שתי ישויות לפחות.";
-      return null;
+      return (p.entityIds?.length ?? 0) < 2 ? "separation" : null;
     default:
       return null;
   }
+}
+
+export function paramsError(kind: PolicyKindLike, p: PolicyParams): string | null {
+  const problem = paramsProblem(kind, p);
+  return problem ? PARAMS_MESSAGES[problem] : null;
 }
 
 /// The ids of the client's entities the parameters point at, so the

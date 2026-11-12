@@ -9,6 +9,10 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { EditRoleStatusForm } from "./EditRoleStatusForm";
 import { ClientAccessForm } from "./ClientAccessForm";
 import { ExceptionApproverForm } from "./ExceptionApproverForm";
+import { CommsAccessForm, type CommsLineChoice } from "./CommsAccessForm";
+import { confidentialitySignedBothChannels } from "@/lib/app-domain/comms-access";
+import { environmentLevelFor, lineOwnerEmails } from "@/lib/comms/grants";
+import { readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { ResendInviteForm } from "./ResendInviteForm";
 import { ExposureReport } from "./ExposureReport";
 import { logoutAllSessionsAction, resetPasskeysAction, revokeClaudeGrantsAction } from "../actions";
@@ -69,6 +73,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
         role: true,
         status: true,
         canApproveExceptions: true,
+        commsAccessLevel: true,
         personalEmail: true,
         createdAt: true,
         clientAccess: true,
@@ -113,6 +118,25 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
 
   const isSelf = targetUser.id === user.id;
 
+  // The communications screen (12.11.2026): the level, the lines, and what
+  // the environment already gives this person.
+  let commsLines: CommsLineChoice[] = [];
+  let confidentialitySigned = false;
+  if (isStaff) {
+    const [owners, signed] = await Promise.all([lineOwnerEmails(), confidentialitySignedBothChannels(targetUser.id)]);
+    confidentialitySigned = signed;
+    const me = targetUser.email.trim().toLowerCase();
+    const otherEmails = [...new Set([...owners.values()].filter((e) => e !== me))];
+    const others = otherEmails.length
+      ? await prisma.user.findMany({ where: { email: { in: otherEmails } }, select: { email: true, name: true } })
+      : [];
+    const nameOf = new Map(others.map((o) => [o.email.toLowerCase(), o.name]));
+    commsLines = readPocConfig().lineNumbers.map((line) => {
+      const owner = owners.get(line) ?? null;
+      return { line, mine: owner === me, otherOwner: owner && owner !== me ? (nameOf.get(owner) ?? owner) : null };
+    });
+  }
+
   return (
     <>
       <div className="space-y-6">
@@ -140,6 +164,15 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
           <div className="rounded-2xl border border-app-border bg-white p-6">
             <h2 className="mb-4 text-sm font-medium text-app-text-primary">{t("specialPermissionsTitle")}</h2>
             <ExceptionApproverForm userId={targetUser.id} value={targetUser.canApproveExceptions} />
+            <div className="mt-6 border-t border-app-border pt-6">
+              <CommsAccessForm
+                userId={targetUser.id}
+                level={targetUser.commsAccessLevel}
+                environmentLevel={environmentLevelFor(targetUser.email)}
+                confidentialitySigned={confidentialitySigned}
+                lines={commsLines}
+              />
+            </div>
           </div>
         )}
 

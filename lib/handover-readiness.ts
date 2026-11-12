@@ -6,6 +6,12 @@
 // 22.10.2026: a backup is no longer one of them (Ariel): what lets someone
 // step in is the approved procedure and the access, both checked here.
 
+import { runBlockerKey } from "@/lib/process-readiness";
+
+/// ADR 0006: a sentence as a key under `clients.handover`, for a screen in
+/// the reader's language, or text with no key, shown as it is.
+export type ReadinessText = { key: string; values?: Record<string, string | number> } | { raw: string };
+
 export type ReadinessSystem = { id: string; name: string; accessStatus: string; permission: string | null };
 
 export type ReadinessProcessInput = {
@@ -47,6 +53,8 @@ export type ReadinessProcess = ReadinessProcessInput & {
   ready: boolean;
   /// What is missing, in words a person acts on.
   missing: string[];
+  /// The same, as keys (ADR 0006). `missing` stays the Hebrew.
+  missingText: ReadinessText[];
 };
 
 export type Readiness = {
@@ -78,7 +86,13 @@ export function readinessOf(input: ReadinessProcessInput[]): Readiness {
       !checks.access && `אין לנו גישה ל: ${noAccess.map((s) => (s.permission ? `${s.name} (${s.permission})` : s.name)).join(", ")}.`,
       !checks.withUs && `עוד לא אצלנו${p.executor ? `: היום מבצע ${p.executor}` : ""}.`,
     ].filter((x): x is string => !!x);
-    return { ...p, checks, ready: DECIDING.every((k) => checks[k]), missing };
+    const blockerKey = runBlockerKey(blocker);
+    const missingText = ([
+      blocker ? (blockerKey ? { key: `missing.blockers.${blockerKey}` } : { raw: `${blocker}.` }) : null,
+      !checks.access ? { key: "missing.noAccess", values: { systems: noAccess.map((s) => (s.permission ? `${s.name} (${s.permission})` : s.name)).join(", ") } } : null,
+      !checks.withUs ? (p.executor ? { key: "missing.notWithUsExecutor", values: { executor: p.executor } } : { key: "missing.notWithUs" }) : null,
+    ] as (ReadinessText | null)[]).filter((x): x is ReadinessText => !!x);
+    return { ...p, checks, ready: DECIDING.every((k) => checks[k]), missing, missingText };
   });
   const seen = new Set<string>();
   const systemsWithoutAccess: ReadinessSystem[] = [];
@@ -99,4 +113,11 @@ export function readinessLine(r: Readiness): string {
   if (r.total === 0) return "אין עדיין תהליכים שמתוכננים לעבור אלינו.";
   if (r.ready === r.total) return r.total === 1 ? "התהליך מוכן: אפשר להעביר אותו אלינו." : `כל ${r.total} התהליכים מוכנים.`;
   return `${r.ready} מתוך ${r.total} תהליכים מוכנים${r.systemsWithoutAccess.length ? `, ${r.systemsWithoutAccess.length === 1 ? "ומערכת אחת" : `ו-${r.systemsWithoutAccess.length} מערכות`} בלי גישה` : ""}.`;
+}
+
+/// readinessLine() as a key under `clients.handover`, for the screen.
+export function readinessLineText(r: Readiness): ReadinessText {
+  if (r.total === 0) return { key: "line.none" };
+  if (r.ready === r.total) return r.total === 1 ? { key: "line.oneReady" } : { key: "line.allReady", values: { total: r.total } };
+  return { key: "line.some", values: { ready: r.ready, total: r.total, systems: r.systemsWithoutAccess.length } };
 }

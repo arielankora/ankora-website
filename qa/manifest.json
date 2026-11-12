@@ -2264,8 +2264,16 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-11-05"
+    },
+    "domain:comms-access": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-12",
+      "riskReason": "Who opens the communications screen: every conversation and call with every client; CALLS and FULL only after the confidentiality undertaking is signed in both channels"
     }
   },
   "waivers": {},
-  "lastScan": "2026-11-05"
+  "lastScan": "2026-11-12"
 }

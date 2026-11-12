@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { ForbiddenError, assertCan } from "@/lib/app-auth/permissions";
@@ -7,7 +8,7 @@ import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { isInternalClient } from "@/lib/app-domain/internal-client-id";
 import { emailDomain, isPublicEmailDomain, normalizeDomain } from "@/lib/contact-normalize";
 import {
-  checkSources,
+  assertSources,
   defaultWeight,
   driveIdFrom,
   readSourceRefs,
@@ -70,11 +71,11 @@ async function assertRefsBelong(clientId: string, refs: ExternalRef[]) {
   const taskIds = refs.filter((r) => r.system === "TASK").map((r) => r.id);
   if (docIds.length > 0) {
     const found = await prisma.clientDocument.count({ where: { id: { in: docIds }, clientId, deletedAt: null } });
-    if (found !== new Set(docIds).size) throw new Error("מסמך שצוין כמקור לא נמצא בתיק של הלקוח.");
+    if (found !== new Set(docIds).size) throw new DomainError("clientSources.documentNotInFile", "מסמך שצוין כמקור לא נמצא בתיק של הלקוח.");
   }
   if (taskIds.length > 0) {
     const found = await prisma.task.count({ where: { id: { in: taskIds }, clientId, deletedAt: null } });
-    if (found !== new Set(taskIds).size) throw new Error("משימה שצוינה כמקור לא נמצאה אצל הלקוח.");
+    if (found !== new Set(taskIds).size) throw new DomainError("clientSources.taskNotInClient", "משימה שצוינה כמקור לא נמצאה אצל הלקוח.");
   }
 }
 
@@ -94,7 +95,7 @@ export async function addClientSource(actor: User, input: ClientSourceInput) {
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
   const title = input.title.trim();
-  if (!title) throw new Error("צריך שם למקור.");
+  if (!title) throw new DomainError("clientSources.titleRequired", "צריך שם למקור.");
   const system = externalSystemFor(input.kind);
   const externalRefs: ExternalRef[] = [...new Set((input.externalIds ?? []).map((i) => i.trim()).filter(Boolean))].map(
     (id) => ({ system, id })
@@ -193,14 +194,14 @@ export async function updateClientSource(
 ) {
   assertCan(actor.role, "time_entry.create_self");
   const before = await prisma.clientSource.findUnique({ where: { id } });
-  if (!before || before.deletedAt) throw new Error("המקור לא נמצא.");
+  if (!before || before.deletedAt) throw new DomainError("clientSources.notFound", "המקור לא נמצא.");
   await assertClientAccess(actor, before.clientId);
-  if (input.title !== undefined && !input.title.trim()) throw new Error("צריך שם למקור.");
+  if (input.title !== undefined && !input.title.trim()) throw new DomainError("clientSources.titleRequired", "צריך שם למקור.");
   // Weight decides whether the items citing a source can be confirmed
   // (R14). Changing it under them would change their status silently.
   if (input.weight && input.weight !== before.weight) {
     const uses = await countSourceUses(before.clientId, before.code);
-    if (uses > 0) throw new Error(`${before.code} כבר משמש ב-${uses} פריטים בתיק, ולכן אי אפשר לשנות את המשקל שלו.`);
+    if (uses > 0) throw new DomainError("clientSources.weightInUse", `${before.code} כבר משמש ב-${uses} פריטים בתיק, ולכן אי אפשר לשנות את המשקל שלו.`, { code: before.code, count: uses });
   }
   const updated = await prisma.clientSource.update({
     where: { id },
@@ -228,10 +229,10 @@ export async function updateClientSource(
 export async function removeClientSource(actor: User, id: string) {
   assertCan(actor.role, "time_entry.create_self");
   const source = await prisma.clientSource.findUnique({ where: { id } });
-  if (!source || source.deletedAt) throw new Error("המקור לא נמצא.");
+  if (!source || source.deletedAt) throw new DomainError("clientSources.notFound", "המקור לא נמצא.");
   await assertClientAccess(actor, source.clientId);
   const uses = await countSourceUses(source.clientId, source.code);
-  if (uses > 0) throw new Error(`${source.code} משמש ב-${uses} פריטים בתיק. קודם צריך להחליף להם את המקור.`);
+  if (uses > 0) throw new DomainError("clientSources.inUse", `${source.code} משמש ב-${uses} פריטים בתיק. קודם צריך להחליף להם את המקור.`, { code: source.code, count: uses });
   const removed = await prisma.clientSource.update({ where: { id }, data: { deletedAt: new Date() } });
   await recordAudit({
     actorId: actor.id,
@@ -270,8 +271,7 @@ export async function resolveItemSources(
   clientId: string,
   item: { status: KnowledgeStatus; refs: SourceRef[]; toResolve: string | null; texts: (string | null | undefined)[]; confirmedByPerson?: boolean }
 ): Promise<{ sources: SourceRef[]; knowledgeStatus: KnowledgeStatus; toResolve: string | null }> {
-  const check = checkSources(item.status, item.refs, await loadRegister(clientId), item.texts, item.confirmedByPerson);
-  if (!check.ok) throw new Error(check.error);
+  const check = assertSources(item.status, item.refs, await loadRegister(clientId), item.texts, item.confirmedByPerson);
   return {
     sources: item.refs,
     knowledgeStatus: check.status as KnowledgeStatus,
@@ -304,8 +304,8 @@ export async function addClientDomain(actor: User, input: ClientDomainInput) {
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
   const domain = normalizeDomain(input.domain);
-  if (!domain) throw new Error("דומיין לא תקין.");
-  if (isPublicEmailDomain(domain)) throw new Error(`${domain} הוא שירות מייל ציבורי, ולא מזהה לקוח.`);
+  if (!domain) throw new DomainError("clientSources.invalidDomain", "דומיין לא תקין.");
+  if (isPublicEmailDomain(domain)) throw new DomainError("clientSources.publicDomain", `${domain} הוא שירות מייל ציבורי, ולא מזהה לקוח.`, { domain });
 
   // A client's own domain is one client's. A partner's may be several
   // clients' (decision 8), which is why it never assigns a message alone.
@@ -313,7 +313,7 @@ export async function addClientDomain(actor: User, input: ClientDomainInput) {
     const owner = await prisma.clientDomain.findFirst({
       where: { domain, kind: "CLIENT", deletedAt: null, clientId: { not: input.clientId } },
     });
-    if (owner) throw new Error(`${domain} כבר רשום כדומיין של לקוח אחר.`);
+    if (owner) throw new DomainError("clientSources.domainOfOtherClient", `${domain} כבר רשום כדומיין של לקוח אחר.`, { domain });
   }
 
   let organizationId: string | null = null;
@@ -335,7 +335,7 @@ export async function addClientDomain(actor: User, input: ClientDomainInput) {
   }
 
   const existing = await prisma.clientDomain.findUnique({ where: { clientId_domain: { clientId: input.clientId, domain } } });
-  if (existing && !existing.deletedAt) throw new Error(`${domain} כבר ברשימה.`);
+  if (existing && !existing.deletedAt) throw new DomainError("clientSources.domainListed", `${domain} כבר ברשימה.`, { domain });
   const data = { kind: input.kind, organizationId, notes: input.notes?.trim() || null };
   const row = existing
     ? await prisma.clientDomain.update({ where: { id: existing.id }, data: { ...data, deletedAt: null } })
@@ -355,7 +355,7 @@ export async function addClientDomain(actor: User, input: ClientDomainInput) {
 export async function removeClientDomain(actor: User, id: string) {
   assertCan(actor.role, "time_entry.create_self");
   const row = await prisma.clientDomain.findUnique({ where: { id } });
-  if (!row || row.deletedAt) throw new Error("הדומיין לא נמצא.");
+  if (!row || row.deletedAt) throw new DomainError("clientSources.domainNotFound", "הדומיין לא נמצא.");
   await assertClientAccess(actor, row.clientId);
   const removed = await prisma.clientDomain.update({ where: { id }, data: { deletedAt: new Date() } });
   await recordAudit({
@@ -388,9 +388,9 @@ export async function setClientSourceAnchors(actor: User, input: SourceAnchorsIn
   await assertClientAccess(actor, input.clientId);
   const keywords = [...new Set(input.keywords.map((k) => k.trim()).filter(Boolean))].slice(0, 20);
   const driveFolderId = driveIdFrom(input.driveFolder);
-  if (input.driveFolder?.trim() && !driveFolderId) throw new Error("תיקיית הדרייב לא מזוהה. מדביקים קישור לתיקייה או את המזהה שלה.");
+  if (input.driveFolder?.trim() && !driveFolderId) throw new DomainError("clientSources.driveFolderUnrecognized", "תיקיית הדרייב לא מזוהה. מדביקים קישור לתיקייה או את המזהה שלה.");
   const conversationsDocId = driveIdFrom(input.conversationsDoc);
-  if (input.conversationsDoc?.trim() && !conversationsDocId) throw new Error("המסמך המצטבר לא מזוהה. מדביקים קישור למסמך או את המזהה שלו.");
+  if (input.conversationsDoc?.trim() && !conversationsDocId) throw new DomainError("clientSources.conversationsDocUnrecognized", "המסמך המצטבר לא מזוהה. מדביקים קישור למסמך או את המזהה שלו.");
   const before = await prisma.client.findUniqueOrThrow({
     where: { id: input.clientId },
     select: { sourceKeywords: true, driveFolderId: true, conversationsDocId: true },

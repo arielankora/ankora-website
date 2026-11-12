@@ -55,9 +55,16 @@ export const IMPORTANT_DATES_LIST_KEYS = ["tab"] as const;
 /// 19.10.2026: the words on the way back, naming the list as it was.
 const IMPORTANT_DATES_TABS: Record<string, string> = { all: "הכל", done: "טופלו" };
 
-export function clientsBackTitle(from?: string | string[] | null): string {
+/// ADR 0006: with `t` (the "clients.list" namespace) the label is in the
+/// reader's language; without it, the Hebrew it has always been.
+export function clientsBackTitle(
+  from?: string | string[] | null,
+  t?: (key: "back" | "backSearch", values?: { q: string }) => string,
+): string {
   const q = typeof from === "string" ? new URLSearchParams(cleanListQuery(new URLSearchParams(from), CLIENTS_LIST_KEYS)).get("q")?.trim() : "";
-  return q ? `לקוחות · "${q.length > 40 ? `${q.slice(0, 40)}…` : q}"` : "לקוחות";
+  const shown = q ? (q.length > 40 ? `${q.slice(0, 40)}…` : q) : "";
+  if (t) return shown ? t("backSearch", { q: shown }) : t("back");
+  return shown ? `לקוחות · "${shown}"` : "לקוחות";
 }
 
 export function importantDatesBackTitle(from?: string | string[] | null): string {

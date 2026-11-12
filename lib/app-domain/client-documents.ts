@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { ForbiddenError, assertCan, can } from "@/lib/app-auth/permissions";
@@ -26,9 +27,9 @@ import type { ClientDocumentKind, User } from "@prisma/client";
 /// compressed, and the honest response is to say so.
 export const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
 
-export class DriveNotConfiguredError extends Error {
+export class DriveNotConfiguredError extends DomainError {
   constructor() {
-    super("אחסון המסמכים עדיין לא חובר. אפשר לצרף כאן ברגע שהתיקייה תיפתח.");
+    super("clientDocuments.driveNotConfigured", "אחסון המסמכים עדיין לא חובר. אפשר לצרף כאן ברגע שהתיקייה תיפתח.");
     this.name = "DriveNotConfiguredError";
   }
 }
@@ -91,10 +92,10 @@ export async function addClientDocumentForLink(input: AddClientDocumentInput, up
 
 async function storeClientDocument(input: AddClientDocumentInput, uploadedById: string) {
   const title = input.title.trim();
-  if (!title) throw new Error("יש להזין שם למסמך.");
-  if (input.content.byteLength === 0) throw new Error("הקובץ ריק.");
+  if (!title) throw new DomainError("clientDocuments.titleRequired", "יש להזין שם למסמך.");
+  if (input.content.byteLength === 0) throw new DomainError("clientDocuments.emptyFile", "הקובץ ריק.");
   if (input.content.byteLength > MAX_DOCUMENT_BYTES) {
-    throw new Error("הקובץ גדול מ-4MB. אפשר לדחוס אותו או לסרוק שוב באיכות נמוכה יותר.");
+    throw new DomainError("clientDocuments.tooLarge", "הקובץ גדול מ-4MB. אפשר לדחוס אותו או לסרוק שוב באיכות נמוכה יותר.");
   }
 
   const folderId = clientDocumentsFolder();
@@ -105,7 +106,7 @@ async function storeClientDocument(input: AddClientDocumentInput, uploadedById: 
       where: { id: input.taskId, clientId: input.clientId, deletedAt: null },
       select: { id: true },
     });
-    if (!task) throw new Error("המשימה לא נמצאה אצל הלקוח הזה.");
+    if (!task) throw new DomainError("clientDocuments.taskNotFound", "המשימה לא נמצאה אצל הלקוח הזה.");
   }
 
   const client = await prisma.client.findUniqueOrThrow({
@@ -123,7 +124,9 @@ async function storeClientDocument(input: AddClientDocumentInput, uploadedById: 
     folderId,
   });
   if (!uploaded.ok || !uploaded.fileId) {
-    throw new Error(`העלאת הקובץ נכשלה: ${uploaded.error ?? "שגיאה לא ידועה"}`);
+    throw uploaded.error
+      ? new DomainError("clientDocuments.uploadFailed", `העלאת הקובץ נכשלה: ${uploaded.error}`, { error: uploaded.error })
+      : new DomainError("clientDocuments.uploadFailedUnknown", "העלאת הקובץ נכשלה: שגיאה לא ידועה");
   }
 
   const doc = await prisma.clientDocument.create({
@@ -191,7 +194,7 @@ export async function setClientDocumentVisibility(actor: User, documentId: strin
   assertCan(actor.role, "time_entry.create_self");
 
   const existing = await prisma.clientDocument.findFirst({ where: { id: documentId, deletedAt: null } });
-  if (!existing) throw new Error("המסמך לא נמצא.");
+  if (!existing) throw new DomainError("clientDocuments.notFound", "המסמך לא נמצא.");
   await assertClientAccess(actor, existing.clientId);
 
   const doc = await prisma.clientDocument.update({ where: { id: documentId }, data: { clientVisible } });
@@ -216,7 +219,7 @@ export async function setClientDocumentAiExcluded(actor: User, documentId: strin
   assertCan(actor.role, "time_entry.create_self");
 
   const existing = await prisma.clientDocument.findFirst({ where: { id: documentId, deletedAt: null } });
-  if (!existing) throw new Error("המסמך לא נמצא.");
+  if (!existing) throw new DomainError("clientDocuments.notFound", "המסמך לא נמצא.");
   await assertClientAccess(actor, existing.clientId);
   if (existing.aiExcluded === aiExcluded) return existing;
   if (!aiExcluded && !can(actor.role, "client.manage")) throw new ForbiddenError(AI_EXCLUSION_CLEAR_FORBIDDEN_MESSAGE);
@@ -244,7 +247,7 @@ export async function setClientDocumentKind(actor: User, documentId: string, kin
   assertCan(actor.role, "time_entry.create_self");
 
   const existing = await prisma.clientDocument.findFirst({ where: { id: documentId, deletedAt: null } });
-  if (!existing) throw new Error("המסמך לא נמצא.");
+  if (!existing) throw new DomainError("clientDocuments.notFound", "המסמך לא נמצא.");
   await assertClientAccess(actor, existing.clientId);
   if (existing.kind === kind) return existing;
 
@@ -270,7 +273,7 @@ export async function removeClientDocument(actor: User, documentId: string) {
   assertCan(actor.role, "time_entry.create_self");
 
   const existing = await prisma.clientDocument.findFirst({ where: { id: documentId, deletedAt: null } });
-  if (!existing) throw new Error("המסמך לא נמצא.");
+  if (!existing) throw new DomainError("clientDocuments.notFound", "המסמך לא נמצא.");
   await assertClientAccess(actor, existing.clientId);
 
   const doc = await prisma.clientDocument.update({ where: { id: documentId }, data: { deletedAt: new Date() } });

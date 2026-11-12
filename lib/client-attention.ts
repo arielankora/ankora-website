@@ -50,11 +50,33 @@ export type Forecast =
 
 export type Tone = "bad" | "warn" | "ok";
 
+/// A reason as a key under `clients.list.reasons` and its values. Hours
+/// are already formatted (decimal hours, as the bank screen shows them);
+/// `date` is a Date the screen formats.
+export type ReasonCode = {
+  key:
+    | "bankEmpty"
+    | "bankOverdrawn"
+    | "previousOverrun"
+    | "lowRemaining"
+    | "lowRemainingRenews"
+    | "pace"
+    | "packageEnding"
+    | "rolloverIn"
+    | "rolloverDebt";
+  values: Record<string, string | number | Date>;
+};
+type Reason = { text: string; code: ReasonCode };
+
 export type Assessment = {
   attention: boolean;
   tone: Tone;
   /// One or two sentences, worst first. Empty when there is nothing to say.
   reasons: string[];
+  /// ADR 0006: the same sentences as keys and values, in the same order,
+  /// for a screen that words them in the reader's language. `reasons`
+  /// stays as it was for everything that reads it.
+  reasonCodes: ReasonCode[];
   /// How far through its cycle the bank is, 0 to 100, for the mark on the
   /// bar. Null for a prepaid package, which has no date it renews on.
   expectedPct: number | null;
@@ -89,8 +111,8 @@ function hours(minutes: number): string {
 
 export function assessClient(input: { bank: BankState; previous: PastBank | null; forecast: Forecast | null; now: Date }): Assessment {
   const { bank, previous, forecast, now } = input;
-  const bad: string[] = [];
-  const warn: string[] = [];
+  const bad: Reason[] = [];
+  const warn: Reason[] = [];
   const shown = bankDisplay(bank);
 
   // A cycle's end is the first moment of the next one.
@@ -99,24 +121,36 @@ export function assessClient(input: { bank: BankState; previous: PastBank | null
   const expectedPct = isCycle ? Math.round(share * 1000) / 10 : null;
 
   if (bank.remainingMinutes <= 0) {
-    bad.push(bank.remainingMinutes < 0 ? `הבנק נגמר, חריגה של ${hours(bank.remainingMinutes)} שעות.` : "הבנק נגמר.");
+    bad.push(
+      bank.remainingMinutes < 0
+        ? { text: `הבנק נגמר, חריגה של ${hours(bank.remainingMinutes)} שעות.`, code: { key: "bankOverdrawn", values: { hours: hours(bank.remainingMinutes) } } }
+        : { text: "הבנק נגמר.", code: { key: "bankEmpty", values: {} } }
+    );
   }
 
   // A package's overrun is taken off the next package by design, so only
   // a monthly cycle that overran is news.
   const previousOverrun = !!previous && previous.kind === "CYCLE" && previous.remainingMinutes < 0;
   if (previous && previousOverrun) {
-    bad.push(
-      `במחזור הקודם חרג ב-${hours(previous.remainingMinutes)} שעות (${formatDecimalHours(previous.consumedMinutes)} מתוך ${formatDecimalHours(previous.totalMinutes)}).`
-    );
+    bad.push({
+      text: `במחזור הקודם חרג ב-${hours(previous.remainingMinutes)} שעות (${formatDecimalHours(previous.consumedMinutes)} מתוך ${formatDecimalHours(previous.totalMinutes)}).`,
+      code: {
+        key: "previousOverrun",
+        values: { hours: hours(previous.remainingMinutes), used: formatDecimalHours(previous.consumedMinutes), total: formatDecimalHours(previous.totalMinutes) },
+      },
+    });
   }
 
   if (bank.remainingMinutes > 0 && shown.sizeMinutes > 0 && bank.remainingMinutes / shown.sizeMinutes < LOW_REMAINING_SHARE) {
     const pct = Math.round((bank.remainingMinutes / shown.sizeMinutes) * 100);
     const renews = isCycle ? Math.max(0, Math.ceil((bank.cycleEnd.getTime() - now.getTime()) / DAY_MS)) : null;
-    warn.push(
-      `נותרו ${hours(bank.remainingMinutes)} שעות, ${pct}% מהבנק${renews !== null ? `, ועוד ${renews === 1 ? "יום אחד" : `${renews} ימים`} עד החידוש` : ""}.`
-    );
+    warn.push({
+      text: `נותרו ${hours(bank.remainingMinutes)} שעות, ${pct}% מהבנק${renews !== null ? `, ועוד ${renews === 1 ? "יום אחד" : `${renews} ימים`} עד החידוש` : ""}.`,
+      code:
+        renews !== null
+          ? { key: "lowRemainingRenews", values: { hours: hours(bank.remainingMinutes), pct, days: renews } }
+          : { key: "lowRemaining", values: { hours: hours(bank.remainingMinutes), pct } },
+    });
   }
 
   if (isCycle && bank.remainingMinutes > 0) {
@@ -124,23 +158,39 @@ export function assessClient(input: { bank: BankState; previous: PastBank | null
     const expected = Math.max(0, bank.totalMinutes) * share;
     if (daysIn >= PACE_MIN_DAYS && expected > 0) {
       const ratio = bank.consumedMinutes / expected;
-      if (ratio >= PACE_RATIO) warn.push(`מנצל בקצב גבוה פי ${Math.round(ratio * 10) / 10} מהצפוי.`);
+      const times = String(Math.round(ratio * 10) / 10);
+      if (ratio >= PACE_RATIO) warn.push({ text: `מנצל בקצב גבוה פי ${times} מהצפוי.`, code: { key: "pace", values: { ratio: times } } });
     }
   }
 
   const endingSoon = bank.kind === "PREPAID" && forecast?.status === "projected" && forecast.daysLeft <= PACKAGE_ENDING_DAYS && bank.remainingMinutes > 0;
   if (endingSoon && forecast?.status === "projected") {
-    warn.push(`בקצב של 4 השבועות האחרונים החבילה תיגמר בסביבות ${shortDate(forecast.depletionDate)}.`);
+    warn.push({
+      text: `בקצב של 4 השבועות האחרונים החבילה תיגמר בסביבות ${shortDate(forecast.depletionDate)}.`,
+      code: { key: "packageEnding", values: { date: forecast.depletionDate } },
+    });
   }
 
   if (bad.length + warn.length > 0) {
-    return { attention: true, tone: bad.length ? "bad" : "warn", reasons: [...bad, ...warn].slice(0, 2), expectedPct, previousOverrun, endingSoon };
+    const picked = [...bad, ...warn].slice(0, 2);
+    return {
+      attention: true,
+      tone: bad.length ? "bad" : "warn",
+      reasons: picked.map((r) => r.text),
+      reasonCodes: picked.map((r) => r.code),
+      expectedPct,
+      previousOverrun,
+      endingSoon,
+    };
   }
 
-  const reasons: string[] = [];
-  if (bank.rolloverInMinutes > 0) reasons.push(`כולל ${hours(bank.rolloverInMinutes)} שעות שהועברו מהמחזור הקודם.`);
-  else if (bank.rolloverInMinutes < 0) reasons.push(`כולל חוב של ${hours(bank.rolloverInMinutes)} שעות מהחבילה הקודמת.`);
-  return { attention: false, tone: "ok", reasons, expectedPct, previousOverrun, endingSoon };
+  const ok: Reason[] = [];
+  if (bank.rolloverInMinutes > 0) {
+    ok.push({ text: `כולל ${hours(bank.rolloverInMinutes)} שעות שהועברו מהמחזור הקודם.`, code: { key: "rolloverIn", values: { hours: hours(bank.rolloverInMinutes) } } });
+  } else if (bank.rolloverInMinutes < 0) {
+    ok.push({ text: `כולל חוב של ${hours(bank.rolloverInMinutes)} שעות מהחבילה הקודמת.`, code: { key: "rolloverDebt", values: { hours: hours(bank.rolloverInMinutes) } } });
+  }
+  return { attention: false, tone: "ok", reasons: ok.map((r) => r.text), reasonCodes: ok.map((r) => r.code), expectedPct, previousOverrun, endingSoon };
 }
 
 /// The order of the grid: needs attention (the worst first), on track,

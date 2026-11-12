@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -58,7 +59,7 @@ async function findOrCreateOrganization(name: string, domains: string[]) {
         : prisma.organization.update({ where: { id: byDomain.id }, data: { domains: merged } });
     }
   }
-  if (!cleanName) throw new Error("צריך שם ארגון או דומיין.");
+  if (!cleanName) throw new DomainError("clientContacts.organizationNameRequired", "צריך שם ארגון או דומיין.");
   const byName = await prisma.organization.findFirst({
     where: { deletedAt: null, name: { equals: cleanName, mode: "insensitive" } },
   });
@@ -108,7 +109,7 @@ export async function addClientOrganization(actor: User, input: ClientOrganizati
   await assertClientAccess(actor, input.clientId);
   assertResolvable(input.knowledgeStatus, input.toResolve);
   if (input.monthlyCostMinor != null && (!Number.isInteger(input.monthlyCostMinor) || input.monthlyCostMinor < 0)) {
-    throw new Error("עלות חודשית לא תקינה.");
+    throw new DomainError("clientContacts.invalidMonthlyCost", "עלות חודשית לא תקינה.");
   }
 
   // Checked before anything is written: a refused source must not leave
@@ -118,7 +119,7 @@ export async function addClientOrganization(actor: User, input: ClientOrganizati
   const existing = await prisma.clientOrganization.findUnique({
     where: { clientId_organizationId: { clientId: input.clientId, organizationId: organization.id } },
   });
-  if (existing && !existing.deletedAt) throw new Error(`${organization.name} כבר בתיק של הלקוח.`);
+  if (existing && !existing.deletedAt) throw new DomainError("clientContacts.organizationInFile", `${organization.name} כבר בתיק של הלקוח.`, { name: organization.name });
 
   const data = {
     role: input.role?.trim() || null,
@@ -155,11 +156,11 @@ export async function addClientOrganization(actor: User, input: ClientOrganizati
 export async function updateClientOrganization(actor: User, id: string, input: Partial<Omit<ClientOrganizationInput, "clientId" | "name">>) {
   assertCan(actor.role, "time_entry.create_self");
   const before = await prisma.clientOrganization.findUnique({ where: { id }, include: { organization: true } });
-  if (!before || before.deletedAt) throw new Error("הארגון לא נמצא בתיק.");
+  if (!before || before.deletedAt) throw new DomainError("clientContacts.organizationNotFound", "הארגון לא נמצא בתיק.");
   await assertClientAccess(actor, before.clientId);
   assertResolvable(input.knowledgeStatus ?? before.knowledgeStatus, input.toResolve !== undefined ? input.toResolve : before.toResolve);
   if (input.monthlyCostMinor != null && (!Number.isInteger(input.monthlyCostMinor) || input.monthlyCostMinor < 0)) {
-    throw new Error("עלות חודשית לא תקינה.");
+    throw new DomainError("clientContacts.invalidMonthlyCost", "עלות חודשית לא תקינה.");
   }
   const sourced = await sourcedFields(before.clientId, input, [input.notes !== undefined ? input.notes : before.notes], before);
 
@@ -168,7 +169,7 @@ export async function updateClientOrganization(actor: User, id: string, input: P
     const clash = domains.length
       ? await prisma.organization.findFirst({ where: { id: { not: before.organizationId }, deletedAt: null, domains: { hasSome: domains } } })
       : null;
-    if (clash) throw new Error(`הדומיין כבר שייך ל-${clash.name}.`);
+    if (clash) throw new DomainError("clientContacts.domainTaken", `הדומיין כבר שייך ל-${clash.name}.`, { name: clash.name });
     await prisma.organization.update({ where: { id: before.organizationId }, data: { domains } });
   }
 
@@ -199,7 +200,7 @@ export async function updateClientOrganization(actor: User, id: string, input: P
 export async function removeClientOrganization(actor: User, id: string) {
   assertCan(actor.role, "time_entry.create_self");
   const link = await prisma.clientOrganization.findUnique({ where: { id } });
-  if (!link || link.deletedAt) throw new Error("לא נמצא.");
+  if (!link || link.deletedAt) throw new DomainError("clientContacts.notFound", "לא נמצא.");
   await assertClientAccess(actor, link.clientId);
   const removed = await prisma.clientOrganization.update({ where: { id }, data: { deletedAt: new Date() } });
   await recordAudit({
@@ -223,7 +224,7 @@ export async function removeClientOrganization(actor: User, id: string) {
 async function ankoraUser(relationship: ContactRelationship | undefined, userId: string | null | undefined): Promise<string | null> {
   if (relationship !== "ANKORA" || !userId) return null;
   const ok = await prisma.user.count({ where: { id: userId, deletedAt: null, role: { not: "CLIENT_USER" } } });
-  if (!ok) throw new Error("המשתמש שנבחר אינו איש צוות של אנקורה.");
+  if (!ok) throw new DomainError("clientContacts.userNotStaff", "המשתמש שנבחר אינו איש צוות של אנקורה.");
   return userId;
 }
 
@@ -285,7 +286,7 @@ export async function addClientContact(actor: User, input: ClientContactInput) {
   const role = input.role?.trim() || null;
   // "The cleaner" has no name but has a role. Somebody with neither is
   // nobody anyone can find again.
-  if (!name && !role) throw new Error("צריך שם או תפקיד.");
+  if (!name && !role) throw new DomainError("clientContacts.nameOrRoleRequired", "צריך שם או תפקיד.");
 
   const sourced = await sourcedFields(input.clientId, input, [input.context]);
   await assertEntityBelongs(input.clientId, input.entityId);
@@ -297,7 +298,7 @@ export async function addClientContact(actor: User, input: ClientContactInput) {
   const existing = await prisma.clientContact.findUnique({
     where: { clientId_personId: { clientId: input.clientId, personId: person.id } },
   });
-  if (existing && !existing.deletedAt) throw new Error(`${person.name ?? "איש הקשר"} כבר בתיק של הלקוח.`);
+  if (existing && !existing.deletedAt) throw new DomainError("clientContacts.contactInFile", `${person.name ?? "איש הקשר"} כבר בתיק של הלקוח.`, { hasName: person.name ? "yes" : "no", name: person.name ?? "" });
 
   const data = {
     role,
@@ -340,7 +341,7 @@ export async function addClientContact(actor: User, input: ClientContactInput) {
 export async function updateClientContact(actor: User, id: string, input: Partial<Omit<ClientContactInput, "clientId">>) {
   assertCan(actor.role, "time_entry.create_self");
   const before = await prisma.clientContact.findUnique({ where: { id }, include: { person: true } });
-  if (!before || before.deletedAt) throw new Error("איש הקשר לא נמצא.");
+  if (!before || before.deletedAt) throw new DomainError("clientContacts.contactNotFound", "איש הקשר לא נמצא.");
   await assertClientAccess(actor, before.clientId);
   assertResolvable(input.knowledgeStatus ?? before.knowledgeStatus, input.toResolve !== undefined ? input.toResolve : before.toResolve);
 
@@ -357,9 +358,9 @@ export async function updateClientContact(actor: User, id: string, input: Partia
       emails.length > 0
         ? await prisma.person.findFirst({ where: { id: { not: before.personId }, deletedAt: null, emails: { hasSome: emails } } })
         : null;
-    if (clash) throw new Error("כתובת המייל כבר שייכת לאיש קשר אחר.");
+    if (clash) throw new DomainError("clientContacts.emailTaken", "כתובת המייל כבר שייכת לאיש קשר אחר.");
     const name = input.name !== undefined ? input.name?.trim() || null : before.person.name;
-    if (!name && !(input.role !== undefined ? input.role?.trim() : before.role)) throw new Error("צריך שם או תפקיד.");
+    if (!name && !(input.role !== undefined ? input.role?.trim() : before.role)) throw new DomainError("clientContacts.nameOrRoleRequired", "צריך שם או תפקיד.");
     await prisma.person.update({ where: { id: before.personId }, data: { emails, phones, name } });
   }
 
@@ -401,7 +402,7 @@ export async function updateClientContact(actor: User, id: string, input: Partia
 export async function removeClientContact(actor: User, id: string) {
   assertCan(actor.role, "time_entry.create_self");
   const contact = await prisma.clientContact.findUnique({ where: { id } });
-  if (!contact || contact.deletedAt) throw new Error("איש הקשר לא נמצא.");
+  if (!contact || contact.deletedAt) throw new DomainError("clientContacts.contactNotFound", "איש הקשר לא נמצא.");
   await assertClientAccess(actor, contact.clientId);
   // Soft, like every delete here, and the person stays: they may be in
   // another client's file.
@@ -471,7 +472,7 @@ export async function lookupContact(actor: User, query: string) {
   assertCan(actor.role, "time_entry.create_self");
   const email = normalizeEmail(query);
   const phone = email ? null : normalizePhone(query);
-  if (!email && !phone) throw new Error("צריך כתובת מייל או מספר טלפון.");
+  if (!email && !phone) throw new DomainError("clientContacts.emailOrPhoneRequired", "צריך כתובת מייל או מספר טלפון.");
   const person = await prisma.person.findFirst({
     where: { deletedAt: null, ...(email ? { emails: { has: email } } : { phones: { has: phone! } }) },
     include: { organization: { select: { name: true } } },

@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canManageClients } from "@/lib/app-auth/permissions";
@@ -100,19 +101,19 @@ export async function coveredTasksForClients(clientIds: string[]): Promise<Cover
 /// "לסגור, התהליך מכסה את זה": the task goes to the archive, with a
 /// comment that names the process, and the decision is in the audit log.
 export async function closeTaskCoveredByProcess(actor: User, taskId: string, processId: string) {
-  if (!canManageClients(actor.role)) throw new Error("רק מנהל סוגר משימה בגלל שתהליך מכסה אותה.");
+  if (!canManageClients(actor.role)) throw new DomainError("processOverlap.managerOnly", "רק מנהל סוגר משימה בגלל שתהליך מכסה אותה.");
   const [task, process] = await Promise.all([
     prisma.task.findFirst({ where: { id: taskId, deletedAt: null }, select: { id: true, clientId: true, title: true, status: true, processId: true } }),
     prisma.process.findFirst({ where: { id: processId, deletedAt: null }, select: { id: true, clientId: true, code: true, title: true, status: true } }),
   ]);
-  if (!task) throw new Error("המשימה לא נמצאה.");
-  if (!process) throw new Error("התהליך לא נמצא.");
+  if (!task) throw new DomainError("processOverlap.taskNotFound", "המשימה לא נמצאה.");
+  if (!process) throw new DomainError("processOverlap.processNotFound", "התהליך לא נמצא.");
   await assertClientAccess(actor, task.clientId);
-  if (task.clientId !== process.clientId) throw new Error("המשימה והתהליך של לקוחות שונים.");
-  if (process.status !== "ACTIVE") throw new Error("רק תהליך עם נוהל מאושר מכסה משימות.");
-  if (task.processId) throw new Error("זו ריצה של תהליך, לא משימה נפרדת.");
-  if (!(OPEN as readonly string[]).includes(task.status)) throw new Error("המשימה כבר לא פתוחה.");
-  if ((await sourceTasksByProcess([process.id])).get(process.id)?.has(taskId)) throw new Error("התהליך הוצע מהמשימה הזו, והיא לא כפולה לו.");
+  if (task.clientId !== process.clientId) throw new DomainError("processOverlap.differentClients", "המשימה והתהליך של לקוחות שונים.");
+  if (process.status !== "ACTIVE") throw new DomainError("processOverlap.notActive", "רק תהליך עם נוהל מאושר מכסה משימות.");
+  if (task.processId) throw new DomainError("processOverlap.isRun", "זו ריצה של תהליך, לא משימה נפרדת.");
+  if (!(OPEN as readonly string[]).includes(task.status)) throw new DomainError("processOverlap.notOpen", "המשימה כבר לא פתוחה.");
+  if ((await sourceTasksByProcess([process.id])).get(process.id)?.has(taskId)) throw new DomainError("processOverlap.sourceTask", "התהליך הוצע מהמשימה הזו, והיא לא כפולה לו.");
   await updateTask(actor, taskId, { status: "ARCHIVED" });
   await addTaskComment(actor, taskId, `נסגרה: התהליך ${process.code} ${process.title} מכסה את העבודה הזו, וכל ריצה שלו פותחת משימה משלה. /app/clients/${process.clientId}?tab=file#item-${process.id}`);
   await recordAudit({

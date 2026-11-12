@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { PageBack } from "@/components/app/BackSlot";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
@@ -23,9 +24,10 @@ export default async function ProcessFlowPage(props: { params: Promise<{ clientI
     throw err;
   }
   if (data.clientId !== clientId) notFound();
+  const t = await getTranslations("clients.processes.flow");
   return (
     <div className="mx-auto w-full max-w-appContent px-4 py-6">
-      <PageBack href={`/app/clients/${clientId}`} label="חזרה לתיק הלקוח" />
+      <PageBack href={`/app/clients/${clientId}`} label={t("backToClient")} />
       <FlowEditor
         clientId={clientId}
         processId={processId}

@@ -1,10 +1,11 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
+import { formatMinor } from "@/lib/money";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
-import { formatMinor } from "@/lib/money";
-import { KNOWLEDGE_STATUS_LABELS, KNOWLEDGE_AUDIENCE_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
+import type { KnowledgeStatusLike } from "@/lib/knowledge";
 import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags, AudienceField, MissingFields, useItemStaff } from "./knowledge-ui";
 import {
   addClientContactAction,
@@ -25,14 +26,7 @@ import {
 
 type Relationship = "CLIENT_STAFF" | "PROVIDER" | "ADVISOR" | "INVESTOR" | "SUPPLIER" | "ANKORA";
 
-const RELATIONSHIP_LABELS: Record<Relationship, string> = {
-  CLIENT_STAFF: "צוות הלקוח",
-  PROVIDER: "נותן שירות",
-  ADVISOR: "יועץ",
-  INVESTOR: "משקיע",
-  SUPPLIER: "ספק",
-  ANKORA: "אנקורה",
-};
+const RELATIONSHIPS: Relationship[] = ["CLIENT_STAFF", "PROVIDER", "ADVISOR", "INVESTOR", "SUPPLIER", "ANKORA"];
 
 export type { SourceOption };
 
@@ -116,32 +110,34 @@ function ContactForm({
   const [status, setStatus] = useState<KnowledgeStatusLike>(existing?.status ?? "CONFIRMED");
   const [relationship, setRelationship] = useState<Relationship>(existing?.relationship ?? "CLIENT_STAFF");
   const staff = useItemStaff();
+  const t = useTranslations("clients.people");
+  const tk = useTranslations("clients.knowledge");
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       {existing && <input type="hidden" name="id" value={existing.id} />}
       <div className="grid grid-cols-2 gap-3">
-        <Field label="שם">
+        <Field label={t("contact.name")}>
           <input name="name" defaultValue={existing?.name ?? ""} className={INPUT} />
         </Field>
-        <Field label="תפקיד">
+        <Field label={t("contact.role")}>
           <input name="role" defaultValue={existing?.role ?? ""} placeholder="VP Finance" className={INPUT} />
         </Field>
       </div>
-      <p className="-mt-2 text-[11px] text-app-text-tertiary">שם או תפקיד, לפחות אחד מהם.</p>
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">{t("contact.nameOrRole")}</p>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="קשר ללקוח">
+        <Field label={t("contact.relationship")}>
           <select name="relationship" value={relationship} onChange={(e) => setRelationship(e.target.value as Relationship)} className={INPUT}>
-            {(Object.keys(RELATIONSHIP_LABELS) as Relationship[]).map((r) => (
+            {RELATIONSHIPS.map((r) => (
               <option key={r} value={r}>
-                {RELATIONSHIP_LABELS[r]}
+                {t(`relationships.${r}`)}
               </option>
             ))}
           </select>
         </Field>
         {!existing && (
-          <Field label="ארגון">
+          <Field label={t("contact.organization")}>
             <input name="organizationName" list="people-org-names" placeholder="Nextage" className={INPUT} />
             <datalist id="people-org-names">
               {organizationNames.map((n) => (
@@ -152,26 +148,26 @@ function ContactForm({
         )}
       </div>
       <EntitySelect entities={entities} defaultValue={existing?.entityId} />
-      <Field label="מיילים">
+      <Field label={t("contact.emails")}>
         <input name="emails" dir="ltr" defaultValue={existing?.emails.join(", ") ?? ""} placeholder="name@company.com" className={INPUT} />
       </Field>
-      <Field label="טלפונים">
+      <Field label={t("contact.phones")}>
         <input name="phones" dir="ltr" defaultValue={existing?.phones.join(", ") ?? ""} placeholder="054-1234567" className={INPUT} />
       </Field>
       {existing && (existing.emails.length > 0 || existing.phones.length > 0) && (
-        <p className="-mt-2 text-[11px] text-app-text-tertiary">מייל וטלפון שייכים לאדם, ומתעדכנים בכל תיק שהוא מופיע בו.</p>
+        <p className="-mt-2 text-[11px] text-app-text-tertiary">{t("contact.sharedDetails")}</p>
       )}
-      <Field label="ערוצים לפי סדר עדיפות">
-        <input name="channelOrder" defaultValue={existing?.channelOrder.join(", ") ?? ""} placeholder="WhatsApp, Slack, מייל" className={INPUT} />
+      <Field label={t("contact.channelOrder")}>
+        <input name="channelOrder" defaultValue={existing?.channelOrder.join(", ") ?? ""} placeholder={t("contact.channelOrderPlaceholder")} className={INPUT} />
       </Field>
-      <Field label="מה צריך לדעת כדי לעבוד איתו">
+      <Field label={t("contact.context")}>
         <textarea name="context" rows={2} defaultValue={existing?.context ?? ""} className={INPUT} />
       </Field>
       {relationship === "ANKORA" && (
         <>
-          <Field label="המשתמש שלו במערכת">
+          <Field label={t("contact.user")}>
             <select name="userId" defaultValue={existing?.userId ?? ""} className={INPUT}>
-              <option value="">לא מקושר</option>
+              <option value="">{t("contact.noUser")}</option>
               {staff.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
@@ -179,7 +175,7 @@ function ContactForm({
               ))}
             </select>
           </Field>
-          <Field label="הכתובת שלו אצל הלקוח">
+          <Field label={t("contact.clientSideAddress")}>
             <input name="clientSideAddress" dir="ltr" defaultValue={existing?.clientSideAddress ?? ""} placeholder="office@client.com" className={INPUT} />
           </Field>
         </>
@@ -187,24 +183,24 @@ function ContactForm({
       <div className="flex flex-wrap gap-4 text-sm text-app-text-primary">
         <label className="flex items-center gap-2">
           <input type="checkbox" name="isPrimary" defaultChecked={existing?.isPrimary} className="h-4 w-4 accent-gold" />
-          איש קשר ראשי
+          {t("contact.isPrimary")}
         </label>
         <label className="flex items-center gap-2">
           <input type="checkbox" name="isDecisionMaker" defaultChecked={existing?.isDecisionMaker} className="h-4 w-4 accent-gold" />
-          מקבל החלטות
+          {t("contact.isDecisionMaker")}
         </label>
         <label className="flex items-center gap-2">
           <input type="checkbox" name="sensitive" defaultChecked={existing?.sensitive} className="h-4 w-4 accent-gold" />
-          רגיש (לא עובר ל-Claude)
+          {t("contact.sensitive")}
         </label>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="סטטוס">
+        <Field label={tk("statusLabel")}>
           <select name="knowledgeStatus" value={status} onChange={(e) => setStatus(e.target.value as KnowledgeStatusLike)} className={INPUT}>
-            <option value="CONFIRMED">{KNOWLEDGE_STATUS_LABELS.CONFIRMED}</option>
-            <option value="UNCERTAIN">{KNOWLEDGE_STATUS_LABELS.UNCERTAIN}</option>
-            <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
+            <option value="CONFIRMED">{tk("status.CONFIRMED")}</option>
+            <option value="UNCERTAIN">{tk("status.UNCERTAIN")}</option>
+            <option value="MISSING">{tk("status.MISSING")}</option>
           </select>
         </Field>
         <AudienceField existing={existing} />
@@ -213,17 +209,17 @@ function ContactForm({
       <MissingFields target="CONTACT" existing={existing} />
       <ItemExtras existing={existing} />
       {status !== "CONFIRMED" && (
-        <Field label="מה יסגור את זה *">
-          <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} placeholder="לבקש מגיא את המייל" className={INPUT} />
+        <Field label={tk("toResolve")}>
+          <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} placeholder={t("contact.toResolvePlaceholder")} className={INPUT} />
         </Field>
       )}
-      <Field label="למי אסור לספר">
-        <input name="doNotDisclose" defaultValue={existing?.doNotDisclose ?? ""} placeholder="עובדי הלקוח, עד הודעה של המנכ״ל" className={INPUT} />
+      <Field label={tk("doNotDisclose")}>
+        <input name="doNotDisclose" defaultValue={existing?.doNotDisclose ?? ""} placeholder={tk("extras.doNotDisclosePlaceholder")} className={INPUT} />
       </Field>
 
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : existing ? "שמירה" : "הוספה לתיק"}
+        {pending ? t("saving") : existing ? t("save") : t("addToFile")}
       </button>
     </form>
   );
@@ -243,11 +239,13 @@ function OrganizationForm({
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(existing ? updateClientOrganizationAction : addClientOrganizationAction, close);
   const [status, setStatus] = useState<KnowledgeStatusLike>(existing?.status ?? "CONFIRMED");
+  const t = useTranslations("clients.people");
+  const tk = useTranslations("clients.knowledge");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       {existing && <input type="hidden" name="id" value={existing.id} />}
-      <Field label={existing ? "שם הארגון (משותף לכל אנקורה, לא נערך כאן)" : "שם הארגון *"}>
+      <Field label={existing ? t("organization.nameShared") : t("organization.name")}>
         <input name="name" required={!existing} readOnly={!!existing} defaultValue={existing?.name ?? ""} list="org-form-names" placeholder="Nextage" className={INPUT} />
         <datalist id="org-form-names">
           {organizationNames.map((n) => (
@@ -255,53 +253,53 @@ function OrganizationForm({
           ))}
         </datalist>
       </Field>
-      <Field label="דומיין">
+      <Field label={t("organization.domain")}>
         <input name="domains" dir="ltr" defaultValue={existing?.domains.join(", ") ?? ""} placeholder="nextage.co.il" className={INPUT} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="מה הוא ללקוח">
-          <input name="role" defaultValue={existing?.role ?? ""} placeholder="הנהלת חשבונות ושכר" className={INPUT} />
+        <Field label={t("organization.role")}>
+          <input name="role" defaultValue={existing?.role ?? ""} placeholder={t("organization.rolePlaceholder")} className={INPUT} />
         </Field>
-        <Field label="סוג">
+        <Field label={t("organization.kind")}>
           <select name="relationship" defaultValue={existing?.relationship ?? "PROVIDER"} className={INPUT}>
-            <option value="PROVIDER">{RELATIONSHIP_LABELS.PROVIDER}</option>
-            <option value="ADVISOR">{RELATIONSHIP_LABELS.ADVISOR}</option>
-            <option value="SUPPLIER">{RELATIONSHIP_LABELS.SUPPLIER}</option>
-            <option value="INVESTOR">{RELATIONSHIP_LABELS.INVESTOR}</option>
+            <option value="PROVIDER">{t("relationships.PROVIDER")}</option>
+            <option value="ADVISOR">{t("relationships.ADVISOR")}</option>
+            <option value="SUPPLIER">{t("relationships.SUPPLIER")}</option>
+            <option value="INVESTOR">{t("relationships.INVESTOR")}</option>
           </select>
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="עלות חודשית">
+        <Field label={t("organization.monthlyCost")}>
           <input name="monthlyCost" dir="ltr" inputMode="decimal" defaultValue={existing?.monthlyCostMinor != null ? String(existing.monthlyCostMinor / 100) : ""} placeholder="22000" className={INPUT} />
         </Field>
-        <Field label="מטבע">
+        <Field label={t("organization.currency")}>
           <select name="currency" defaultValue={existing?.currency ?? "ILS"} className={INPUT}>
             <option value="ILS">₪</option>
             <option value="USD">$</option>
           </select>
         </Field>
       </div>
-      <Field label="הערות">
+      <Field label={t("organization.notes")}>
         <textarea name="notes" rows={2} defaultValue={existing?.notes ?? ""} className={INPUT} />
       </Field>
-      <Field label="סטטוס">
+      <Field label={tk("statusLabel")}>
         <select name="knowledgeStatus" value={status} onChange={(e) => setStatus(e.target.value as KnowledgeStatusLike)} className={INPUT}>
-          <option value="CONFIRMED">{KNOWLEDGE_STATUS_LABELS.CONFIRMED}</option>
-          <option value="UNCERTAIN">{KNOWLEDGE_STATUS_LABELS.UNCERTAIN}</option>
-          <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
+          <option value="CONFIRMED">{tk("status.CONFIRMED")}</option>
+          <option value="UNCERTAIN">{tk("status.UNCERTAIN")}</option>
+          <option value="MISSING">{tk("status.MISSING")}</option>
         </select>
       </Field>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} confirmedBefore={existing?.status === "CONFIRMED"} />
       <ItemExtras existing={existing} disclose audience />
       {status !== "CONFIRMED" && (
-        <Field label="מה יסגור את זה *">
+        <Field label={tk("toResolve")}>
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
         </Field>
       )}
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : existing ? "שמירה" : "הוספה לתיק"}
+        {pending ? t("saving") : existing ? t("save") : t("addToFile")}
       </button>
     </form>
   );
@@ -323,29 +321,30 @@ export function PeoplePanel({
   entities: EntityOption[];
 }) {
   const { showToast } = useToast();
+  const t = useTranslations("clients.people");
 
   async function removeContact(c: PanelContact) {
     const result = await removeClientContactAction(c.id, clientId);
-    if (result.error) showToast({ tone: "error", title: "ההסרה נכשלה", description: result.error });
-    else showToast({ tone: "info", title: "הוסר מהתיק", description: c.name ?? c.role ?? "" });
+    if (result.error) showToast({ tone: "error", title: t("toast.removeFailed"), description: result.error });
+    else showToast({ tone: "info", title: t("toast.removed"), description: c.name ?? c.role ?? "" });
   }
   async function removeOrganization(o: PanelOrganization) {
     const result = await removeClientOrganizationAction(o.id, clientId);
-    if (result.error) showToast({ tone: "error", title: "ההסרה נכשלה", description: result.error });
-    else showToast({ tone: "info", title: "הוסר מהתיק", description: o.name });
+    if (result.error) showToast({ tone: "error", title: t("toast.removeFailed"), description: result.error });
+    else showToast({ tone: "info", title: t("toast.removed"), description: o.name });
   }
 
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-app-border bg-white p-6">
         <div className="flex flex-wrap items-center justify-between gap-2.5">
-          <h2 className="text-sm font-medium text-app-text-primary">אנשים ויחסים ({contacts.length})</h2>
-          <Drawer triggerLabel="+ איש קשר" title="איש קשר בתיק" variant="link">
+          <h2 className="text-sm font-medium text-app-text-primary">{t("contacts.heading", { count: contacts.length })}</h2>
+          <Drawer triggerLabel={t("contacts.add")} title={t("contacts.addTitle")} variant="link">
             <ContactForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} entities={entities} />
           </Drawer>
         </div>
         {contacts.length === 0 ? (
-          <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין אנשי קשר בתיק.</p>
+          <p className="mt-2 text-sm text-app-text-tertiary">{t("contacts.empty")}</p>
         ) : (
           <ul className="mt-4 divide-y divide-app-border">
             {contacts.map((c) => (
@@ -353,31 +352,31 @@ export function PeoplePanel({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-[1_1_18rem]">
                     <p className="text-sm font-medium text-app-text-primary">
-                      {c.name ?? c.role}
-                      {c.isPrimary && <span className="ms-2 text-xs font-normal text-app-text-accent">ראשי</span>}
-                      {c.isDecisionMaker && <span className="ms-2 text-xs font-normal text-app-text-accent">מקבל החלטות</span>}
+                      <span dir="auto">{c.name ?? c.role}</span>
+                      {c.isPrimary && <span className="ms-2 text-xs font-normal text-app-text-accent">{t("contacts.primary")}</span>}
+                      {c.isDecisionMaker && <span className="ms-2 text-xs font-normal text-app-text-accent">{t("contact.isDecisionMaker")}</span>}
                     </p>
                     <p className="text-xs text-app-text-secondary">
-                      {[c.name ? c.role : null, RELATIONSHIP_LABELS[c.relationship], c.organizationName, c.entityName].filter(Boolean).join(" · ")}
+                      {[c.name ? c.role : null, t(`relationships.${c.relationship}`), c.organizationName, c.entityName].filter(Boolean).join(" · ")}
                     </p>
                     {(c.emails.length > 0 || c.phones.length > 0 || c.clientSideAddress) && (
                       <p className="mt-1 text-xs text-app-text-secondary" dir="ltr">
                         {[...c.emails, ...c.phones, c.clientSideAddress].filter(Boolean).join("  ·  ")}
                       </p>
                     )}
-                    {c.context && <p className="mt-1 text-xs text-app-text-secondary">{c.context}</p>}
-                    {c.channelOrder.length > 0 && <p className="mt-1 text-xs text-app-text-tertiary">ערוצים: {c.channelOrder.join(", ")}</p>}
-                    {c.doNotDisclose && <p className="mt-1 text-xs text-app-error">לא לספר: {c.doNotDisclose}</p>}
+                    {c.context && <p className="mt-1 text-xs text-app-text-secondary" dir="auto">{c.context}</p>}
+                    {c.channelOrder.length > 0 && <p className="mt-1 text-xs text-app-text-tertiary">{t("contacts.channels", { channels: c.channelOrder.join(", ") })}</p>}
+                    {c.doNotDisclose && <p className="mt-1 text-xs text-app-error">{t("doNotTell", { text: c.doNotDisclose })}</p>}
                     <StatusLine status={c.status} toResolve={c.toResolve} />
-                    <ItemTags item={c} />
+                    <ItemTags item={c} missingTarget="CONTACT" />
                     <SourceCodes sources={c.sources} options={sourceOptions} />
                   </div>
                   <div className="flex shrink-0 items-center gap-3 text-xs">
-                    <Drawer triggerLabel="עריכה" title="עריכת איש קשר" variant="link">
+                    <Drawer triggerLabel={t("edit")} title={t("contacts.editTitle")} variant="link">
                       <ContactForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} entities={entities} existing={c} />
                     </Drawer>
                     <button type="button" onClick={() => removeContact(c)} className="text-app-text-tertiary hover:text-app-error">
-                      הסרה
+                      {t("remove")}
                     </button>
                   </div>
                 </div>
@@ -389,38 +388,41 @@ export function PeoplePanel({
 
       <div className="rounded-2xl border border-app-border bg-white p-6">
         <div className="flex flex-wrap items-center justify-between gap-2.5">
-          <h2 className="text-sm font-medium text-app-text-primary">ספקים ונותני שירות ({organizations.length})</h2>
-          <Drawer triggerLabel="+ ארגון" title="ארגון בתיק" variant="link">
+          <h2 className="text-sm font-medium text-app-text-primary">{t("organizations.heading", { count: organizations.length })}</h2>
+          <Drawer triggerLabel={t("organizations.add")} title={t("organizations.addTitle")} variant="link">
             <OrganizationForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} />
           </Drawer>
         </div>
         {organizations.length === 0 ? (
-          <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין ספקים או נותני שירות קבועים בתיק.</p>
+          <p className="mt-2 text-sm text-app-text-tertiary">{t("organizations.empty")}</p>
         ) : (
           <ul className="mt-4 divide-y divide-app-border">
             {organizations.map((o) => (
               <li key={o.id} id={`item-${o.id}`} className="flex flex-wrap items-start justify-between gap-3 py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
                 <div className="min-w-0 flex-[1_1_18rem]">
-                  <p className="text-sm font-medium text-app-text-primary">{o.name}</p>
+                  <p className="text-sm font-medium text-app-text-primary" dir="auto">{o.name}</p>
                   <p className="text-xs text-app-text-secondary">
-                    {[o.role, RELATIONSHIP_LABELS[o.relationship], o.domains.join(", ") || null].filter(Boolean).join(" · ")}
+                    {[o.role, t(`relationships.${o.relationship}`), o.domains.join(", ") || null].filter(Boolean).join(" · ")}
                   </p>
                   {o.monthlyCostMinor !== null && (
                     <p className="mt-1 text-xs text-app-text-secondary">
-                      {o.currency === "USD" ? `$${(o.monthlyCostMinor / 100).toLocaleString("en-US")}` : formatMinor(o.monthlyCostMinor)} בחודש
+                      {t("organizations.perMonth", {
+                        // As before: the amount reads the same in either language.
+                        amount: o.currency === "USD" ? `$${(o.monthlyCostMinor / 100).toLocaleString("en-US")}` : formatMinor(o.monthlyCostMinor) ?? "",
+                      })}
                     </p>
                   )}
-                  {o.notes && <p className="mt-1 text-xs text-app-text-secondary">{o.notes}</p>}
+                  {o.notes && <p className="mt-1 text-xs text-app-text-secondary" dir="auto">{o.notes}</p>}
                   <StatusLine status={o.status} toResolve={o.toResolve} />
                   <ItemTags item={o} disclose />
                   <SourceCodes sources={o.sources} options={sourceOptions} />
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
-                  <Drawer triggerLabel="עריכה" title={`עריכת ${o.name}`} variant="link">
+                  <Drawer triggerLabel={t("edit")} title={t("organizations.editTitle", { name: o.name })} variant="link">
                     <OrganizationForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} existing={o} />
                   </Drawer>
                   <button type="button" onClick={() => removeOrganization(o)} className="text-xs text-app-text-tertiary hover:text-app-error">
-                    הסרה
+                    {t("remove")}
                   </button>
                 </div>
               </li>

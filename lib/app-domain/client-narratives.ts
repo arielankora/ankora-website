@@ -1,9 +1,10 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
-import { checkSources } from "@/lib/knowledge-sources";
+import { assertSources } from "@/lib/knowledge-sources";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import type { User, NarrativeKind } from "@prisma/client";
 
@@ -18,9 +19,9 @@ import type { User, NarrativeKind } from "@prisma/client";
 
 export const NARRATIVE_KINDS: NarrativeKind[] = ["OVERVIEW", "BACKGROUND", "OUR_ROLE"];
 
-export class NarrativeConflictError extends Error {
+export class NarrativeConflictError extends DomainError {
   constructor(public readonly current: number) {
-    super(`בינתיים נשמרה גרסה ${current}. צריך לפתוח מחדש ולערוך את הגרסה הנוכחית.`);
+    super("clientNarratives.conflict", `בינתיים נשמרה גרסה ${current}. צריך לפתוח מחדש ולערוך את הגרסה הנוכחית.`, { current });
   }
 }
 
@@ -28,12 +29,11 @@ export async function saveNarrative(actor: User, input: { clientId: string; kind
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
   const body = input.body.trim();
-  if (body.length > 20000) throw new Error("הטקסט ארוך מדי.");
+  if (body.length > 20000) throw new DomainError("clientNarratives.tooLong", "הטקסט ארוך מדי.");
   // Codes cited in the text must exist (R17). The text itself needs no
   // source: it is a summary, and its claims carry their own codes.
   const register = await prisma.clientSource.findMany({ where: { clientId: input.clientId, deletedAt: null }, select: { code: true, weight: true } });
-  const check = checkSources("MISSING", [], register, [body]);
-  if (!check.ok) throw new Error(check.error);
+  assertSources("MISSING", [], register, [body]);
 
   const latest = await prisma.clientNarrative.findFirst({
     where: { clientId: input.clientId, kind: input.kind },

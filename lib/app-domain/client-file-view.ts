@@ -23,7 +23,7 @@ import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { listProcesses, ruleWarnings } from "@/lib/app-domain/processes";
 import { daysSinceLastBatch } from "@/lib/app-domain/client-control";
-import { controlFrom, controlParts } from "@/lib/client-control";
+import { controlFrom, controlPartMessages, controlParts, type ControlMessage } from "@/lib/client-control";
 import { batchItem, CHANGES_GROUP, oneOffSuppliers, ruleSection } from "@/lib/client-file-sections";
 import { paramsInForce, paramsSummary } from "@/lib/policy-params";
 import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
@@ -80,7 +80,11 @@ function knowledge(row: { knowledgeStatus: DocItem["status"]; fieldStatus: unkno
   };
 }
 
-export async function buildClientFile(actor: User, clientId: string, options: { audience: "staff" | "ai" }): Promise<ClientFileDoc> {
+/// ADR 0006: the document, plus the control line as keys for the read
+/// screen. The document itself (exports, Claude) does not change.
+export type ClientFileView = ClientFileDoc & { controlMessages: ControlMessage[] };
+
+export async function buildClientFile(actor: User, clientId: string, options: { audience: "staff" | "ai" }): Promise<ClientFileView> {
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, clientId);
   const ai = options.audience === "ai";
@@ -463,16 +467,15 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
 
   // The same rows the sections show, so the line never counts what this
   // reader cannot see.
-  const control = controlParts(
-    controlFrom({
-      processes: processes.filter(shown),
-      exceptions,
-      facts: current,
-      otherItems: [...contacts, ...orgs, ...systems.filter(shown), ...entities.filter(shown), ...requestTypes.filter(shown), ...rules],
-      systems: systems.filter(shown),
-      daysSinceBatch,
-    })
-  );
+  const controlData = controlFrom({
+    processes: processes.filter(shown),
+    exceptions,
+    facts: current,
+    otherItems: [...contacts, ...orgs, ...systems.filter(shown), ...entities.filter(shown), ...requestTypes.filter(shown), ...rules],
+    systems: systems.filter(shown),
+    daysSinceBatch,
+  });
+  const control = controlParts(controlData);
 
   // Spec 3.1: the owners, by name.
   const keeperIds = [...new Set(sections.flatMap((x) => x.items.map((i) => i.owner)).filter((x): x is string => !!x))];
@@ -483,6 +486,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     generatedAt: now,
     audience: options.audience,
     control,
+    controlMessages: controlPartMessages(controlData),
     sections: sections.map((s) => ({
       ...s,
       items: s.items.filter((i) => i.text).map((i) => {

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { PageBack } from "@/components/app/BackSlot";
 import { requireUser } from "@/lib/app-auth/session";
 import { canManageClients, ForbiddenError } from "@/lib/app-auth/permissions";
 import { procedureDocument, type ProcedureDocumentView } from "@/lib/app-domain/procedure-documents";
-import { dateText, type DocBlock, type ProcedureDoc } from "@/lib/procedure-document";
+import { type DocBlock, type ProcedureDoc } from "@/lib/procedure-document";
 import { parsePageNumber } from "@/lib/url-numbers";
 import { ApproveTranslation, TranslateWithClaude } from "./TranslationActions";
 
@@ -14,8 +15,6 @@ import { ApproveTranslation, TranslateWithClaude } from "./TranslationActions";
 // screen; this is where it is read the way a client or an auditor will.
 
 export const metadata = { robots: { index: false, follow: false } };
-
-const TRANSLATION_STATE = { NONE: "", DRAFT: "טיוטת תרגום", APPROVED: "תרגום מאושר" } as const;
 
 function Blocks({ blocks }: { blocks: DocBlock[] }) {
   return (
@@ -110,6 +109,8 @@ function Paper({ doc, fingerprint }: { doc: ProcedureDoc; fingerprint: string })
   );
 }
 
+/// The prompt a person pastes into Claude. It is a prompt, not interface,
+/// so it stays in Hebrew whatever the reader's language (ADR 0006).
 function translationPrompt(view: ProcedureDocumentView, clientName: string, version: number): string {
   return [
     `תתרגם לאנגלית את הנוהל ${view.code} של ${clientName}, גרסה ${version}, למסמך שיוצא ללקוח או למבקר SOC 2.`,
@@ -147,6 +148,9 @@ export default async function ProcedureDocumentPage(props: {
     throw err;
   }
   if (view.clientId !== clientId) notFound();
+  const t = await getTranslations("clients.processes.document");
+  const format = await getFormatter();
+  const day = (d: Date) => format.dateTime(d, { day: "numeric", month: "numeric", year: "numeric" });
   const doc = view.doc;
   const shownLang = doc.lang;
   const tr = heView.translation;
@@ -168,7 +172,7 @@ export default async function ProcedureDocumentPage(props: {
         <PageBack href={`/app/clients/${clientId}#item-${processId}`} label={doc.clientName} />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-app-text-tertiary">גרסה:</span>
+            <span className="text-app-text-tertiary">{t("version")}</span>
             {heView.versions.map((x) => (
               <Link
                 key={x.version}
@@ -177,31 +181,33 @@ export default async function ProcedureDocumentPage(props: {
                 aria-current={x.version === doc.version ? "page" : undefined}
               >
                 {x.version}
-                {x.status === "APPROVED" ? " · בתוקף" : x.status === "DRAFT" ? " · טיוטה" : ""}
+                {x.status === "APPROVED" ? ` · ${t("inForce")}` : x.status === "DRAFT" ? ` · ${t("draft")}` : ""}
               </Link>
             ))}
-            <span className="ms-3 text-app-text-tertiary">שפה:</span>
+            <span className="ms-3 text-app-text-tertiary">{t("language")}</span>
             <Link href={`${base}${q({ lang: "he" })}`} className={shownLang === "he" ? "font-medium text-app-text-primary" : "text-app-text-accent hover:underline"}>
-              עברית
+              {t("hebrew")}
             </Link>
             {tr && (tr.state === "APPROVED" || isManager) ? (
               <Link href={`${base}${q({ lang: "en" })}`} className={shownLang === "en" ? "font-medium text-app-text-primary" : "text-app-text-accent hover:underline"}>
-                English
+                {t("english")}
               </Link>
             ) : (
-              <span className="text-app-text-tertiary" title="אין עדיין תרגום מאושר">English</span>
+              <span className="text-app-text-tertiary" title={t("noApprovedTranslation")}>
+                {t("english")}
+              </span>
             )}
           </div>
           <div className="flex items-center gap-4 text-sm">
             {englishDraftShown ? (
-              <span className="text-xs text-app-text-tertiary">ייצוא באנגלית אחרי אישור התרגום</span>
+              <span className="text-xs text-app-text-tertiary">{t("exportAfterApproval")}</span>
             ) : (
               <>
                 <a href={exportHref("pdf")} className="text-app-text-accent hover:underline" data-testid="export-pdf">
-                  הורדה כ-PDF
+                  {t("downloadPdf")}
                 </a>
                 <a href={exportHref("docx")} className="text-app-text-accent hover:underline" data-testid="export-docx">
-                  הורדה כ-Word
+                  {t("downloadWord")}
                 </a>
               </>
             )}
@@ -211,11 +217,15 @@ export default async function ProcedureDocumentPage(props: {
 
       {heView.doc.gaps.length > 0 && (
         <div className="rounded-xl bg-app-warning-soft px-4 py-3 text-xs text-app-text-primary" data-testid="procedure-gaps">
-          <span className="font-medium">חסר במסמך: </span>
-          {heView.doc.gaps.join(", ")}. בקבצים שמייצאים סעיף ריק לא מופיע.{" "}
-          <Link href={`/app/clients/${clientId}#item-${processId}`} className="font-medium text-app-text-accent hover:underline">
-            להשלים בתהליך
-          </Link>
+          {t.rich("gaps", {
+            gaps: heView.doc.gaps.join(", "),
+            b: (chunks) => <span className="font-medium">{chunks}</span>,
+            link: (chunks) => (
+              <Link href={`/app/clients/${clientId}#item-${processId}`} className="font-medium text-app-text-accent hover:underline">
+                {chunks}
+              </Link>
+            ),
+          })}
         </div>
       )}
 
@@ -223,39 +233,40 @@ export default async function ProcedureDocumentPage(props: {
         <div className="rounded-xl border border-app-border bg-white px-4 py-3 text-xs" data-testid="translation-panel">
           {!tr && (
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-app-text-secondary">אין עדיין גרסה באנגלית. קלוד מתרגם, ומנהל מאשר לפני שאפשר לייצא.</p>
-              <TranslateWithClaude prompt={translationPrompt(view, doc.clientName, doc.version)} label="תרגום לאנגלית עם קלוד" />
+              <p className="text-app-text-secondary">{t("noTranslation")}</p>
+              <TranslateWithClaude prompt={translationPrompt(view, doc.clientName, doc.version)} label={t("translate")} />
             </div>
           )}
           {tr?.state === "DRAFT" && (
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-app-text-primary">
-                  <span className="font-medium">{TRANSLATION_STATE.DRAFT}</span>
-                  {tr.by ? ` מאת ${tr.by}` : ""}
-                  {tr.at ? `, ${dateText(tr.at, "he")}` : ""}. ממתין לאישור מנהל.
+                  <span className="font-medium">{t("draftState")}</span>
+                  {tr.by ? ` ${t("byName", { name: tr.by })}` : ""}
+                  {tr.at ? `, ${day(tr.at)}` : ""}
+                  {t("awaitingApproval")}
                 </p>
                 <div className="flex items-center gap-3">
                   {shownLang !== "en" && isManager && (
                     <Link href={`${base}${q({ lang: "en" })}`} className="font-medium text-app-text-accent hover:underline">
-                      לקריאת התרגום
+                      {t("readTranslation")}
                     </Link>
                   )}
                   {isManager && <ApproveTranslation processId={processId} version={doc.version} clientId={clientId} disabled={tr.gaps.length > 0} />}
                 </div>
               </div>
-              {tr.gaps.length > 0 && <p className="text-app-warning">התרגום לא שלם: {tr.gaps.join(", ")}. צריך להשלים לפני אישור.</p>}
-              <TranslateWithClaude prompt={translationPrompt(view, doc.clientName, doc.version)} label="תרגום מחדש עם קלוד" />
+              {tr.gaps.length > 0 && <p className="text-app-warning">{t("incomplete", { gaps: tr.gaps.join(", ") })}</p>}
+              <TranslateWithClaude prompt={translationPrompt(view, doc.clientName, doc.version)} label={t("retranslate")} />
             </div>
           )}
           {tr?.state === "APPROVED" && (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-app-text-secondary">
-                <span className="font-medium text-app-text-primary">{TRANSLATION_STATE.APPROVED}</span>
-                {tr.approvedBy ? ` על ידי ${tr.approvedBy}` : ""}
-                {tr.approvedAt ? `, ${dateText(tr.approvedAt, "he")}` : ""}.
+                <span className="font-medium text-app-text-primary">{t("approvedState")}</span>
+                {tr.approvedBy ? ` ${t("approvedBy", { name: tr.approvedBy })}` : ""}
+                {tr.approvedAt ? `, ${day(tr.approvedAt)}` : ""}.
               </p>
-              <TranslateWithClaude prompt={translationPrompt(view, doc.clientName, doc.version)} label="תרגום מחדש עם קלוד" />
+              <TranslateWithClaude prompt={translationPrompt(view, doc.clientName, doc.version)} label={t("retranslate")} />
             </div>
           )}
         </div>
