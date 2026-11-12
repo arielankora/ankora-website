@@ -2,10 +2,11 @@
 import Link from "next/link";
 import { CalendarDays, Clock, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { taskHref } from "../tasks/list-query";
 import { setTaskDueDateAction } from "./actions";
-import { calendarFrom, dayOfMonth, shortDate, WEEKDAY_LABELS, type CalendarDrawer, type CalendarView } from "@/lib/calendar-keys";
+import { calendarFrom, dayOfMonth, KEY_FORMAT, keyDate, type CalendarDrawer, type CalendarView } from "@/lib/calendar-keys";
 import type { CalendarDate, CalendarTask } from "@/lib/app-domain/calendar";
 
 // The calendar's grid and its drawer: tasks with no due date, and tasks
@@ -77,8 +78,28 @@ type Props = {
   dayHrefs: Record<string, string>;
 };
 
+/// A day key as "18.10" (he) or "18/10" (en), in the reader's language.
+function useShortDate(): (key: string) => string {
+  const format = useFormatter();
+  return (key) => format.dateTime(keyDate(key), KEY_FORMAT.short);
+}
+
+/// The grid's seven column names, Sunday first (the week stays Sunday to
+/// Saturday in every language). Hebrew keeps its one-letter "א׳"; English
+/// reads "Sun", since a lone "S" would be Sunday or Saturday.
+function useWeekdayNames(): string[] {
+  const format = useFormatter();
+  const locale = useLocale();
+  const width = locale.startsWith("he") ? "narrow" : "short";
+  // 2026-10-18 is a Sunday.
+  return Array.from({ length: 7 }, (_, i) => format.dateTime(keyDate(`2026-10-${18 + i}`), { weekday: width, timeZone: "UTC" }));
+}
+
 export function CalendarGrid(props: Props) {
   const { showToast } = useToast();
+  const t = useTranslations("calendar");
+  const shortDate = useShortDate();
+  const weekdayNames = useWeekdayNames();
   const [local, setLocal] = useState(props.tasks);
   const [over, setOver] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -118,12 +139,12 @@ export function CalendarGrid(props: Props) {
     setPending(false);
     if (!result.ok) {
       setLocal((rows) => rows.map((t) => (t.id === task.id ? { ...t, dueKey: prev } : t)));
-      showToast({ tone: "error", title: "תאריך היעד לא השתנה", description: result.error });
+      showToast({ tone: "error", title: t("toast.notChanged"), description: result.error });
       return;
     }
     showToast({
       tone: "success",
-      title: to ? `${task.title}: יעד ${shortDate(to)}` : `${task.title}: בלי תאריך יעד`,
+      title: to ? t("toast.moved", { title: task.title, date: shortDate(to) }) : t("toast.cleared", { title: task.title }),
       ...(withUndo ? { undo: () => save({ ...task, dueKey: to }, prev, to, false) } : {}),
     });
   }
@@ -135,13 +156,13 @@ export function CalendarGrid(props: Props) {
     if (task.clientVisible) {
       showToast({
         tone: "warning",
-        title: "המשימה מוצגת ללקוח",
-        description: `${task.title}. הלקוח יראה את התאריך החדש בפורטל.`,
+        title: t("toast.clientVisibleTitle"),
+        description: t("toast.clientVisibleDescription", { title: task.title }),
         ask: {
-          question: to ? `להזיז ל-${shortDate(to)}?` : "להסיר את תאריך היעד?",
+          question: to ? t("toast.askMove", { date: shortDate(to) }) : t("toast.askClear"),
           choices: [
-            { value: "move", label: to ? "להזיז" : "להסיר" },
-            { value: "cancel", label: "ביטול" },
+            { value: "move", label: to ? t("toast.move") : t("toast.remove") },
+            { value: "cancel", label: t("toast.cancel") },
           ],
           onAnswer: async (value) => {
             if (value === "move") await save(task, to, fromKey, true);
@@ -172,7 +193,7 @@ export function CalendarGrid(props: Props) {
     };
   }
 
-  const item = (t: CalendarTask) => <TaskChip key={t.id} task={t} today={props.today} from={from} disabled={pending} />;
+  const item = (task: CalendarTask) => <TaskChip key={task.id} task={task} today={props.today} from={from} disabled={pending} />;
   const dateItem = (d: CalendarDate) => <DateChip key={`${d.id}:${d.dayKey}`} date={d} from={from} />;
 
   const anchorMonth = props.anchor.slice(0, 7);
@@ -191,7 +212,7 @@ export function CalendarGrid(props: Props) {
               dates={byDay.get(props.days[0])?.dates ?? []}
               item={item}
               dateItem={dateItem}
-              empty="אין משימות או מועדים ביום הזה."
+              empty={t("grid.emptyDay")}
             />
           </section>
         ) : (
@@ -200,7 +221,7 @@ export function CalendarGrid(props: Props) {
                 right-to-left page that is the right edge, as on paper. */}
             <div className="hidden overflow-hidden rounded-2xl border border-app-border bg-app-border md:block">
               <div className={`grid gap-px ${GRID_COLUMNS}`}>
-                {WEEKDAY_LABELS.map((label) => (
+                {weekdayNames.map((label) => (
                   <div key={label} className="bg-cream-dim/40 px-2 py-1.5 text-center text-[12px] font-medium text-app-text-secondary">
                     {label}
                   </div>
@@ -231,7 +252,7 @@ export function CalendarGrid(props: Props) {
                       <a
                         href={props.dayHrefs[day]}
                         draggable={false}
-                        aria-label={`יום ${shortDate(day)}`}
+                        aria-label={t("grid.dayLink", { date: shortDate(day) })}
                         className={`self-start rounded-full px-1.5 text-[12px] font-jbmono ${
                           day === props.today ? "bg-app-surface-nav text-cream" : outside ? "text-app-text-tertiary" : "text-app-text-secondary hover:text-app-text-primary"
                         }`}
@@ -241,7 +262,7 @@ export function CalendarGrid(props: Props) {
                       {capped}
                       {items.length > capped.length && (
                         <a href={props.dayHrefs[day]} className="px-1 text-[11.5px] text-app-text-tertiary hover:text-app-text-primary">
-                          ועוד {items.length - capped.length}
+                          {t("grid.more", { count: items.length - capped.length })}
                         </a>
                       )}
                     </section>
@@ -261,11 +282,11 @@ export function CalendarGrid(props: Props) {
                 .map((day) => (
                   <section key={day} className="rounded-2xl border border-app-border bg-white p-3">
                     <a href={props.dayHrefs[day]} className={`text-[13px] font-medium ${day === props.today ? "text-app-text-primary" : "text-app-text-secondary"}`}>
-                      {WEEKDAY_LABELS[new Date(`${day}T00:00:00Z`).getUTCDay()]} {shortDate(day)}
-                      {day === props.today ? " · היום" : ""}
+                      {weekdayNames[new Date(`${day}T00:00:00Z`).getUTCDay()]} {shortDate(day)}
+                      {day === props.today ? ` · ${t("grid.today")}` : ""}
                     </a>
                     <div className="mt-2">
-                      <DayItems tasks={byDay.get(day)!.tasks} dates={byDay.get(day)!.dates} item={item} dateItem={dateItem} empty="אין כלום היום." />
+                      <DayItems tasks={byDay.get(day)!.tasks} dates={byDay.get(day)!.dates} item={item} dateItem={dateItem} empty={t("grid.emptyToday")} />
                     </div>
                   </section>
                 ))}
@@ -315,6 +336,7 @@ function DayItems({
 }
 
 function TaskChip({ task, today, from, disabled }: { task: CalendarTask; today: string; from: string; disabled: boolean }) {
+  const t = useTranslations("calendar");
   const overdue = task.dueKey !== null && task.dueKey < today;
   return (
     <article
@@ -324,7 +346,7 @@ function TaskChip({ task, today, from, disabled }: { task: CalendarTask; today: 
         e.dataTransfer.effectAllowed = "move";
       }}
       data-calendar-task={task.id}
-      title={`${task.title} · ${task.clientName}${task.assigneeName ? ` · ${task.assigneeName}` : ""}${overdue ? " · באיחור" : ""}`}
+      title={`${task.title} · ${task.clientName}${task.assigneeName ? ` · ${task.assigneeName}` : ""}${overdue ? ` · ${t("overdue")}` : ""}`}
       className="cursor-grab rounded-lg border border-app-border bg-white px-2 py-1 active:cursor-grabbing"
     >
       <div className="flex items-start gap-1.5">
@@ -339,12 +361,13 @@ function TaskChip({ task, today, from, disabled }: { task: CalendarTask; today: 
         <a
           href={taskHref(task.id, from)}
           draggable={false}
+          dir="auto"
           className="line-clamp-2 min-w-0 flex-1 text-[12.5px] leading-snug text-app-text-primary [overflow-wrap:anywhere] hover:text-app-text-secondary"
         >
           {task.title}
         </a>
       </div>
-      <p className="truncate ps-3 text-[11px] text-app-text-secondary">{task.clientName}</p>
+      <p dir="auto" className="truncate ps-3 text-[11px] text-app-text-secondary">{task.clientName}</p>
     </article>
   );
 }
@@ -380,6 +403,7 @@ function Drawer({
   over: boolean;
   zone: DropZone;
 }) {
+  const t = useTranslations("calendar");
   const [q, setQ] = useState("");
   const rows = tab === "undated" ? undated : overdue;
   const needle = q.trim().toLowerCase();
@@ -408,39 +432,39 @@ function Drawer({
     >
       <div className="flex flex-col gap-2.5 border-b border-app-border p-3">
         <div className="flex items-center gap-2">
-          <h2 className="flex-1 text-[14px] font-medium text-app-text-primary">{tab === "undated" ? "בלי תאריך יעד" : "באיחור"}</h2>
-          <Link href={hrefs.close} aria-label="סגירת המגירה" data-testid="calendar-drawer-close" className="rounded-lg p-1.5 text-app-text-secondary hover:bg-cream-dim/40 hover:text-app-text-primary">
+          <h2 className="flex-1 text-[14px] font-medium text-app-text-primary">{tab === "undated" ? t("drawer.undatedTitle") : t("overdue")}</h2>
+          <Link href={hrefs.close} aria-label={t("drawer.close")} data-testid="calendar-drawer-close" className="rounded-lg p-1.5 text-app-text-secondary hover:bg-cream-dim/40 hover:text-app-text-primary">
             <X size={16} strokeWidth={1.8} />
           </Link>
         </div>
         <div className="flex rounded-full bg-cream-dim/40 p-[3px]">
           <Link href={hrefs.undated} data-testid="calendar-drawer-tab-undated" className={tabClass(tab === "undated")} aria-current={tab === "undated" ? "page" : undefined}>
-            בלי תאריך <span className="font-jbmono text-[11.5px]">{undated.length}{undatedMore ? "+" : ""}</span>
+            {t("undated")} <span className="font-jbmono text-[11.5px]">{undated.length}{undatedMore ? "+" : ""}</span>
           </Link>
           <Link href={hrefs.overdue} data-testid="calendar-drawer-tab-overdue" className={tabClass(tab === "overdue")} aria-current={tab === "overdue" ? "page" : undefined}>
-            באיחור <span className="font-jbmono text-[11.5px]">{overdue.length}{overdueMore ? "+" : ""}</span>
+            {t("overdue")} <span className="font-jbmono text-[11.5px]">{overdue.length}{overdueMore ? "+" : ""}</span>
           </Link>
         </div>
         <label className="flex items-center gap-2 rounded-lg border border-app-border px-2.5 py-1.5 text-[13px] text-app-text-secondary focus-within:border-app-accent">
           <Search size={14} strokeWidth={1.8} />
-          <span className="sr-only">חיפוש</span>
+          <span className="sr-only">{t("drawer.search")}</span>
           <input
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="חיפוש לפי משימה או לקוח"
+            placeholder={t("drawer.searchPlaceholder")}
             data-testid="calendar-drawer-search"
             className="min-w-0 flex-1 bg-transparent text-app-text-primary outline-none placeholder:text-app-text-tertiary"
           />
         </label>
-        <p className="text-[11.5px] text-app-text-secondary">גוררים משימה ליום כדי לקבוע יעד. גרירה לכאן מסירה את היעד.</p>
+        <p className="text-[11.5px] text-app-text-secondary">{t("drawer.hint")}</p>
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-3">
         {ordered.map(([client, list]) => (
           <section key={client}>
             <h3 className="flex items-baseline gap-1.5 px-1.5 pb-1 pt-3 text-[11.5px] font-semibold tracking-wide text-app-text-secondary">
-              {client}
+              <span dir="auto">{client}</span>
               <span className="font-jbmono text-[11px] font-normal text-app-text-tertiary">{list.length}</span>
             </h3>
             {list.map((t) => (
@@ -450,12 +474,12 @@ function Drawer({
         ))}
         {shown.length === 0 && (
           <p className="px-1.5 py-4 text-[12.5px] text-app-text-tertiary">
-            {needle ? "אין משימה שמתאימה לחיפוש." : tab === "undated" ? "לכל המשימות הפתוחות יש תאריך." : "אין משימות באיחור."}
+            {needle ? t("drawer.noMatch") : tab === "undated" ? t("drawer.allDated") : t("drawer.noneOverdue")}
           </p>
         )}
         {(tab === "undated" ? undatedMore : overdueMore) && (
           <Link href="/app/tasks" className="block px-1.5 pt-3 text-[12px] text-app-text-secondary hover:text-app-text-primary">
-            יש עוד. לרשימת המשימות
+            {t("drawer.more")}
           </Link>
         )}
       </div>
@@ -464,6 +488,7 @@ function Drawer({
 }
 
 function DrawerRow({ task, from, disabled, showDue }: { task: CalendarTask; from: string; disabled: boolean; showDue: boolean }) {
+  const shortDate = useShortDate();
   return (
     <article
       draggable={!disabled}
@@ -484,7 +509,7 @@ function DrawerRow({ task, from, disabled, showDue }: { task: CalendarTask; from
         <circle cx="9" cy="18" r="1.6" />
         <circle cx="15" cy="18" r="1.6" />
       </svg>
-      <a href={taskHref(task.id, from)} draggable={false} className="line-clamp-2 min-w-0 flex-1 text-[13px] leading-snug text-app-text-primary [overflow-wrap:anywhere] hover:text-app-text-secondary">
+      <a href={taskHref(task.id, from)} draggable={false} dir="auto" className="line-clamp-2 min-w-0 flex-1 text-[13px] leading-snug text-app-text-primary [overflow-wrap:anywhere] hover:text-app-text-secondary">
         {task.title}
       </a>
       {showDue && task.dueKey && (
@@ -507,9 +532,9 @@ function DateChip({ date, from }: { date: CalendarDate; from: string }) {
       className="flex items-start gap-1.5 rounded-lg bg-gold/10 px-2 py-1 text-[12.5px] leading-snug text-app-text-primary hover:bg-gold/20"
     >
       <CalendarDays size={12} strokeWidth={1.8} className="mt-[3px] shrink-0 text-app-text-accent" />
-      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+      <span dir="auto" className="min-w-0 flex-1 [overflow-wrap:anywhere]">
         {date.title}
-        <span className="block truncate text-[11px] text-app-text-tertiary">{date.clientName}</span>
+        <span dir="auto" className="block truncate text-[11px] text-app-text-tertiary">{date.clientName}</span>
       </span>
     </a>
   );

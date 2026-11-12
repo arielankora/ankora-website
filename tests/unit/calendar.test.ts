@@ -13,6 +13,11 @@ import { computeHolidayOccurrencesForYear } from "@/lib/app-domain/important-dat
 import { localDateKey } from "@/lib/timezone";
 import { backLabel, carriedListQuery, tasksListHref } from "@/app/(product)/app/(authenticated)/tasks/list-query";
 import { calendarBackHref, calendarFrom, parseDrawer } from "@/lib/calendar-keys";
+import { createTranslator } from "next-intl";
+import he from "@/messages/he.json";
+
+// The Hebrew dictionary, as the task screen passes it (ADR 0006).
+const tList = createTranslator({ locale: "he-IL", messages: he, namespace: "tasks.list" });
 
 // 19.10.2026, the calendar screen. No Prisma here: calendar-keys.ts is
 // plain key arithmetic and calendar-occurrences.ts only walks the
@@ -166,7 +171,7 @@ describe("the way back to the calendar", () => {
 
   it("a task opened from the calendar goes back to the same calendar", () => {
     expect(tasksListHref(from)).toBe("/app/calendar?view=month&date=2026-11-01&show=tasks&mine=0");
-    expect(backLabel(from)).toBe("חזרה ליומן");
+    expect(backLabel(from, tList)).toBe("חזרה ליומן");
   });
 
   it("a step opened from that task still leads back to the calendar", () => {
@@ -187,7 +192,7 @@ describe("the way back to the calendar", () => {
 
   it("a list `from` is untouched", () => {
     expect(tasksListHref("status=DONE")).toBe("/app/tasks?status=DONE");
-    expect(backLabel("status=DONE")).toBe("חזרה למשימות");
+    expect(backLabel("status=DONE", tList)).toBe("חזרה למשימות");
     expect(calendarBackHref("status=DONE")).toBeNull();
   });
 });
