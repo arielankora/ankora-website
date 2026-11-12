@@ -53,7 +53,7 @@ describe("the shard plan", () => {
   // and a map keyed one-shard-per-id kept whichever came last. integration-1
   // and integration-2 owned nothing and would have run no tests at all.
   it("lets several shards share one check", () => {
-    for (const s of ["integration-1", "integration-2", "integration-3", "integration-4"]) {
+    for (const s of ["integration-1", "integration-2", "integration-3", "integration-4", "integration-5"]) {
       expect(inShard("integration", s, 3), s).toBe(true);
       expect(checksOwnedBy(s)).toEqual(["integration"]);
     }
@@ -99,10 +99,12 @@ describe("the shard plan", () => {
   it("hands each integration shard a different part of the suite", () => {
     // 12.11.2026: four ways, at 18.5 minutes and one overrun of a 20-minute
     // budget on integration-3 (qa/lib/shards.mjs).
-    expect(splitFor("integration-1")).toEqual([1, 4]);
-    expect(splitFor("integration-2")).toEqual([2, 4]);
-    expect(splitFor("integration-3")).toEqual([3, 4]);
-    expect(splitFor("integration-4")).toEqual([4, 4]);
+    // 12.11.2026, later: five ways, after three overruns that day.
+    expect(splitFor("integration-1")).toEqual([1, 5]);
+    expect(splitFor("integration-2")).toEqual([2, 5]);
+    expect(splitFor("integration-3")).toEqual([3, 5]);
+    expect(splitFor("integration-4")).toEqual([4, 5]);
+    expect(splitFor("integration-5")).toEqual([5, 5]);
     // 25.10.2026: the UTC pass is sharded on the same three-way split, and
     // for the same reason one level down - it reached 19.8 minutes against a
     // 20-minute budget, and a budget overrun is a blocker by design.
@@ -134,7 +136,7 @@ describe("which shards a level runs as", () => {
   });
 
   it("splits level 2, because that is the one that runs every night", () => {
-    expect(shardsFor(2)).toEqual(["main", "integration-1", "integration-2", "integration-3", "integration-4"]);
+    expect(shardsFor(2)).toEqual(["main", "integration-1", "integration-2", "integration-3", "integration-4", "integration-5"]);
   });
 
   it("splits level 3 further, for the passes only it runs", () => {

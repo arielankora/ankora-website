@@ -85,6 +85,13 @@
 //   closest to the budget. Four ways is about 12 minutes a shard. Level 2
 //   pays one more job setup for it, about two minutes of runner time.
 
+// 12.11.2026, sixth pass: five ways (approved by Ariel). On four, the
+// shard holding the heaviest files still ran 13 to 18 minutes and passed
+// the 20-minute budget three times that day on slow runners (#480, #485
+// twice), with no test stuck; #486 raised the budget to 30 minutes as a
+// stopgap. Five ways is about 10 minutes a shard. The jobs come from
+// PLAN below, so the workflow's matrix follows without a change there.
+
 /**
  * Shards that own specific checks, and how a check is divided inside one.
  *
@@ -92,10 +99,11 @@
  * split runs whole in its shard. Everything unclaimed runs in `main`.
  */
 export const SHARD_CHECKS = {
-  "integration-1": { checks: ["integration"], split: [1, 4] },
-  "integration-2": { checks: ["integration"], split: [2, 4] },
-  "integration-3": { checks: ["integration"], split: [3, 4] },
-  "integration-4": { checks: ["integration"], split: [4, 4] },
+  "integration-1": { checks: ["integration"], split: [1, 5] },
+  "integration-2": { checks: ["integration"], split: [2, 5] },
+  "integration-3": { checks: ["integration"], split: [3, 5] },
+  "integration-4": { checks: ["integration"], split: [4, 5] },
+  "integration-5": { checks: ["integration"], split: [5, 5] },
   "utc-1": { checks: ["integration-utc"], split: [1, 3] },
   "utc-2": { checks: ["integration-utc"], split: [2, 3] },
   "utc-3": { checks: ["integration-utc"], split: [3, 3] },
@@ -115,8 +123,8 @@ export const MAIN_SHARD = "main";
  */
 export const PLAN = {
   1: null,
-  2: [MAIN_SHARD, "integration-1", "integration-2", "integration-3", "integration-4"],
-  3: [MAIN_SHARD, "integration-1", "integration-2", "integration-3", "integration-4", "utc-1", "utc-2", "utc-3", "coverage-1", "coverage-2", "coverage-3"],
+  2: [MAIN_SHARD, "integration-1", "integration-2", "integration-3", "integration-4", "integration-5"],
+  3: [MAIN_SHARD, "integration-1", "integration-2", "integration-3", "integration-4", "integration-5", "utc-1", "utc-2", "utc-3", "coverage-1", "coverage-2", "coverage-3"],
 };
 
 /** The shard names for a level, or null when that level runs as one job. */
