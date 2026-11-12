@@ -7,6 +7,8 @@ import {
   isEmptyBrief,
   MAX_COMMENT_CHARS,
   sourcesRules,
+  SOURCES_LOOKBACK_DAYS,
+  SOURCES_WIDE_LOOKBACK_DAYS,
   timerRules,
   type AdvancePromptInput,
 } from "@/lib/advance-prompt";
@@ -391,6 +393,8 @@ describe("mail, Drive and recordings (22.10.2026)", () => {
     conversationsDocId: "1hqxKEycC9O2xz_az0dppFpaVLJbAIt2CiyiKLTTcPF0",
     fromLabel: "03.07.2026",
     fromIso: "2026-07-03",
+    wideFromLabel: "04.05.2026",
+    wideFromIso: "2026-05-04",
   };
 
   it("leaves the section out when the caller passes no anchors", () => {
@@ -402,10 +406,40 @@ describe("mail, Drive and recordings (22.10.2026)", () => {
   it("checks what is connected, never assumes it, and uses whatever is", () => {
     const text = buildAdvancePrompt({ ...base, sources });
     expect(text).toContain("## מקורות נוספים: מייל, דרייב והקלטות");
-    expect(text).toContain("אל תניח שמקור מחובר, ואל תוותר על מקור שמחובר");
-    expect(text).toContain("כשהמקור מחובר, זה חובה ולא רשות");
+    expect(text).toContain("אל תניח שמקור מחובר");
     expect(text).toContain("שורה אחת שהוא לא היה זמין, וממשיכים");
     expect(text).toContain("שורה ראשונה \"מקורות:\"");
+  });
+
+  it("searches only when Ankora's data leaves a gap, and says so when it did not (12.11.2026)", () => {
+    const text = buildAdvancePrompt({ ...base, sources });
+    expect(text).not.toContain("חובה ולא רשות");
+    expect(text).toContain("קודם נתוני המשימה מאנקורה");
+    expect(text).toContain("מחפשים במקורות רק אם חסר בהם מידע שבלעדיו אי אפשר לתכנן");
+    expect(text).toContain("כשלא ברור איפה המשימה עומדת היום");
+    expect(text).toContain("אם לא חיפשת כי הנתונים מאנקורה הספיקו, לכתוב את זה");
+  });
+
+  it("reads mail previews first and opens at most five threads", () => {
+    const text = buildAdvancePrompt({ ...base, sources });
+    expect(text).toContain("קודם קטעי התצוגה מתוצאות החיפוש");
+    expect(text).toContain("פותחים עד חמישה שרשורים");
+  });
+
+  it("reads meeting summaries first and a full transcript for one or two meetings at most", () => {
+    const text = buildAdvancePrompt({ ...base, sources });
+    expect(text).toContain("קודם רשימת הפגישות שנמצאו, ואז רק הסיכום");
+    expect(text).toContain("תמלול מלא פותחים רק לפגישה אחת או שתיים");
+  });
+
+  it("starts at 30 days and widens to 90 only when nothing was found", () => {
+    expect(SOURCES_LOOKBACK_DAYS).toBe(30);
+    expect(SOURCES_WIDE_LOOKBACK_DAYS).toBe(90);
+    const text = buildAdvancePrompt({ ...base, sources });
+    expect(text).toContain("(30 יום לפני פתיחת המשימה)");
+    expect(text).toContain("רק אם בטווח הזה לא נמצא כלום רלוונטי, מרחיבים פעם אחת ל-04.05.2026 (90 יום)");
+    expect(text).toContain("after:2026/05/04");
+    expect(text).toContain("from:2026-05-04");
   });
 
   it("carries the anchors, the window and the forwarded-mail case", () => {
