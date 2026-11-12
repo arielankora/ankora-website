@@ -37,7 +37,7 @@ function SubmitOption({
       disabled={pending || locked || !canAnswer}
       // 20.10.2026 (canvas, portal boards): the recommendation is a tag, and
       // every price sits in the same column so the options compare at a glance.
-      className={`grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-1 rounded-[14px] border px-4 py-3 text-right transition-colors disabled:opacity-50 ${
+      className={`grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-1 rounded-[14px] border px-4 py-3 text-start transition-colors disabled:opacity-50 ${
         option.recommended ? "border-app-accent bg-app-accent-soft" : "border-app-border-strong bg-white hover:border-app-accent"
       }`}
     >
@@ -47,7 +47,7 @@ function SubmitOption({
           <span className="rounded-full bg-app-accent px-2 py-0.5 text-[11px] font-medium text-app-text-primary">ההמלצה שלנו</span>
         )}
       </span>
-      <span dir="ltr" className="min-w-[96px] text-left font-jbmono text-[13px] text-app-text-primary">
+      <span dir="ltr" className="min-w-[96px] text-page-end font-jbmono text-[13px] text-app-text-primary">
         {price ?? ""}
       </span>
       {option.detail && <span className="col-span-2 block text-[12.5px] text-app-text-secondary">{option.detail}</span>}

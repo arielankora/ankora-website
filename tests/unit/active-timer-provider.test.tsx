@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { act, cleanup, render as rtlRender, screen } from "@testing-library/react";
+import { intlWrapper } from "../helpers/intl";
+
+/// The shell's pill is worded by the dictionary (ADR 0006).
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: intlWrapper() });
 import { summariseActiveTimers, sameSummary } from "@/components/app/active-timer-summary";
 
 // 19.10.2026, reported by Ariel with two screenshots: the timer was

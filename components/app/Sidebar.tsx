@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronUp, Home, Search } from "lucide-react";
@@ -8,11 +9,9 @@ import { LogoutButton } from "./LogoutButton";
 import { OPEN_COMMAND_PALETTE_EVENT } from "./CommandPalette";
 import { useActiveTimer } from "./ActiveTimerProvider";
 
-export type NavItem = { href: string; label: string; group?: string };
+import { ACCOUNT_GROUP, type NavItem } from "./nav-groups";
 
-/// Items in this group live in the menu under the person's name, not in the
-/// list (19.10.2026). BottomNav and the command palette still list them.
-export const ACCOUNT_GROUP = "חשבון";
+export { ACCOUNT_GROUP, type NavGroupId, type NavItem } from "./nav-groups";
 
 export type NavCounters = {
   importantDatesCount?: number;
@@ -66,6 +65,7 @@ export function Sidebar({
   counters?: NavCounters;
 }) {
   const pathname = usePathname();
+  const t = useTranslations("shell");
 
   // 20.10.2026: the two home screens are exact; every other item owns its
   // sub-paths ("/app/portal" used to light up on every portal screen).
@@ -74,7 +74,7 @@ export function Sidebar({
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
-  // The canvas names the client's menu "פורטל", not "OPS".
+  // The canvas names the client's menu "portal", not "OPS".
   const isPortal = items.some((i) => i.href === "/app/portal");
 
   function openCommandPalette() {
@@ -94,7 +94,7 @@ export function Sidebar({
           Ankora
         </Link>
         <span className="rounded-full border border-[rgba(243,234,219,0.18)] px-1.5 py-0.5 text-[11px] text-[#B4B8BC]">
-          {isPortal ? "פורטל" : "OPS"}
+          {isPortal ? t("sidebar.portalBadge") : t("sidebar.opsBadge")}
         </span>
       </div>
 
@@ -105,14 +105,14 @@ export function Sidebar({
           className="flex w-full items-center gap-2 rounded-[10px] bg-[rgba(248,244,236,0.06)] px-2.5 py-2 text-start text-[13px] text-cream/60 transition-colors hover:bg-[rgba(248,244,236,0.1)]"
         >
           <Search size={15} strokeWidth={1.75} className="shrink-0" />
-          <span className="flex-1 truncate">חיפוש או פעולה</span>
+          <span className="flex-1 truncate">{t("sidebar.search")}</span>
           <kbd className="shrink-0 rounded border border-[rgba(243,234,219,0.18)] px-1 font-jbmono text-[10px] text-[#B4B8BC]">
             ⌘K
           </kbd>
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="ניווט ראשי">
+      <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label={t("mainNav")}>
         {items.filter((item) => item.group !== ACCOUNT_GROUP).map((item) => {
           const showHeader = item.group && item.group !== lastGroup;
           lastGroup = item.group;
@@ -136,7 +136,7 @@ export function Sidebar({
             <div key={item.href}>
               {showHeader && (
                 <p className="mb-1 mt-4 px-2.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-[#8F98A3] first:mt-1">
-                  {item.group}
+                  {item.groupLabel}
                 </p>
               )}
               <Link
@@ -182,7 +182,7 @@ export function Sidebar({
             {userName.replace(/^[^A-Za-z0-9\u0590-\u05FF]+/, "").charAt(0)}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium text-cream">{userName}</span>
+            <span dir="auto" className="block truncate text-sm font-medium text-cream">{userName}</span>
             <span className="block truncate text-xs text-cream/60">{roleLabel}</span>
           </span>
           <ChevronUp size={14} aria-hidden="true" className="shrink-0 text-cream/60 transition-transform group-open:rotate-180" />

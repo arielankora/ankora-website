@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { Check, AlertCircle, TriangleAlert, Info, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 // App redesign (design_handoff_ankora_app_redesign/README.md, "Interactions
 // & Behavior"): "מערכת הודעות (החלק החשוב ביותר בעיצוב הזה)." Five rules
@@ -149,6 +150,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {
   const { icon: Icon, iconClass, iconBg, barColor } = TONE_CONFIG[toast.tone];
   const [undoing, setUndoing] = useState(false);
+  const t = useTranslations("shell");
 
   async function handleUndo() {
     if (!toast.undo || undoing) return;
@@ -192,14 +194,14 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
               disabled={undoing}
               className="mt-1.5 text-xs font-medium text-app-text-accent hover:text-app-text-primary disabled:opacity-50"
             >
-              {undoing ? "מבטל…" : "ביטול"}
+              {undoing ? t("toast.undoing") : t("toast.undo")}
             </button>
           )}
         </div>
         <button
           type="button"
           onClick={onDismiss}
-          aria-label="סגירה"
+          aria-label={t("close")}
           className="shrink-0 rounded-full p-1 text-app-text-tertiary hover:bg-app-surface-sunken hover:text-app-text-secondary"
         >
           <X size={14} strokeWidth={2} />
@@ -221,6 +223,7 @@ function ToastQuestion({ ask, onDone }: { ask: ToastAsk; onDone: () => void }) {
   const [choice, setChoice] = useState<ToastAsk["choices"][number] | null>(null);
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
+  const t = useTranslations("shell");
 
   async function answer(value: string, written?: string) {
     if (saving) return;
@@ -255,7 +258,7 @@ function ToastQuestion({ ask, onDone }: { ask: ToastAsk; onDone: () => void }) {
             onClick={() => void answer(choice.value, text.trim())}
             className="shrink-0 rounded-full bg-app-accent px-3 py-1.5 text-[11px] font-medium text-app-text-primary disabled:opacity-40"
           >
-            שמירה
+            {t("toast.save")}
           </button>
           <button
             type="button"
@@ -263,7 +266,7 @@ function ToastQuestion({ ask, onDone }: { ask: ToastAsk; onDone: () => void }) {
             onClick={() => setChoice(null)}
             className="shrink-0 text-[11px] text-app-text-tertiary hover:text-app-text-primary"
           >
-            חזרה
+            {t("toast.back")}
           </button>
         </div>
       </div>

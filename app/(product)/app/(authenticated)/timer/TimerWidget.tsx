@@ -389,7 +389,7 @@ export function TimerWidget({
                     className="flex items-center gap-2.5 rounded-xl border border-app-border bg-app-surface-page px-3.5 py-2.5 text-start transition-colors hover:border-gold hover:bg-white disabled:opacity-50 disabled:hover:border-app-border disabled:hover:bg-app-surface-page"
                   >
                     <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-gold/16 text-app-text-accent">
-                      <ChevronLeft size={13} strokeWidth={2.25} />
+                      <ChevronLeft size={13} strokeWidth={2.25} className="ltr:rotate-180" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] text-app-text-primary">

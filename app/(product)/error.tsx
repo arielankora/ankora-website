@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 
 // Phase 7 (spec 20: "Network error עם Retry", ADR addendum 14.4). Catches
 // any unhandled exception thrown while rendering a page under this route
@@ -19,6 +20,7 @@ export default function ProductError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useTranslations("shell.errorPage");
   useEffect(() => {
     console.error("Unhandled error in product app:", error);
   }, [error]);
@@ -27,16 +29,16 @@ export default function ProductError({
     <div className="flex min-h-screen items-center justify-center bg-app-surface-page px-6">
       <div className="w-full max-w-sm rounded-2xl border border-app-border bg-white p-8 text-center shadow-sm">
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-app-text-accent">Ankora</p>
-        <h1 className="mt-4 text-lg font-semibold text-app-text-primary">משהו השתבש</h1>
+        <h1 className="mt-4 text-lg font-semibold text-app-text-primary">{t("title")}</h1>
         <p className="mt-2 text-sm text-app-text-secondary">
-          אירעה תקלה בלתי צפויה. אפשר לנסות שוב, ואם זה חוזר - לפנות לתמיכה.
+          {t("body")}
         </p>
         <button
           type="button"
           onClick={() => reset()}
           className="mt-6 w-full rounded-full bg-app-surface-nav px-6 py-3 text-sm font-medium text-white"
         >
-          ניסיון חוזר
+          {t("retry")}
         </button>
       </div>
     </div>

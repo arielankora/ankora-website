@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Home } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { NAV_ICONS } from "./nav-icons";
 
 export const OPEN_COMMAND_PALETTE_EVENT = "ankora:open-command-palette";
@@ -19,6 +20,7 @@ export function CommandPalette({ actions, clients }: { actions: NavAction[]; cli
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const t = useTranslations("shell");
 
   useEffect(() => {
     function onKeydown(e: KeyboardEvent) {
@@ -67,8 +69,8 @@ export function CommandPalette({ actions, clients }: { actions: NavAction[]; cli
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="חיפוש ופעולות">
-      <button type="button" aria-label="סגירה" onClick={() => setOpen(false)} className="absolute inset-0 bg-app-surface-nav/30" />
+    <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label={t("palette.dialog")}>
+      <button type="button" aria-label={t("close")} onClick={() => setOpen(false)} className="absolute inset-0 bg-app-surface-nav/30" />
       <div
         className="relative mx-auto flex max-h-[70vh] w-[min(560px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border border-app-border bg-white shadow-[0_30px_70px_rgba(11,27,51,0.3)]"
         style={{ marginTop: "14vh" }}
@@ -79,7 +81,7 @@ export function CommandPalette({ actions, clients }: { actions: NavAction[]; cli
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="חיפוש או פעולה"
+            placeholder={t("palette.placeholder")}
             className="w-full bg-transparent text-sm text-app-text-primary outline-none placeholder:text-app-text-tertiary"
           />
           <kbd className="shrink-0 rounded border border-app-border px-1.5 py-0.5 font-jbmono text-[10px] text-app-text-tertiary">Esc</kbd>
@@ -88,7 +90,7 @@ export function CommandPalette({ actions, clients }: { actions: NavAction[]; cli
         <div className="overflow-y-auto py-2">
           {filteredActions.length > 0 && (
             <div className="px-2 pb-2">
-              <p className="px-2.5 py-1.5 text-[10.5px] font-medium uppercase tracking-wide text-app-text-tertiary">פעולות</p>
+              <p className="px-2.5 py-1.5 text-[10.5px] font-medium uppercase tracking-wide text-app-text-tertiary">{t("palette.actions")}</p>
               {filteredActions.map((a) => {
                 const Icon = NAV_ICONS[a.href] ?? Home;
                 return (
@@ -108,7 +110,7 @@ export function CommandPalette({ actions, clients }: { actions: NavAction[]; cli
 
           {filteredClients.length > 0 && (
             <div className="px-2 pb-2">
-              <p className="px-2.5 py-1.5 text-[10.5px] font-medium uppercase tracking-wide text-app-text-tertiary">לקוחות</p>
+              <p className="px-2.5 py-1.5 text-[10.5px] font-medium uppercase tracking-wide text-app-text-tertiary">{t("palette.clients")}</p>
               {filteredClients.map((c) => (
                 <button
                   key={c.id}
@@ -124,7 +126,7 @@ export function CommandPalette({ actions, clients }: { actions: NavAction[]; cli
           )}
 
           {filteredActions.length === 0 && filteredClients.length === 0 && (
-            <p className="px-4 py-8 text-center text-sm text-app-text-tertiary">אין תוצאות</p>
+            <p className="px-4 py-8 text-center text-sm text-app-text-tertiary">{t("palette.noResults")}</p>
           )}
         </div>
       </div>

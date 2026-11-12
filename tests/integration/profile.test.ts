@@ -5,9 +5,11 @@ import {
   changeOwnPassword,
   getLastPasswordChangeAt,
   updateLongRunningTimerEmailPreference,
+  updateOwnLocale,
   updateOwnName,
   updateOwnTimezone,
   updateOwnWhatsappNumber,
+  ProfileError,
 } from "@/lib/app-domain/profile";
 import { authenticateWithPassword } from "@/lib/app-auth/authenticate";
 
@@ -202,5 +204,55 @@ describe("updateOwnWhatsappNumber()", () => {
       where: { actorId: user.id, action: "profile.whatsapp_update" },
     });
     expect(JSON.stringify(event?.afterJson)).toContain("0521234567");
+  });
+});
+
+// ADR 0006: the interface language. Hebrew for everyone until they choose,
+// one of the app's locales and nothing else, and every change on record.
+describe("updateOwnLocale()", () => {
+  it("starts everyone on Hebrew", async () => {
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    expect(user.locale).toBe("he");
+  });
+
+  it("saves English and records the change", async () => {
+    const { user } = await createTestUser({ role: "ANKORA_ADMIN" });
+
+    await expect(updateOwnLocale(user, "en")).resolves.toBe("en");
+
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).locale).toBe("en");
+    const event = await prisma.auditEvent.findFirst({ where: { actorId: user.id, action: "profile.locale_update" } });
+    expect(event?.beforeJson).toEqual({ locale: "he" });
+    expect(event?.afterJson).toEqual({ locale: "en" });
+  });
+
+  it("refuses anything that is not one of the app's locales, and changes nothing", async () => {
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+
+    for (const bad of ["fr", "EN", "en-US", "", "he; drop table users"]) {
+      await expect(updateOwnLocale(user, bad)).rejects.toThrow(ProfileError);
+    }
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).locale).toBe("he");
+  });
+
+  it("writes nothing when the choice is the one already saved", async () => {
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+
+    await updateOwnLocale(user, "he");
+
+    expect(await prisma.auditEvent.count({ where: { actorId: user.id, action: "profile.locale_update" } })).toBe(0);
+  });
+});
+
+describe("profile refusals carry a code (ADR 0006)", () => {
+  it("names the rule that failed, so a screen in either language can say it", async () => {
+    const { user, password } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+
+    await expect(updateOwnName(user, " ")).rejects.toMatchObject({ code: "name_required" });
+    await expect(updateOwnTimezone(user, " ")).rejects.toMatchObject({ code: "timezone_required" });
+    await expect(updateOwnWhatsappNumber(user, "call me")).rejects.toMatchObject({ code: "whatsapp_characters" });
+    await expect(updateOwnWhatsappNumber(user, "123")).rejects.toMatchObject({ code: "whatsapp_invalid" });
+    expect(await changeOwnPassword(user, "wrong-current-one", "Br4nd-New-Passw0rd!")).toMatchObject({ ok: false, code: "wrong_password" });
+    expect(await changeOwnPassword(user, password, "short")).toMatchObject({ ok: false, code: "password_too_short" });
   });
 });

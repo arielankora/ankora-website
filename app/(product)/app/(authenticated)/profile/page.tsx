@@ -1,7 +1,10 @@
+import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
+import { PASSWORD_MIN_LENGTH } from "@/lib/app-auth/password";
 import { getLastPasswordChangeAt } from "@/lib/app-domain/profile";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 import { TimezoneForm } from "./TimezoneForm";
+import { LanguageForm } from "./LanguageForm";
 import { NameForm } from "./NameForm";
 import { WhatsappForm } from "./WhatsappForm";
 import { DailyDigestPreferenceForm, NotificationPreferenceForm } from "./NotificationPreferenceForm";
@@ -21,11 +24,6 @@ function initials(name: string): string {
   return name.trim().slice(0, 2);
 }
 
-function formatPasswordChangedLabel(date: Date | null): string | null {
-  if (!date) return null;
-  const formatted = new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
-  return `הסיסמה עודכנה לאחרונה ב-${formatted}`;
-}
 
 // App redesign (handoff README, screen 18 "פרופיל ומדריך שימוש"): two-
 // column card layout - avatar/name/timezone on the right (RTL "start"),
@@ -63,13 +61,16 @@ export default async function ProfilePage() {
     showClaudeCard ? getMyClaudeConnection(user) : Promise.resolve(null),
     showPasskeys ? listMyPasskeys(user) : Promise.resolve([]),
   ]);
-  const dateFmt = new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" });
+  // ADR 0006: dates in the person's locale and time zone (i18n/request.ts).
+  const t = await getTranslations("profile");
+  const format = await getFormatter();
+  const formatDate = (date: Date) => format.dateTime(date, { dateStyle: "medium" });
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-medium text-app-text-primary">הפרופיל שלי</h1>
-        <p className="mt-1 text-sm text-app-text-secondary">פרטים אישיים, אזור זמן, התראות וחיבורים.</p>
+        <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
+        <p className="mt-1 text-sm text-app-text-secondary">{t("subtitle")}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -80,7 +81,7 @@ export default async function ProfilePage() {
                 {initials(user.name)}
               </span>
               <div className="min-w-0">
-                <p className="truncate text-base font-medium text-app-text-primary">{user.name}</p>
+                <p dir="auto" className="truncate text-base font-medium text-app-text-primary">{user.name}</p>
                 <p dir="ltr" className="truncate text-end text-xs text-app-text-tertiary">
                   {user.email}
                 </p>
@@ -90,6 +91,10 @@ export default async function ProfilePage() {
             <div className="mt-5 space-y-5 border-t border-app-border pt-5">
               <NameForm name={user.name} />
               <TimezoneForm timezone={user.timezone} />
+              {/* ADR 0006: staff only for now. The client portal is not
+                  translated yet, and a client who chose English would get a
+                  left-to-right page full of Hebrew. */}
+              {user.role !== "CLIENT_USER" && <LanguageForm locale={user.locale} />}
               {/* Staff only: it is what a colleague's "שיתוף" on a task
                   reaches. A client's number lives on the client. */}
               {user.role !== "CLIENT_USER" && <WhatsappForm whatsappNumber={user.whatsappNumber} />}
@@ -99,7 +104,7 @@ export default async function ProfilePage() {
 
         <div className="space-y-6">
           <div className="rounded-2xl border border-app-border bg-white p-6">
-            <h2 className="mb-3 text-sm font-medium text-app-text-primary">התראות אישיות</h2>
+            <h2 className="mb-3 text-sm font-medium text-app-text-primary">{t("notificationsTitle")}</h2>
             <div className="divide-y divide-app-border">
               <DailyDigestPreferenceForm enabled={user.dailyDigestByEmail} />
               <div className="pt-3">
@@ -109,8 +114,13 @@ export default async function ProfilePage() {
           </div>
 
           <div className="rounded-2xl border border-app-border bg-white p-6">
-            <h2 className="mb-3 text-sm font-medium text-app-text-primary">סיסמה</h2>
-            <ChangePasswordForm lastChangedLabel={formatPasswordChangedLabel(lastPasswordChangeAt)} />
+            <h2 className="mb-3 text-sm font-medium text-app-text-primary">{t("password.title")}</h2>
+            <ChangePasswordForm
+              minLength={PASSWORD_MIN_LENGTH}
+              lastChangedLabel={
+                lastPasswordChangeAt ? t("password.lastChanged", { date: formatDate(lastPasswordChangeAt) }) : null
+              }
+            />
           </div>
 
           {showPasskeys && (
@@ -121,8 +131,8 @@ export default async function ProfilePage() {
               passkeys={passkeys.map((p) => ({
                 id: p.id,
                 name: p.name,
-                createdAt: dateFmt.format(p.createdAt),
-                lastUsedAt: p.lastUsedAt ? dateFmt.format(p.lastUsedAt) : null,
+                createdAt: formatDate(p.createdAt),
+                lastUsedAt: p.lastUsedAt ? formatDate(p.lastUsedAt) : null,
                 backedUp: p.backedUp,
               }))}
             />

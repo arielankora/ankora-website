@@ -32,7 +32,7 @@ export function ProcessCheckForm({
       {from && <input type="hidden" name="from" value={from} />}
       {checkText && <p className="text-sm text-app-text-primary">{checkText}</p>}
       {steps.length > 0 && (
-        <ol className="list-decimal space-y-0.5 pr-5 text-xs text-app-text-secondary">
+        <ol className="list-decimal space-y-0.5 ps-5 text-xs text-app-text-secondary">
           {steps.map((s, i) => (
             <li key={i}>{s}</li>
           ))}

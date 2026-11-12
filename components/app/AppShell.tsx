@@ -3,7 +3,9 @@ import Link from "next/link";
 import type { User } from "@prisma/client";
 import { can } from "@/lib/app-auth/permissions";
 import { BottomNav } from "./BottomNav";
-import { ACCOUNT_GROUP, Sidebar, type NavItem } from "./Sidebar";
+import { getTranslations } from "next-intl/server";
+import { Sidebar } from "./Sidebar";
+import { ACCOUNT_GROUP, type NavGroupId, type NavItem } from "./nav-groups";
 import { TopBar } from "./TopBar";
 import { BackSlotProvider } from "./BackSlot";
 import { HashScroll } from "./HashScroll";
@@ -12,22 +14,17 @@ import { ActiveTimerProvider, MobileTimerStrip } from "./ActiveTimerProvider";
 import { OfflineBanner } from "./states/Offline";
 import { NotificationsBell, type NotificationSummary } from "./NotificationsBell";
 
-const ROLE_LABELS: Record<User["role"], string> = {
-  SUPER_ADMIN: "מנהל-על",
-  ANKORA_ADMIN: "מנהל Ankora",
-  ANKORA_EMPLOYEE: "ספק פנימי אנקורה",
-  CLIENT_USER: "לקוח",
-};
+type Translate = Awaited<ReturnType<typeof getTranslations<"shell">>>;
 
-function navItemsFor(role: User["role"], options: { whatsappPoc?: boolean } = {}): NavItem[] {
+function navItemsFor(role: User["role"], t: Translate, options: { whatsappPoc?: boolean } = {}): NavItem[] {
   // 19.10.2026 (canvas "Ankora App UI Round", task cmvddvqqv000plc08l6qzt2ho):
   // four groups instead of six, by what the person came to do, and the
   // account items moved out of the list into the menu under the person's
   // name (Sidebar.tsx renders group ACCOUNT_GROUP there, not in the list).
   // A super admin went from 20 rows to 15, an operations manager from 10
-  // to 6, a client from 9 to 5. "הזמן שלי" is a tab of the timer,
-  // "דוחות מתוזמנים" a tab of the reports, "דוח חודשי" a view of the
-  // portal's hours; their old addresses redirect.
+  // to 6, a client from 9 to 5. "My time" is a tab of the timer,
+  // scheduled reports a tab of the reports, the monthly report a view of
+  // the portal's hours; their old addresses redirect.
   //
   // The portal keeps a separate, deliberately short list (spec 13: "feel
   // part of Ankora, not an internal tool exposed outward"), never derived
@@ -35,61 +32,68 @@ function navItemsFor(role: User["role"], options: { whatsappPoc?: boolean } = {}
   //
   // Every item is still filtered server-side from the real permission
   // map; the pages re-check on their own.
+  //
+  // ADR 0006: a group is an id, and its label comes from the dictionary
+  // beside the item's own. Sidebar.tsx and TopBar.tsx decide by the id,
+  // so a translation can never move an item between the list and the menu.
+  const item = (href: string, key: Parameters<Translate>[0], group?: NavGroupId): NavItem =>
+    group ? { href, label: t(key), group, groupLabel: t(`groups.${group}`) } : { href, label: t(key) };
+
   if (role === "CLIENT_USER") {
     return [
-      { href: "/app/portal", label: "בית" },
-      { href: "/app/portal/decisions", label: "החלטות" },
-      { href: "/app/portal/activity", label: "פעילות" },
-      { href: "/app/portal/hours", label: "שעות ודוחות" },
-      { href: "/app/portal/history", label: "היסטוריה" },
+      item("/app/portal", "nav.portalHome"),
+      item("/app/portal/decisions", "nav.portalDecisions"),
+      item("/app/portal/activity", "nav.portalActivity"),
+      item("/app/portal/hours", "nav.portalHours"),
+      item("/app/portal/history", "nav.portalHistory"),
       // 20.10.2026: the portal's own tab bar is gone; the menu is its one
       // navigation, so the client file joins it.
-      { href: "/app/portal/file", label: "התיק שלי" },
-      ...accountItems(),
+      item("/app/portal/file", "nav.portalFile"),
+      ...accountItems(item),
     ];
   }
 
   const tracks = can(role, "time_entry.create_self");
-  const items: NavItem[] = [{ href: "/app", label: "בית", group: "עבודה" }];
-  if (tracks) items.push({ href: "/app/timer", label: "טיימר", group: "עבודה" });
-  if (tracks) items.push({ href: "/app/tasks", label: "משימות", group: "עבודה" });
-  if (tracks) items.push({ href: "/app/calendar", label: "יומן", group: "עבודה" });
+  const items: NavItem[] = [item("/app", "nav.home", "work")];
+  if (tracks) items.push(item("/app/timer", "nav.timer", "work"));
+  if (tracks) items.push(item("/app/tasks", "nav.tasks", "work"));
+  if (tracks) items.push(item("/app/calendar", "nav.calendar", "work"));
   // 20.10.2026: every approval in one place, with what waits on this
-  // person beside it. Always there, unlike "ממתין לאישור" before it, so
-  // the way to it does not move while the count is zero.
-  if (tracks) items.push({ href: "/app/approvals", label: "אישורים", group: "עבודה" });
+  // person beside it. Always there, unlike the old pending-approval
+  // entry before it, so the way to it does not move while the count is zero.
+  if (tracks) items.push(item("/app/approvals", "nav.approvals", "work"));
 
-  if (can(role, "client.manage")) items.push({ href: "/app/clients", label: "לקוחות", group: "לקוחות" });
-  if (tracks) items.push({ href: "/app/important-dates", label: "מועדים חשובים", group: "לקוחות" });
-  if (can(role, "credential.view")) items.push({ href: "/app/credentials", label: "מערכות וגישות", group: "לקוחות" });
+  if (can(role, "client.manage")) items.push(item("/app/clients", "nav.clients", "clients"));
+  if (tracks) items.push(item("/app/important-dates", "nav.importantDates", "clients"));
+  if (can(role, "credential.view")) items.push(item("/app/credentials", "nav.credentials", "clients"));
   // Communications (1.11.2026): only for those the screen opens to
   // (lib/comms/access.ts), the same rule the screens check. Anyone
   // else neither sees the link nor gets past the screen's own gate.
-  if (options.whatsappPoc) items.push({ href: "/app/whatsapp-poc", label: "תקשורת", group: "לקוחות" });
+  if (options.whatsappPoc) items.push(item("/app/whatsapp-poc", "nav.comms", "clients"));
 
-  if (can(role, "time_entry.edit_others")) items.push({ href: "/app/time-entries", label: "דיווחי זמן", group: "בקרה" });
-  if (can(role, "hour_bank.manage")) items.push({ href: "/app/hour-banks", label: "בנק שעות", group: "בקרה" });
-  if (can(role, "report.internal.view")) items.push({ href: "/app/reports", label: "דוחות", group: "בקרה" });
-  // "כללי התראה", not "התראות": the rules managers set, never confused with
-  // "התראות שלי" in the account menu.
-  if (can(role, "alert.manage")) items.push({ href: "/app/alerts", label: "כללי התראה", group: "בקרה" });
+  if (can(role, "time_entry.edit_others")) items.push(item("/app/time-entries", "nav.timeEntries", "control"));
+  if (can(role, "hour_bank.manage")) items.push(item("/app/hour-banks", "nav.hourBanks", "control"));
+  if (can(role, "report.internal.view")) items.push(item("/app/reports", "nav.reports", "control"));
+  // "Alert rules", not "alerts": the rules managers set, never confused
+  // with "my notifications" in the account menu.
+  if (can(role, "alert.manage")) items.push(item("/app/alerts", "nav.alertRules", "control"));
 
-  if (can(role, "category.manage")) items.push({ href: "/app/categories", label: "קטגוריות", group: "הגדרות" });
-  if (can(role, "user.manage")) items.push({ href: "/app/users", label: "משתמשים", group: "הגדרות" });
-  if (can(role, "integration.manage")) items.push({ href: "/app/integrations", label: "אינטגרציות", group: "הגדרות" });
-  if (can(role, "audit.view")) items.push({ href: "/app/audit-log", label: "יומן פעולות", group: "הגדרות" });
+  if (can(role, "category.manage")) items.push(item("/app/categories", "nav.categories", "settings"));
+  if (can(role, "user.manage")) items.push(item("/app/users", "nav.users", "settings"));
+  if (can(role, "integration.manage")) items.push(item("/app/integrations", "nav.integrations", "settings"));
+  if (can(role, "audit.view")) items.push(item("/app/audit-log", "nav.auditLog", "settings"));
 
-  items.push(...accountItems());
+  items.push(...accountItems(item));
   return items;
 }
 
 /// Self-service for every signed-in role. Last in the list, so the phone's
-/// bottom bar keeps them under "עוד" and the palette still finds them.
-function accountItems(): NavItem[] {
+/// bottom bar keeps them under "more" and the palette still finds them.
+function accountItems(item: (href: string, key: Parameters<Translate>[0], group?: NavGroupId) => NavItem): NavItem[] {
   return [
-    { href: "/app/notifications", label: "התראות שלי", group: ACCOUNT_GROUP },
-    { href: "/app/profile", label: "הפרופיל שלי", group: ACCOUNT_GROUP },
-    { href: "/app/guide", label: "מדריך שימוש", group: ACCOUNT_GROUP },
+    item("/app/notifications", "nav.myNotifications", ACCOUNT_GROUP),
+    item("/app/profile", "nav.myProfile", ACCOUNT_GROUP),
+    item("/app/guide", "nav.guide", ACCOUNT_GROUP),
   ];
 }
 
@@ -109,7 +113,7 @@ function accountItems(): NavItem[] {
 /// notifications, counters, clients) is fetched once in
 /// (authenticated)/layout.tsx and threaded through here rather than
 /// re-fetched per screen.
-export function AppShell({
+export async function AppShell({
   user,
   activeTimer,
   notifications,
@@ -138,7 +142,9 @@ export function AppShell({
   showComms?: boolean;
   children: ReactNode;
 }) {
-  const items = navItemsFor(user.role, { whatsappPoc: showComms ?? false });
+  const t = await getTranslations("shell");
+  const items = navItemsFor(user.role, t, { whatsappPoc: showComms ?? false });
+  const roleLabel = t(`roles.${user.role}`);
   const showPrimaryCta = can(user.role, "time_entry.create_self");
 
   return (
@@ -150,7 +156,7 @@ export function AppShell({
       <Sidebar
         items={items}
         userName={user.name}
-        roleLabel={ROLE_LABELS[user.role]}
+        roleLabel={roleLabel}
         counters={{
           importantDatesCount,
           alertsCount,
@@ -193,7 +199,7 @@ export function AppShell({
         </main>
       </div>
 
-      <BottomNav items={items} userName={user.name} roleLabel={ROLE_LABELS[user.role]} />
+      <BottomNav items={items} userName={user.name} roleLabel={roleLabel} />
     </div>
     </BackSlotProvider>
     </ActiveTimerProvider>

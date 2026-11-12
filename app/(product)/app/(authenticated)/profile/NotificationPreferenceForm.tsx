@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { Switch } from "@/components/app/Switch";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { updateDailyDigestPreferenceAction, updateNotificationPreferenceAction } from "./actions";
@@ -18,6 +19,7 @@ const LONG_TIMER_HOURS = 8;
 // than several invented ones. Same optimistic-toggle + toast + undo
 // pattern as ScheduleActions.tsx/RuleActions.tsx.
 export function DailyDigestPreferenceForm({ enabled }: { enabled: boolean }) {
+  const t = useTranslations("profile.notifications");
   const { showToast } = useToast();
   const [, startTransition] = useTransition();
   const [checked, setChecked] = useState(enabled);
@@ -28,13 +30,13 @@ export function DailyDigestPreferenceForm({ enabled }: { enabled: boolean }) {
       const result = await updateDailyDigestPreferenceAction(next);
       if (!result.ok) {
         setChecked(!next);
-        showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
+        showToast({ tone: "error", title: t("updateFailed"), description: result.error });
         return;
       }
       if (isUndo) return;
       showToast({
         tone: "success",
-        title: next ? "המייל היומי הופעל" : "המייל היומי בוטל",
+        title: next ? t("digestOn") : t("digestOff"),
         undo: () => toggle(!next, true),
       });
     });
@@ -43,18 +45,16 @@ export function DailyDigestPreferenceForm({ enabled }: { enabled: boolean }) {
   return (
     <div className="flex items-center justify-between gap-4 py-1">
       <div>
-        <p className="text-sm text-app-text-primary">מייל יומי בבוקר</p>
-        <p className="mt-0.5 text-xs text-app-text-tertiary">
-          מה שעליך היום: מה שבאיחור, מה שנפתח עליך מאז המייל הקודם, ומה שמחכה לחתימה שלך. לא נשלח
-          בימים שאין בהם כלום.
-        </p>
+        <p className="text-sm text-app-text-primary">{t("digestTitle")}</p>
+        <p className="mt-0.5 text-xs text-app-text-tertiary">{t("digestHint")}</p>
       </div>
-      <Switch checked={checked} onChange={() => toggle(!checked)} label="מייל יומי בבוקר" />
+      <Switch checked={checked} onChange={() => toggle(!checked)} label={t("digestTitle")} />
     </div>
   );
 }
 
 export function NotificationPreferenceForm({ enabled }: { enabled: boolean }) {
+  const t = useTranslations("profile.notifications");
   const { showToast } = useToast();
   const [, startTransition] = useTransition();
   const [checked, setChecked] = useState(enabled);
@@ -65,13 +65,13 @@ export function NotificationPreferenceForm({ enabled }: { enabled: boolean }) {
       const result = await updateNotificationPreferenceAction(next);
       if (!result.ok) {
         setChecked(!next);
-        showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
+        showToast({ tone: "error", title: t("updateFailed"), description: result.error });
         return;
       }
       if (isUndo) return;
       showToast({
         tone: "success",
-        title: next ? "התראת המייל הופעלה" : "התראת המייל בוטלה",
+        title: next ? t("longTimerOn") : t("longTimerOff"),
         undo: () => toggle(!next, true),
       });
     });
@@ -80,12 +80,10 @@ export function NotificationPreferenceForm({ enabled }: { enabled: boolean }) {
   return (
     <div className="flex items-center justify-between gap-4 py-1">
       <div>
-        <p className="text-sm text-app-text-primary">התראת מייל על טיימר שרץ זמן ארוך</p>
-        <p className="mt-0.5 text-xs text-app-text-tertiary">
-          נוסף על ההתראה בתוך המערכת (מסך &quot;התראות שלי&quot;), כשטיימר רץ יותר מ-{LONG_TIMER_HOURS} שעות ברציפות.
-        </p>
+        <p className="text-sm text-app-text-primary">{t("longTimerTitle")}</p>
+        <p className="mt-0.5 text-xs text-app-text-tertiary">{t("longTimerHint", { hours: LONG_TIMER_HOURS })}</p>
       </div>
-      <Switch checked={checked} onChange={() => toggle(!checked)} label="התראת מייל על טיימר שרץ זמן ארוך" />
+      <Switch checked={checked} onChange={() => toggle(!checked)} label={t("longTimerTitle")} />
     </div>
   );
 }

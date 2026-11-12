@@ -66,6 +66,15 @@ enum UserRole {
 }
 
 /// Spec section 4.2 - explicit list.
+/// The language of the app's own words for one person (12.11.2026,
+/// ADR 0006). Lowercase on purpose: the value is the locale itself, the
+/// same "he" / "en" the marketing site's [locale] segment uses, so no
+/// mapping table sits between the database and the dictionaries.
+enum AppLocale {
+  he
+  en
+}
+
 enum UserStatus {
   INVITED
   ACTIVE
@@ -141,6 +150,11 @@ model User {
   role         UserRole
   status       UserStatus @default(INVITED)
   timezone     String     @default("Asia/Jerusalem")
+
+  /// ADR 0006: the language the app speaks to this person, and with it the
+  /// page direction. Only the interface: what people write (client files,
+  /// tasks, notes) stays in the language it was written in.
+  locale       AppLocale  @default(he)
 
   /// Employee agreements: a private address, collected at hiring. The
   /// work account is suspended the day someone leaves, and that is the

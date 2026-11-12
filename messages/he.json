@@ -1,0 +1,167 @@
+{
+  "shell": {
+    "documentTitle": "Ankora - ניהול שעות",
+    "mainNav": "ניווט ראשי",
+    "close": "סגירה",
+    "logout": "התנתקות",
+    "backTo": "חזרה: {label}",
+    "roles": {
+      "SUPER_ADMIN": "מנהל-על",
+      "ANKORA_ADMIN": "מנהל Ankora",
+      "ANKORA_EMPLOYEE": "ספק פנימי אנקורה",
+      "CLIENT_USER": "לקוח"
+    },
+    "groups": {
+      "work": "עבודה",
+      "clients": "לקוחות",
+      "control": "בקרה",
+      "settings": "הגדרות",
+      "account": "חשבון"
+    },
+    "nav": {
+      "home": "בית",
+      "timer": "טיימר",
+      "tasks": "משימות",
+      "calendar": "יומן",
+      "approvals": "אישורים",
+      "clients": "לקוחות",
+      "importantDates": "מועדים חשובים",
+      "credentials": "מערכות וגישות",
+      "comms": "תקשורת",
+      "timeEntries": "דיווחי זמן",
+      "hourBanks": "בנק שעות",
+      "reports": "דוחות",
+      "alertRules": "כללי התראה",
+      "categories": "קטגוריות",
+      "users": "משתמשים",
+      "integrations": "אינטגרציות",
+      "auditLog": "יומן פעולות",
+      "myNotifications": "התראות שלי",
+      "myProfile": "הפרופיל שלי",
+      "guide": "מדריך שימוש",
+      "portalHome": "בית",
+      "portalDecisions": "החלטות",
+      "portalActivity": "פעילות",
+      "portalHours": "שעות ודוחות",
+      "portalHistory": "היסטוריה",
+      "portalFile": "התיק שלי"
+    },
+    "sidebar": {
+      "portalBadge": "פורטל",
+      "opsBadge": "OPS",
+      "search": "חיפוש או פעולה"
+    },
+    "topBar": {
+      "newEntry": "דיווח חדש",
+      "newTask": "משימה חדשה"
+    },
+    "bottomNav": {
+      "more": "עוד",
+      "moreOptions": "עוד אפשרויות"
+    },
+    "palette": {
+      "dialog": "חיפוש ופעולות",
+      "placeholder": "חיפוש או פעולה",
+      "actions": "פעולות",
+      "clients": "לקוחות",
+      "noResults": "אין תוצאות"
+    },
+    "notifications": {
+      "title": "התראות",
+      "markAllRead": "סימון הכל כנקרא",
+      "empty": "אין התראות",
+      "all": "כל ההתראות",
+      "now": "עכשיו",
+      "minutesAgo": "לפני {count} דק׳",
+      "hoursAgo": "לפני {count} שע׳",
+      "daysAgo": "לפני {count} ימים"
+    },
+    "timerPill": {
+      "extra": "ועוד {count} טיימר פעיל"
+    },
+    "offline": {
+      "message": "אין חיבור לרשת. הטיימר ממשיך לרוץ מקומית.",
+      "pending": "{count} ממתינים לסנכרון."
+    },
+    "toast": {
+      "undo": "ביטול",
+      "undoing": "מבטל…",
+      "save": "שמירה",
+      "back": "חזרה"
+    },
+    "errorPage": {
+      "title": "משהו השתבש",
+      "body": "אירעה תקלה בלתי צפויה. אפשר לנסות שוב, ואם זה חוזר - לפנות לתמיכה.",
+      "retry": "ניסיון חוזר"
+    },
+    "notFound": {
+      "title": "הדף לא נמצא",
+      "body": "הכתובת שביקשתם לא קיימת, או שאין לכם הרשאה לצפות בה.",
+      "home": "חזרה לדף הבית"
+    }
+  },
+  "profile": {
+    "title": "הפרופיל שלי",
+    "subtitle": "פרטים אישיים, אזור זמן, התראות וחיבורים.",
+    "save": "שמירה",
+    "saving": "נשמר...",
+    "name": {
+      "label": "שם לתצוגה",
+      "saved": "השם עודכן."
+    },
+    "timezone": {
+      "label": "אזור זמן",
+      "saved": "אזור הזמן עודכן.",
+      "cities": {
+        "jerusalem": "ירושלים",
+        "london": "לונדון",
+        "newYork": "ניו יורק"
+      }
+    },
+    "language": {
+      "label": "שפת הממשק",
+      "hint": "משנה את שפת המסכים ואת הכיוון שלהם. מה שנכתב במערכת, כמו תיקי לקוח ומשימות, נשאר בשפה שבה נכתב."
+    },
+    "whatsapp": {
+      "label": "מספר וואטסאפ",
+      "hint": "כך עמיתים יוכלו לשלוח לך משימה בוואטסאפ. אפשר להשאיר ריק.",
+      "saved": "המספר נשמר."
+    },
+    "notificationsTitle": "התראות אישיות",
+    "notifications": {
+      "updateFailed": "העדכון נכשל",
+      "digestTitle": "מייל יומי בבוקר",
+      "digestHint": "מה שעליך היום: מה שבאיחור, מה שנפתח עליך מאז המייל הקודם, ומה שמחכה לחתימה שלך. לא נשלח בימים שאין בהם כלום.",
+      "digestOn": "המייל היומי הופעל",
+      "digestOff": "המייל היומי בוטל",
+      "longTimerTitle": "התראת מייל על טיימר שרץ זמן ארוך",
+      "longTimerHint": "נוסף על ההתראה בתוך המערכת (מסך \"התראות שלי\"), כשטיימר רץ יותר מ-{hours} שעות ברציפות.",
+      "longTimerOn": "התראת המייל הופעלה",
+      "longTimerOff": "התראת המייל בוטלה"
+    },
+    "password": {
+      "title": "סיסמה",
+      "lastChanged": "הסיסמה עודכנה לאחרונה ב-{date}",
+      "current": "סיסמה נוכחית",
+      "new": "סיסמה חדשה",
+      "confirm": "אימות סיסמה חדשה",
+      "submit": "החלפת סיסמה",
+      "submitting": "מתבצע...",
+      "hint": "לפחות {min} תווים. החלפת סיסמה מנתקת את כל ההתחברויות הפעילות, כולל זו הנוכחית - תתבקשו להתחבר מחדש."
+    },
+    "errors": {
+      "generic": "אירעה שגיאה. נסו שוב.",
+      "allFieldsRequired": "יש למלא את כל השדות.",
+      "confirmMismatch": "אימות הסיסמה אינו תואם.",
+      "wrong_password": "הסיסמה הנוכחית שגויה.",
+      "password_too_short": "הסיסמה חייבת להכיל לפחות {min} תווים.",
+      "password_too_common": "הסיסמה נפוצה מדי. יש לבחור סיסמה חזקה יותר.",
+      "timezone_required": "יש לבחור אזור זמן.",
+      "name_required": "יש להזין שם.",
+      "name_too_long": "השם ארוך מדי (100 תווים לכל היותר).",
+      "whatsapp_characters": "מספר הוואטסאפ יכול להכיל רק ספרות, רווחים, מקפים ו-+.",
+      "whatsapp_invalid": "מספר הוואטסאפ לא נראה תקין.",
+      "locale_invalid": "יש לבחור שפה מהרשימה."
+    }
+  }
+}

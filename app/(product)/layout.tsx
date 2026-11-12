@@ -6,6 +6,9 @@ import "@fontsource/heebo/600.css";
 import "@fontsource/heebo/700.css";
 import "../globals.css";
 import { ToastProvider } from "@/components/app/toast/ToastProvider";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getTranslations } from "next-intl/server";
+import { directionOf } from "@/lib/i18n/config";
 
 // Second Next.js "root layout" - see ADR-0001 and the note in
 // app/[locale]/layout.tsx's sibling: this route group lives outside
@@ -24,8 +27,7 @@ import { ToastProvider } from "@/components/app/toast/ToastProvider";
 // file bypasses app-router path matching entirely, so no such conflict is
 // possible. Scoped to this route group only via this layout's own
 // metadata - the marketing site under app/[locale] has no manifest link.
-export const metadata: Metadata = {
-  title: "Ankora - ניהול שעות",
+const baseMetadata: Metadata = {
   robots: { index: false, follow: false }, // internal tool, never indexed
   manifest: "/manifest.webmanifest",
   icons: {
@@ -41,6 +43,13 @@ export const metadata: Metadata = {
     title: "Ankora",
   },
 };
+
+// ADR 0006: the tab title is in the person's language, so the metadata is
+// generated per request instead of being a constant.
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("shell");
+  return { ...baseMetadata, title: t("documentTitle") };
+}
 
 export const viewport: Viewport = {
   themeColor: "#1B2A3D",
@@ -60,11 +69,19 @@ export const viewport: Viewport = {
 // under this group (the internal app *and* the login/forgot/reset-password
 // pages that sit outside (authenticated)), so useToast() works anywhere in
 // app/(product)/app/**.
-export default function ProductRootLayout({ children }: { children: React.ReactNode }) {
+//
+// ADR 0006: the language and direction are the signed-in person's own
+// (i18n/request.ts), Hebrew for everyone else. The provider hands the same
+// locale, time zone and dictionary to the client components below it, so
+// a client component and the server agree on every word and every date.
+export default async function ProductRootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale();
   return (
-    <html lang="he" dir="rtl">
+    <html lang={locale} dir={directionOf(locale)}>
       <body className="bg-app-surface-page text-app-text-primary antialiased">
-        <ToastProvider>{children}</ToastProvider>
+        <NextIntlClientProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

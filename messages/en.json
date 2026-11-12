@@ -1,0 +1,167 @@
+{
+  "shell": {
+    "documentTitle": "Ankora: time tracking",
+    "mainNav": "Main navigation",
+    "close": "Close",
+    "logout": "Sign out",
+    "backTo": "Back: {label}",
+    "roles": {
+      "SUPER_ADMIN": "Super admin",
+      "ANKORA_ADMIN": "Ankora manager",
+      "ANKORA_EMPLOYEE": "Ankora internal provider",
+      "CLIENT_USER": "Client"
+    },
+    "groups": {
+      "work": "Work",
+      "clients": "Clients",
+      "control": "Oversight",
+      "settings": "Settings",
+      "account": "Account"
+    },
+    "nav": {
+      "home": "Home",
+      "timer": "Timer",
+      "tasks": "Tasks",
+      "calendar": "Calendar",
+      "approvals": "Approvals",
+      "clients": "Clients",
+      "importantDates": "Key dates",
+      "credentials": "Systems and access",
+      "comms": "Communications",
+      "timeEntries": "Time entries",
+      "hourBanks": "Hour banks",
+      "reports": "Reports",
+      "alertRules": "Alert rules",
+      "categories": "Categories",
+      "users": "Users",
+      "integrations": "Integrations",
+      "auditLog": "Activity log",
+      "myNotifications": "My notifications",
+      "myProfile": "My profile",
+      "guide": "User guide",
+      "portalHome": "Home",
+      "portalDecisions": "Decisions",
+      "portalActivity": "Activity",
+      "portalHours": "Hours and reports",
+      "portalHistory": "History",
+      "portalFile": "My file"
+    },
+    "sidebar": {
+      "portalBadge": "Portal",
+      "opsBadge": "OPS",
+      "search": "Search or action"
+    },
+    "topBar": {
+      "newEntry": "New time entry",
+      "newTask": "New task"
+    },
+    "bottomNav": {
+      "more": "More",
+      "moreOptions": "More options"
+    },
+    "palette": {
+      "dialog": "Search and actions",
+      "placeholder": "Search or action",
+      "actions": "Actions",
+      "clients": "Clients",
+      "noResults": "No results"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "markAllRead": "Mark all as read",
+      "empty": "No notifications",
+      "all": "All notifications",
+      "now": "Now",
+      "minutesAgo": "{count} min ago",
+      "hoursAgo": "{count, plural, one {# hr ago} other {# hrs ago}}",
+      "daysAgo": "{count, plural, one {# day ago} other {# days ago}}"
+    },
+    "timerPill": {
+      "extra": "{count, plural, one {and # more running timer} other {and # more running timers}}"
+    },
+    "offline": {
+      "message": "No network connection. The timer keeps running locally.",
+      "pending": "{count} waiting to sync."
+    },
+    "toast": {
+      "undo": "Undo",
+      "undoing": "Undoing…",
+      "save": "Save",
+      "back": "Back"
+    },
+    "errorPage": {
+      "title": "Something went wrong",
+      "body": "An unexpected error occurred. You can try again, and if it keeps happening, contact support.",
+      "retry": "Try again"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "body": "This address does not exist, or you do not have permission to view it.",
+      "home": "Back to home"
+    }
+  },
+  "profile": {
+    "title": "My profile",
+    "subtitle": "Personal details, time zone, notifications and connections.",
+    "save": "Save",
+    "saving": "Saving...",
+    "name": {
+      "label": "Display name",
+      "saved": "Name updated."
+    },
+    "timezone": {
+      "label": "Time zone",
+      "saved": "Time zone updated.",
+      "cities": {
+        "jerusalem": "Jerusalem",
+        "london": "London",
+        "newYork": "New York"
+      }
+    },
+    "language": {
+      "label": "Interface language",
+      "hint": "Changes the language and direction of the screens. What people write in the system, such as client files and tasks, stays in the language it was written in."
+    },
+    "whatsapp": {
+      "label": "WhatsApp number",
+      "hint": "Lets colleagues send you a task on WhatsApp. You can leave it empty.",
+      "saved": "Number saved."
+    },
+    "notificationsTitle": "Personal notifications",
+    "notifications": {
+      "updateFailed": "Update failed",
+      "digestTitle": "Daily morning email",
+      "digestHint": "What is on you today: what is overdue, what was opened for you since the last email, and what is waiting for your sign-off. Not sent on days with nothing in it.",
+      "digestOn": "Daily email turned on",
+      "digestOff": "Daily email turned off",
+      "longTimerTitle": "Email when a timer runs for a long time",
+      "longTimerHint": "In addition to the in-app notification (the \"My notifications\" screen), when a timer runs for more than {hours} hours in a row.",
+      "longTimerOn": "Email alert turned on",
+      "longTimerOff": "Email alert turned off"
+    },
+    "password": {
+      "title": "Password",
+      "lastChanged": "Password last changed on {date}",
+      "current": "Current password",
+      "new": "New password",
+      "confirm": "Confirm new password",
+      "submit": "Change password",
+      "submitting": "Working...",
+      "hint": "At least {min} characters. Changing your password signs out every active session, including this one, so you will be asked to sign in again."
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again.",
+      "allFieldsRequired": "Please fill in all fields.",
+      "confirmMismatch": "The password confirmation does not match.",
+      "wrong_password": "The current password is incorrect.",
+      "password_too_short": "The password must be at least {min} characters long.",
+      "password_too_common": "This password is too common. Please choose a stronger one.",
+      "timezone_required": "Please choose a time zone.",
+      "name_required": "Please enter a name.",
+      "name_too_long": "The name is too long (100 characters at most).",
+      "whatsapp_characters": "A WhatsApp number can contain only digits, spaces, hyphens and +.",
+      "whatsapp_invalid": "This WhatsApp number does not look valid.",
+      "locale_invalid": "Please choose a language from the list."
+    }
+  }
+}

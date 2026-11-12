@@ -115,15 +115,16 @@ export default async function CalendarPage(props: {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        {/* Right is "back" in Hebrew, so the right arrow goes to the past. */}
+        {/* Right is "back" in Hebrew, so the right arrow goes to the past.
+            In a left-to-right page both arrows turn around (ADR 0006). */}
         <Link href={href({ date: shiftAnchor(state.view, state.date, -1) })} aria-label="הקודם" data-testid="calendar-prev" className="rounded-full border border-app-border bg-white p-2 text-app-text-secondary hover:text-app-text-primary">
-          <ChevronRight size={16} />
+          <ChevronRight size={16} className="ltr:rotate-180" />
         </Link>
         <Link href={href({ date: today })} className="rounded-full border border-app-border bg-white px-4 py-1.5 text-[13px] font-medium text-app-text-secondary hover:text-app-text-primary">
           היום
         </Link>
         <Link href={href({ date: shiftAnchor(state.view, state.date, 1) })} aria-label="הבא" data-testid="calendar-next" className="rounded-full border border-app-border bg-white p-2 text-app-text-secondary hover:text-app-text-primary">
-          <ChevronLeft size={16} />
+          <ChevronLeft size={16} className="ltr:rotate-180" />
         </Link>
         <h2 data-testid="calendar-title" className="text-[15px] font-medium text-app-text-primary">
           {rangeTitle(state.view, state.date)}

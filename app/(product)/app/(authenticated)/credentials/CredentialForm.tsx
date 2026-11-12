@@ -100,9 +100,11 @@ export function CredentialForm({
           </div>
           <div>
             <label className={LABEL} htmlFor="cred-pass">סיסמה</label>
-            {/* Physical left, not logical end: the field itself is LTR,
-                so its text starts on the left and the toggle must not sit
-                on top of it. */}
+            {/* The toggle sits at the end of the row, in the page's
+                direction (ADR 0006). The field itself is always LTR, so a
+                logical padding on it would resolve by the field's own
+                direction; the padding is chosen by the page's direction
+                instead, so the room is always on the toggle's side. */}
             <div className="relative">
               <input
                 id="cred-pass"
@@ -113,13 +115,13 @@ export function CredentialForm({
                 spellCheck={false}
                 maxLength={1024}
                 placeholder={existing?.hasPassword ? kept : undefined}
-                className={`${INPUT} pl-10`}
+                className={`${INPUT} [html[dir=ltr]_&]:pr-10 [html[dir=rtl]_&]:pl-10`}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 aria-label={showPassword ? "הסתרת הסיסמה שמוקלדת" : "הצגת הסיסמה שמוקלדת"}
-                className="absolute inset-y-0 left-2 mt-1.5 flex items-center text-app-text-tertiary hover:text-app-text-primary"
+                className="absolute inset-y-0 end-2 mt-1.5 flex items-center text-app-text-tertiary hover:text-app-text-primary"
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>

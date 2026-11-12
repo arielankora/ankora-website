@@ -146,3 +146,19 @@ input[type="time"]::-webkit-date-and-time-value,
 input[type="datetime-local"]::-webkit-date-and-time-value {
   text-align: right;
 }
+
+/* ADR 0006: alignment to the page's side rather than the element's own.
+   `text-start` resolves by the element's direction, so on an element with
+   dir="auto" (a client name that may be English inside a Hebrew page) it
+   follows the name, not the page. These follow the page: the start of the
+   line in the reader's language, whatever the text inside is written in. */
+@layer utilities {
+  html[dir="rtl"] .text-page-start,
+  html[dir="ltr"] .text-page-end {
+    text-align: right;
+  }
+  html[dir="ltr"] .text-page-start,
+  html[dir="rtl"] .text-page-end {
+    text-align: left;
+  }
+}

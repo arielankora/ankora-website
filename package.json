@@ -50,6 +50,7 @@
     "mcp-handler": "^2.3.0",
     "next": "16.4.1",
     "next-auth": "^5.0.0-beta.32",
+    "next-intl": "4.14.9",
     "next-mdx-remote-client": "1.1.9",
     "pdfkit": "^0.20.2",
     "prisma": "6.19.3",
@@ -92,6 +93,9 @@
   },
   "overrides": {
     "postcss": "$postcss",
-    "js-yaml": "^3.15.2"
+    "js-yaml": "^3.15.2",
+    "use-intl": "4.14.9",
+    "icu-minify": "4.14.9",
+    "@swc/core": "1.16.20"
   }
 }

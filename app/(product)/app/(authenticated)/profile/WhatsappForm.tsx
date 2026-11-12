@@ -1,15 +1,17 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { updateWhatsappNumberAction } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
 
 function SubmitButton({ pending }: { pending: boolean }) {
+  const t = useTranslations("profile");
   return (
     <button
       type="submit"
       disabled={pending}
       className="mt-4 w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
-      {pending ? "נשמר..." : "שמירה"}
+      {pending ? t("saving") : t("save")}
     </button>
   );
 }
@@ -18,12 +20,13 @@ function SubmitButton({ pending }: { pending: boolean }) {
 // Without it a colleague can still share by email, and the share panel
 // says whose number is missing rather than offering a dead button.
 export function WhatsappForm({ whatsappNumber }: { whatsappNumber: string | null }) {
+  const t = useTranslations("profile");
   const { onSubmit, pending, error, ok } = useActionForm(updateWhatsappNumberAction);
 
   return (
     <form onSubmit={onSubmit}>
       <label className="block">
-        <span className="mb-1.5 block text-xs font-medium text-app-text-secondary">מספר וואטסאפ</span>
+        <span className="mb-1.5 block text-xs font-medium text-app-text-secondary">{t("whatsapp.label")}</span>
         <input
           name="whatsappNumber"
           type="tel"
@@ -35,12 +38,12 @@ export function WhatsappForm({ whatsappNumber }: { whatsappNumber: string | null
           className="w-full rounded-lg border border-app-border-strong bg-white px-3.5 py-2.5 text-end text-sm text-app-text-primary outline-none focus:border-gold"
         />
         <span className="mt-1.5 block text-[11.5px] text-app-text-tertiary">
-          כך עמיתים יוכלו לשלוח לך משימה בוואטסאפ. אפשר להשאיר ריק.
+          {t("whatsapp.hint")}
         </span>
       </label>
 
       {error && <p className="mt-2 text-xs text-app-error">{error}</p>}
-      {ok && <p className="mt-2 text-xs text-app-success">המספר נשמר.</p>}
+      {ok && <p className="mt-2 text-xs text-app-success">{t("whatsapp.saved")}</p>}
 
       <SubmitButton pending={pending} />
     </form>

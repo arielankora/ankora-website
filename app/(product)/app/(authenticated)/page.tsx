@@ -598,7 +598,7 @@ export default async function AppHomePage() {
                 href="/app/reports"
                 icon={BarChart3}
                 label="לכל הדוחות הפנימיים"
-                value={<ArrowLeft size={20} strokeWidth={1.75} />}
+                value={<ArrowLeft size={20} strokeWidth={1.75} className="ltr:rotate-180" />}
               />
             )}
           </div>

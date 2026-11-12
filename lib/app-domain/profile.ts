@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword, validatePasswordPolicy } from "@/lib/app-auth/password";
 import { recordAudit } from "@/lib/app-auth/audit";
 import type { User } from "@prisma/client";
+import { isAppLocale, type AppLocale } from "@/lib/i18n/config";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2, spec §11): self-service
 // Profile screen - before this phase the only password-change path was
@@ -11,6 +12,30 @@ import type { User } from "@prisma/client";
 // logged-in user to change their own password or set a timezone
 // preference. Strictly self-service, same as notifications.ts: every
 // function here only ever acts on the caller's own row.
+
+/// ADR 0006: every refusal here carries a code. The Hebrew message is
+/// unchanged, so anything that shows it today still does; a screen in
+/// another language shows its own sentence for the code instead.
+export type ProfileErrorCode =
+  | "wrong_password"
+  | "password_too_short"
+  | "password_too_common"
+  | "timezone_required"
+  | "name_required"
+  | "name_too_long"
+  | "whatsapp_characters"
+  | "whatsapp_invalid"
+  | "locale_invalid";
+
+export class ProfileError extends Error {
+  constructor(
+    readonly code: ProfileErrorCode,
+    message: string
+  ) {
+    super(message);
+    this.name = "ProfileError";
+  }
+}
 
 export class WrongPasswordError extends Error {
   constructor() {
@@ -34,12 +59,18 @@ export async function changeOwnPassword(
   actor: User,
   currentPassword: string,
   newPassword: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true } | { ok: false; error: string; code: ProfileErrorCode }> {
   const matches = await verifyPassword(currentPassword, actor.passwordHash);
-  if (!matches) return { ok: false, error: "הסיסמה הנוכחית שגויה." };
+  if (!matches) return { ok: false, error: "הסיסמה הנוכחית שגויה.", code: "wrong_password" };
 
   const policy = validatePasswordPolicy(newPassword);
-  if (!policy.valid) return { ok: false, error: policy.reason! };
+  if (!policy.valid) {
+    return {
+      ok: false,
+      error: policy.reason!,
+      code: policy.code === "too_common" ? "password_too_common" : "password_too_short",
+    };
+  }
 
   const passwordHash = await hashPassword(newPassword);
   await prisma.user.update({
@@ -59,7 +90,7 @@ export async function changeOwnPassword(
 
 export async function updateOwnTimezone(actor: User, timezone: string): Promise<void> {
   const trimmed = timezone.trim();
-  if (!trimmed) throw new Error("יש לבחור אזור זמן.");
+  if (!trimmed) throw new ProfileError("timezone_required", "יש לבחור אזור זמן.");
 
   await prisma.user.update({ where: { id: actor.id }, data: { timezone: trimmed } });
   await recordAudit({
@@ -69,6 +100,26 @@ export async function updateOwnTimezone(actor: User, timezone: string): Promise<
     entityId: actor.id,
     after: { timezone: trimmed },
   });
+}
+
+/// ADR 0006: the language the app speaks to this person. Only the
+/// interface changes: nothing anyone wrote is translated by it. The value
+/// arrives from a form, so it is checked against the locales the app has
+/// dictionaries for, never trusted.
+export async function updateOwnLocale(actor: User, locale: string): Promise<AppLocale> {
+  if (!isAppLocale(locale)) throw new ProfileError("locale_invalid", "יש לבחור שפה מהרשימה.");
+  if (locale === actor.locale) return locale;
+
+  await prisma.user.update({ where: { id: actor.id }, data: { locale } });
+  await recordAudit({
+    actorId: actor.id,
+    action: "profile.locale_update",
+    entityType: "User",
+    entityId: actor.id,
+    before: { locale: actor.locale },
+    after: { locale },
+  });
+  return locale;
 }
 
 /// App redesign, Profile screen (screen 18): the prototype's editable "שם
@@ -81,8 +132,8 @@ export async function updateOwnTimezone(actor: User, timezone: string): Promise<
 /// display name.
 export async function updateOwnName(actor: User, name: string): Promise<void> {
   const trimmed = name.trim();
-  if (!trimmed) throw new Error("יש להזין שם.");
-  if (trimmed.length > 100) throw new Error("השם ארוך מדי (100 תווים לכל היותר).");
+  if (!trimmed) throw new ProfileError("name_required", "יש להזין שם.");
+  if (trimmed.length > 100) throw new ProfileError("name_too_long", "השם ארוך מדי (100 תווים לכל היותר).");
 
   await prisma.user.update({ where: { id: actor.id }, data: { name: trimmed } });
   await recordAudit({
@@ -102,9 +153,11 @@ export async function updateOwnName(actor: User, name: string): Promise<void> {
 export async function updateOwnWhatsappNumber(actor: User, raw: string): Promise<void> {
   const trimmed = raw.trim();
   if (trimmed) {
-    if (!/^[+\d\s()-]+$/.test(trimmed)) throw new Error("מספר הוואטסאפ יכול להכיל רק ספרות, רווחים, מקפים ו-+.");
+    if (!/^[+\d\s()-]+$/.test(trimmed)) {
+      throw new ProfileError("whatsapp_characters", "מספר הוואטסאפ יכול להכיל רק ספרות, רווחים, מקפים ו-+.");
+    }
     const digits = trimmed.replace(/\D/g, "").length;
-    if (digits < 9 || digits > 15) throw new Error("מספר הוואטסאפ לא נראה תקין.");
+    if (digits < 9 || digits > 15) throw new ProfileError("whatsapp_invalid", "מספר הוואטסאפ לא נראה תקין.");
   }
   const next = trimmed || null;
 

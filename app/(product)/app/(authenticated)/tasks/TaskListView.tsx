@@ -102,7 +102,7 @@ export function TaskListView({
           <section key={clientName}>
             <h2 className="text-sm font-medium text-app-text-primary">
               {clientName}
-              <span className="mr-2 font-normal text-app-text-tertiary">{inClient.length}</span>
+              <span className="ms-2 font-normal text-app-text-tertiary">{inClient.length}</span>
             </h2>
             <div className="mt-2 rounded-2xl border border-app-border bg-white">
               <ColumnHeader />

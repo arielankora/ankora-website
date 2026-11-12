@@ -1,30 +1,51 @@
 "use server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import {
   changeOwnPassword,
   updateOwnTimezone,
   updateOwnName,
+  updateOwnLocale,
   updateOwnWhatsappNumber,
   updateLongRunningTimerEmailPreference,
   updateDailyDigestPreference,
+  ProfileError,
+  type ProfileErrorCode,
 } from "@/lib/app-domain/profile";
+import { PASSWORD_MIN_LENGTH } from "@/lib/app-auth/password";
+import { APP_LOCALE_COOKIE, APP_LOCALE_COOKIE_MAX_AGE } from "@/lib/i18n/config";
+import { isProductionBuild } from "@/lib/env";
 
 type FormState = { error?: string; ok?: boolean };
 type ToggleState = { ok: true } | { ok: false; error: string };
 
+/// ADR 0006: a refusal from the domain is shown by its code, in the
+/// person's language. Anything else is a fault, and says so without
+/// repeating an internal message to the screen.
+async function errorMessage(err: unknown): Promise<string> {
+  const t = await getTranslations("profile.errors");
+  return err instanceof ProfileError ? profileErrorText(t, err.code) : t("generic");
+}
+
+function profileErrorText(t: Awaited<ReturnType<typeof getTranslations<"profile.errors">>>, code: ProfileErrorCode): string {
+  return code === "password_too_short" ? t(code, { min: PASSWORD_MIN_LENGTH }) : t(code);
+}
+
 export async function changePasswordAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
+  const t = await getTranslations("profile.errors");
   const currentPassword = String(formData.get("currentPassword") || "");
   const newPassword = String(formData.get("newPassword") || "");
   const confirmPassword = String(formData.get("confirmPassword") || "");
 
-  if (!currentPassword || !newPassword) return { error: "יש למלא את כל השדות." };
-  if (newPassword !== confirmPassword) return { error: "אימות הסיסמה אינו תואם." };
+  if (!currentPassword || !newPassword) return { error: t("allFieldsRequired") };
+  if (newPassword !== confirmPassword) return { error: t("confirmMismatch") };
 
   const result = await changeOwnPassword(user, currentPassword, newPassword);
-  if (!result.ok) return { error: result.error };
+  if (!result.ok) return { error: profileErrorText(t, result.code) };
 
   // Password change invalidates every session, including this one (spec
   // 4.2's "logout all sessions" semantics - see profile.ts's comment).
@@ -40,10 +61,36 @@ export async function updateTimezoneAction(_prev: FormState | undefined, formDat
   try {
     await updateOwnTimezone(user, timezone);
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
+    return { error: await errorMessage(err) };
   }
 
   revalidatePath("/app/profile");
+  return { ok: true };
+}
+
+/// ADR 0006: the interface language. The whole app changes with it, down
+/// to the direction of the page, so LanguageForm reloads the page on
+/// success rather than refreshing one screen. The cookie remembers the
+/// choice on this browser for the screens before sign-in; the user's row
+/// stays the source of truth everywhere a user is known.
+export async function updateLocaleAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const requested = String(formData.get("locale") || "");
+
+  let locale;
+  try {
+    locale = await updateOwnLocale(user, requested);
+  } catch (err) {
+    return { error: await errorMessage(err) };
+  }
+
+  (await cookies()).set(APP_LOCALE_COOKIE, locale, {
+    path: "/",
+    maxAge: APP_LOCALE_COOKIE_MAX_AGE,
+    sameSite: "lax",
+    secure: isProductionBuild(),
+    httpOnly: true,
+  });
   return { ok: true };
 }
 
@@ -54,7 +101,7 @@ export async function updateNameAction(_prev: FormState | undefined, formData: F
   try {
     await updateOwnName(user, name);
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
+    return { error: await errorMessage(err) };
   }
 
   revalidatePath("/app/profile");
@@ -68,7 +115,7 @@ export async function updateWhatsappNumberAction(_prev: FormState | undefined, f
   try {
     await updateOwnWhatsappNumber(user, whatsappNumber);
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
+    return { error: await errorMessage(err) };
   }
 
   revalidatePath("/app/profile");
@@ -87,7 +134,7 @@ export async function updateNotificationPreferenceAction(enabled: boolean): Prom
     revalidatePath("/app/profile");
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
+    return { ok: false, error: await errorMessage(err) };
   }
 }
 
@@ -98,7 +145,7 @@ export async function updateDailyDigestPreferenceAction(enabled: boolean): Promi
     revalidatePath("/app/profile");
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
+    return { ok: false, error: await errorMessage(err) };
   }
 }
 
