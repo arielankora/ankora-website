@@ -3511,7 +3511,7 @@
         "noDay": "No day in the procedure",
         "needsApproval": "Needs approval",
         "day": "Day {day}",
-        "daysBefore": "{days} days before"
+        "daysBefore": "{days, plural, one {# day before} other {# days before}}"
       },
       "checkForm": {
         "legend": "What was found",
@@ -5947,7 +5947,7 @@
       "notes": "Notes",
       "reminders": "Reminders",
       "noReminders": "No reminders set for this date.",
-      "daysBefore": "{days} days before",
+      "daysBefore": "{days, plural, one {# day before} other {# days before}}",
       "inApp": "In the app",
       "email": "Email",
       "disabled": "Disabled",
