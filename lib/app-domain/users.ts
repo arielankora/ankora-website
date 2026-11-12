@@ -1,4 +1,6 @@
 import "server-only";
+import { outgoingOf } from "@/lib/i18n/recipients";
+import { isAppLocale, type AppLocale } from "@/lib/i18n/config";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/domain-error";
@@ -43,6 +45,9 @@ export async function inviteUser(
     clientUserRole?: ClientUserRole;
     /// Employee agreements: optional private address, staff only.
     personalEmail?: string;
+    /// ADR 0006: the language the new person's account starts in, and so
+    /// the language of the invite itself. Hebrew when not given.
+    locale?: AppLocale;
   }
 ) {
   assertCan(actor.role, "user.manage");
@@ -82,6 +87,7 @@ export async function inviteUser(
       status: "INVITED",
       passwordHash: placeholder,
       personalEmail,
+      ...(input.locale && isAppLocale(input.locale) ? { locale: input.locale } : {}),
       clientAccess:
         input.role !== "CLIENT_USER" && input.clientIds?.length
           ? { create: input.clientIds.map((clientId) => ({ clientId })) }
@@ -165,26 +171,27 @@ async function issueInvite(user: User) {
   });
 
   const isClient = user.role === "CLIENT_USER";
-  const { html, text } = renderActionEmail({
-    title: isClient ? "הגישה שלך לפורטל Ankora" : "הזמנה למערכת Ankora",
-    body: isClient
-      ? [
-          `שלום ${user.name},`,
-          "פתחנו עבורך גישה לפורטל, שבו רואים מה בטיפול, מה הושלם ומה ממתין להחלטה שלך.",
-          "הקישור תקף ל-48 שעות. בכניסה הראשונה בוחרים סיסמה, ואפשר גם להיכנס בהמשך בקישור למייל בלי סיסמה.",
-        ]
-      : [
-          `שלום ${user.name},`,
-          "נוצר עבורך חשבון במערכת התפעול של Ankora. הקישור תקף ל-48 שעות, ובכניסה הראשונה בוחרים סיסמה.",
-        ],
-    buttonLabel: isClient ? "כניסה לפורטל" : "בחירת סיסמה",
-    url: `${appBaseUrl()}/app/reset-password?token=${raw}`,
-    footnote: "אם ההזמנה הגיעה אליך בטעות, אפשר להתעלם מההודעה.",
-  });
+  // In the invited person's language (ADR 0006, outgoing channels): the
+  // one the inviter chose for them, Hebrew when nobody did.
+  const out = outgoingOf(user);
+  const t = out.t;
+  const title = isClient ? t("invite.client.title") : t("invite.staff.title");
+  const { html, text } = renderActionEmail(
+    {
+      title,
+      body: isClient
+        ? [t("greeting", { name: user.name }), t("invite.client.body1"), t("invite.client.body2")]
+        : [t("greeting", { name: user.name }), t("invite.staff.body")],
+      buttonLabel: isClient ? t("invite.client.button") : t("invite.staff.button"),
+      url: `${appBaseUrl()}/app/reset-password?token=${raw}`,
+      footnote: t("invite.footnote"),
+    },
+    out
+  );
 
   const mail = await sendEmail({
     to: [user.email],
-    subject: isClient ? "הגישה שלך לפורטל Ankora" : "הזמנה למערכת Ankora",
+    subject: title,
     text,
     html,
   });

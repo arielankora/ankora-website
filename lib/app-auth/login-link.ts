@@ -1,4 +1,5 @@
 import "server-only";
+import { outgoingOf } from "@/lib/i18n/recipients";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -51,18 +52,21 @@ export async function requestLoginLink(identifier: string): Promise<{ devToken?:
   });
 
   const url = `${appBaseUrl()}/app/login-link?token=${raw}`;
-  const { html, text } = renderActionEmail({
-    title: "קישור כניסה לפורטל Ankora",
-    body: [
-      `שלום ${user.name},`,
-      "הקישור הזה מכניס אותך לפורטל בלי סיסמה. הוא תקף ל-15 דקות ולשימוש אחד בלבד.",
-    ],
-    buttonLabel: "כניסה לפורטל",
-    url,
-    footnote: "אם לא ביקשת את הקישור, אפשר להתעלם מההודעה. לא בוצע שינוי בחשבון.",
-  });
+  // In the client user's own language (ADR 0006, outgoing channels).
+  const out = outgoingOf(user);
+  const t = out.t;
+  const { html, text } = renderActionEmail(
+    {
+      title: t("loginLink.title"),
+      body: [t("greeting", { name: user.name }), t("loginLink.body")],
+      buttonLabel: t("loginLink.button"),
+      url,
+      footnote: t("loginLink.footnote"),
+    },
+    out
+  );
 
-  await sendEmail({ to: [user.email], subject: "קישור כניסה לפורטל Ankora", text, html });
+  await sendEmail({ to: [user.email], subject: t("loginLink.title"), text, html });
   await recordAudit({
     actorId: user.id,
     action: "login_link.requested",

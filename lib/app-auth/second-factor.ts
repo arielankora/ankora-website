@@ -1,4 +1,5 @@
 import "server-only";
+import { outgoingOf } from "@/lib/i18n/recipients";
 import { createHash, randomBytes } from "node:crypto";
 import type { User } from "@prisma/client";
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from "@simplewebauthn/server";
@@ -243,18 +244,20 @@ export async function finishLoginEnrollment(raw: string, response: RegistrationR
 /// does not wait on the mail.
 async function notifyDeviceAdded(user: User, name: string) {
   try {
-    const label = (name ?? "").trim().slice(0, 60) || "מכשיר חדש";
-    const { html, text } = renderActionEmail({
-      title: "נוסף מכשיר לחשבון",
-      body: [
-        `שלום ${user.name},`,
-        `המכשיר "${label}" נוסף עכשיו לכניסה לחשבון באנקורה, באישור ממכשיר שכבר היה מחובר.`,
-        "אם לא אתם הוספתם אותו, היכנסו לפרופיל, הסירו את המכשיר והחליפו סיסמה, או כתבו לנו ל-security@ankora.co.il.",
-      ],
-      buttonLabel: "למכשירים שלי",
-      url: `${appBaseUrl()}/app/profile#passkeys`,
-    });
-    await sendEmail({ to: [user.email], subject: "נוסף מכשיר לחשבון באנקורה", text, html });
+    // In the person's own language (ADR 0006, outgoing channels).
+    const out = outgoingOf(user);
+    const t = out.t;
+    const label = (name ?? "").trim().slice(0, 60) || t("deviceAdded.unnamed");
+    const { html, text } = renderActionEmail(
+      {
+        title: t("deviceAdded.title"),
+        body: [t("greeting", { name: user.name }), t("deviceAdded.body1", { label }), t("deviceAdded.body2")],
+        buttonLabel: t("deviceAdded.button"),
+        url: `${appBaseUrl()}/app/profile#passkeys`,
+      },
+      out
+    );
+    await sendEmail({ to: [user.email], subject: t("deviceAdded.subject"), text, html });
   } catch (err) {
     console.error("[second-factor] device-added email failed:", err);
   }

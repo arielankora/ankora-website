@@ -1,4 +1,5 @@
 import "server-only";
+import { outgoingForUser } from "@/lib/i18n/recipients";
 import { prisma } from "@/lib/prisma";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { businessDaysBetween, STALE_BUSINESS_DAYS } from "@/lib/client-control";
@@ -34,12 +35,14 @@ export async function notifyStaleExtraction(now = new Date()): Promise<{ notifie
     if (days <= STALE_BUSINESS_DAYS) continue;
     const sent = await prisma.notification.count({ where: { userId: c.accountManagerId!, type: EXTRACTION_STALE, entityId: c.id, createdAt: { gt: last.createdAt } } });
     if (sent) continue;
+    // In the account manager's language (ADR 0006, outgoing channels).
+    const { t } = await outgoingForUser(c.accountManagerId!);
     await prisma.notification.create({
       data: {
         userId: c.accountManagerId!,
         type: EXTRACTION_STALE,
-        title: `לא הגיע חילוץ ל-${c.name} כבר ${days} ימי עבודה`.slice(0, 200),
-        body: "ההצעה האחרונה לתיק הלקוח הגיעה לפני יותר משלושה ימי עבודה. כדאי לבדוק שהחילוץ היומי רץ, ושהפגישות של הלקוח משויכות אליו לפי הדומיינים.",
+        title: t("extractionStale.title", { client: c.name, days: String(days) }).slice(0, 200),
+        body: t("extractionStale.body"),
         entityType: "Knowledge",
         entityId: c.id,
         // The run's own clock, so "once per silence" compares like with

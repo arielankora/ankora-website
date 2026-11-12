@@ -7,6 +7,7 @@ import { listProcesses } from "@/lib/app-domain/processes";
 import { BATCH_WINDOW_DAYS, COVERAGE_WINDOW_DAYS, RUNS_WINDOW_DAYS, metricsReport, type ClientMetricsInput } from "@/lib/brain-metrics";
 import { metricsSubject, renderMetricsEmail } from "@/lib/brain-metrics-email";
 import { sendEmail } from "@/lib/email";
+import { outgoingOf } from "@/lib/i18n/recipients";
 import { appBaseUrl } from "@/lib/email-templates";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
@@ -101,8 +102,10 @@ export async function sendWeeklyBrainMetrics(now = new Date(), options: { force?
     });
     if (already) continue;
     const report = await brainMetrics(admin, now);
-    const { html, text } = renderMetricsEmail(report, admin.name, base, weekLabel);
-    const result = await sendEmail({ to: [admin.email], subject: metricsSubject(report, weekLabel), text, html });
+    // In the admin's own language (ADR 0006, outgoing channels).
+    const out = outgoingOf(admin);
+    const { html, text } = renderMetricsEmail(report, admin.name, base, weekLabel, out);
+    const result = await sendEmail({ to: [admin.email], subject: metricsSubject(report, weekLabel, out), text, html });
     if (!result.ok) continue;
     await recordAudit({ actorId: null, action: "brain_metrics.weekly_email", entityType: "User", entityId: admin.id, after: { week: weekLabel } });
     sent++;

@@ -1,4 +1,7 @@
 import "server-only";
+import { outgoingForUser } from "@/lib/i18n/recipients";
+import { translatorFor, type OutgoingT } from "@/lib/i18n/outgoing";
+import { APP_LOCALES } from "@/lib/i18n/config";
 import { DomainError } from "@/lib/domain-error";
 import type { ProcessCheckOutcome, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -164,18 +167,29 @@ export async function notifyDueProcessChecks(now = new Date()): Promise<{ notifi
     if (!userId) continue;
     const dueKey = checkDueKey({ checkEveryDays: p.checkEveryDays, lastCheckedKey: p.lastCheckedAt ? localDateKey(p.lastCheckedAt, TIMEZONE) : null }, todayKey);
     if (!dueKey || checkState(dueKey, todayKey) === "LATER") continue;
-    const title = `הגיע זמן הבדיקה: ${p.code} ${p.title}`.slice(0, 200);
+    // In the owner's language (ADR 0006, outgoing channels).
+    const { t } = await outgoingForUser(userId);
+    const titleIn = (words: OutgoingT) => words("processCheck.title", { code: p.code, title: p.title }).slice(0, 200);
+    const title = titleIn(t);
     // Once per due day: a reminder already sent since the check fell due
     // is the same reminder. The next one comes when the next check does.
+    // Matched in either language, so a person who changed theirs that day
+    // is not reminded twice.
     const since = localDateTimeToUtc(dueKey, "00:00", TIMEZONE);
-    const sent = await prisma.notification.count({ where: { userId, type: CHECK_DUE, entityId: p.clientId, title, createdAt: { gte: since } } });
+    const titles = [...new Set(APP_LOCALES.map((l) => titleIn(translatorFor(l).t)))];
+    const sent = await prisma.notification.count({ where: { userId, type: CHECK_DUE, entityId: p.clientId, title: { in: titles }, createdAt: { gte: since } } });
     if (sent) continue;
     await prisma.notification.create({
       data: {
         userId,
         type: CHECK_DUE,
         title,
-        body: [p.checkText ?? "בדיקה שוטפת", p.lastCheckedAt ? `נבדק לאחרונה ב-${localDateKey(p.lastCheckedAt, TIMEZONE).split("-").reverse().join(".")}` : "עוד לא נבדק"].join(". ") + ".",
+        body: t("processCheck.body", {
+          check: p.checkText ?? t("processCheck.defaultCheck"),
+          last: p.lastCheckedAt
+            ? t("processCheck.lastChecked", { date: localDateKey(p.lastCheckedAt, TIMEZONE).split("-").reverse().join(".") })
+            : t("processCheck.neverChecked"),
+        }),
         entityType: "ClientProcesses",
         entityId: p.clientId,
       },

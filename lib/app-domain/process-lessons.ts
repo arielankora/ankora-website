@@ -1,4 +1,5 @@
 import "server-only";
+import { outgoingForUser } from "@/lib/i18n/recipients";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
@@ -64,12 +65,14 @@ export async function recordRunLesson(actor: User, taskId: string, body: string 
   // The owner hears about a remark; the backup when the owner wrote it.
   const to = text ? (process.ownerId && process.ownerId !== actor.id ? process.ownerId : process.backupOwnerId) : null;
   if (to && to !== actor.id) {
+    // In the owner's language (ADR 0006, outgoing channels).
+    const { t } = await outgoingForUser(to);
     await prisma.notification.create({
       data: {
         userId: to,
         type: LESSON_ARRIVED,
-        title: `הערה על הנוהל: ${process.code} ${process.title}`.slice(0, 200),
-        body: `${actor.name} סגר/ה את "${task.title}" וכתב/ה: ${text}`.slice(0, 2000),
+        title: t("lesson.title", { code: process.code, title: process.title }).slice(0, 200),
+        body: t("lesson.body", { actor: actor.name, task: task.title, text: text ?? "" }).slice(0, 2000),
         entityType: "ClientProcesses",
         entityId: task.clientId,
       },

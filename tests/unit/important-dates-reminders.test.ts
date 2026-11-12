@@ -5,9 +5,15 @@ import {
   occurrenceKeyFor,
   buildInAppReminderMessage,
   buildEmailReminderSubject,
+  buildEmailReminderBody,
+  localizedReminderTitle,
   DEFAULT_REMINDER_OFFSETS_BY_CATEGORY,
   IMPORTANT_DATE_TYPE_EXAMPLES,
 } from "@/lib/app-domain/important-dates-reminders";
+import { translatorFor } from "@/lib/i18n/outgoing";
+
+const he = translatorFor("he").t;
+const en = translatorFor("en").t;
 
 // Phase 10 ("מועדים חשובים"). Zero Prisma import - genuinely runs here.
 
@@ -63,15 +69,29 @@ describe("message templates", () => {
   const input = { clientName: "חברת דוגמה", dateTitle: "יום הולדת", occurrenceDate: "28/02/2026", daysBefore: 7 };
 
   it("renders a relative day phrase for 0/1/N days before", () => {
-    expect(buildInAppReminderMessage({ ...input, daysBefore: 0 })).toContain("היום");
-    expect(buildInAppReminderMessage({ ...input, daysBefore: 1 })).toContain("מחר");
-    expect(buildInAppReminderMessage({ ...input, daysBefore: 7 })).toContain("בעוד 7 ימים");
+    expect(buildInAppReminderMessage({ ...input, daysBefore: 0 }, he)).toContain("היום");
+    expect(buildInAppReminderMessage({ ...input, daysBefore: 1 }, he)).toContain("מחר");
+    expect(buildInAppReminderMessage({ ...input, daysBefore: 7 }, he)).toContain("בעוד 7 ימים");
   });
 
   it("includes the client name and date title in the email subject", () => {
-    const subject = buildEmailReminderSubject(input);
+    const subject = buildEmailReminderSubject(input, he);
     expect(subject).toContain(input.clientName);
     expect(subject).toContain(input.dateTitle);
+  });
+
+  it("keeps the Hebrew exactly as it was", () => {
+    expect(buildInAppReminderMessage(input, he)).toBe("יום הולדת (חברת דוגמה) - בעוד 7 ימים, בתאריך 28/02/2026.");
+    expect(buildEmailReminderSubject(input, he)).toBe("תזכורת: יום הולדת - חברת דוגמה");
+    expect(buildEmailReminderBody({ ...input, daysBefore: 1 }, he)).toBe(
+      "שלום,\n\nמועד חשוב מתקרב עבור חברת דוגמה:\nיום הולדת - מחר (28/02/2026).\n\nהודעה זו נשלחה אוטומטית ממערכת ניהול הזמן של Ankora."
+    );
+    expect(localizedReminderTitle({ title: "דוח ספקים", expectsReceipt: true, expectedFrom: "איילה" }, he)).toBe("ממתין לקבלה: דוח ספקים (מ-איילה)");
+  });
+
+  it("speaks English to a reader who chose it (ADR 0006, outgoing channels)", () => {
+    expect(buildInAppReminderMessage({ ...input, daysBefore: 1 }, en)).toBe("יום הולדת (חברת דוגמה): tomorrow, on 28/02/2026.");
+    expect(buildEmailReminderSubject(input, en)).toBe("Reminder: יום הולדת, חברת דוגמה");
   });
 });
 

@@ -1,4 +1,5 @@
 import "server-only";
+import { outgoingForUser } from "@/lib/i18n/recipients";
 import { prisma } from "@/lib/prisma";
 import { isPastValidity } from "@/lib/client-facts";
 import {
@@ -223,12 +224,14 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
       const expiredSince = attention.pastValidity > 0 && b.latestExpiry !== null && (!last || b.latestExpiry > last.createdAt);
       if (last && last.createdAt > weekAgo && !expiredSince) continue;
 
+      // In the recipient's language (ADR 0006, outgoing channels).
+      const { t } = await outgoingForUser(userId);
       await prisma.notification.create({
         data: {
           userId,
           type: ATTENTION_TYPE,
-          title: `תיק ${client.name}: מה מחכה לתשומת לב`,
-          body: attentionSentence(attention),
+          title: t("attention.title", { client: client.name }),
+          body: attentionSentence(attention, t),
           entityType: "Client",
           entityId: client.id,
           // Stamped with the run's own clock, the one the week is counted

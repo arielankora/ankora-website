@@ -1,4 +1,5 @@
 import "server-only";
+import { outgoingForUser } from "@/lib/i18n/recipients";
 import { DomainError } from "@/lib/domain-error";
 import type { Prisma, ProcessStepMode, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -194,12 +195,18 @@ export async function openProcessRun(input: OpenRunInput) {
   }
   await prisma.process.update({ where: { id: process.id }, data: { lastRunAt: now } });
   if (assignee && assignee !== input.actorId) {
+    // In the assignee's language (ADR 0006, outgoing channels).
+    const { t } = await outgoingForUser(assignee);
     await prisma.notification.create({
       data: {
         userId: assignee,
         type: RUN_OPENED,
-        title: `נפתחה ריצה: ${process.code} ${process.title}`.slice(0, 200),
-        body: `${steps.length} שלבים, לפי נוהל גרסה ${version.version}. הראשון ב-${dueKeys.length ? dueKeys.slice().sort()[0].split("-").reverse().join(".") : runKey.split("-").reverse().join(".")}.`,
+        title: t("runOpened.title", { code: process.code, title: process.title }).slice(0, 200),
+        body: t("runOpened.body", {
+          steps: String(steps.length),
+          version: String(version.version),
+          date: dueKeys.length ? dueKeys.slice().sort()[0].split("-").reverse().join(".") : runKey.split("-").reverse().join("."),
+        }),
         entityType: "Task",
         entityId: run.id,
       },

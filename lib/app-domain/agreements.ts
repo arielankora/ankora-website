@@ -1,4 +1,5 @@
 import "server-only";
+import { outgoingOf } from "@/lib/i18n/recipients";
 import { prisma } from "@/lib/prisma";
 import { DomainError, type DomainErrorValues } from "@/lib/domain-error";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -311,10 +312,12 @@ export async function issueDeletionDeclarationLink(
   ]);
 
   const url = `${appBaseUrl()}/agreements/sign/${raw}`;
-  const { html, text } = renderDeletionDeclarationEmail({ name: target.name, url });
+  // In the person's own language (ADR 0006, outgoing channels).
+  const out = outgoingOf(target);
+  const { html, text } = renderDeletionDeclarationEmail({ name: target.name, url }, out);
   const mail = await sendEmail({
     to: [target.personalEmail],
-    subject: "הצהרת מחיקה בסיום העבודה עם Ankora",
+    subject: out.t("deletionDeclaration.title"),
     text,
     html,
     replyTo: "ops@ankora.co.il",

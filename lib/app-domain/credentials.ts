@@ -442,10 +442,13 @@ export async function revealCredential(
     });
     await deny(actor, id, row.clientId, "rate_limit");
     if (alreadyAlerted === 0) {
-      await sendVaultAlert("חריגה ממכסת חשיפות", [
-        `${actor.name} (${actor.email}) הגיע/ה ל-${REVEAL_LIMIT_PER_HOUR} חשיפות גישה בשעה האחרונה.`,
-        "חשיפות נוספות נחסמו עד שהשעה תתחלף.",
-      ]);
+      await sendVaultAlert((t) => ({
+        subject: t("vault.rateLimit.subject"),
+        lines: [
+          t("vault.rateLimit.line1", { name: actor.name, email: actor.email, limit: String(REVEAL_LIMIT_PER_HOUR) }),
+          t("vault.rateLimit.line2"),
+        ],
+      }));
     }
     throw new RevealRateLimitedError();
   }
@@ -484,9 +487,10 @@ export async function revealCredential(
   // distinct credential and only then.
   const distinctBefore = new Set(recent.map((r) => r.entityId));
   if (!distinctBefore.has(id) && distinctBefore.size === DISTINCT_REVEAL_ALERT_THRESHOLD) {
-    await sendVaultAlert("חשיפות רבות בזמן קצר", [
-      `${actor.name} (${actor.email}) צפה/תה ב-${DISTINCT_REVEAL_ALERT_THRESHOLD + 1} גישות שונות בשעה האחרונה.`,
-    ]);
+    await sendVaultAlert((t) => ({
+      subject: t("vault.many.subject"),
+      lines: [t("vault.many.line", { name: actor.name, email: actor.email, count: String(DISTINCT_REVEAL_ALERT_THRESHOLD + 1) })],
+    }));
   }
 
   return { ...secret, systemName: row.systemName };

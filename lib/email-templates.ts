@@ -1,14 +1,19 @@
 import "server-only";
 import { SITE_URL, isUnreachableFromOutside } from "@/lib/site";
 import { isProductionDeployment } from "@/lib/env";
+import { HEBREW, type Outgoing } from "@/lib/i18n/outgoing";
 
 // Portal phase 0. Every transactional email the app sends to a PERSON
-// (invite, sign-in link) is built here, so there is one Hebrew RTL
-// layout, one button style and one footer to change - and so no screen
+// (invite, sign-in link) is built here, so there is one layout, one button style and one footer to change - and so no screen
 // hand-rolls HTML into sendEmail(). The operational emails that predate
 // this (alerts, scheduled reports, the nightly backup) stay plain text on
 // purpose: they go to people who asked for a machine's output, not to a
 // client meeting Ankora for the first time.
+//
+// ADR 0006, outgoing channels: the layout is in the recipient's language,
+// right to left for Hebrew and left to right for English. The caller
+// passes the recipient's `Outgoing` (lib/i18n/recipients.ts); without
+// one it is the Hebrew it always was.
 
 /// Absolute origin for links that leave the app and land in someone's
 /// inbox. The one rule that matters: a production email must never carry
@@ -73,7 +78,7 @@ export interface RenderedEmail {
 /// mail client agrees on - this is not a place for the app's Tailwind
 /// tokens, so the few hex values below are intentional duplicates of
 /// `navy`, `paper`, `gold` and `cream` rather than a second palette.
-export function renderActionEmail(input: ActionEmailInput): RenderedEmail {
+export function renderActionEmail(input: ActionEmailInput, out: Outgoing = HEBREW): RenderedEmail {
   const paragraphs = input.body
     .map(
       (line) =>
@@ -88,7 +93,7 @@ export function renderActionEmail(input: ActionEmailInput): RenderedEmail {
     : "";
 
   const html = `<!doctype html>
-<html dir="rtl" lang="he">
+<html dir="${out.dir}" lang="${out.locale}">
   <body style="margin:0;padding:0;background:#F8F4EC;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8F4EC;padding:28px 12px;">
       <tr>
@@ -100,7 +105,7 @@ export function renderActionEmail(input: ActionEmailInput): RenderedEmail {
               </td>
             </tr>
             <tr>
-              <td style="padding:26px 24px 28px;" dir="rtl" align="right">
+              <td style="padding:26px 24px 28px;" dir="${out.dir}" align="${out.start}">
                 <p style="margin:0 0 16px;font-size:20px;font-weight:500;color:#0B1B33;">${escapeHtml(
                   input.title
                 )}</p>
@@ -118,13 +123,13 @@ export function renderActionEmail(input: ActionEmailInput): RenderedEmail {
                 </table>
                 ${footnote}
                 <p style="margin:22px 0 0;font-size:11.5px;line-height:1.6;color:rgba(27,42,61,.45);word-break:break-all;">
-                  אם הכפתור אינו עובד, אפשר להעתיק את הכתובת הזו לדפדפן:<br />${escapeHtml(input.url)}
+                  ${escapeHtml(out.t("layout.buttonFallback"))}<br />${escapeHtml(input.url)}
                 </p>
               </td>
             </tr>
             <tr>
               <td style="background:#F8F4EC;padding:14px 24px;font-size:11px;color:rgba(27,42,61,.5);">
-                Ankora · אינטליגנציה תפעולית שמחזירה זמן
+                ${escapeHtml(out.t("layout.footer"))}
               </td>
             </tr>
           </table>
@@ -146,16 +151,18 @@ export function renderActionEmail(input: ActionEmailInput): RenderedEmail {
 /// declaration. Goes to the person's private address, because by the time
 /// it is sent their work account is usually suspended. Says what the link
 /// is for and how long it lives, and nothing about the reasons for leaving.
-export function renderDeletionDeclarationEmail(input: { name: string; url: string }): RenderedEmail {
-  return renderActionEmail({
-    title: "הצהרת מחיקה בסיום העבודה עם Ankora",
-    body: [
-      `שלום ${input.name},`,
-      "בסיום העבודה אנחנו מבקשים מכל אחד מאנשי Ankora לאשר שהחזיר ציוד ומחק מידע של לקוחות, כמו שנקבע בהתחייבות לסודיות.",
-      "הקישור פותח את ההצהרה לקריאה ולאישור. הוא אישי, תקף לשבעה ימים ולשימוש אחד בלבד.",
-    ],
-    buttonLabel: "קריאה ואישור ההצהרה",
-    url: input.url,
-    footnote: "אם יש שאלה על ההצהרה, אפשר לפנות ל-ops@ankora.co.il לפני האישור.",
-  });
+/// In the person's own language; the declaration it opens stays Hebrew
+/// (ADR 0006 decision 5).
+export function renderDeletionDeclarationEmail(input: { name: string; url: string }, out: Outgoing = HEBREW): RenderedEmail {
+  const t = out.t;
+  return renderActionEmail(
+    {
+      title: t("deletionDeclaration.title"),
+      body: [t("greeting", { name: input.name }), t("deletionDeclaration.body1"), t("deletionDeclaration.body2")],
+      buttonLabel: t("deletionDeclaration.button"),
+      url: input.url,
+      footnote: t("deletionDeclaration.footnote"),
+    },
+    out
+  );
 }

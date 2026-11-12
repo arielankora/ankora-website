@@ -5,6 +5,8 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { deliver } from "@/lib/notify/channels";
 import { policyFromEnv, type OutboundMessage, type Recipient } from "@/lib/notify/policy";
 import type { TaskPriority } from "@prisma/client";
+import { HEBREW, type Outgoing } from "@/lib/i18n/outgoing";
+import { outgoingForUser, outgoingOf } from "@/lib/i18n/recipients";
 
 // Urgent work reaches the person the same day.
 //
@@ -83,35 +85,41 @@ export function quoteFor(text: string | null | undefined): string | null {
 ///
 /// The subject carries the whole answer, because on a phone it is often
 /// the only part read: what, for which client, from whom.
-export function urgentMessage(input: {
-  kind: "landed" | "comment";
-  taskId: string;
-  taskTitle: string;
-  clientName: string;
-  actorName: string;
-  detail: string | null;
-  baseUrl: string;
-}): OutboundMessage {
+export function urgentMessage(
+  input: {
+    kind: "landed" | "comment";
+    taskId: string;
+    taskTitle: string;
+    clientName: string;
+    actorName: string;
+    detail: string | null;
+    baseUrl: string;
+  },
+  // The recipient's language (ADR 0006, outgoing channels).
+  out: Outgoing = HEBREW
+): OutboundMessage {
+  const { t } = out;
   const url = `${input.baseUrl}/app/tasks/${input.taskId}`;
+  const values = { task: input.taskTitle, client: input.clientName, actor: input.actorName };
   if (input.kind === "landed") {
     return {
       template: "task_urgent",
-      subject: `משימה דחופה אצלך: ${input.taskTitle} · ${input.clientName}`,
-      title: "משימה דחופה אצלך",
-      lines: [`${input.taskTitle} · ${input.clientName}`, `מאת ${input.actorName}`],
+      subject: t("urgent.landed.subject", values),
+      title: t("urgent.landed.title"),
+      lines: [t("urgent.taskLine", values), t("urgent.landed.from", values)],
       detail: input.detail,
       url,
-      buttonLabel: "פתיחת המשימה",
+      buttonLabel: t("urgent.button"),
     };
   }
   return {
     template: "task_urgent_comment",
-    subject: `עדכון במשימה דחופה: ${input.taskTitle} · ${input.clientName}`,
-    title: "עדכון במשימה דחופה שלך",
-    lines: [`${input.taskTitle} · ${input.clientName}`, `${input.actorName} כתב/ה תגובה`],
+    subject: t("urgent.comment.subject", values),
+    title: t("urgent.comment.title"),
+    lines: [t("urgent.taskLine", values), t("urgent.comment.wrote", values)],
     detail: input.detail,
     url,
-    buttonLabel: "פתיחת המשימה",
+    buttonLabel: t("urgent.button"),
   };
 }
 
@@ -134,13 +142,13 @@ function afterResponse(fn: () => Promise<void>): Promise<void> {
   }
 }
 
-async function recipientFor(userId: string): Promise<Recipient | null> {
+async function recipientFor(userId: string): Promise<(Recipient & { out: Outgoing }) | null> {
   const user = await prisma.user.findFirst({
     where: { id: userId, deletedAt: null, status: "ACTIVE" },
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true, email: true, locale: true, timezone: true },
   });
   if (!user) return null;
-  return { userId: user.id, name: user.name, email: user.email, phone: null };
+  return { userId: user.id, name: user.name, email: user.email, phone: null, locale: user.locale, out: outgoingOf(user) };
 }
 
 function policy() {
@@ -182,7 +190,7 @@ export async function alertIfUrgentLanded(
         actorName: actor.name,
         detail,
         baseUrl: appBaseUrl(),
-      }),
+      }, recipient.out),
       policy()
     );
   });
@@ -217,12 +225,14 @@ export async function alertIfUrgentComment(
 
     // The bell row first, synchronously. It is the record the cooldown
     // reads, so two comments a second apart cannot both slip past it.
+    // In the assignee's language (ADR 0006, outgoing channels).
+    const { t } = await outgoingForUser(task.assignedToId);
     await prisma.notification.create({
       data: {
         userId: task.assignedToId,
         type: TASK_URGENT_COMMENT_NOTIFICATION_TYPE,
-        title: "עדכון במשימה דחופה",
-        body: `${task.title} · ${task.client.name} · ${actor.name}`,
+        title: t("urgent.bellTitle"),
+        body: t("urgent.bellBody", { task: task.title, client: task.client.name, actor: actor.name }),
         entityType: "Task",
         entityId: task.id,
       },
@@ -242,7 +252,7 @@ export async function alertIfUrgentComment(
           actorName: actor.name,
           detail: quoteFor(commentBody),
           baseUrl: appBaseUrl(),
-        }),
+        }, recipient.out),
         policy()
       );
     });

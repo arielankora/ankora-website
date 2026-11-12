@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { APP_LOCALES, LOCALE_NATIVE_NAMES } from "@/lib/i18n/config";
 import { inviteUserAction } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
 
@@ -42,6 +43,8 @@ function SubmitButton({ pending }: { pending: boolean }) {
 // a detour inside this one.
 export function InviteUserForm({ clients }: { clients: { id: string; name: string }[] }) {
   const t = useTranslations("users.invite");
+  // next-intl's locale is the Intl tag (he-IL / en-IL); the form sends the app locale.
+  const inviterLocale = useLocale().startsWith("en") ? "en" : "he";
   const tRoles = useTranslations("shell.roles");
   const { onSubmit, pending, result } = useActionForm(inviteUserAction);
   const state = result;
@@ -96,6 +99,22 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
             <p className="mt-1 text-[11px] text-app-text-tertiary">{t("personalEmailHint")}</p>
           </div>
         )}
+        {/* ADR 0006: the invite and everything the app sends this person go
+            out in this language; they can change it later in their profile. */}
+        <div>
+          <label className="block text-xs font-medium text-app-text-secondary">{t("language")}</label>
+          <select
+            name="locale"
+            defaultValue={inviterLocale}
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          >
+            {APP_LOCALES.map((l) => (
+              <option key={l} value={l} lang={l}>
+                {LOCALE_NATIVE_NAMES[l]}
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <label className="block text-xs font-medium text-app-text-secondary">{t("role")}</label>
           <select

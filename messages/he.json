@@ -2763,7 +2763,8 @@
       "clearAll": "נקה הכל",
       "noClients": "אין עדיין לקוחות במערכת.",
       "invitedEmailSent": "{name} הוזמן בהצלחה, והמייל נשלח. הקישור החד-פעמי הבא הוא גיבוי אם המייל לא הגיע:",
-      "invitedEmailFailed": "{name} הוזמן בהצלחה, אך שליחת המייל נכשלה. יש להעביר את הקישור החד-פעמי הבא ידנית:"
+      "invitedEmailFailed": "{name} הוזמן בהצלחה, אך שליחת המייל נכשלה. יש להעביר את הקישור החד-פעמי הבא ידנית:",
+      "language": "שפה"
     },
     "detail": {
       "back": "משתמשים",
@@ -7022,6 +7023,377 @@
     },
     "documentRoute": {
       "unavailable": "המסמך לא זמין כרגע. אפשר לבקש אותו מאיתנו בוואטסאפ."
+    }
+  },
+  "outgoing": {
+    "greeting": "שלום {name},",
+    "layout": {
+      "buttonFallback": "אם הכפתור אינו עובד, אפשר להעתיק את הכתובת הזו לדפדפן:",
+      "footer": "Ankora · אינטליגנציה תפעולית שמחזירה זמן"
+    },
+    "deletionDeclaration": {
+      "title": "הצהרת מחיקה בסיום העבודה עם Ankora",
+      "body1": "בסיום העבודה אנחנו מבקשים מכל אחד מאנשי Ankora לאשר שהחזיר ציוד ומחק מידע של לקוחות, כמו שנקבע בהתחייבות לסודיות.",
+      "body2": "הקישור פותח את ההצהרה לקריאה ולאישור. הוא אישי, תקף לשבעה ימים ולשימוש אחד בלבד.",
+      "button": "קריאה ואישור ההצהרה",
+      "footnote": "אם יש שאלה על ההצהרה, אפשר לפנות ל-ops@ankora.co.il לפני האישור."
+    },
+    "loginLink": {
+      "title": "קישור כניסה לפורטל Ankora",
+      "body": "הקישור הזה מכניס אותך לפורטל בלי סיסמה. הוא תקף ל-15 דקות ולשימוש אחד בלבד.",
+      "button": "כניסה לפורטל",
+      "footnote": "אם לא ביקשת את הקישור, אפשר להתעלם מההודעה. לא בוצע שינוי בחשבון."
+    },
+    "passwordReset": {
+      "title": "בחירת סיסמה חדשה למערכת Ankora",
+      "body": "התקבלה בקשה לבחור סיסמה חדשה לחשבון שלך. הקישור תקף לשעה ולשימוש אחד בלבד.",
+      "button": "בחירת סיסמה",
+      "footnote": "אם לא ביקשת את הקישור, אפשר להתעלם מההודעה. הסיסמה הנוכחית לא השתנתה."
+    },
+    "deviceAdded": {
+      "subject": "נוסף מכשיר לחשבון באנקורה",
+      "title": "נוסף מכשיר לחשבון",
+      "unnamed": "מכשיר חדש",
+      "body1": "המכשיר \"{label}\" נוסף עכשיו לכניסה לחשבון באנקורה, באישור ממכשיר שכבר היה מחובר.",
+      "body2": "אם לא אתם הוספתם אותו, היכנסו לפרופיל, הסירו את המכשיר והחליפו סיסמה, או כתבו לנו ל-security@ankora.co.il.",
+      "button": "למכשירים שלי"
+    },
+    "invite": {
+      "staff": {
+        "title": "הזמנה למערכת Ankora",
+        "body": "נוצר עבורך חשבון במערכת התפעול של Ankora. הקישור תקף ל-48 שעות, ובכניסה הראשונה בוחרים סיסמה.",
+        "button": "בחירת סיסמה"
+      },
+      "client": {
+        "title": "הגישה שלך לפורטל Ankora",
+        "body1": "פתחנו עבורך גישה לפורטל, שבו רואים מה בטיפול, מה הושלם ומה ממתין להחלטה שלך.",
+        "body2": "הקישור תקף ל-48 שעות. בכניסה הראשונה בוחרים סיסמה, ואפשר גם להיכנס בהמשך בקישור למייל בלי סיסמה.",
+        "button": "כניסה לפורטל"
+      },
+      "footnote": "אם ההזמנה הגיעה אליך בטעות, אפשר להתעלם מההודעה."
+    },
+    "clientPreferences": {
+      "title": "{client} עדכן העדפות שירות",
+      "body1": "{actor} שינה את ההעדפות של {client} בפורטל.",
+      "body2": "שווה לקרוא לפני הפנייה הבאה: זה בדיוק המקום שבו לקוח אומר לנו מה חשוב לו ומה אסור שיקרה.",
+      "button": "לכרטיס הלקוח",
+      "subject": "{client}: העדפות שירות עודכנו"
+    },
+    "longTimer": {
+      "title": "טיימר רץ זמן ארוך",
+      "body": "הטיימר עבור {client} רץ כבר {hours} שעות ברצף. בדקו אם יש לעצור אותו."
+    },
+    "taskNotice": {
+      "assigned": "משימה חדשה אצלך",
+      "assignedUrgent": "משימה דחופה אצלך",
+      "supervising": "מונית למפקח על משימה",
+      "body": "{task} · {client}"
+    },
+    "urgent": {
+      "landed": {
+        "subject": "משימה דחופה אצלך: {task} · {client}",
+        "title": "משימה דחופה אצלך",
+        "from": "מאת {actor}"
+      },
+      "comment": {
+        "subject": "עדכון במשימה דחופה: {task} · {client}",
+        "title": "עדכון במשימה דחופה שלך",
+        "wrote": "{actor} כתב/ה תגובה"
+      },
+      "taskLine": "{task} · {client}",
+      "button": "פתיחת המשימה",
+      "bellTitle": "עדכון במשימה דחופה",
+      "bellBody": "{task} · {client} · {actor}"
+    },
+    "stepApproval": {
+      "title": "מחכה לאישור שלך: {step}",
+      "body": "{actor} סיים/ה את השלב ושלח/ה אותו לאישור שלך. אחרי האישור אפשר לסגור את המשימה."
+    },
+    "exceptions": {
+      "requested": {
+        "title": "{client}: בקשה לחריגה מהכלל \"{policy}\"",
+        "body": "{actor} מבקש/ת: {what}"
+      },
+      "approved": "אושרה חריגה מהכלל \"{policy}\"",
+      "rejected": "נדחתה חריגה מהכלל \"{policy}\""
+    },
+    "sensitiveProposed": {
+      "title": "{client}: מידע רגיש ממתין לאישור שלך",
+      "body": "{count, plural, =1 {פריט רגיש אחד} other {# פריטים רגישים}} מ-{source}. רק מי שמאשר מידע רגיש אצל הלקוח רואה אותם."
+    },
+    "extractionStale": {
+      "title": "לא הגיע חילוץ ל-{client} כבר {days} ימי עבודה",
+      "body": "ההצעה האחרונה לתיק הלקוח הגיעה לפני יותר משלושה ימי עבודה. כדאי לבדוק שהחילוץ היומי רץ, ושהפגישות של הלקוח משויכות אליו לפי הדומיינים."
+    },
+    "processCheck": {
+      "title": "הגיע זמן הבדיקה: {code} {title}",
+      "body": "{check}. {last}.",
+      "defaultCheck": "בדיקה שוטפת",
+      "lastChecked": "נבדק לאחרונה ב-{date}",
+      "neverChecked": "עוד לא נבדק"
+    },
+    "lesson": {
+      "title": "הערה על הנוהל: {code} {title}",
+      "body": "{actor} סגר/ה את \"{task}\" וכתב/ה: {text}"
+    },
+    "runOpened": {
+      "title": "נפתחה ריצה: {code} {title}",
+      "body": "{steps} שלבים, לפי נוהל גרסה {version}. הראשון ב-{date}."
+    },
+    "processReview": {
+      "rulesTitle": "דורש סקירה: {code} {title}",
+      "rulesBody": "{cause}. הנוהל שבתוקף כבר לא עומד בכללי הלקוח.",
+      "dueTitle": "הגיע מועד הסקירה: {code} {title}",
+      "dueBody": "סקירה כל {days} ימים. עוברים על הנוהל מול מה שקורה בפועל, ומסמנים \"נסקר\", או כותבים גרסה חדשה."
+    },
+    "autoApply": {
+      "clientTitle": "כניסה אוטומטית נעצרה ללקוח {client}",
+      "clientBody": "{errors} פריטים של הלקוח שנכנסו לתיק אוטומטית בוטלו או תוקנו בתוך {days} יום. מעכשיו ההצעות של הלקוח ממתינות לאישור של אדם. מחזירים אותו לכניסה אוטומטית במסך האישורים, בלשונית \"ידע מהחילוץ\".",
+      "kindTitle": "כניסה אוטומטית נעצרה: {kind}",
+      "kindBody": "{errors} מתוך {counted} הפריטים האחרונים מסוג {kind} שנכנסו לתיקים אוטומטית בוטלו או תוקנו. מעכשיו הצעות מהסוג הזה ממתינות לאישור של אדם. מחזירים אותו לכניסה אוטומטית במסך האישורים, בלשונית \"ידע מהחילוץ\"."
+    },
+    "labels": {
+      "targets": {
+        "FACT": "עובדה",
+        "CONTACT": "איש קשר",
+        "ORGANIZATION": "ספק או נותן שירות",
+        "SYSTEM": "מערכת",
+        "REQUEST_TYPE": "סוג פנייה",
+        "POLICY": "כלל של הלקוח",
+        "ENTITY": "ישות משפטית",
+        "NARRATIVE": "סקירה, רקע או תפקידנו",
+        "PROCESS": "תהליך",
+        "DOMAIN": "דומיין",
+        "TASK": "משימה",
+        "DATE": "מועד"
+      },
+      "factKinds": {
+        "SCOPE_IN": "בתחום",
+        "SCOPE_OUT": "מחוץ לתחום",
+        "PREFERENCE": "העדפה",
+        "REQUIREMENT": "דרישה חוזרת",
+        "LOCATION": "מיקום",
+        "FINANCE": "כספים",
+        "TEMPORARY": "מידע זמני",
+        "ONE_OFF_DECISION": "החלטה חד-פעמית",
+        "QUESTION": "שאלה פתוחה",
+        "NOTE": "הערה"
+      },
+      "status": {
+        "OPEN": "פתוחה",
+        "IN_PROGRESS": "בביצוע",
+        "PENDING_APPROVAL": "ממתינה לאישור",
+        "DONE": "הושלמה",
+        "ARCHIVED": "בארכיון"
+      },
+      "priority": {
+        "LOW": "נמוכה",
+        "NORMAL": "רגילה",
+        "HIGH": "גבוהה",
+        "URGENT": "דחופה"
+      },
+      "blocker": {
+        "CLIENT": "ממתין ללקוח",
+        "SUPPLIER": "ממתין לספק",
+        "INTERNAL": "ממתין לגורם פנימי",
+        "OTHER": "ממתין"
+      }
+    },
+    "attention": {
+      "title": "תיק {client}: מה מחכה לתשומת לב",
+      "pastValidity": "{count, plural, =1 {פריט זמני אחד עבר את התוקף שלו. עדיין נכון?} other {# פריטים זמניים עברו את התוקף שלהם. עדיין נכונים?}}",
+      "openQuestions": "{count, plural, =1 {שאלה פתוחה אחת עדיין בלי תשובה.} other {# שאלות פתוחות עדיין בלי תשובה.}}",
+      "staleUncertain": "{count, plural, =1 {פריט אחד לא ודאי כבר יותר מ-{days} יום.} other {# פריטים לא ודאיים כבר יותר מ-{days} יום.}}",
+      "staleProposedRules": "{count, plural, =1 {כלל מוצע אחד מחכה לאישור מנהל כבר יותר מ-{days} ימים, ועד אז הוא לא מחייב.} other {# כללים מוצעים מחכים לאישור מנהל כבר יותר מ-{days} ימים, ועד אז הם לא מחייבים.}}",
+      "staleProposals": "{count, plural, =1 {הצעה אחת מחכה במסך הבדיקה כבר יותר מ-{days} ימים, ועד שתאושר היא לא בתיק.} other {# הצעות מחכות במסך הבדיקה כבר יותר מ-{days} ימים, ועד שיאושרו הן לא בתיק.}}",
+      "rulesDueReview": "{count, plural, =1 {הגיע מועד הסקירה של כלל אחד.} other {הגיע מועד הסקירה של # כללים.}}"
+    },
+    "importantDates": {
+      "today": "היום",
+      "tomorrow": "מחר",
+      "inDays": "בעוד {days} ימים",
+      "inApp": "{title} ({client}) - {when}, בתאריך {date}.",
+      "emailSubject": "תזכורת: {title} - {client}",
+      "emailHello": "שלום,",
+      "emailLead": "מועד חשוב מתקרב עבור {client}:",
+      "emailLine": "{title} - {when} ({date}).",
+      "emailFooter": "הודעה זו נשלחה אוטומטית ממערכת ניהול הזמן של Ankora.",
+      "escalation": "{title} ({client}) לא טופל על ידי {person} - המועד חל ב-{date}.",
+      "escalationSubject": "הסלמה: {title} - {client}",
+      "receiptTitle": "ממתין לקבלה: {title}",
+      "receiptTitleFrom": "ממתין לקבלה: {title} (מ-{from})",
+      "conditionCheck": "מועד מותנה ב-{date}. האם התנאי מתקיים: {condition}? אם כן, צריך לפתוח משימה."
+    },
+    "alerts": {
+      "subject": "[Ankora] התראת בנק שעות - {client}",
+      "client": "לקוח: {client}",
+      "kind": "סוג התראה: {kind}",
+      "threshold": "סף: {value}",
+      "current": "ערך נוכחי: {value}",
+      "prepaid": "חבילה: נוצלו {pct}% מ-{hours} השעות שנטענו. {rest}",
+      "prepaidOver": "חריגה: {hours} שעות, תקוזז מהטעינה הבאה.",
+      "prepaidLeft": "נותרו {hours} שעות.",
+      "utilization": "ניצול: {pct}% ({consumed}/{total} דקות)",
+      "thresholds": {
+        "UTILIZATION_PCT": "ניצול (%)",
+        "REMAINING_MINUTES": "דקות שנותרו",
+        "CONSUMED_MINUTES": "דקות שנוצלו",
+        "OVERAGE": "חריגה (דקות)"
+      }
+    },
+    "vault": {
+      "subject": "כספת הגישות: {subject}",
+      "footer": "הפרטים המלאים ביומן הפעולות.",
+      "rateLimit": {
+        "subject": "חריגה ממכסת חשיפות",
+        "line1": "{name} ({email}) הגיע/ה ל-{limit} חשיפות גישה בשעה האחרונה.",
+        "line2": "חשיפות נוספות נחסמו עד שהשעה תתחלף."
+      },
+      "many": {
+        "subject": "חשיפות רבות בזמן קצר",
+        "line": "{name} ({email}) צפה/תה ב-{count} גישות שונות בשעה האחרונה."
+      },
+      "lockout": {
+        "subject": "נעילת אימות",
+        "line1": "{name} ({email}) נכשל/ה באימות זהות {limit} פעמים לפני חשיפת גישה.",
+        "line2": "החשיפה נעולה למשתמש הזה ל-{minutes} דקות."
+      },
+      "rewrap": {
+        "moved": "הועברו למפתח החדש: {count}",
+        "current": "כבר על המפתח החדש: {count}",
+        "failed": "נכשלו בבדיקה ולא נגעו בהן: {count}",
+        "foreign": "רשומות במפתח שהסביבה לא מחזיקה: {count}",
+        "doneSubject": "החלפת המפתח הושלמה",
+        "notDoneSubject": "החלפת המפתח לא הושלמה",
+        "doneNext": "אפשר להעביר את הערך החדש ל-VAULT_KEK, למחוק את VAULT_KEK_NEXT ולפרוס מחדש.",
+        "notDoneNext": "אל תמחקו את המפתח הישן עד שהמספרים האלה יתאפסו."
+      }
+    },
+    "brainMetrics": {
+      "subjectAllOk": "מדדי התיק, שבוע {week}: הכול ביעד",
+      "subjectOff": "מדדי התיק, שבוע {week}: {count, plural, =1 {מדד אחד} other {# מדדים}} עוד לא ביעד",
+      "lead": "מדדי התיק לשבוע {week}, לכל הלקוחות יחד:",
+      "line": "- {label}: {display} (יעד: {target}). {state}.",
+      "byClientText": "מה עוד לא ביעד, לפי לקוח:",
+      "byClient": "מה עוד לא ביעד, לפי לקוח",
+      "target": "יעד: {target}",
+      "heading": "מדדי התיק, שבוע {week}",
+      "intro": "שלום {name}, כך התיק עובד השבוע, לכל הלקוחות יחד.",
+      "link": "למסך המדדים"
+    },
+    "changes": {
+      "noDate": "ללא",
+      "backFromApproval": "הוחזרה מאישור",
+      "reopened": "נפתחה מחדש",
+      "status": "סטטוס: {from} ← {to}",
+      "priority": "עדיפות: {from} ← {to}",
+      "dueDate": "תאריך יעד: {from} ← {to}",
+      "comment": "תגובה: «{quote}»",
+      "fileNamed": "צירף/ה קובץ: {title}",
+      "file": "צירף/ה קובץ",
+      "approved": "המשימה אושרה",
+      "blocked": "סומנה כממתינה",
+      "unblocked": "ההמתנה הסתיימה",
+      "descriptionUpdated": "התיאור עודכן",
+      "descriptionRemoved": "התיאור הוסר"
+    },
+    "digest": {
+      "someone": "מישהו",
+      "days": "{count, plural, =1 {יום אחד} =2 {יומיים} other {# ימים}}",
+      "subject": {
+        "staleWaits": "{count, plural, =1 {משימה אחת ממתינה יותר משבוע} other {# משימות ממתינות יותר משבוע}}",
+        "morning": "הבוקר שלך",
+        "more": "{count, plural, =1 {{head}, ועוד אחת} other {{head}, ועוד #}}"
+      },
+      "approvals": "{count, plural, =1 {דבר אחד מחכה לאישור שלך.} other {# דברים מחכים לאישור שלך.}}",
+      "review": {
+        "rules": "לא עומד עוד בכללי הלקוח",
+        "periodic": "הגיע מועד הסקירה התקופתית"
+      },
+      "clients": {
+        "prepaid": "ניצלו {pct}% מהחבילה, {rest}.",
+        "prepaidLeft": "נשארו {hours} שעות",
+        "prepaidNone": "ואין יתרה",
+        "bank": "ניצלו {pct}% מבנק השעות, {rest}.",
+        "cycleEndsToday": "המחזור נגמר היום",
+        "cycleLeft": "{days} לסוף המחזור",
+        "proposals": "{count, plural, =1 {הצעה אחת לתיק מחכה לבדיקה.} other {# הצעות לתיק מחכות לבדיקה.}}",
+        "extraction": "לא הגיע חילוץ כבר {days} ימי עבודה."
+      },
+      "house": {
+        "sinceYesterday": "מאתמול",
+        "sinceDays": "כבר {days}, מ-{date}",
+        "timer": "טיימר רץ {when} {time} על {client}.",
+        "timerLink": "לעצור ולתקן",
+        "noHours": "לא דווחו שעות ב{weekday}, {date}.",
+        "noHoursLink": "לדווח"
+      },
+      "sensitiveDate": "מועד רגיש",
+      "stepOf": "שלב במשימה: {parent}",
+      "rank": {
+        "urgent": "דחופה",
+        "approval": "מחכה לאישור שלך",
+        "blocking": "עוצר את {name}",
+        "approve": "לאשר",
+        "exception": "בקשת חריגה מחכה להחלטה שלך",
+        "exceptionShort": "בקשת חריגה מחכה לך",
+        "askedBy": "ביקש/ה {name}",
+        "decide": "להחליט",
+        "late": "באיחור {days}",
+        "open": "לפתוח",
+        "decideHint": "לבצע, לדחות את התאריך, או לסגור?",
+        "routineLate": "בדיקה שגרתית באיחור {days}",
+        "routineLateShort": "בדיקה שגרתית באיחור",
+        "routineToday": "בדיקה שגרתית להיום",
+        "check": "לבדוק",
+        "datePast": "מועד שעבר לפני {days} ולא טופל",
+        "datePastShort": "מועד שעבר",
+        "dateToday": "מועד היום",
+        "dateTomorrow": "מועד מחר",
+        "dateAhead": "מועד בעוד {days}",
+        "handle": "לטפל",
+        "dateNoTask": "אין עדיין משימה פתוחה למועד הזה.",
+        "today": "להיום",
+        "todayUrgentShort": "דחופה להיום",
+        "fresh": "חדשה אצלך",
+        "freshUrgentShort": "דחופה חדשה",
+        "updated": "עודכנה",
+        "updatedUrgentShort": "דחופה עודכנה",
+        "review": "נוהל לבדיקה",
+        "remind": "להזכיר"
+      },
+      "wait": {
+        "CLIENT": "ממתינה ללקוח",
+        "SUPPLIER": "ממתינה לספק",
+        "INTERNAL": "ממתינה לגורם פנימי",
+        "OTHER": "ממתינה"
+      },
+      "lead": {
+        "none": "אין משימות שדורשות אותך היום.",
+        "updated": "{count, plural, =1 {משימה אחת שלך עודכנה.} other {# משימות שלך עודכנו.}}",
+        "needs": "{count, plural, =1 {דבר אחד דורש אותך היום.} other {# דברים דורשים אותך היום.}}",
+        "blocking": "{count, plural, =1 {אחד מהם עוצר מישהו אחר.} other {# מהם עוצרים אחרים.}}"
+      },
+      "moreChanges": "{count, plural, =1 {ועוד עדכון אחד} other {ועוד # עדכונים}}",
+      "email": {
+        "greetingText": "בוקר טוב {name},",
+        "greeting": "בוקר טוב {name}",
+        "dayText": "היום שלך: {url}",
+        "due": "יעד {date}",
+        "moreTasks": "{count, plural, =1 {ועוד משימה אחת ברשימה.} other {ועוד # משימות ברשימה.}}",
+        "waits": "{count, plural, =1 {משימה אחת ממתינה למישהו יותר משבוע. אולי הגיע הזמן להזכיר.} other {# משימות ממתינות למישהו יותר משבוע. אולי הגיע הזמן להזכיר.}}",
+        "alsoWaits": "{count, plural, =1 {ועוד משימה אחת ממתינה למישהו יותר משבוע. אולי הגיע הזמן להזכיר.} other {ועוד # משימות ממתינות למישהו יותר משבוע. אולי הגיע הזמן להזכיר.}}",
+        "allTasksText": "כל המשימות: {url}",
+        "allTasksLink": "לכל המשימות",
+        "moreClients": "{count, plural, =1 {ועוד עניין אחד} other {ועוד # עניינים}}",
+        "clientsLink": "ללקוחות",
+        "clientsHeading": "הלקוחות שלך",
+        "houseHeading": "סדר בית",
+        "openDay": "פתח את היום שלי",
+        "approvalsLink": "למסך האישורים",
+        "ranked": "לפי סדר חשיבות",
+        "settings": "הגדרות המייל"
+      }
     }
   }
 }

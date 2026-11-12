@@ -1,4 +1,6 @@
 import "server-only";
+import { outgoingForUsers } from "@/lib/i18n/recipients";
+import { HEBREW, type OutgoingT } from "@/lib/i18n/outgoing";
 import { prisma } from "@/lib/prisma";
 import type { AutoApplyScope, Prisma, User } from "@prisma/client";
 import { assertCan, canManageClients, ForbiddenError } from "@/lib/app-auth/permissions";
@@ -106,7 +108,20 @@ async function managers() {
   return prisma.user.findMany({ where: { role: { in: ["SUPER_ADMIN", "ANKORA_ADMIN"] }, status: "ACTIVE", deletedAt: null }, select: { id: true } });
 }
 
-async function pause(scope: AutoApplyScope, key: string, errors: number, reason: string, notice: { title: string; body: string }) {
+/// The managers' notice is worded per manager, in their own language
+/// (ADR 0006, outgoing channels). `reason` is the record, and stays Hebrew.
+/// proposalKindLabel (lib/knowledge-review-filters.ts) in the reader's
+/// language: a target, or FACT.<kind> for a kind of fact.
+function kindLabelIn(t: OutgoingT, key: string): string {
+  const [target, factKind] = key.split(".");
+  if (factKind && factKind in FACT_KINDS) return t(`labels.factKinds.${factKind as keyof typeof FACT_KINDS}`);
+  if (target in TARGETS) return t(`labels.targets.${target as keyof typeof TARGETS}`);
+  return key;
+}
+const TARGETS = { FACT: 1, CONTACT: 1, ORGANIZATION: 1, SYSTEM: 1, REQUEST_TYPE: 1, POLICY: 1, ENTITY: 1, NARRATIVE: 1, PROCESS: 1, DOMAIN: 1, TASK: 1, DATE: 1 } as const;
+const FACT_KINDS = { SCOPE_IN: 1, SCOPE_OUT: 1, PREFERENCE: 1, REQUIREMENT: 1, LOCATION: 1, FINANCE: 1, TEMPORARY: 1, ONE_OFF_DECISION: 1, QUESTION: 1, NOTE: 1 } as const;
+
+async function pause(scope: AutoApplyScope, key: string, errors: number, reason: string, notice: (t: OutgoingT) => { title: string; body: string }) {
   // Checked again just before: two arrivals at once pause once.
   const open = await prisma.autoApplyPause.findFirst({ where: { scope, key, liftedAt: null } });
   if (open) return open;
@@ -114,8 +129,12 @@ async function pause(scope: AutoApplyScope, key: string, errors: number, reason:
   await recordAudit({ actorId: null, action: "knowledge.auto_apply_pause", entityType: "AutoApplyPause", entityId: row.id, clientId: scope === "CLIENT" ? key : null, after: { scope, key, errors } });
   const to = await managers();
   if (to.length) {
+    const words = await outgoingForUsers(to.map((u) => u.id));
     await prisma.notification.createMany({
-      data: to.map((u) => ({ userId: u.id, type: AUTO_APPLY_PAUSED, title: notice.title.slice(0, 200), body: notice.body.slice(0, 500), entityType: "Knowledge", entityId: row.id })),
+      data: to.map((u) => {
+        const n = notice((words.get(u.id) ?? HEBREW).t);
+        return { userId: u.id, type: AUTO_APPLY_PAUSED, title: n.title.slice(0, 200), body: n.body.slice(0, 500), entityType: "Knowledge", entityId: row.id };
+      }),
     });
   }
   return row;
@@ -139,10 +158,10 @@ export async function evaluateAutoPauses(scope: { clientId: string; kindKeys: st
     const due = clientPauseDue(errors, now, await lastLift("CLIENT", scope.clientId));
     if (due.due) {
       const client = await prisma.client.findUnique({ where: { id: scope.clientId }, select: { name: true } });
-      await pause("CLIENT", scope.clientId, due.errors, `${due.errors} פריטים שנכנסו אוטומטית בוטלו או תוקנו בתוך ${CLIENT_WINDOW_DAYS} יום`, {
-        title: `כניסה אוטומטית נעצרה ללקוח ${client?.name ?? ""}`,
-        body: `${due.errors} פריטים של הלקוח שנכנסו לתיק אוטומטית בוטלו או תוקנו בתוך ${CLIENT_WINDOW_DAYS} יום. מעכשיו ההצעות של הלקוח ממתינות לאישור של אדם. מחזירים אותו לכניסה אוטומטית במסך האישורים, בלשונית "ידע מהחילוץ".`,
-      });
+      await pause("CLIENT", scope.clientId, due.errors, `${due.errors} פריטים שנכנסו אוטומטית בוטלו או תוקנו בתוך ${CLIENT_WINDOW_DAYS} יום`, (t) => ({
+        title: t("autoApply.clientTitle", { client: client?.name ?? "" }),
+        body: t("autoApply.clientBody", { errors: String(due.errors), days: String(CLIENT_WINDOW_DAYS) }),
+      }));
       clientPaused = true;
     }
   }
@@ -163,9 +182,12 @@ export async function evaluateAutoPauses(scope: { clientId: string; kindKeys: st
     const due = kindPauseDue(rows.map((r) => ({ decidedAt: r.decidedAt!, error: !!errs.get(r.id) })), since);
     if (!due.due) continue;
     const label = proposalKindLabel(key);
-    await pause("KIND", key, due.errors, `${due.errors} מתוך ${due.counted} הפריטים האחרונים מסוג ${label} שנכנסו אוטומטית בוטלו או תוקנו`, {
-      title: `כניסה אוטומטית נעצרה: ${label}`,
-      body: `${due.errors} מתוך ${due.counted} הפריטים האחרונים מסוג ${label} שנכנסו לתיקים אוטומטית בוטלו או תוקנו. מעכשיו הצעות מהסוג הזה ממתינות לאישור של אדם. מחזירים אותו לכניסה אוטומטית במסך האישורים, בלשונית "ידע מהחילוץ".`,
+    await pause("KIND", key, due.errors, `${due.errors} מתוך ${due.counted} הפריטים האחרונים מסוג ${label} שנכנסו אוטומטית בוטלו או תוקנו`, (t) => {
+      const kind = kindLabelIn(t, key);
+      return {
+        title: t("autoApply.kindTitle", { kind }),
+        body: t("autoApply.kindBody", { errors: String(due.errors), counted: String(due.counted), kind }),
+      };
     });
     pausedKinds.add(key);
   }

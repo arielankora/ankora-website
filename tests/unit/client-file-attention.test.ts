@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { attentionSentence, hasAttention, isStaleProposal, isStaleProposedRule, isStaleUncertain } from "@/lib/client-file-attention";
+import { translatorFor } from "@/lib/i18n/outgoing";
+
+const he = translatorFor("he").t;
+const en = translatorFor("en").t;
 
 describe("client file attention", () => {
   const now = new Date("2026-10-14T05:00:00Z");
@@ -11,10 +15,10 @@ describe("client file attention", () => {
   });
 
   it("says only the counts that are not zero, most urgent first, in Hebrew number agreement", () => {
-    expect(attentionSentence({ pastValidity: 1, staleUncertain: 0, openQuestions: 3, staleProposedRules: 0 })).toBe(
+    expect(attentionSentence({ pastValidity: 1, staleUncertain: 0, openQuestions: 3, staleProposedRules: 0 }, he)).toBe(
       "פריט זמני אחד עבר את התוקף שלו. עדיין נכון? 3 שאלות פתוחות עדיין בלי תשובה."
     );
-    expect(attentionSentence({ pastValidity: 0, staleUncertain: 2, openQuestions: 1, staleProposedRules: 0 })).toBe(
+    expect(attentionSentence({ pastValidity: 0, staleUncertain: 2, openQuestions: 1, staleProposedRules: 0 }, he)).toBe(
       "שאלה פתוחה אחת עדיין בלי תשובה. 2 פריטים לא ודאיים כבר יותר מ-14 יום."
     );
     expect(hasAttention({ pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 0 })).toBe(false);
@@ -25,7 +29,7 @@ describe("client file attention", () => {
     expect(isStaleProposedRule({ status: "ACTIVE", createdAt: new Date("2026-01-01T00:00:00Z") }, now)).toBe(false);
     expect(isStaleProposedRule({ status: "PROPOSED", createdAt: new Date(now.getTime() - 2 * 86_400_000) }, now)).toBe(false);
     expect(isStaleProposedRule({ status: "PROPOSED", createdAt: new Date(now.getTime() - 4 * 86_400_000) }, now)).toBe(true);
-    expect(attentionSentence({ pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 1 })).toBe("כלל מוצע אחד מחכה לאישור מנהל כבר יותר מ-3 ימים, ועד אז הוא לא מחייב.");
+    expect(attentionSentence({ pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 1 }, he)).toBe("כלל מוצע אחד מחכה לאישור מנהל כבר יותר מ-3 ימים, ועד אז הוא לא מחייב.");
     expect(hasAttention({ pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 2 })).toBe(true);
   });
 
@@ -35,7 +39,13 @@ describe("client file attention", () => {
     expect(isStaleProposal({ state: "REJECTED", createdAt: new Date("2026-01-01T00:00:00Z") }, now)).toBe(false);
     const a = { pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 0 };
     expect(hasAttention({ ...a, staleProposals: 1 })).toBe(true);
-    expect(attentionSentence({ ...a, staleProposals: 1 })).toBe("הצעה אחת מחכה במסך הבדיקה כבר יותר מ-7 ימים, ועד שתאושר היא לא בתיק.");
-    expect(attentionSentence({ ...a, staleProposals: 3 })).toBe("3 הצעות מחכות במסך הבדיקה כבר יותר מ-7 ימים, ועד שיאושרו הן לא בתיק.");
+    expect(attentionSentence({ ...a, staleProposals: 1 }, he)).toBe("הצעה אחת מחכה במסך הבדיקה כבר יותר מ-7 ימים, ועד שתאושר היא לא בתיק.");
+    expect(attentionSentence({ ...a, staleProposals: 3 }, he)).toBe("3 הצעות מחכות במסך הבדיקה כבר יותר מ-7 ימים, ועד שיאושרו הן לא בתיק.");
+  });
+
+  it("speaks the recipient's language (ADR 0006, outgoing channels)", () => {
+    expect(attentionSentence({ pastValidity: 1, staleUncertain: 0, openQuestions: 3, staleProposedRules: 0 }, en)).toBe(
+      "One temporary item is past its validity. Still true? 3 open questions still have no answer."
+    );
   });
 });

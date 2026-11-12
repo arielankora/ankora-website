@@ -107,10 +107,13 @@ export async function recordStepUpFailure(actor: User, method: "password" | "pas
     after: { method, locked },
   });
   if (locked) {
-    await sendVaultAlert("נעילת אימות", [
-      `${actor.name} (${actor.email}) נכשל/ה באימות זהות ${STEP_UP_FAIL_LIMIT} פעמים לפני חשיפת גישה.`,
-      `החשיפה נעולה למשתמש הזה ל-${STEP_UP_FAIL_WINDOW_MS / 60_000} דקות.`,
-    ]);
+    await sendVaultAlert((t) => ({
+      subject: t("vault.lockout.subject"),
+      lines: [
+        t("vault.lockout.line1", { name: actor.name, email: actor.email, limit: String(STEP_UP_FAIL_LIMIT) }),
+        t("vault.lockout.line2", { minutes: String(STEP_UP_FAIL_WINDOW_MS / 60_000) }),
+      ],
+    }));
     throw new StepUpLockedError();
   }
   throw new StepUpFailedError();

@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { LONG_TIMER_HOURS } from "@/lib/app-domain/reports";
 import type { User } from "@prisma/client";
+import { outgoingForUsers, outgoingOf } from "@/lib/i18n/recipients";
+import { HEBREW, type Outgoing } from "@/lib/i18n/outgoing";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2): spec §11's "Notifications"
 // screen (anomalies/long-timer warnings/internal alerts) and spec §6.1's
@@ -122,8 +124,11 @@ export async function notifyLongRunningTimers(): Promise<{ notified: number }> {
 
   for (const entry of toNotify) {
     const hoursRunning = Math.floor((Date.now() - entry.startAt.getTime()) / 3600_000);
-    const title = "טיימר רץ זמן ארוך";
-    const body = `הטיימר עבור ${entry.client.name} רץ כבר ${hoursRunning} שעות ברצף. בדקו אם יש לעצור אותו.`;
+    // In the timer owner's language (ADR 0006, outgoing channels). A
+    // string, so a long count is never written with a thousands separator.
+    const { t } = outgoingOf(entry.user);
+    const title = t("longTimer.title");
+    const body = t("longTimer.body", { client: entry.client.name, hours: String(hoursRunning) });
 
     await prisma.notification.create({
       data: {
@@ -228,7 +233,11 @@ export async function notifyTaskPeople(
   // the client was promised, not what somebody has to go and do.
   const subject = task.title;
 
+  // Each person in their own language (ADR 0006, outgoing channels).
+  const words = await outgoingForUsers(targets.map((x) => x.userId)).catch(() => new Map<string, Outgoing>());
+
   for (const target of targets) {
+    const { t } = words.get(target.userId) ?? HEBREW;
     try {
       await prisma.notification.create({
         data: {
@@ -240,10 +249,10 @@ export async function notifyTaskPeople(
           title:
             target.type === TASK_ASSIGNED_NOTIFICATION_TYPE
               ? task.priority === "URGENT"
-                ? "משימה דחופה אצלך"
-                : "משימה חדשה אצלך"
-              : "מונית למפקח על משימה",
-          body: `${subject} · ${clientName}`,
+                ? t("taskNotice.assignedUrgent")
+                : t("taskNotice.assigned")
+              : t("taskNotice.supervising"),
+          body: t("taskNotice.body", { task: subject, client: clientName }),
           entityType: "Task",
           entityId: task.id,
         },

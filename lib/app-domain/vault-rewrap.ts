@@ -121,19 +121,18 @@ export async function rewrapVaultKeys(): Promise<RewrapResult> {
       ip: null,
       userAgent: null,
     });
-    const lines = [
-      `הועברו למפתח החדש: ${result.rewrapped}`,
-      `כבר על המפתח החדש: ${result.current}`,
-      `נכשלו בבדיקה ולא נגעו בהן: ${result.failed}`,
-      `רשומות במפתח שהסביבה לא מחזיקה: ${result.foreign}`,
-    ];
     const done = result.failed === 0 && result.skipped === 0 && result.foreign === 0;
-    await sendVaultAlert(
-      done ? "החלפת המפתח הושלמה" : "החלפת המפתח לא הושלמה",
-      done
-        ? [...lines, "", "אפשר להעביר את הערך החדש ל-VAULT_KEK, למחוק את VAULT_KEK_NEXT ולפרוס מחדש."]
-        : [...lines, "", "אל תמחקו את המפתח הישן עד שהמספרים האלה יתאפסו."],
-    );
+    await sendVaultAlert((t) => {
+      const lines = [
+        t("vault.rewrap.moved", { count: String(result.rewrapped) }),
+        t("vault.rewrap.current", { count: String(result.current) }),
+        t("vault.rewrap.failed", { count: String(result.failed) }),
+        t("vault.rewrap.foreign", { count: String(result.foreign) }),
+      ];
+      return done
+        ? { subject: t("vault.rewrap.doneSubject"), lines: [...lines, "", t("vault.rewrap.doneNext")] }
+        : { subject: t("vault.rewrap.notDoneSubject"), lines: [...lines, "", t("vault.rewrap.notDoneNext")] };
+    });
   } else if (result.foreign > 0) {
     // Logged, not mailed: a preview copied from production sees this
     // every night, and a nightly email would teach everyone to ignore it.
