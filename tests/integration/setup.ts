@@ -29,6 +29,7 @@ const TABLES = [
   "comms_conversations",
   "comms_blocks",
   "comms_channels",
+  "comms_line_owners",
   // Phase 4 tables truncate before the Phase 3 tables they (loosely)
   // reference - email_deliveries -> alert_events -> alert_rules -> clients.
   // alert_events.hourBankId is a plain column (no FK - see ADR 11.3), so
