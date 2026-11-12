@@ -228,6 +228,28 @@ function toMinutes(seconds: number | null | undefined): number {
   return round((seconds ?? 0) / 60);
 }
 
+/// 11.11.2026 (Hadas's portal review): every total the portal shows is
+/// summed in seconds and rounded to minutes once, the way the hour bank
+/// counts consumption (consumedMinutesFromEntries). Summing minutes that
+/// were already rounded per entry drifted from the bank: 12:53 on the week
+/// beside 12.87 (772 minutes) on the bank, for the same entries.
+function sumMinutes(rows: Array<{ billableSeconds: number }>): number {
+  return toMinutes(rows.reduce((s, r) => s + r.billableSeconds, 0));
+}
+
+/// Groups rows by a key and totals each group with sumMinutes.
+function minutesBy<T extends { billableSeconds: number }>(rows: T[], key: (r: T) => string): Map<string, number> {
+  const seconds = new Map<string, number>();
+  for (const r of rows) seconds.set(key(r), (seconds.get(key(r)) ?? 0) + r.billableSeconds);
+  return new Map([...seconds.entries()].map(([k, s]) => [k, toMinutes(s)]));
+}
+
+/// The row as callers see it: the per-entry minutes, without the seconds
+/// the totals above are built from.
+function publicRow({ billableSeconds: _seconds, ...row }: PortalEntryRow): PublicPortalEntryRow {
+  return row;
+}
+
 /// Spec 13's Dashboard: "בנק שעות נוכחי, נוצל, נותר, % ניצול, ימים עד סוף
 /// cycle." Reuses the exact same live snapshot the internal Hour Banks /
 /// Reports screens trust (lib/app-domain/hour-banks.ts) - a client must
@@ -260,12 +282,17 @@ function daysLeftToShow(snapshot: { bank: { cycleEnd: Date; kind: string } } | n
   return days;
 }
 
-interface PortalEntryRow {
+interface PublicPortalEntryRow {
   date: string;
   activity: string;
   category: string;
   billableMinutes: number;
   employee?: string;
+}
+
+interface PortalEntryRow extends PublicPortalEntryRow {
+  /// For totals only (sumMinutes); stripped by publicRow before a row leaves this file.
+  billableSeconds: number;
 }
 
 /// `forAi` (28.10.2026): for the portal's MCP connector. An entry on a task
@@ -284,6 +311,7 @@ async function fetchPortalEntries(clientId: string, from: Date, to: Date, showEm
       activity: (hidden ? null : e.task?.title) ?? e.category.name,
       category: e.category.name,
       billableMinutes: toMinutes(e.billableSeconds),
+      billableSeconds: e.billableSeconds ?? 0,
     };
     if (showEmployeeNames) row.employee = e.user.name;
     return row;
@@ -306,14 +334,12 @@ function dailyTotals(rows: PortalEntryRow[], from: Date) {
   const dayKeys = Array.from({ length: 7 }, (_, i) => new Date(Date.UTC(y, m - 1, day + i)).toISOString().slice(0, 10));
   return dayKeys.map((date) => ({
     date,
-    minutes: rows.filter((r) => r.date === date).reduce((s, r) => s + r.billableMinutes, 0),
+    minutes: sumMinutes(rows.filter((r) => r.date === date)),
   }));
 }
 
 function topActivities(rows: PortalEntryRow[], limit = 5) {
-  const byActivity = new Map<string, number>();
-  for (const r of rows) byActivity.set(r.activity, (byActivity.get(r.activity) ?? 0) + r.billableMinutes);
-  return [...byActivity.entries()]
+  return [...minutesBy(rows, (r) => r.activity).entries()]
     .map(([activity, minutes]) => ({ activity, minutes }))
     .sort((a, b) => b.minutes - a.minutes)
     .slice(0, limit);
@@ -328,19 +354,21 @@ export async function getWeeklyActivity(actor: User, weekStart?: Date, opts: { f
   const to = endOfWeek(from);
 
   const rows = await fetchPortalEntries(client.id, from, to, client.portalShowEmployeeNames, opts.forAi);
-  const totalMinutes = rows.reduce((s, r) => s + r.billableMinutes, 0);
-
-  const byCategory = new Map<string, number>();
-  for (const r of rows) byCategory.set(r.category, (byCategory.get(r.category) ?? 0) + r.billableMinutes);
+  const days = dailyTotals(rows, from);
 
   return {
     from,
     to,
-    rows,
-    totalMinutes,
-    byCategory: [...byCategory.entries()].map(([category, minutes]) => ({ category, minutes })),
-    dailyTotals: dailyTotals(rows, from),
+    rows: rows.map(publicRow),
+    totalMinutes: sumMinutes(rows),
+    byCategory: [...minutesBy(rows, (r) => r.category).entries()].map(([category, minutes]) => ({ category, minutes })),
+    dailyTotals: days,
     topActivities: topActivities(rows),
+    /// 11.11.2026: the same list for each day on its own, for the screen's
+    /// day filter (a click on a bar). Every activity of the day, not a top five.
+    activitiesByDay: Object.fromEntries(
+      days.map((d) => [d.date, topActivities(rows.filter((r) => r.date === d.date), Infinity)])
+    ) as Record<string, Array<{ activity: string; minutes: number }>>,
     showEmployeeNames: client.portalShowEmployeeNames,
   };
 }
@@ -389,13 +417,11 @@ export async function getMonthlyDetailed(actor: User, monthStart?: Date, opts: {
     tasksCompletedCount(client.id, from, to),
     nextAutoSendLabel(client.id),
   ]);
-  const totalMinutes = rows.reduce((s, r) => s + r.billableMinutes, 0);
-
   return {
     from,
     to,
-    rows,
-    totalMinutes,
+    rows: rows.map(publicRow),
+    totalMinutes: sumMinutes(rows),
     tasksCompleted,
     autoSendLabel,
     showEmployeeNames: client.portalShowEmployeeNames,
@@ -413,11 +439,9 @@ export async function getCategorySummary(actor: User, from?: Date, to?: Date) {
     include: { category: true },
   });
 
-  const byCategory = new Map<string, number>();
-  for (const e of entries) {
-    byCategory.set(e.category.name, (byCategory.get(e.category.name) ?? 0) + toMinutes(e.billableSeconds));
-  }
-  const total = [...byCategory.values()].reduce((s, m) => s + m, 0);
+  const seconds = entries.map((e) => ({ category: e.category.name, billableSeconds: e.billableSeconds ?? 0 }));
+  const byCategory = minutesBy(seconds, (e) => e.category);
+  const total = sumMinutes(seconds);
 
   const rows = [...byCategory.entries()]
     .map(([category, minutes]) => ({
@@ -803,4 +827,38 @@ export async function getPortalProgress(actor: User): Promise<PortalStageCounts>
   const counts: PortalStageCounts = { total: rows.length, RECEIVED: 0, IN_PROGRESS: 0, WAITING_ON_CLIENT: 0, DONE: 0 };
   for (const row of rows) counts[stageOf(row)] += 1;
   return counts;
+}
+
+export interface PortalTaskReport {
+  from: Date;
+  to: Date;
+  /// Everything not finished, as of now: waiting on the client first, then ours.
+  open: PortalPromise[];
+  /// Finished inside the month on screen, newest first.
+  closed: PortalPromise[];
+  waitingOnClient: number;
+}
+
+/// 11.11.2026 (Hadas's portal review): the "משימות" tab of the hours screen,
+/// in place of the monthly report. How many of the client's tasks closed in
+/// a month, how many are still open, and the tasks themselves.
+///
+/// The same visible set and stage rule as every other portal screen
+/// (listVisibleTasks, stageOf), so the counts here and on the home screen
+/// never disagree. "Closed in the month" is by completedAt, the same date
+/// the row shows (PortalPromise.movedAt); "open" is always as of today,
+/// whichever month is on screen, because an open task has no month.
+export async function getPortalTaskReport(actor: User, monthStart?: Date): Promise<PortalTaskReport> {
+  const { client } = await resolvePortalClient(actor);
+  const from = startOfMonth(monthStart ?? new Date());
+  const to = endOfMonth(from);
+  const promises = (await listVisibleTasks(client.id)).map(toPromise);
+
+  const rank = (p: PortalPromise) => (p.stage === "WAITING_ON_CLIENT" ? 0 : 1);
+  const open = promises.filter((p) => p.stage !== "DONE").sort((a, b) => rank(a) - rank(b));
+  const closed = promises
+    .filter((p) => p.stage === "DONE" && p.movedAt >= from && p.movedAt < to)
+    .sort((a, b) => b.movedAt.getTime() - a.movedAt.getTime());
+
+  return { from, to, open, closed, waitingOnClient: open.filter((p) => p.stage === "WAITING_ON_CLIENT").length };
 }
