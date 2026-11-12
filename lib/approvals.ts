@@ -10,6 +10,8 @@
 // all read one definition of what a tab is, what it holds and in what
 // order. The rows are read in lib/app-domain/approvals.ts.
 
+import type { MessageKeys, NestedKeyOf } from "next-intl";
+import type he from "@/messages/he.json";
 import type { ApprovalPreview } from "@/lib/approvals-preview";
 import type { StepOp } from "@/lib/next-steps";
 
@@ -123,11 +125,51 @@ export type ApprovalItem = {
   blocking?: boolean;
   /// A date it is tied to: the task's due date, the process's next run.
   deadline?: Date | null;
+  /// The row's own words for the screen, as dictionary keys under
+  /// approvals.items (ADR 0006). The Hebrew fields above stay as they
+  /// were: Claude reads them through list_approvals and decide_approval.
+  /// A field without a key here (a process decision's words, which come
+  /// from lib/next-steps.ts) is shown as it is.
+  screen?: ApprovalScreenText;
   /// A knowledge batch: false when it waits on someone else (whoever sent
   /// it, the account manager). Out of the count and "היום", on screen
   /// under "של כולם" and with a client chosen (22.10.2026).
   mine?: boolean;
 };
+
+// ---------------------------------------------------------------------------
+// The screen's words (ADR 0006)
+// ---------------------------------------------------------------------------
+
+type ItemMessages = (typeof he)["approvals"]["items"];
+/// A key under approvals.items, checked against he.json by tsc.
+export type ApprovalItemKey = MessageKeys<ItemMessages, NestedKeyOf<ItemMessages>>;
+/// A date in a row's words: "day" is a calendar date stored at UTC
+/// midnight (an exception's last day), "month" a summary's month, which
+/// begins at Israel's midnight on the 1st. Both decide which day or month
+/// it is, so they keep these zones whatever the reader's.
+export type ApprovalDate = { date: Date; as: keyof typeof APPROVAL_DATE_FORMATS };
+export type ApprovalTextValue = string | number | ApprovalDate | ApprovalText;
+export type ApprovalText = { key: ApprovalItemKey; values?: Record<string, ApprovalTextValue> };
+export type ApprovalScreenText = {
+  title?: ApprovalText;
+  detail?: ApprovalText;
+  approve?: ApprovalText;
+  reject?: ApprovalText;
+  recommend?: { text: ApprovalText; why: ApprovalText | null };
+  blocked?: ApprovalText;
+  go?: ApprovalText;
+};
+
+export const APPROVAL_DATE_FORMATS = {
+  day: { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" },
+  month: { month: "long", year: "numeric", timeZone: "Asia/Jerusalem" },
+} as const satisfies Record<string, Intl.DateTimeFormatOptions>;
+
+/// Whole days a row has waited, for the screen's "waited" words.
+export function waitedDays(since: Date, now: Date): number {
+  return Math.floor((now.getTime() - since.getTime()) / 86_400_000);
+}
 
 /// What waits on the person: everything but other people's meetings.
 export function onlyMine<T extends { mine?: boolean }>(items: T[]): T[] {
@@ -197,7 +239,7 @@ export function approvalsHref(tab: ApprovalTab, clientId: string | null): string
 
 /// "לפני 3 ימים", for a row's waiting time.
 export function waitedLabel(since: Date, now: Date): string {
-  const days = Math.floor((now.getTime() - since.getTime()) / 86_400_000);
+  const days = waitedDays(since, now);
   if (days <= 0) return "מהיום";
   if (days === 1) return "מאתמול";
   return `כבר ${days} ימים`;
@@ -242,11 +284,20 @@ export function withApprovalsBack(href: string, tab: ApprovalTab, clientId: stri
   return `${base}${sep}${APPROVALS_BACK_PARAM}=${encodeURIComponent(backValue(tab, clientId))}${hash}`;
 }
 
+/// The words of the way back come from the dictionary, under "approvals":
+/// `title` and tabs.*. A caller passes its translator for "approvals"; one
+/// that does not (the unit tests, a screen not yet translated) gets the
+/// Hebrew, the same text he.json holds for these keys.
+export type ApprovalsBackKey = "title" | `tabs.${ApprovalTab}`;
+export type ApprovalsBackWords = (key: ApprovalsBackKey) => string;
+
+const hebrewBack: ApprovalsBackWords = (key) => (key === "title" ? "אישורים" : (APPROVAL_TABS.find((t) => `tabs.${t.key}` === key)?.label ?? ""));
+
 /// The way back, from the parameter: the screen's address and its name,
 /// "אישורים · כללים". Null when the page was not opened from there. The
 /// value is input: only the screen's own keys survive, and the address is
 /// always /app/approvals.
-export function approvalsBack(value: string | string[] | null | undefined): { href: string; label: string; param: string } | null {
+export function approvalsBack(value: string | string[] | null | undefined, t: ApprovalsBackWords = hebrewBack): { href: string; label: string; param: string } | null {
   const raw = Array.isArray(value) ? value[0] : value;
   if (typeof raw !== "string" || !raw || raw.length > MAX_VALUE * 2) return null;
   const input = raw === "all" ? new URLSearchParams() : new URLSearchParams(raw);
@@ -256,10 +307,10 @@ export function approvalsBack(value: string | string[] | null | undefined): { hr
     if (v && v.length <= MAX_VALUE) params[key] = v;
   }
   const { tab, clientId } = parseApprovalsParams(params);
-  const name = APPROVAL_TABS.find((t) => t.key === tab)?.label;
+  const screen = t("title");
   return {
     href: approvalsHref(tab, clientId),
-    label: tab === "all" || !name ? "אישורים" : `אישורים · ${name}`,
+    label: tab === "all" ? screen : `${screen} · ${t(`tabs.${tab}`)}`,
     param: `${APPROVALS_BACK_PARAM}=${encodeURIComponent(backValue(tab, clientId))}`,
   };
 }

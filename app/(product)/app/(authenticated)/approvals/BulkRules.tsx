@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { approveRulesTogetherAction } from "./actions";
 
@@ -18,30 +19,32 @@ export function BulkRules({ groups }: { groups: { clientId: string; clientName: 
 }
 
 function BulkRule({ group }: { group: { clientId: string; clientName: string; ids: string[] } }) {
+  const t = useTranslations("approvals.bulk");
   const { showToast } = useToast();
   const [pending, start] = useTransition();
   const [confirming, setConfirming] = useState(false);
   const [done, setDone] = useState<string | null>(null);
-  const label = `לאשר את ${group.ids.length} הכללים של ${group.clientName}`;
+  const label = t("label", { count: String(group.ids.length), client: group.clientName });
   if (done) return <span className="rounded-full border border-app-border px-3 py-1 text-[12.5px] text-app-text-tertiary">{done}</span>;
   const run = () =>
     start(async () => {
       const r = await approveRulesTogetherAction(group.clientId, group.ids);
       if (r.error) {
-        showToast({ tone: "error", title: "האישור נכשל", description: r.error });
+        showToast({ tone: "error", title: t("approveFailed"), description: r.error });
         return;
       }
       const failed = r.failed ?? [];
-      setDone(`${r.approved} כללים אושרו`);
-      showToast({ tone: failed.length ? "info" : "success", title: `${r.approved} כללים אושרו`, description: failed.length ? `לא אושרו: ${failed.join("; ").slice(0, 200)}` : group.clientName });
+      const approved = t("approved", { count: String(r.approved ?? 0) });
+      setDone(approved);
+      showToast({ tone: failed.length ? "info" : "success", title: approved, description: failed.length ? t("notApproved", { list: failed.join("; ").slice(0, 200) }) : group.clientName });
     });
   return confirming ? (
     <span className="flex items-center gap-2 rounded-full border border-app-accent bg-app-accent-soft px-3 py-1 text-[12.5px]">
       <button type="button" disabled={pending} onClick={run} className="font-medium text-app-text-primary disabled:opacity-40">
-        {pending ? "מאשר..." : `כן, ${label}`}
+        {pending ? t("approving") : t("confirm", { label })}
       </button>
       <button type="button" onClick={() => setConfirming(false)} className="text-app-text-tertiary hover:underline">
-        ביטול
+        {t("cancel")}
       </button>
     </span>
   ) : (

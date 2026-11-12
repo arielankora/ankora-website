@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { decideApproval, type DecideInput } from "@/lib/app-domain/decide-approval";
@@ -12,10 +14,14 @@ import { approveRulesTogether } from "@/lib/app-domain/process-next-steps";
 
 export type { DecideInput };
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה להחליט על זה.";
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("approvals.errors");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  const coded = await domainErrorText(err);
+  if (coded) return coded;
+  // Refusals from domains not yet given codes keep their own sentence.
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
 }
 
 export async function decideApprovalAction(input: DecideInput): Promise<{ error?: string; ok?: boolean }> {
@@ -23,7 +29,7 @@ export async function decideApprovalAction(input: DecideInput): Promise<{ error?
   try {
     await decideApproval(user, input);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   // The menu's count lives in the layout.
   revalidatePath("/app", "layout");
@@ -40,6 +46,6 @@ export async function approveRulesTogetherAction(clientId: string, ids: string[]
     revalidatePath(`/app/clients/${clientId}`);
     return r;
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 }

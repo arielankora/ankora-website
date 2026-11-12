@@ -1,7 +1,8 @@
 "use client";
 import { useRef } from "react";
+import { useTranslations } from "next-intl";
 import { AGE_OPTIONS, reviewFiltersHref, type ReviewFilters } from "@/lib/knowledge-review-filters";
-import { SOURCE_KIND_LABELS } from "@/lib/knowledge-sources";
+import { sourceKindLabel } from "./labels";
 
 // The filter bar on "ממתין לאישור"
 // (claude/knowledge-review-filters-spec-2026-10-17.md).
@@ -36,6 +37,8 @@ export function ReviewFilterBar({
   people: FilterOption[];
   attentionCount: number;
 }) {
+  const t = useTranslations("knowledge.filters");
+  const tk = useTranslations("knowledge");
   const formRef = useRef<HTMLFormElement>(null);
   const submit = () => formRef.current?.requestSubmit();
   const toggleKind = (k: string) =>
@@ -46,11 +49,11 @@ export function ReviewFilterBar({
   // A client chosen by link that has nothing waiting is still shown as
   // chosen, so the select never claims "all clients" while one is set.
   const clientOptions = filters.clientId && !clients.some((c) => c.value === filters.clientId)
-    ? [...clients, { value: filters.clientId, label: "לקוח שנבחר", count: 0 }]
+    ? [...clients, { value: filters.clientId, label: t("chosenClient"), count: 0 }]
     : clients;
 
   return (
-    <form ref={formRef} method="get" action="/app/approvals" aria-label="סינון הצעות" className="space-y-2.5">
+    <form ref={formRef} method="get" action="/app/approvals" aria-label={t("ariaLabel")} className="space-y-2.5">
       {/* The review screen is a tab of "אישורים" (20.10.2026). */}
       <input type="hidden" name="tab" value="knowledge" />
       {/* What the chips own, carried so a select change keeps them. */}
@@ -61,10 +64,10 @@ export function ReviewFilterBar({
 
       <div className="flex flex-wrap items-center gap-2">
         <Select
-          label="לקוח"
+          label={t("client")}
           name="clientId"
           value={filters.clientId ?? ""}
-          options={[{ value: "", label: "כל הלקוחות" }, ...clientOptions.map((c) => ({ value: c.value, label: c.count ? `${c.label} (${c.count})` : c.label }))]}
+          options={[{ value: "", label: t("allClients") }, ...clientOptions.map((c) => ({ value: c.value, label: c.count ? t("optionCount", { label: c.label, count: c.count }) : c.label }))]}
           onChange={submit}
         />
 
@@ -72,11 +75,11 @@ export function ReviewFilterBar({
           <a
             href={reviewFiltersHref({ ...filters, attention: !filters.attention })}
             aria-current={filters.attention ? "true" : undefined}
-            title="רגיש, משנה פריט קיים, אולי כבר בתיק, או שכלל סימן אותו"
+            title={t("attentionHint")}
             className={`${CHIP} ${filters.attention ? CHIP_ON : CHIP_OFF}`}
           >
             <span className={`h-1.5 w-1.5 rounded-full ${filters.attention ? "bg-gold" : "bg-app-warning"}`} aria-hidden />
-            דורש תשומת לב <span className="text-app-text-tertiary">{attentionCount}</span>
+            {t("attention")} <span className="text-app-text-tertiary">{attentionCount}</span>
           </a>
         ) : null}
 
@@ -103,35 +106,35 @@ export function ReviewFilterBar({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
         <details open={more} className="group">
           <summary className="cursor-pointer list-none text-app-text-secondary hover:text-app-text-primary">
-            עוד סינונים<span className="ms-1 inline-block transition-transform group-open:rotate-180">▾</span>
+            {t("more")}<span className="ms-1 inline-block transition-transform group-open:rotate-180">▾</span>
           </summary>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Select
-              label="מקור"
+              label={t("source")}
               name="source"
               value={filters.source ?? ""}
-              options={[{ value: "", label: "כל המקורות" }, ...sources.map((s) => ({ value: s.value, label: `${SOURCE_KIND_LABELS[s.value as keyof typeof SOURCE_KIND_LABELS] ?? s.label} (${s.count})` }))]}
+              options={[{ value: "", label: t("allSources") }, ...sources.map((s) => ({ value: s.value, label: t("optionCount", { label: sourceKindLabel(tk, s.value), count: s.count }) }))]}
               onChange={submit}
             />
             <Select
-              label="נשלח על ידי"
+              label={t("sentBy")}
               name="by"
               value={filters.by ?? ""}
-              options={[{ value: "", label: "כולם" }, ...people.map((p) => ({ value: p.value, label: `${p.label} (${p.count})` }))]}
+              options={[{ value: "", label: t("everyone") }, ...people.map((p) => ({ value: p.value, label: t("optionCount", { label: p.label, count: p.count }) }))]}
               onChange={submit}
             />
             <Select
-              label="ממתין"
+              label={t("waiting")}
               name="age"
               value={filters.age !== null ? String(filters.age) : ""}
-              options={[{ value: "", label: "כל זמן" }, ...AGE_OPTIONS.map((d) => ({ value: String(d), label: `יותר מ-${d} ימים` }))]}
+              options={[{ value: "", label: t("anyTime") }, ...AGE_OPTIONS.map((d) => ({ value: String(d), label: t("olderThan", { days: d }) }))]}
               onChange={submit}
             />
           </div>
         </details>
         {any && (
           <a href={reviewFiltersHref({ clientId: null, kinds: [], attention: false, source: null, by: null, age: null })} className="text-app-text-accent hover:underline">
-            ניקוי הסינון
+            {t("clear")}
           </a>
         )}
       </div>

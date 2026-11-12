@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText, domainText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { approveProposal, approveWithSuggestion, attachProposalToExisting, decideProposals, mergeProposal, proposalToTask, rejectProposal, revertProposal } from "@/lib/app-domain/knowledge-proposals";
@@ -50,10 +52,25 @@ const EDITABLE = new Set([
   "assigneeName",
 ]);
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
+/// ADR 0006: every refusal in the reader's language. A DomainError is
+/// worded from its code; anything else keeps its message, as before.
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("knowledge.errors");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  const domain = await domainErrorText(err);
+  if (domain) return domain;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
+}
+
+/// A bulk failure as the domain reported it (BulkResult), in the reader's
+/// language when it came with a code.
+async function failedText(f: { error: string; code?: string; values?: Record<string, string | number> }): Promise<string> {
+  return f.code ? domainText(`domainErrors.${f.code}`, f.values) : f.error;
+}
+
+async function failedInReaderLanguage(failed: { id: string; error: string; code?: string; values?: Record<string, string | number> }[]) {
+  return Promise.all(failed.map(async (f) => ({ id: f.id, error: await failedText(f) })));
 }
 
 function done(): FormState {
@@ -68,7 +85,7 @@ export async function approveProposalAction(id: string): Promise<ApproveState> {
   try {
     procedure = (await approveProposal(user, id)).procedure;
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   return { ...done(), procedure };
 }
@@ -80,7 +97,7 @@ export async function revertProposalAction(id: string): Promise<FormState> {
   try {
     await revertProposal(user, id);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   return done();
 }
@@ -93,7 +110,7 @@ export async function approveWithSuggestionAction(id: string): Promise<ApproveSt
   try {
     procedure = (await approveWithSuggestion(user, id)).procedure;
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   return { ...done(), procedure };
 }
@@ -104,7 +121,7 @@ export async function attachProposalAction(id: string): Promise<FormState> {
   try {
     await attachProposalToExisting(user, id);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   return done();
 }
@@ -115,7 +132,7 @@ export async function mergeProposalAction(id: string, targetId: string): Promise
   try {
     await mergeProposal(user, id, targetId);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   return done();
 }
@@ -139,7 +156,7 @@ export async function approveEditedProposalAction(_prev: ApproveState | undefine
   try {
     procedure = (await approveProposal(user, String(formData.get("id") ?? ""), edits)).procedure;
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   return { ...done(), procedure };
 }
@@ -149,7 +166,7 @@ export async function rejectProposalAction(_prev: FormState | undefined, formDat
   try {
     await rejectProposal(user, String(formData.get("id") ?? ""), String(formData.get("reason") ?? ""));
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   return done();
 }
@@ -170,7 +187,7 @@ export async function proposalToTaskAction(_prev: (FormState & { taskId?: string
     revalidatePath("/app/tasks");
     return { ...done(), taskId: r.taskId };
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 }
 
@@ -182,9 +199,9 @@ export async function approveProposalsAction(ids: string[]): Promise<BulkState> 
     const r = await decideProposals(user, ids, { approve: true });
     revalidatePath("/app/approvals");
     revalidatePath("/app", "layout");
-    return { ok: r.failed.length === 0, done: r.done.length, failed: r.failed };
+    return { ok: r.failed.length === 0, done: r.done.length, failed: await failedInReaderLanguage(r.failed) };
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 }
 
@@ -194,10 +211,14 @@ export async function rejectProposalsAction(_prev: BulkState | undefined, formDa
     const r = await decideProposals(user, formData.getAll("id").map(String), { approve: false, reason: String(formData.get("reason") ?? "") });
     revalidatePath("/app/approvals");
     revalidatePath("/app", "layout");
-    if (r.failed.length) return { error: `${r.failed.length} לא נדחו: ${r.failed[0].error}`, done: r.done.length, failed: r.failed };
+    if (r.failed.length) {
+      const failed = await failedInReaderLanguage(r.failed);
+      const t = await getTranslations("knowledge.errors");
+      return { error: t("notRejected", { count: r.failed.length, error: failed[0].error }), done: r.done.length, failed };
+    }
     return { ok: true, done: r.done.length };
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 }
 
@@ -207,7 +228,7 @@ export async function assignBatchAction(_prev: FormState | undefined, formData: 
   try {
     await assignBatch(user, String(formData.get("batchId") ?? ""), String(formData.get("clientId") ?? ""));
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   return done();
 }
@@ -217,7 +238,7 @@ export async function discardAwaitingAction(_prev: FormState | undefined, formDa
   try {
     await discardAwaiting(user, String(formData.get("batchId") ?? ""), String(formData.get("why") ?? ""));
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   return done();
 }
@@ -229,10 +250,14 @@ export async function discardAwaitingAction(_prev: FormState | undefined, formDa
 // ---------------------------------------------------------------------------
 
 /// The manager-only actions say what they need, not "the client is not
-/// assigned to you".
-function managerError(err: unknown): string {
+/// assigned to you". `forbidden` is what this action needs.
+async function managerError(err: unknown, forbidden: "managerSwitch" | "managerLift"): Promise<string> {
+  const t = await getTranslations("knowledge.errors");
+  if (err instanceof ForbiddenError) return t(forbidden);
+  const domain = await domainErrorText(err);
+  if (domain) return domain;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
 }
 
 /// "תקין": the auto-applied item was looked at and is right.
@@ -241,7 +266,7 @@ export async function markAutoReviewedAction(id: string): Promise<FormState> {
   try {
     await markAutoReviewed(user, id);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   return done();
 }
@@ -252,7 +277,7 @@ export async function setAutoApplyAction(enabled: boolean): Promise<FormState> {
   try {
     await setAutoApply(user, enabled);
   } catch (err) {
-    return { error: managerError(err) };
+    return { error: await managerError(err, "managerSwitch") };
   }
   return done();
 }
@@ -263,7 +288,7 @@ export async function liftAutoApplyPauseAction(id: string): Promise<FormState> {
   try {
     await liftAutoApplyPause(user, id);
   } catch (err) {
-    return { error: managerError(err) };
+    return { error: await managerError(err, "managerLift") };
   }
   return done();
 }

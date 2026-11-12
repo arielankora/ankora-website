@@ -30,11 +30,28 @@ export function approvesProceduresOf(p: Omit<ProcedureApprovalInput, "authorId" 
   return p.isManager || (!!p.accountManagerId && p.accountManagerId === p.userId);
 }
 
+/// Why this person may not approve this version, as a code, or null when
+/// they may. The code names the sentence under
+/// domainErrors.procedureApproval (and approvals.items.procedure.blocker),
+/// so a screen can say it in the reader's language (ADR 0006); a refusal
+/// can throw it as new DomainError(`procedureApproval.${code}`, message).
+export type ProcedureApprovalBlockerCode = "notApprover" | "separationRequired";
+
+export const PROCEDURE_APPROVAL_BLOCKER_MESSAGES: Record<ProcedureApprovalBlockerCode, string> = {
+  notApprover: NOT_APPROVER,
+  separationRequired: SEPARATION_REQUIRED,
+};
+
+export function procedureApprovalBlockerCode(p: ProcedureApprovalInput): ProcedureApprovalBlockerCode | null {
+  if (!approvesProceduresOf(p)) return "notApprover";
+  if (p.separation && !!p.authorId && p.authorId === p.userId) return "separationRequired";
+  return null;
+}
+
 /// Why this person may not approve this version, or null when they may.
 export function procedureApprovalBlocker(p: ProcedureApprovalInput): string | null {
-  if (!approvesProceduresOf(p)) return NOT_APPROVER;
-  if (p.separation && !!p.authorId && p.authorId === p.userId) return SEPARATION_REQUIRED;
-  return null;
+  const code = procedureApprovalBlockerCode(p);
+  return code ? PROCEDURE_APPROVAL_BLOCKER_MESSAGES[code] : null;
 }
 
 export function mayApproveProcedure(p: ProcedureApprovalInput): boolean {
