@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// 12.11.2026: the reset link used to be minted and never mailed.
+const mail = vi.hoisted(() => ({ sendEmail: vi.fn(async (_input: { to: string[]; text: string }) => ({ ok: true })) }));
+vi.mock("@/lib/email", () => mail);
 import { prisma } from "./setup";
 import { createTestUser } from "./factories";
 import { requestPasswordReset, consumePasswordResetToken } from "@/lib/app-auth/password-reset";
@@ -11,6 +15,27 @@ describe("password reset - spec 4.2 'forgot password via one-time link with expi
 
     const tokenCount = await prisma.passwordResetToken.count();
     expect(tokenCount).toBe(0);
+  });
+
+  it("mails the link to the account's work address, and mails nothing for an unknown address", async () => {
+    mail.sendEmail.mockClear();
+    await requestPasswordReset("nobody@test.ankora.local");
+    expect(mail.sendEmail).not.toHaveBeenCalled();
+
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    const raw = await requestPasswordReset(user.email);
+    expect(mail.sendEmail).toHaveBeenCalledTimes(1);
+    const sent = mail.sendEmail.mock.calls[0][0];
+    expect(sent.to).toEqual([user.email]);
+    expect(sent.text).toContain(`/app/reset-password?token=${raw}`);
+  });
+
+  it("mails an INVITED user who never used the invite, too", async () => {
+    mail.sendEmail.mockClear();
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE", status: "INVITED" });
+    const raw = await requestPasswordReset(user.email);
+    expect(raw).toBeTruthy();
+    expect(mail.sendEmail).toHaveBeenCalledTimes(1);
   });
 
   it("issues a token for an existing ACTIVE user", async () => {
