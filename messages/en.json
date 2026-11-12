@@ -1049,7 +1049,16 @@
     "whatsapp": "Open in WhatsApp",
     "copy": "Copy",
     "email": "Send by email",
-    "otherDraft": "Different draft"
+    "otherDraft": "Different draft",
+    "kinds": {
+      "decision_waiting": "Something is waiting for a decision",
+      "summary_ready": "The monthly summary is ready",
+      "promise_update": "A progress update",
+      "promise_done": "We're done",
+      "need_information": "We need something from them",
+      "delay": "There's a delay",
+      "handover": "Handover"
+    }
   },
   "timer": {
     "page": {
@@ -2052,7 +2061,8 @@
       "commsGroupAssigned": "WhatsApp group assigned to a client",
       "commsEngagementEndSweep": "Conversations and recordings of a client whose engagement ended deleted",
       "commsExportDownloaded": "Client conversations and recordings exported",
-      "userCommsAccess": "Changed access to the communications screen"
+      "userCommsAccess": "Changed access to the communications screen",
+      "clientCommunicationLocale": "Client communication language changed"
     },
     "kinds": {
       "failure": "Failure",
@@ -3962,6 +3972,12 @@
           "contact": "How to talk to them",
           "matters": "What matters to them",
           "never": "What must never happen"
+        },
+        "communicationLocale": "Language for this client",
+        "communicationLocaleHint": "The language of emails, reports and alerts to the client's people who have no account in the app. People with an account get the language they chose.",
+        "communicationLocales": {
+          "he": "Hebrew",
+          "en": "English"
         }
       },
       "knowledgeStatus": {
@@ -7393,6 +7409,154 @@
         "approvalsLink": "Go to approvals",
         "ranked": "In order of importance",
         "settings": "Email settings"
+      }
+    },
+    "connectionTest": {
+      "subject": "Connection test from Ankora",
+      "body": "This is a test email from Ankora's connections screen. You can delete it."
+    },
+    "reports": {
+      "types": {
+        "MONTHLY_DETAILED": "Monthly detailed report",
+        "WEEKLY_ACTIVITY": "Weekly activity",
+        "HOURS_BY_CATEGORY": "Hours by category",
+        "HOUR_BANK_STATUS": "Hour bank status"
+      },
+      "subject": "Ankora - {label} - {client} ({period})",
+      "heading": "{label} for {client}",
+      "period": "Period: {period}",
+      "prepaidLoaded": "Hour package loaded on {date}: {hours} hours",
+      "rolloverOffset": "Overrun offset from the previous package: {hours} hours",
+      "rolloverCarried": "Carried over from the previous package: {hours} hours",
+      "periodUsed": "Used in this period: {hours} hours",
+      "packageUsedPct": "Package used: {pct}%",
+      "overageOffset": "Overrun: {hours} hours, to be offset from the next top-up",
+      "remaining": "Remaining: {hours} hours",
+      "cycleTotal": "Total in this cycle: {hours} hours",
+      "cycleUsed": "Used in this cycle: {hours} hours ({pct}%)",
+      "overage": "Overrun: {hours} hours",
+      "legacyPurchased": "Purchased: {minutes} minutes",
+      "legacyConsumed": "Used (cached): {minutes} minutes",
+      "legacyStatus": "Cycle status: {status}",
+      "noCycle": "No active cycle in this period.",
+      "categoryRow": "{category}: {minutes} minutes",
+      "rowCount": "Total rows: {count}",
+      "minutesShort": "{minutes} min",
+      "more": "... and {count} more rows (see the client portal for the full details).",
+      "fullView": "Full view: {url}"
+    },
+    "clientAlert": {
+      "subjectPrepaid": "Hour package update - {client}",
+      "subjectUtilization": "Hours usage update - {client}",
+      "hello": "Hello,",
+      "signoff": "Best regards,",
+      "team": "The Ankora team",
+      "intro": "This is an automatic update on the use of your hour bank with Ankora.",
+      "current": "Current usage: {pct}%",
+      "overdrawn": "Over the bank by: {minutes} minutes",
+      "remaining": "Minutes remaining: {minutes}",
+      "depleted": "Your hour package has been fully used.",
+      "overHours": "Hours beyond the package so far: {hours}.",
+      "noneLeft": "There are no hours left in the package.",
+      "fromNow": "From now on, hours are recorded as an overrun and will be offset from the next top-up.",
+      "usedPct": "{pct}% of your latest hour package has been used.",
+      "hoursLeft": "{hours} hours remain."
+    },
+    "clientMessages": {
+      "hi": "Hi,",
+      "anythingElse": "Is there anything else we can take off your plate?",
+      "decisionWaiting": {
+        "label": "Something is waiting for a decision",
+        "subject": "Something is waiting for your decision",
+        "line1": "There is one decision waiting for you.",
+        "line1About": "There is one decision waiting for you about {about}.",
+        "line2": "We've put the options and prices together, along with our recommendation.",
+        "line3": "You can approve it in one click, or reply to me here if you'd rather talk it through."
+      },
+      "summaryReady": {
+        "label": "The monthly summary is ready",
+        "subject": "The monthly summary",
+        "subjectAbout": "The summary of {about}",
+        "line1": "The monthly summary is ready for you in the portal.",
+        "line1About": "The summary of {about} is ready for you in the portal.",
+        "line2": "It covers what was done this month and where the hours went.",
+        "line3": "If anything there doesn't add up, I'm here."
+      },
+      "promiseUpdate": {
+        "label": "A progress update",
+        "subject": "Update",
+        "subjectAbout": "Update: {about}",
+        "line1": "Just so you know: [what is happening now].",
+        "line1About": "Just so you know where {about} stands: [what is happening now].",
+        "line2": "[What the next step is and when]. Nothing is needed from you."
+      },
+      "promiseDone": {
+        "label": "We're done",
+        "subject": "Done",
+        "subjectAbout": "Done: {about}",
+        "done": "It's done. [What exactly was done].",
+        "doneAbout": "{about} is done. [What exactly was done]."
+      },
+      "needInformation": {
+        "label": "We need something from them",
+        "subject": "One detail needed",
+        "subjectAbout": "One detail needed: {about}",
+        "line1": "To move forward we're missing one thing: [what is missing].",
+        "line1About": "To move forward with {about} we're missing one thing: [what is missing].",
+        "line2": "As soon as we have it, we'll take it from there."
+      },
+      "delay": {
+        "label": "There's a delay",
+        "subject": "Schedule update",
+        "subjectAbout": "Schedule update: {about}",
+        "line1": "I wanted to let you know before you noticed yourself: it's running late. [Why, in one sentence].",
+        "line1About": "I wanted to let you know before you noticed yourself: {about} is running late. [Why, in one sentence].",
+        "line2": "The new date is [when], and I'm seeing it through to the end."
+      },
+      "handover": {
+        "label": "Handover",
+        "subject": "Handover",
+        "subjectAbout": "Handover: {about}",
+        "line1": "It's ready and handed over to you. What's included: [what was done, approvals, links].",
+        "line1About": "{about} is ready and handed over to you. What's included: [what was done, approvals, links].",
+        "line2": "[Points worth keeping in mind going forward]."
+      }
+    },
+    "exports": {
+      "noData": "No data to show for the selected range.",
+      "yes": "Yes",
+      "timeEntries": {
+        "title": "Time entries",
+        "date": "Date",
+        "employee": "Team member",
+        "client": "Client",
+        "category": "Category",
+        "duration": "Duration",
+        "note": "Note",
+        "source": "Source",
+        "edited": "Edited",
+        "running": "Running",
+        "sources": {
+          "manual": "Manual",
+          "timer": "Timer"
+        }
+      },
+      "auditLog": {
+        "at": "Time",
+        "action": "Action",
+        "actor": "By",
+        "entity": "Entity",
+        "entityId": "Entity ID",
+        "client": "Client",
+        "system": "System"
+      },
+      "monthly": {
+        "title": "Monthly detailed report",
+        "date": "Date",
+        "activity": "Activity",
+        "category": "Category",
+        "billableMinutes": "Billable minutes",
+        "employee": "Team member"
       }
     }
   }

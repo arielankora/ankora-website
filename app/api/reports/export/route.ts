@@ -4,7 +4,8 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { runReport, REPORT_DEFINITIONS, type ReportType } from "@/lib/app-domain/reports";
 import { getClient } from "@/lib/app-domain/clients";
 import { toCsv } from "@/lib/csv";
-import { formatReportCell } from "@/lib/report-cell";
+import { localizedReportTable } from "@/lib/i18n/report-words";
+import { outgoingOf } from "@/lib/i18n/recipients";
 import { attachmentDisposition } from "@/lib/http-headers";
 import type { TimeEntrySource } from "@prisma/client";
 import { dayEndInZone, dayStartInZone } from "@/lib/timezone";
@@ -74,21 +75,25 @@ export async function GET(req: NextRequest) {
     to: parseDateEndOfDay(params.get("to")),
   };
 
+  // ADR 0006, part C: the file is in the language of whoever asked for it,
+  // headers, title, the words in the rows and the dates alike. The file
+  // name stays as it was.
+  const out = outgoingOf(user);
+
   let result;
   try {
-    result = await runReport(user, type, filters);
+    result = await runReport(user, type, filters, { locale: out.tag, timeZone: out.timeZone });
   } catch (err) {
     if (err instanceof ForbiddenError) return Response.json({ error: "Forbidden" }, { status: 403 });
     throw err;
   }
 
   const format = parseFormat(params.get("format"));
-  const headers = result.columns.map((c) => c.label);
-  const rows = result.rows.map((row) => result.columns.map((c) => row[c.key] ?? ""));
+  const { headers, rows } = localizedReportTable(out, type, result.columns, result.rows);
 
   const dateStr = new Date().toISOString().slice(0, 10);
   const clientSlug = filters.clientId ? (await getClient(filters.clientId))?.name ?? filters.clientId : "all-clients";
-  const reportLabel = REPORT_DEFINITIONS.find((r) => r.id === type)?.label ?? type;
+  const reportLabel = localizedReportTable(out, type, [], []).title;
 
   if (format === "xlsx") {
     // Dynamic import: exceljs (~23MB with its archiver/unzipper/jszip/tmp
@@ -99,7 +104,7 @@ export async function GET(req: NextRequest) {
     // suspected to have caused the whole route to 503 under Vercel's
     // Node.js function cold-start.
     const { toXlsx } = await import("@/lib/xlsx");
-    const buf = await toXlsx(reportLabel, headers, rows);
+    const buf = await toXlsx(reportLabel, headers, rows, out.dir);
     const filename = `${type}_${clientSlug}_${dateStr}.xlsx`;
     return new Response(buf, {
       headers: {
@@ -117,16 +122,19 @@ export async function GET(req: NextRequest) {
     // PDF is only ever read, so it gets the same text as the screen: bank
     // figures in decimal hours, an overrun as "חריגה 0.35", durations as
     // H:MM. Before October 2026 it printed raw minutes ("1507", "-21").
-    const pdfRows = result.rows.map((row) => result.columns.map((c) => formatReportCell(row, c).text));
-    const rangeParts = [
-      filters.from ? filters.from.toLocaleDateString("he-IL") : null,
-      filters.to ? filters.to.toLocaleDateString("he-IL") : null,
-    ].filter(Boolean);
+    const pdfRows = localizedReportTable(out, type, result.columns, result.rows, { pdf: true }).rows;
+    // The days in the requester's language and time zone. (Until 12.11.2026
+    // they were written in the server's zone, which is UTC on Vercel, so an
+    // Israeli midnight showed as the day before.)
+    const day = (d: Date) => d.toLocaleDateString(out.tag, { timeZone: out.timeZone });
+    const rangeParts = [filters.from ? day(filters.from) : null, filters.to ? day(filters.to) : null].filter(Boolean);
     const buf = await toPdfTable({
       title: reportLabel,
       subtitle: rangeParts.length ? rangeParts.join(" - ") : undefined,
       headers,
       rows: pdfRows,
+      dir: out.dir,
+      emptyText: out.t("exports.noData"),
     });
     const filename = `${type}_${clientSlug}_${dateStr}.pdf`;
     return new Response(buf, {

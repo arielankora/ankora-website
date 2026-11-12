@@ -24,6 +24,13 @@ import { recordClientMessageAction } from "@/app/(product)/app/(authenticated)/c
 // parse them, and the sentence "וואטסאפ בלבד, לא מיילים" came out as
 // email. See the comment in lib/app-domain/client-messages.ts.
 
+/// The situations, named in the reader's own language (the drafts
+/// themselves are in the client's).
+const DRAFT_KINDS = ["decision_waiting", "summary_ready", "promise_update", "promise_done", "need_information", "delay", "handover"] as const;
+function isDraftKind(kind: string): kind is (typeof DRAFT_KINDS)[number] {
+  return (DRAFT_KINDS as readonly string[]).includes(kind);
+}
+
 export type MessageDraftChoice = { kind: string; label: string; emailSubject: string; body: string };
 
 /// Everything about a client that the composer needs, as one object, so
@@ -77,9 +84,10 @@ export function MessageClient({
   /// asking them to confirm what they just did.
   preselectKind?: string;
 }) {
-  // ADR 0006: the drawer's own labels are translated. The drafts (their
-  // labels and bodies) are built on the server by messageComposerProps
-  // and are what goes to the client, so they arrive and leave untouched.
+  // ADR 0006: the drawer's own labels, the situation list included, are
+  // translated. The drafts (subject and body) are built on the server by
+  // messageComposerProps in the client's communication language, and are
+  // what goes to the client, so they arrive and leave untouched.
   const t = useTranslations("messageClient");
   const [open, setOpen] = useState(false);
   const [chosen, setChosen] = useState<MessageDraftChoice | null>(null);
@@ -174,7 +182,7 @@ export function MessageClient({
                           onClick={() => start(d)}
                           className="w-full rounded-lg px-2 py-2 text-start text-[13.5px] text-app-text-primary transition-colors hover:bg-cream/60"
                         >
-                          {d.label}
+                          {isDraftKind(d.kind) ? t(`kinds.${d.kind}`) : d.label}
                         </button>
                       </li>
                     ))}

@@ -362,6 +362,17 @@ export function layoutRtlColumns(colWidths: number[], left: number): number[] {
   return colWidths.map((_, i) => slotX[colWidths.length - 1 - i]);
 }
 
+/// x positions for LTR table columns: header[0] is the LEFTMOST column.
+export function layoutLtrTableColumns(colWidths: number[], left: number): number[] {
+  const xs: number[] = [];
+  let acc = left;
+  for (const w of colWidths) {
+    xs.push(acc);
+    acc += w;
+  }
+  return xs;
+}
+
 /// An A4 pdfkit document with both Heebo subsets registered. Shared by
 /// the report tables below and by lib/agreement-pdf.ts, so the two
 /// production lessons recorded here (the eager standard font, and the
@@ -421,9 +432,17 @@ export interface PdfTableOptions {
   /// Relative column widths (sums are normalized to the page width) -
   /// defaults to equal-width columns.
   columnWeights?: number[];
+  /// ADR 0006, part C: the language of the file decides its direction.
+  /// "rtl" (the default) is the Hebrew table, drawn exactly as before.
+  /// "ltr" puts the first column on the left and starts every cell on the
+  /// left, with the same two Heebo subsets, so a Hebrew name inside an
+  /// English report still renders and reads right to left.
+  dir?: "rtl" | "ltr";
+  /// The line shown when there are no rows, in the file's language.
+  emptyText?: string;
 }
 
-/// Builds one A4-portrait, RTL Hebrew PDF table. Pagination (a new page
+/// Builds one A4-portrait PDF table, RTL Hebrew by default (`dir`). Pagination (a new page
 /// once rows run past the bottom margin) is handled manually - pdfkit has
 /// no built-in table/pagination widget.
 export function toPdfTable(opts: PdfTableOptions): Promise<Buffer> {
@@ -439,12 +458,17 @@ export function toPdfTable(opts: PdfTableOptions): Promise<Buffer> {
     const weights = opts.columnWeights ?? opts.headers.map(() => 1);
     const weightSum = weights.reduce((a, b) => a + b, 0);
     const colWidths = weights.map((w) => (w / weightSum) * pageWidth);
-    const colX = layoutRtlColumns(colWidths, doc.page.margins.left);
+    const ltr = opts.dir === "ltr";
+    const colX = ltr ? layoutLtrTableColumns(colWidths, doc.page.margins.left) : layoutRtlColumns(colWidths, doc.page.margins.left);
+    // The Hebrew table keeps drawCell, whose glyph order the tests pin; an
+    // English one draws each cell as a left-to-right line.
+    const cell = (text: string, x: number, cy: number, w: number, size: number) =>
+      ltr ? drawBidiLine(doc, text, x, cy, w, size, "ltr") : drawCell(doc, text, x, cy, w, { size });
 
-    drawCell(doc, opts.title, doc.page.margins.left, doc.page.margins.top, pageWidth, { size: 16 });
+    cell(opts.title, doc.page.margins.left, doc.page.margins.top, pageWidth, 16);
     let y = doc.page.margins.top + 26;
     if (opts.subtitle) {
-      drawCell(doc, opts.subtitle, doc.page.margins.left, y, pageWidth, { size: 10 });
+      cell(opts.subtitle, doc.page.margins.left, y, pageWidth, 10);
       y += 20;
     }
     y += 8;
@@ -453,7 +477,7 @@ export function toPdfTable(opts: PdfTableOptions): Promise<Buffer> {
     const bottomLimit = doc.page.height - doc.page.margins.bottom;
 
     function drawHeaderRow() {
-      opts.headers.forEach((h, i) => drawCell(doc, h, colX[i], y, colWidths[i], { size: 9 }));
+      opts.headers.forEach((h, i) => cell(h, colX[i], y, colWidths[i], 9));
       doc
         .moveTo(doc.page.margins.left, y + 16)
         .lineTo(doc.page.width - doc.page.margins.right, y + 16)
@@ -470,12 +494,12 @@ export function toPdfTable(opts: PdfTableOptions): Promise<Buffer> {
         y = doc.page.margins.top;
         drawHeaderRow();
       }
-      row.forEach((cell, i) => drawCell(doc, String(cell), colX[i], y, colWidths[i], { size: 9 }));
+      row.forEach((value, i) => cell(String(value), colX[i], y, colWidths[i], 9));
       y += rowHeight;
     }
 
     if (opts.rows.length === 0) {
-      drawCell(doc, "אין נתונים להצגה בטווח שנבחר.", doc.page.margins.left, y, pageWidth, { size: 9 });
+      cell(opts.emptyText ?? "אין נתונים להצגה בטווח שנבחר.", doc.page.margins.left, y, pageWidth, 9);
     }
 
     doc.end();

@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
-import { runReport, REPORT_DEFINITIONS, REPORT_TEXT, type ReportColumn, type ReportType } from "@/lib/app-domain/reports";
-import { FORECAST_CELL_TEXT } from "@/lib/prepaid-format";
+import { runReport, REPORT_DEFINITIONS, type ReportColumn, type ReportType } from "@/lib/app-domain/reports";
+import { REPORT_TYPE_KEY, REPORT_WORD_COLUMNS, REPORT_WORD_KEY, isReportColumnKey } from "@/lib/i18n/report-words";
 import { getLocale, getTimeZone, getTranslations } from "next-intl/server";
 import { useTranslations } from "next-intl";
-import type messages from "@/messages/he.json";
 import { formatReportCell } from "@/lib/report-cell";
 import { listTimeEntriesForAdmin } from "@/lib/app-domain/time-entries";
 import { prisma } from "@/lib/prisma";
@@ -43,47 +42,14 @@ function isReportType(value: string | undefined): value is ReportType {
   return REPORT_DEFINITIONS.some((r) => r.id === value);
 }
 
-// ADR 0006: the screen's names for each report and column. The labels in
-// lib/app-domain/reports.ts stay as they are: they head the CSV, XLSX and
-// PDF exports.
-const TYPE_KEY = {
-  total_client_hours: "totalClientHours",
-  hours_by_employee: "hoursByEmployee",
-  hours_by_client: "hoursByClient",
-  hours_by_category: "hoursByCategory",
-  employee_client_matrix: "employeeClientMatrix",
-  manual_edits: "manualEdits",
-  overage_at_risk: "overageAtRisk",
-  active_timers: "activeTimers",
-  capacity: "capacity",
-} as const satisfies Record<ReportType, string>;
-
-type ColumnKey = keyof (typeof messages)["reports"]["columns"];
-
-const COLUMN_KEYS: ReadonlySet<string> = new Set([
-  "entryCount", "clientCount", "actualMinutes", "billableMinutes", "employee", "client", "usedMinutes",
-  "remainingMinutes", "utilizationPct", "kind", "forecast", "category", "pctOfTotal", "date", "manual",
-  "edited", "actor", "reason", "status", "thresholdUsed", "startedAt", "elapsedMinutes", "longRunning",
-  "clientBreakdown",
-] satisfies ColumnKey[]);
-
-function isColumnKey(key: string): key is ColumnKey {
-  return COLUMN_KEYS.has(key);
-}
-
-/// The words a row carries as values (REPORT_TEXT, forecastCell), in the
-/// reader's language. Only these columns hold them; names stay as written.
-const WORD_COLUMNS = new Set(["kind", "status", "manual", "edited", "longRunning", "forecast"]);
-const WORD_KEY = new Map<string, "yes" | "no" | "package" | "cycle" | "overage" | "atRisk" | "depleted" | "insufficientData">([
-  [REPORT_TEXT.yes, "yes"],
-  [REPORT_TEXT.no, "no"],
-  [REPORT_TEXT.package, "package"],
-  [REPORT_TEXT.cycle, "cycle"],
-  [REPORT_TEXT.overage, "overage"],
-  [REPORT_TEXT.atRisk, "atRisk"],
-  [FORECAST_CELL_TEXT.depleted, "depleted"],
-  [FORECAST_CELL_TEXT.insufficientData, "insufficientData"],
-]);
+// ADR 0006: the screen's names for each report, column and row word come
+// from lib/i18n/report-words.ts, shared with the export route so the file
+// and the screen say the same thing. The labels in
+// lib/app-domain/reports.ts are the Hebrew those keys hold.
+const TYPE_KEY = REPORT_TYPE_KEY;
+const isColumnKey = isReportColumnKey;
+const WORD_COLUMNS = REPORT_WORD_COLUMNS;
+const WORD_KEY = REPORT_WORD_KEY;
 
 // One cell of the numeric report. Figures sit in a left-to-right isolate
 // so a sign or a colon can never be reordered by the surrounding RTL text,

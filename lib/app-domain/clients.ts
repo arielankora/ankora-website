@@ -3,7 +3,7 @@ import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
-import type { User, ClientStatus, ClientKind } from "@prisma/client";
+import type { User, ClientStatus, ClientKind, AppLocale } from "@prisma/client";
 import { ensureDefaultAlertRules } from "@/lib/app-domain/alerts";
 import {
   normalizeSubprocessorNotice,
@@ -129,6 +129,9 @@ export async function updateClient(
     aiExcluded?: boolean;
     /// Client.procedureApprovalSeparation.
     procedureApprovalSeparation?: boolean;
+    /// 12.11.2026: Client.communicationLocale, the language its people
+    /// without an account are written to (ADR 0006).
+    communicationLocale?: AppLocale;
     /// Org brain (spec 3.3).
     kind?: ClientKind;
     industry?: string | null;
@@ -192,6 +195,7 @@ export async function updateClient(
       isInternal: input.isInternal,
       aiExcluded: input.aiExcluded,
       procedureApprovalSeparation: input.procedureApprovalSeparation,
+      communicationLocale: input.communicationLocale,
       kind: input.kind,
       industry: input.industry === null ? null : input.industry?.trim() || undefined,
       // Who checked and when is stamped only when the answer moved, so a
@@ -227,6 +231,19 @@ export async function updateClient(
       clientId,
       before: { aiExcluded: before.aiExcluded },
       after: { aiExcluded: client.aiExcluded },
+    });
+  }
+  // 12.11.2026: its own line, like "בלי AI", so "since when does this
+  // client get English emails, and who decided" has a direct answer.
+  if (input.communicationLocale !== undefined && input.communicationLocale !== before.communicationLocale) {
+    await recordAudit({
+      actorId: actor.id,
+      action: "client.communication_locale",
+      entityType: "Client",
+      entityId: clientId,
+      clientId,
+      before: { communicationLocale: before.communicationLocale },
+      after: { communicationLocale: client.communicationLocale },
     });
   }
   // 3.11.2026: its own line, like "בלי AI", so "who marked this client and

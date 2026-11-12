@@ -26,12 +26,14 @@ export interface XlsxSheet {
 // this, kept byte-for-byte behavior-compatible (same signature, same
 // 31-char sheet-name truncation, same bold header row, same
 // autofit-ish column width) so every existing caller is unaffected.
-export async function toXlsxWorkbook(sheets: XlsxSheet[]): Promise<Buffer> {
+/// `dir` (ADR 0006, part C): an English file reads left to right. Hebrew,
+/// the default, is the right-to-left sheet it always was.
+export async function toXlsxWorkbook(sheets: XlsxSheet[], dir: "rtl" | "ltr" = "rtl"): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
 
   for (const { name, headers, rows } of sheets) {
     const sheet = workbook.addWorksheet(name.slice(0, 31) || "Sheet1", {
-      views: [{ rightToLeft: true }],
+      views: [{ rightToLeft: dir === "rtl" }],
     });
 
     sheet.addRow(headers);
@@ -58,6 +60,6 @@ export async function toXlsxWorkbook(sheets: XlsxSheet[]): Promise<Buffer> {
   return Buffer.from(buffer);
 }
 
-export async function toXlsx(sheetName: string, headers: string[], rows: (string | number)[][]): Promise<Buffer> {
-  return toXlsxWorkbook([{ name: sheetName, headers, rows }]);
+export async function toXlsx(sheetName: string, headers: string[], rows: (string | number)[][], dir: "rtl" | "ltr" = "rtl"): Promise<Buffer> {
+  return toXlsxWorkbook([{ name: sheetName, headers, rows }], dir);
 }

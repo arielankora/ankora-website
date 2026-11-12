@@ -8,6 +8,7 @@ import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { createCredential, deleteCredential, openConnectionSecret } from "@/lib/app-domain/credentials";
 import { accessTokenFrom, revokeToken, type OAuthPurpose } from "@/lib/google-oauth";
 import { rtlMimeMessage } from "@/lib/rtl-mail";
+import { outgoingOf } from "@/lib/i18n/recipients";
 
 // Client connections (ADR 0001 section 24, task cmvtivumj000pjs08q9qj4t67,
 // Ariel 4.11.2026): a client's mailbox and Drive that its procedures read
@@ -165,7 +166,10 @@ export async function testConnection(actor: User, id: string, opts: { folderId?:
   await prisma.clientConnection.update({ where: { id }, data: { lastUsedAt: new Date() } });
 
   if (row.kind === "MANAGER_SEND") {
-    const raw = rtlMimeMessage({ to: row.account, subject: "בדיקת חיבור מאנקורה", text: "זה מייל בדיקה ממסך החיבורים של אנקורה. אפשר למחוק אותו." });
+    // To the mailbox of the person testing it, in their language (ADR 0006);
+    // the wrapper's direction follows the text (lib/rtl-mail.ts).
+    const { t } = outgoingOf(actor);
+    const raw = rtlMimeMessage({ to: row.account, subject: t("connectionTest.subject"), text: t("connectionTest.body") });
     const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
       method: "POST",
       headers: { ...auth, "content-type": "application/json" },

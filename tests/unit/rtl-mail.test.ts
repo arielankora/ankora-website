@@ -26,3 +26,21 @@ describe("rtlMimeMessage", () => {
     expect(raw.split("\r\n").filter((l) => l.startsWith("Bcc:"))).toEqual([]);
   });
 });
+
+// 12.11.2026 (ADR 0006, part B): the wrapper follows the language of the
+// text it carries; the text is sent as written.
+describe("rtlMimeMessage direction", () => {
+  it("sends English text left to right, with lang en", () => {
+    const raw = rtlMimeMessage({ to: "a@b.co", subject: "Monthly invoices", text: "Hi Dana,\n\nThe invoices for October are attached.", boundary: "x" });
+    const html = part(raw, "text/html");
+    expect(html).toContain('<html lang="en" dir="ltr">');
+    expect(html).toContain("text-align:left");
+    expect(html).not.toContain('dir="rtl"');
+    expect(part(raw, "text/plain")).toBe("Hi Dana,\n\nThe invoices for October are attached.");
+  });
+
+  it("keeps Hebrew right to left even when it opens with an English name", () => {
+    const raw = rtlMimeMessage({ to: "a@b.co", subject: "x", text: "NUX: החשבוניות של אוקטובר מצורפות למייל הזה.", boundary: "x" });
+    expect(part(raw, "text/html")).toContain('<html lang="he" dir="rtl">');
+  });
+});

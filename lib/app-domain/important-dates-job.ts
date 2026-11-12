@@ -382,7 +382,7 @@ export async function sendPendingReminders(now = new Date()): Promise<{ sent: nu
     const daysBefore = Math.round((date.nextOccurrenceAt!.getTime() - occ.occurrenceDate.getTime()) / 86_400_000) + (occ.reminderRule?.daysBefore ?? 0);
     // Worded per recipient (ADR 0006, outgoing channels): the bell row in
     // its person's language, the email once per language among its
-    // addresses. An address that is not an app user's keeps Hebrew.
+    // addresses (see below for addresses that are not an app user's).
     const messageInput = (t: OutgoingT) => ({
       clientName: date.client.name,
       // Spec 3.10: a date that expects something says so first.
@@ -414,8 +414,15 @@ export async function sendPendingReminders(now = new Date()): Promise<{ sent: nu
         );
         // One send per language. The occurrence is SENT when every send
         // went out; the first failure is the one recorded.
+        //
+        // Part B (ADR 0006): an app user's address in that user's language;
+        // the date's extra addresses, which are where a client's own people
+        // are typed, in the client's communication language; the rule's
+        // Ankora-side extras in Hebrew, as before.
+        const clientSide = new Set([occ.recipientEmail, ...date.extraEmailRecipients].filter((e): e is string => Boolean(e)).map((e) => e.toLowerCase()));
+        const fallback = (email: string) => (clientSide.has(email.toLowerCase()) ? date.client.communicationLocale : "he");
         let result: { ok: boolean; error?: string; providerMessageId?: string } = { ok: true };
-        for (const group of await groupEmailsByLocale(recipients)) {
+        for (const group of await groupEmailsByLocale(recipients, fallback)) {
           const r = await sendEmail({
             to: group.to,
             subject: buildEmailReminderSubject(messageInput(group.out.t), group.out.t),

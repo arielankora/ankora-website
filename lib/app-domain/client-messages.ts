@@ -5,6 +5,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import type { ComposerProps } from "@/components/app/MessageClient";
 import type { User } from "@prisma/client";
+import { HEBREW, translatorFor, type Outgoing } from "@/lib/i18n/outgoing";
 
 // A person sends. The system never does.
 //
@@ -80,23 +81,37 @@ export type MessageDraft = {
 /// and says so with a bracketed placeholder where the product genuinely
 /// cannot know the answer. A draft that pretends to know is worse than a
 /// blank: it gets sent.
-export function buildMessage(kind: MessageKind, ctx: MessageContext): MessageDraft {
+///
+/// ADR 0006, part B: the draft is written in the client's communication
+/// language (`out`, from Client.communicationLocale), because it is the
+/// start of what the client reads. What the person then types over it is
+/// theirs and is sent as typed. The Hebrew is the wording it always had
+/// (outgoing.clientMessages in messages/he.json).
+export function buildMessage(kind: MessageKind, ctx: MessageContext, out: Outgoing = HEBREW): MessageDraft {
+  const t = out.t;
   const who = ctx.fromName;
   const about = ctx.subject?.trim() || null;
   const base = ctx.portalUrl?.trim().replace(/\/+$/, "") || null;
   const link = (path: string) => (base ? `\n\n${base}${path}` : "");
+  const hi = t("clientMessages.hi");
+  const anythingElse = t("clientMessages.anythingElse");
+  // A line that names the work when it is known, and reads without it
+  // when it is not.
+  const withAbout = (key: "decisionWaiting" | "summaryReady" | "promiseUpdate" | "needInformation" | "delay" | "handover") =>
+    about ? t(`clientMessages.${key}.line1About`, { about }) : t(`clientMessages.${key}.line1`);
+  const subjectOf = (key: "summaryReady" | "promiseUpdate" | "promiseDone" | "needInformation" | "delay" | "handover") =>
+    about ? t(`clientMessages.${key}.subjectAbout`, { about }) : t(`clientMessages.${key}.subject`);
 
   switch (kind) {
     case "decision_waiting":
       return {
         kind,
-        label: "משהו מחכה להחלטה",
-        emailSubject: "משהו מחכה להחלטה שלך",
+        label: t("clientMessages.decisionWaiting.label"),
+        emailSubject: t("clientMessages.decisionWaiting.subject"),
         body:
-          `היי,\n\n` +
-          `יש החלטה אחת שמחכה לך${about ? ` בנושא ${about}` : ""}. ` +
-          `ריכזנו את האפשרויות והמחירים, ויש גם המלצה שלנו.\n\n` +
-          `אפשר לאשר בלחיצה אחת, ואפשר לענות לי כאן אם עדיף לדבר על זה.${link("/decisions")}\n\n` +
+          `${hi}\n\n` +
+          `${withAbout("decisionWaiting")} ${t("clientMessages.decisionWaiting.line2")}\n\n` +
+          `${t("clientMessages.decisionWaiting.line3")}${link("/decisions")}\n\n` +
           `${who}`,
       };
 
@@ -107,52 +122,41 @@ export function buildMessage(kind: MessageKind, ctx: MessageContext): MessageDra
     case "summary_ready":
       return {
         kind,
-        label: "הסיכום החודשי מוכן",
-        emailSubject: about ? `הסיכום של ${about}` : "הסיכום החודשי",
+        label: t("clientMessages.summaryReady.label"),
+        emailSubject: subjectOf("summaryReady"),
         body:
-          `היי,\n\n` +
-          `הסיכום${about ? ` של ${about}` : " החודשי"} מוכן וממתין לך בפורטל. ` +
-          `הוא מרכז מה נעשה החודש ואיפה הושקעו השעות.\n\n` +
-          `אם משהו שם לא מסתדר, אני כאן.${link("")}\n\n` +
+          `${hi}\n\n` +
+          `${withAbout("summaryReady")} ${t("clientMessages.summaryReady.line2")}\n\n` +
+          `${t("clientMessages.summaryReady.line3")}${link("")}\n\n` +
           `${who}`,
       };
 
     case "promise_update":
       return {
         kind,
-        label: "עדכון באמצע",
-        emailSubject: about ? `עדכון: ${about}` : "עדכון",
-        body:
-          `היי,\n\n` +
-          `רק שתדע${about ? ` מה קורה עם ${about}` : ""}: [מה קורה עכשיו].\n\n` +
-          `[מה הצעד הבא ומתי]. אין צורך לעשות כלום מצידך.\n\n` +
-          `${who}`,
+        label: t("clientMessages.promiseUpdate.label"),
+        emailSubject: subjectOf("promiseUpdate"),
+        body: `${hi}\n\n` + `${withAbout("promiseUpdate")}\n\n` + `${t("clientMessages.promiseUpdate.line2")}\n\n` + `${who}`,
       };
 
     case "promise_done":
       return {
         kind,
-        label: "סיימנו",
-        emailSubject: about ? `הושלם: ${about}` : "הושלם",
+        label: t("clientMessages.promiseDone.label"),
+        emailSubject: subjectOf("promiseDone"),
         body:
-          `היי,\n\n` +
-          (ctx.outcome?.trim()
-            ? `${ctx.outcome.trim()}\n\n`
-            : `${about ? `${about} ` : ""}הושלם. [מה בדיוק נעשה].\n\n`) +
-          `יש משהו נוסף שנוכל להוריד ממך?\n\n` +
+          `${hi}\n\n` +
+          (ctx.outcome?.trim() ? `${ctx.outcome.trim()}\n\n` : `${about ? t("clientMessages.promiseDone.doneAbout", { about }) : t("clientMessages.promiseDone.done")}\n\n`) +
+          `${anythingElse}\n\n` +
           `${who}`,
       };
 
     case "need_information":
       return {
         kind,
-        label: "צריך משהו ממך",
-        emailSubject: about ? `צריך פרט אחד: ${about}` : "צריך פרט אחד",
-        body:
-          `היי,\n\n` +
-          `כדי להתקדם${about ? ` עם ${about}` : ""} חסר לנו דבר אחד: [מה חסר].\n\n` +
-          `ברגע שיהיה לנו, אנחנו ממשיכים משם.\n\n` +
-          `${who}`,
+        label: t("clientMessages.needInformation.label"),
+        emailSubject: subjectOf("needInformation"),
+        body: `${hi}\n\n` + `${withAbout("needInformation")}\n\n` + `${t("clientMessages.needInformation.line2")}\n\n` + `${who}`,
       };
 
     case "delay":
@@ -161,25 +165,21 @@ export function buildMessage(kind: MessageKind, ctx: MessageContext): MessageDra
       // rather than explain whose fault it is.
       return {
         kind,
-        label: "יש עיכוב",
-        emailSubject: about ? `עדכון על לוח הזמנים: ${about}` : "עדכון על לוח הזמנים",
-        body:
-          `היי,\n\n` +
-          `רציתי לעדכן לפני שתשים לב בעצמך: ${about ? `${about} ` : ""}מתעכב. [למה, במשפט].\n\n` +
-          `המועד המעודכן הוא [מתי], ואני מלווה את זה עד הסוף.\n\n` +
-          `${who}`,
+        label: t("clientMessages.delay.label"),
+        emailSubject: subjectOf("delay"),
+        body: `${hi}\n\n` + `${withAbout("delay")}\n\n` + `${t("clientMessages.delay.line2")}\n\n` + `${who}`,
       };
 
     case "handover":
       return {
         kind,
-        label: "מסירה",
-        emailSubject: about ? `מסירה: ${about}` : "מסירה",
+        label: t("clientMessages.handover.label"),
+        emailSubject: subjectOf("handover"),
         body:
-          `היי,\n\n` +
-          `${about ? `${about} ` : ""}מוכן ומועבר אליך. מה שכלול: [מה בוצע, אישורים, קישורים].\n\n` +
-          `[נקודות שחשוב לזכור להמשך].\n\n` +
-          `יש משהו נוסף שנוכל להוריד ממך?\n\n` +
+          `${hi}\n\n` +
+          `${withAbout("handover")}\n\n` +
+          `${t("clientMessages.handover.line2")}\n\n` +
+          `${anythingElse}\n\n` +
           `${who}`,
       };
   }
@@ -356,6 +356,7 @@ export async function messageComposerProps(input: {
     where: { id: input.clientId },
     select: {
       name: true,
+      communicationLocale: true,
       whatsappNumber: true,
       preferenceContact: true,
       preferenceNever: true,
@@ -376,14 +377,21 @@ export async function messageComposerProps(input: {
     never: client.preferenceNever,
     whatsappDigits: whatsappDigits(client.whatsappNumber),
     emails: client.portalUsers.map((p) => p.user.email),
+    // In the client's communication language (ADR 0006, part B). The
+    // composer's own words, the situation list included, are the
+    // person's interface and come from their dictionary.
     drafts: MESSAGE_KINDS.map((kind) =>
-      buildMessage(kind, {
-        clientName: client.name,
-        fromName: input.fromName,
-        subject: input.subject,
-        outcome: input.outcome,
-        portalUrl: input.portalUrl,
-      })
+      buildMessage(
+        kind,
+        {
+          clientName: client.name,
+          fromName: input.fromName,
+          subject: input.subject,
+          outcome: input.outcome,
+          portalUrl: input.portalUrl,
+        },
+        translatorFor(client.communicationLocale)
+      )
     ),
   };
 }

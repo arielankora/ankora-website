@@ -113,6 +113,24 @@ export function EditClientForm({
         />
       </div>
 
+      {/* 12.11.2026 (ADR 0006): the language emails, reports and alerts are
+          written in for this client's people who have no account. */}
+      <div>
+        <label className="block text-xs font-medium text-app-text-secondary" htmlFor="communicationLocale">
+          {t("communicationLocale")}
+        </label>
+        <select
+          id="communicationLocale"
+          name="communicationLocale"
+          defaultValue={client.communicationLocale}
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+        >
+          <option value="he">{t("communicationLocales.he")}</option>
+          <option value="en">{t("communicationLocales.en")}</option>
+        </select>
+        <span className="mt-1 block text-[11px] text-app-text-tertiary">{t("communicationLocaleHint")}</span>
+      </div>
+
       <label className="flex items-start gap-3 sm:col-span-2">
         <input
           type="checkbox"
