@@ -5,7 +5,8 @@ import { listTimeEntriesForAdmin } from "@/lib/app-domain/time-entries";
 import { getClient } from "@/lib/app-domain/clients";
 import { toCsv } from "@/lib/csv";
 import { attachmentDisposition } from "@/lib/http-headers";
-import { formatDuration, formatSource } from "@/lib/time-entry-format";
+import { formatDuration, sourceKey } from "@/lib/time-entry-format";
+import { outgoingOf } from "@/lib/i18n/recipients";
 import { dayEndInZone, dayStartInZone } from "@/lib/timezone";
 
 // Same additive `?format=` pattern as app/api/reports/export/route.ts
@@ -69,19 +70,34 @@ export async function GET(req: NextRequest) {
   // gates this route, matching the page.tsx screen's own can() check.
   const entries = await listTimeEntriesForAdmin(filters);
 
-  const headers = ["תאריך", "איש צוות", "לקוח", "קטגוריה", "משך", "הערה", "מקור", "נערך"];
-  const rows = entries.map((e) => [
-    new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Jerusalem" }).format(
-      e.startAt
-    ),
-    e.user.name,
-    e.client.name,
-    e.category.name,
-    formatDuration(e.actualSeconds),
-    e.note ?? "",
-    formatSource(e.source),
-    e.isEdited ? "כן" : "",
-  ]);
+  // ADR 0006, part C: in the language and time zone of whoever asked for
+  // it. Names, categories and notes are what people wrote, as written.
+  const out = outgoingOf(user);
+  const t = out.t;
+  const when = new Intl.DateTimeFormat(out.tag, { dateStyle: "short", timeStyle: "short", timeZone: out.timeZone });
+  const headers = [
+    t("exports.timeEntries.date"),
+    t("exports.timeEntries.employee"),
+    t("exports.timeEntries.client"),
+    t("exports.timeEntries.category"),
+    t("exports.timeEntries.duration"),
+    t("exports.timeEntries.note"),
+    t("exports.timeEntries.source"),
+    t("exports.timeEntries.edited"),
+  ];
+  const rows = entries.map((e) => {
+    const source = sourceKey(e.source);
+    return [
+      when.format(e.startAt),
+      e.user.name,
+      e.client.name,
+      e.category.name,
+      e.actualSeconds === null ? t("exports.timeEntries.running") : formatDuration(e.actualSeconds),
+      e.note ?? "",
+      source ? t(`exports.timeEntries.sources.${source}`) : e.source,
+      e.isEdited ? t("exports.yes") : "",
+    ];
+  });
 
   const dateStr = new Date().toISOString().slice(0, 10);
   const clientSlug = clientId ? (await getClient(clientId))?.name ?? clientId : "all-clients";
@@ -92,7 +108,7 @@ export async function GET(req: NextRequest) {
     // Dynamic import - see ADR 0001 section 18.14: exceljs is only loaded
     // for xlsx requests, same reasoning as app/api/reports/export/route.ts.
     const { toXlsx } = await import("@/lib/xlsx");
-    const buf = await toXlsx("דיווחי זמן", headers, rows);
+    const buf = await toXlsx(t("exports.timeEntries.title"), headers, rows, out.dir);
     const filename = `time-entries_${clientSlug}_${dateStr}.xlsx`;
     return new Response(buf, {
       headers: {
@@ -106,15 +122,17 @@ export async function GET(req: NextRequest) {
     // Dynamic import - see ADR 0001 section 18.14: pdfkit + fontkit are
     // only loaded for pdf requests.
     const { toPdfTable } = await import("@/lib/pdf");
-    const rangeParts = [
-      filters.from ? filters.from.toLocaleDateString("he-IL") : null,
-      filters.to ? filters.to.toLocaleDateString("he-IL") : null,
-    ].filter(Boolean);
+    // The requester's time zone, not the server's (UTC on Vercel, which
+    // showed an Israeli midnight as the day before until 12.11.2026).
+    const day = (d: Date) => d.toLocaleDateString(out.tag, { timeZone: out.timeZone });
+    const rangeParts = [filters.from ? day(filters.from) : null, filters.to ? day(filters.to) : null].filter(Boolean);
     const buf = await toPdfTable({
-      title: "דיווחי זמן",
+      title: t("exports.timeEntries.title"),
       subtitle: rangeParts.length ? rangeParts.join(" - ") : undefined,
       headers,
       rows,
+      dir: out.dir,
+      emptyText: t("exports.noData"),
     });
     const filename = `time-entries_${clientSlug}_${dateStr}.pdf`;
     return new Response(buf, {

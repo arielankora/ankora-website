@@ -254,7 +254,7 @@ caused it and whatever request (or cron) it runs in.
   (`inviteUser`'s `locale`, read from the form's `locale` field when it
   sends one), Hebrew otherwise.
 
-Still Hebrew, for part B or by decision: anything to people who are not
+Still Hebrew after part A (parts B and C below change most of it), for part B or by decision: anything to people who are not
 app users (client contacts, the client copy of an hour bank alert,
 scheduled reports, messages staff write to clients, WhatsApp, procedure
 steps sent through the person's Gmail), PDFs and exports, the nightly
@@ -262,3 +262,86 @@ backup email, prompts to Claude and MCP answers. Text people wrote, and
 lines lib/ builds as a record (a process review's cause, a failing
 check's message, the reason stored on an auto-apply pause), are put into
 the message as they are.
+
+## Outgoing channels, parts B and C (12.11.2026)
+
+Decided by Ariel on 12.11.2026, and built with it.
+
+The rule: a person with an account in the app is written to in their own
+language (`User.locale`, part A). Everyone else, a client's contacts and
+any address typed into one of its lists, is written to in the client's
+communication language: `Client.communicationLocale` (enum `AppLocale`,
+default `he`, migration `20261112200000_client_communication_locale`).
+It is chosen on the client card (`EditClientForm`, for whoever may edit
+the card: `client.manage`), and a change writes its own audit line,
+`client.communication_locale`, beside the settings change.
+`groupEmailsByLocale(emails, fallback)` takes the language for an address
+that is no app user's, as one locale or per address, and
+`clientCommunicationLocale(clientId)` reads the client's.
+
+Part B, client channels, and what decides each:
+
+* Scheduled report emails (`lib/app-domain/report-schedules.ts`): one
+  email per language among the schedule's recipients, an app user in
+  theirs, every other address in the client's. One `EmailDelivery` row per
+  email, all on the same `ReportRun`. A retry of a row old enough to have
+  no stored body is rebuilt in the client's language. These emails carry
+  no attachment.
+* The client copy of an hour bank alert (`clientAlertEmail` in
+  `lib/app-domain/alerts.ts`): the same split over the rule's client list.
+* Important-date reminders: the date's extra addresses (and an
+  occurrence's own address) are the client side and fall back to the
+  client's language; the rule's Ankora-side extras keep Hebrew; the
+  people with accounts get their own, as in part A.
+* "Message the client" (`lib/app-domain/client-messages.ts`): the draft
+  the person starts from (greeting, subject, template lines, sign-off
+  line) is in the client's communication language. What the person then
+  writes is sent as written, untranslated, as plain text with no frame.
+  The list of situations in the composer is the person's interface and
+  comes from `messageClient.kinds`.
+* Mail sent from a person's own Gmail (`lib/rtl-mail.ts`): the HTML
+  part's `dir` and `lang` follow the language of the text
+  (`textDirection`, by majority of letters). The text is what the step
+  says. The connection test mail is in the tester's language.
+* Emails to client users of the portal (the invite, the action layout)
+  were already theirs in part A.
+
+Part C, files:
+
+* A file a person downloads is in that person's language: the reports
+  export, the time entries export, the audit log export (headers only:
+  action codes, entity types and ISO times stay as recorded, to match the
+  database), and the portal's monthly export, whether a client user or a
+  staff member previewing the portal asks for it. Titles, headers, the
+  words rows carry (yes, package, overrun and the like, shared with the
+  reports screen through `lib/i18n/report-words.ts`) and dates follow the
+  requester; names, categories and notes stay as written. File names do
+  not change.
+* `toPdfTable` takes `dir`: an English table is laid out left to right
+  (first column on the left, every cell from the left) with the same two
+  Heebo subsets, so a Hebrew name inside it still renders and reads right
+  to left. The Hebrew table is drawn exactly as before. `toXlsx` turns the
+  sheet left to right for English the same way.
+* The date range under an export PDF's title is now written in the
+  requester's time zone. Before, it used the server's (UTC on Vercel), so
+  an Israeli midnight showed as the day before.
+
+Stays Hebrew, and why:
+
+* What people wrote: messages to clients, notes, task titles, the client
+  file's text, the approved monthly summary. Never translated.
+* Prompts to Claude and MCP answers. The MCP tools have no general client
+  settings tool (only the sub-processor notice has its own), so the new
+  field is not in MCP.
+* Agreement and confidentiality documents (decision 5).
+* The client file PDF and Markdown. Their section names, empty lines and
+  status words are built once in `lib/app-domain/client-file-view.ts` and
+  `lib/client-file-document.ts`, and the same document is what Claude
+  reads through MCP; translating its frame alone would leave an English
+  page around Hebrew sections. Left for a decision.
+* Procedure documents keep the language the requester picks with
+  `?lang=` (a procedure's own approved translation), as before.
+* The communications export (Markdown handed to a client after an
+  engagement ends) and the nightly backup email.
+* No PDF is attached to any email the app sends to a client today; when
+  one is, it goes in the client's communication language.

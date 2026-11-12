@@ -248,6 +248,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "client.ai_excluded": "לקוח סומן בלי AI",
   "client.ai_included": "הסימון בלי AI הוסר מלקוח",
   "client.subprocessor_notice": "עדכון התחייבות לעדכון יזום על תת-מעבד",
+  "client.communication_locale": "שינוי שפת התקשורת עם הלקוח",
   "client.archive": "העברת לקוח לארכיון",
   "client.restore": "שחזור לקוח מהארכיון",
   "category.create": "יצירת קטגוריה",

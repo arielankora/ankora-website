@@ -3,7 +3,8 @@ import { requireUser } from "@/lib/app-auth/session";
 import { parsePeriodOffset, MAX_MONTH_OFFSET, israelMonthReference } from "@/lib/period-offset";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getMonthlyDetailed } from "@/lib/app-domain/client-portal";
-import { monthlyDetailedToCsv } from "@/lib/app-domain/report-schedules";
+import { monthlyDetailedTable, monthlyDetailedToCsv } from "@/lib/app-domain/report-schedules";
+import { outgoingOf } from "@/lib/i18n/recipients";
 import { attachmentDisposition } from "@/lib/http-headers";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17): same `?format=` addition as
@@ -28,20 +29,17 @@ export async function GET(request: Request) {
   try {
     const report = await getMonthlyDetailed(user, referenceDate);
     const period = `report-${year}-${String(month).padStart(2, "0")}`;
-    const showEmployee = report.rows.some((r) => r.employee !== undefined);
-    const headers = showEmployee
-      ? ["תאריך", "פעילות", "קטגוריה", "דקות לחיוב", "איש צוות"]
-      : ["תאריך", "פעילות", "קטגוריה", "דקות לחיוב"];
-    const rows = report.rows.map((r) =>
-      showEmployee
-        ? [r.date, r.activity, r.category, r.billableMinutes, r.employee ?? ""]
-        : [r.date, r.activity, r.category, r.billableMinutes]
-    );
+    // ADR 0006, part C: in the language of whoever downloads it, a client
+    // user in theirs and a staff member in theirs. The rows (activities,
+    // categories, names) are what was recorded, as recorded.
+    const out = outgoingOf(user);
+    const { headers, body: rows } = monthlyDetailedTable(report.rows, out);
+    const title = out.t("exports.monthly.title");
 
     if (format === "xlsx") {
       // Dynamic import - see ADR 0001 section 18.14.
       const { toXlsx } = await import("@/lib/xlsx");
-      const buf = await toXlsx("דוח חודשי מפורט", headers, rows);
+      const buf = await toXlsx(title, headers, rows, out.dir);
       return new NextResponse(buf, {
         status: 200,
         headers: {
@@ -55,10 +53,12 @@ export async function GET(request: Request) {
       // Dynamic import - see ADR 0001 section 18.14.
       const { toPdfTable } = await import("@/lib/pdf");
       const buf = await toPdfTable({
-        title: "דוח חודשי מפורט",
-        subtitle: referenceDate.toLocaleDateString("he-IL", { year: "numeric", month: "long" }),
+        title,
+        subtitle: referenceDate.toLocaleDateString(out.tag, { year: "numeric", month: "long", timeZone: out.timeZone }),
         headers,
         rows,
+        dir: out.dir,
+        emptyText: out.t("exports.noData"),
       });
       return new NextResponse(buf, {
         status: 200,
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const csv = monthlyDetailedToCsv(report.rows);
+    const csv = monthlyDetailedToCsv(report.rows, out);
     const filename = `${period}.csv`;
 
     // toCsv() (lib/app-domain/report-schedules.ts -> lib/csv.ts) already

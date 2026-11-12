@@ -1,6 +1,6 @@
 import "server-only";
 import { groupEmailsByLocale } from "@/lib/i18n/recipients";
-import type { OutgoingT } from "@/lib/i18n/outgoing";
+import { HEBREW, type OutgoingT } from "@/lib/i18n/outgoing";
 import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -16,7 +16,7 @@ import {
   supersedeLowerUtilizationAlerts,
   type UtilizationSnapshotForAlerts,
 } from "@/lib/app-domain/alert-closure";
-import type { User, AlertRule, AlertThresholdType, HourBank, EmailDelivery } from "@prisma/client";
+import type { User, AlertRule, AlertThresholdType, HourBank, EmailDelivery, AppLocale } from "@prisma/client";
 
 // Phase 4 domain service: spec sections 9 ("התראות") and 9.1/9.2 (threshold
 // types, delivery). See docs/adr/0001 section 11 for every decision this
@@ -113,23 +113,61 @@ export function isFullPackageRule(rule: Pick<AlertRule, "type" | "thresholdValue
 
 export function prepaidClientAlertLines(
   rule: Pick<AlertRule, "type" | "thresholdValue">,
-  utilization: Pick<UtilizationSnapshotForAlerts, "utilizationPct" | "remainingMinutes">
+  utilization: Pick<UtilizationSnapshotForAlerts, "utilizationPct" | "remainingMinutes">,
+  /// ADR 0006, part B: the client's communication language, or an app
+  /// user's own. Hebrew when not given.
+  t: OutgoingT = HEBREW.t
 ): string[] {
   const hours = (m: number) => (Math.abs(m) / 60).toFixed(2);
   const depleted = utilization.remainingMinutes <= 0;
   if (depleted || isFullPackageRule(rule)) {
     return [
-      "חבילת השעות שלכם נוצלה במלואה.",
+      t("clientAlert.depleted"),
       utilization.remainingMinutes < 0
-        ? `שעות מעבר לחבילה עד עכשיו: ${hours(utilization.remainingMinutes)}.`
-        : "לא נותרו שעות בחבילה.",
-      "מעכשיו השעות נרשמות כחריגה ויקוזזו מהטעינה הבאה.",
+        ? t("clientAlert.overHours", { hours: hours(utilization.remainingMinutes) })
+        : t("clientAlert.noneLeft"),
+      t("clientAlert.fromNow"),
     ];
   }
   return [
-    `נוצלו ${Math.round(utilization.utilizationPct)}% מחבילת השעות האחרונה שלכם.`,
-    `נותרו ${hours(utilization.remainingMinutes)} שעות.`,
+    t("clientAlert.usedPct", { pct: String(Math.round(utilization.utilizationPct)) }),
+    t("clientAlert.hoursLeft", { hours: hours(utilization.remainingMinutes) }),
   ];
+}
+
+/// The client copy of an hour bank alert, in one language (ADR 0006,
+/// part B). Exported for its test.
+export function clientAlertEmail(
+  input: {
+    clientName: string;
+    isPrepaid: boolean;
+    rule: Pick<AlertRule, "type" | "thresholdValue">;
+    utilization: Pick<UtilizationSnapshotForAlerts, "utilizationPct" | "remainingMinutes">;
+  },
+  t: OutgoingT = HEBREW.t
+): { subject: string; text: string } {
+  const { clientName, isPrepaid, rule, utilization } = input;
+  const subject = isPrepaid
+    ? t("clientAlert.subjectPrepaid", { client: clientName })
+    : t("clientAlert.subjectUtilization", { client: clientName });
+  // Deliberately omits a "link to portal" line (spec 9.2) - no Client
+  // Portal existed when this was written (ADR 11.5 / Phase 6 gap).
+  const text = isPrepaid
+    ? [t("clientAlert.hello"), ``, ...prepaidClientAlertLines(rule, utilization, t), ``, t("clientAlert.signoff"), t("clientAlert.team")].join("\n")
+    : [
+        t("clientAlert.hello"),
+        ``,
+        t("clientAlert.intro"),
+        t("clientAlert.current", { pct: String(utilization.utilizationPct) }),
+        // An overdrawn bank is stated in words, not as "דקות שנותרו: -21".
+        utilization.remainingMinutes < 0
+          ? t("clientAlert.overdrawn", { minutes: String(-utilization.remainingMinutes) })
+          : t("clientAlert.remaining", { minutes: String(utilization.remainingMinutes) }),
+        ``,
+        t("clientAlert.signoff"),
+        t("clientAlert.team"),
+      ].join("\n");
+  return { subject, text };
 }
 
 /// What the alerts are actually watching: enabled rules on clients that
@@ -435,7 +473,7 @@ export async function evaluateAlertsForClient(clientId: string): Promise<void> {
   });
   let anyResolved = false;
   for (const rule of ordered) {
-    const action = await evaluateSingleRule(rule, bank, utilization, client.name, accountManagerEmail, hasFullRule);
+    const action = await evaluateSingleRule(rule, bank, utilization, client.name, accountManagerEmail, hasFullRule, client.communicationLocale);
     if (action === "resolve" && rule.type === "UTILIZATION_PCT") anyResolved = true;
   }
 
@@ -455,7 +493,10 @@ async function evaluateSingleRule(
   utilization: UtilizationSnapshotForAlerts,
   clientName: string,
   accountManagerEmail: string | null = null,
-  hasFullRule = false
+  hasFullRule = false,
+  /// Client.communicationLocale: the client copy's language for an
+  /// address that is not an app user's (ADR 0006, part B).
+  clientLocale: AppLocale = "he"
 ): Promise<"fire" | "resolve" | "none"> {
   const currentValue = currentValueForThreshold(rule.type, utilization);
   const breached = isThresholdBreached(rule.type, rule.thresholdValue, currentValue);
@@ -506,7 +547,7 @@ async function evaluateSingleRule(
 
   // The Ankora copy goes to people on the team, each in their own
   // language (ADR 0006, outgoing channels): one email per language among
-  // the recipients. The client copy below stays Hebrew (part B).
+  // the recipients. The client copy below follows the client (part B).
   const isPrepaid = bank.kind === "PREPAID";
   const ankoraText = (t: OutgoingT) =>
     [
@@ -531,24 +572,11 @@ async function evaluateSingleRule(
     ].join("\n");
 
   const skipClientCopy = isPrepaid && hasFullRule && !isFullPackageRule(rule) && utilization.remainingMinutes <= 0;
-  const subjectClient = isPrepaid ? `עדכון חבילת שעות - ${clientName}` : `עדכון ניצול שעות - ${clientName}`;
-  // Deliberately omits a "link to portal" line (spec 9.2) - no Client
-  // Portal exists yet (ADR 11.5 / Phase 6 gap).
-  const textClient = isPrepaid
-    ? [`שלום,`, ``, ...prepaidClientAlertLines(rule, utilization), ``, `בברכה,`, `צוות Ankora`].join("\n")
-    : [
-    `שלום,`,
-    ``,
-    `זהו עדכון אוטומטי על ניצול בנק השעות שלכם אצל Ankora.`,
-    `ניצול נוכחי: ${utilization.utilizationPct}%`,
-    // An overdrawn bank is stated in words, not as "דקות שנותרו: -21".
-    utilization.remainingMinutes < 0
-      ? `חריגה מהבנק: ${-utilization.remainingMinutes} דקות`
-      : `דקות שנותרו: ${utilization.remainingMinutes}`,
-    ``,
-    `בברכה,`,
-    `צוות Ankora`,
-  ].join("\n");
+  // The client copy: an address that is an app user's (a client user on
+  // the portal) in that user's language, every other address in the
+  // client's communication language. One email per language.
+  const clientGroups = skipClientCopy ? [] : await groupEmailsByLocale(rule.recipientsClient, clientLocale);
+  const clientInput = { clientName, isPrepaid, rule, utilization };
 
   const ankoraGroups = await groupEmailsByLocale(
     ankoraRecipients(rule.recipientsAnkora, rule.notifyAccountManager ? accountManagerEmail : null)
@@ -557,13 +585,10 @@ async function evaluateSingleRule(
     ...ankoraGroups.map((g) =>
       deliverAlertEmail(event.id, "ankora_internal", g.to, g.out.t("alerts.subject", { client: clientName }), ankoraText(g.out.t))
     ),
-    deliverAlertEmail(
-      event.id,
-      "client_facing",
-      skipClientCopy ? [] : rule.recipientsClient,
-      subjectClient,
-      textClient
-    ),
+    ...clientGroups.map((g) => {
+      const { subject, text } = clientAlertEmail(clientInput, g.out.t);
+      return deliverAlertEmail(event.id, "client_facing", g.to, subject, text);
+    }),
   ]);
   return "fire";
 }

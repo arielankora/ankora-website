@@ -1049,7 +1049,16 @@
     "whatsapp": "פתיחה בוואטסאפ",
     "copy": "העתקה",
     "email": "שליחה במייל",
-    "otherDraft": "נוסח אחר"
+    "otherDraft": "נוסח אחר",
+    "kinds": {
+      "decision_waiting": "משהו מחכה להחלטה",
+      "summary_ready": "הסיכום החודשי מוכן",
+      "promise_update": "עדכון באמצע",
+      "promise_done": "סיימנו",
+      "need_information": "צריך משהו ממך",
+      "delay": "יש עיכוב",
+      "handover": "מסירה"
+    }
   },
   "timer": {
     "page": {
@@ -2052,7 +2061,8 @@
       "commsGroupAssigned": "שיוך קבוצת WhatsApp ללקוח",
       "commsEngagementEndSweep": "מחיקת שיחות והקלטות של לקוח שההתקשרות איתו הסתיימה",
       "commsExportDownloaded": "ייצוא שיחות והקלטות של לקוח",
-      "userCommsAccess": "שינוי הגישה למסך התקשורת"
+      "userCommsAccess": "שינוי הגישה למסך התקשורת",
+      "clientCommunicationLocale": "שינוי שפת התקשורת עם הלקוח"
     },
     "kinds": {
       "failure": "כשלון",
@@ -3962,6 +3972,12 @@
           "contact": "איך לדבר איתו",
           "matters": "מה חשוב לו",
           "never": "מה אסור שיקרה"
+        },
+        "communicationLocale": "שפת התקשורת עם הלקוח",
+        "communicationLocaleHint": "השפה של המיילים, הדוחות וההתראות לאנשי הלקוח שאין להם חשבון במערכת. מי שיש לו חשבון מקבל בשפה שבחר.",
+        "communicationLocales": {
+          "he": "עברית",
+          "en": "אנגלית"
         }
       },
       "knowledgeStatus": {
@@ -7393,6 +7409,154 @@
         "approvalsLink": "למסך האישורים",
         "ranked": "לפי סדר חשיבות",
         "settings": "הגדרות המייל"
+      }
+    },
+    "connectionTest": {
+      "subject": "בדיקת חיבור מאנקורה",
+      "body": "זה מייל בדיקה ממסך החיבורים של אנקורה. אפשר למחוק אותו."
+    },
+    "reports": {
+      "types": {
+        "MONTHLY_DETAILED": "דוח חודשי מפורט",
+        "WEEKLY_ACTIVITY": "פעילות שבועית",
+        "HOURS_BY_CATEGORY": "סיכום קטגוריות",
+        "HOUR_BANK_STATUS": "סטטוס בנק שעות"
+      },
+      "subject": "Ankora - {label} - {client} ({period})",
+      "heading": "{label} עבור {client}",
+      "period": "תקופה: {period}",
+      "prepaidLoaded": "חבילת שעות שנטענה ב-{date}: {hours} שעות",
+      "rolloverOffset": "קוזזה חריגה מהחבילה הקודמת: {hours} שעות",
+      "rolloverCarried": "עברה יתרה מהחבילה הקודמת: {hours} שעות",
+      "periodUsed": "נוצלו בתקופה: {hours} שעות",
+      "packageUsedPct": "נוצלו מהחבילה: {pct}%",
+      "overageOffset": "חריגה: {hours} שעות, תקוזז מהטעינה הבאה",
+      "remaining": "נותרו: {hours} שעות",
+      "cycleTotal": "סה\"כ במחזור: {hours} שעות",
+      "cycleUsed": "נוצלו במחזור: {hours} שעות ({pct}%)",
+      "overage": "חריגה: {hours} שעות",
+      "legacyPurchased": "נרכשו: {minutes} דקות",
+      "legacyConsumed": "נוצל (מטמון): {minutes} דקות",
+      "legacyStatus": "סטטוס מחזור: {status}",
+      "noCycle": "אין מחזור פעיל בתקופה זו.",
+      "categoryRow": "{category}: {minutes} דקות",
+      "rowCount": "סה\"כ שורות: {count}",
+      "minutesShort": "{minutes} דק''",
+      "more": "... ועוד {count} שורות (ראו את פורטל הלקוח לפרטים המלאים).",
+      "fullView": "לצפייה מלאה: {url}"
+    },
+    "clientAlert": {
+      "subjectPrepaid": "עדכון חבילת שעות - {client}",
+      "subjectUtilization": "עדכון ניצול שעות - {client}",
+      "hello": "שלום,",
+      "signoff": "בברכה,",
+      "team": "צוות Ankora",
+      "intro": "זהו עדכון אוטומטי על ניצול בנק השעות שלכם אצל Ankora.",
+      "current": "ניצול נוכחי: {pct}%",
+      "overdrawn": "חריגה מהבנק: {minutes} דקות",
+      "remaining": "דקות שנותרו: {minutes}",
+      "depleted": "חבילת השעות שלכם נוצלה במלואה.",
+      "overHours": "שעות מעבר לחבילה עד עכשיו: {hours}.",
+      "noneLeft": "לא נותרו שעות בחבילה.",
+      "fromNow": "מעכשיו השעות נרשמות כחריגה ויקוזזו מהטעינה הבאה.",
+      "usedPct": "נוצלו {pct}% מחבילת השעות האחרונה שלכם.",
+      "hoursLeft": "נותרו {hours} שעות."
+    },
+    "clientMessages": {
+      "hi": "היי,",
+      "anythingElse": "יש משהו נוסף שנוכל להוריד ממך?",
+      "decisionWaiting": {
+        "label": "משהו מחכה להחלטה",
+        "subject": "משהו מחכה להחלטה שלך",
+        "line1": "יש החלטה אחת שמחכה לך.",
+        "line1About": "יש החלטה אחת שמחכה לך בנושא {about}.",
+        "line2": "ריכזנו את האפשרויות והמחירים, ויש גם המלצה שלנו.",
+        "line3": "אפשר לאשר בלחיצה אחת, ואפשר לענות לי כאן אם עדיף לדבר על זה."
+      },
+      "summaryReady": {
+        "label": "הסיכום החודשי מוכן",
+        "subject": "הסיכום החודשי",
+        "subjectAbout": "הסיכום של {about}",
+        "line1": "הסיכום החודשי מוכן וממתין לך בפורטל.",
+        "line1About": "הסיכום של {about} מוכן וממתין לך בפורטל.",
+        "line2": "הוא מרכז מה נעשה החודש ואיפה הושקעו השעות.",
+        "line3": "אם משהו שם לא מסתדר, אני כאן."
+      },
+      "promiseUpdate": {
+        "label": "עדכון באמצע",
+        "subject": "עדכון",
+        "subjectAbout": "עדכון: {about}",
+        "line1": "רק שתדע: [מה קורה עכשיו].",
+        "line1About": "רק שתדע מה קורה עם {about}: [מה קורה עכשיו].",
+        "line2": "[מה הצעד הבא ומתי]. אין צורך לעשות כלום מצידך."
+      },
+      "promiseDone": {
+        "label": "סיימנו",
+        "subject": "הושלם",
+        "subjectAbout": "הושלם: {about}",
+        "done": "הושלם. [מה בדיוק נעשה].",
+        "doneAbout": "{about} הושלם. [מה בדיוק נעשה]."
+      },
+      "needInformation": {
+        "label": "צריך משהו ממך",
+        "subject": "צריך פרט אחד",
+        "subjectAbout": "צריך פרט אחד: {about}",
+        "line1": "כדי להתקדם חסר לנו דבר אחד: [מה חסר].",
+        "line1About": "כדי להתקדם עם {about} חסר לנו דבר אחד: [מה חסר].",
+        "line2": "ברגע שיהיה לנו, אנחנו ממשיכים משם."
+      },
+      "delay": {
+        "label": "יש עיכוב",
+        "subject": "עדכון על לוח הזמנים",
+        "subjectAbout": "עדכון על לוח הזמנים: {about}",
+        "line1": "רציתי לעדכן לפני שתשים לב בעצמך: מתעכב. [למה, במשפט].",
+        "line1About": "רציתי לעדכן לפני שתשים לב בעצמך: {about} מתעכב. [למה, במשפט].",
+        "line2": "המועד המעודכן הוא [מתי], ואני מלווה את זה עד הסוף."
+      },
+      "handover": {
+        "label": "מסירה",
+        "subject": "מסירה",
+        "subjectAbout": "מסירה: {about}",
+        "line1": "מוכן ומועבר אליך. מה שכלול: [מה בוצע, אישורים, קישורים].",
+        "line1About": "{about} מוכן ומועבר אליך. מה שכלול: [מה בוצע, אישורים, קישורים].",
+        "line2": "[נקודות שחשוב לזכור להמשך]."
+      }
+    },
+    "exports": {
+      "noData": "אין נתונים להצגה בטווח שנבחר.",
+      "yes": "כן",
+      "timeEntries": {
+        "title": "דיווחי זמן",
+        "date": "תאריך",
+        "employee": "איש צוות",
+        "client": "לקוח",
+        "category": "קטגוריה",
+        "duration": "משך",
+        "note": "הערה",
+        "source": "מקור",
+        "edited": "נערך",
+        "running": "פעיל",
+        "sources": {
+          "manual": "ידני",
+          "timer": "טיימר"
+        }
+      },
+      "auditLog": {
+        "at": "מועד",
+        "action": "פעולה",
+        "actor": "בוצע ע\"י",
+        "entity": "ישות",
+        "entityId": "מזהה ישות",
+        "client": "לקוח",
+        "system": "מערכת"
+      },
+      "monthly": {
+        "title": "דוח חודשי מפורט",
+        "date": "תאריך",
+        "activity": "פעילות",
+        "category": "קטגוריה",
+        "billableMinutes": "דקות לחיוב",
+        "employee": "איש צוות"
       }
     }
   }

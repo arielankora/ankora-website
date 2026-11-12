@@ -3,6 +3,7 @@ import { requireUserOrThrow, UnauthorizedError } from "@/lib/app-auth/session";
 import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { toCsv } from "@/lib/csv";
+import { outgoingOf } from "@/lib/i18n/recipients";
 import { attachmentDisposition } from "@/lib/http-headers";
 import { auditSearchWhere } from "@/app/(product)/app/(authenticated)/audit-log/labels";
 
@@ -44,12 +45,23 @@ export async function GET(req: NextRequest) {
     take: 5000,
   });
 
+  // ADR 0006, part C: the headers in the requester's language. The action
+  // and entity stay as the codes they are recorded under, and the time as
+  // ISO, so the file can be matched against the database.
+  const { t } = outgoingOf(user);
   const csv = toCsv(
-    ["מועד", "פעולה", "בוצע ע\"י", "ישות", "מזהה ישות", "לקוח"],
+    [
+      t("exports.auditLog.at"),
+      t("exports.auditLog.action"),
+      t("exports.auditLog.actor"),
+      t("exports.auditLog.entity"),
+      t("exports.auditLog.entityId"),
+      t("exports.auditLog.client"),
+    ],
     events.map((e) => [
       e.createdAt.toISOString(),
       e.action,
-      e.actor?.name ?? "מערכת",
+      e.actor?.name ?? t("exports.auditLog.system"),
       e.entityType,
       e.entityId ?? "",
       e.client?.name ?? "",

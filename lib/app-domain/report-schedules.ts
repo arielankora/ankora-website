@@ -8,6 +8,8 @@ import { getClient } from "@/lib/app-domain/clients";
 import { getHourBankSnapshot } from "@/lib/app-domain/hour-banks";
 import { computeConsumedMinutesForRange } from "@/lib/app-domain/billing";
 import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
+import { HEBREW, translatorFor, type Outgoing } from "@/lib/i18n/outgoing";
+import { groupEmailsByLocale } from "@/lib/i18n/recipients";
 import type { User, ReportSchedule, ClientReportType, ReportFrequency } from "@prisma/client";
 
 // Phase 6 domain service: spec section 15 ("דוחות מתוזמנים במייל"). Owns
@@ -234,12 +236,11 @@ export function computeReportingPeriod(
 // Snapshot + send
 // ---------------------------------------------------------------------------
 
-const REPORT_TYPE_LABELS: Record<ClientReportType, string> = {
-  MONTHLY_DETAILED: "דוח חודשי מפורט",
-  WEEKLY_ACTIVITY: "פעילות שבועית",
-  HOURS_BY_CATEGORY: "סיכום קטגוריות",
-  HOUR_BANK_STATUS: "סטטוס בנק שעות",
-};
+// ADR 0006, outgoing channels, part B: the email is worded in the
+// recipient's language (outgoing.reports in messages/*.json). An address
+// that is an app user's gets that user's language; any other address on
+// the list gets the client's communication language. What people wrote
+// (the approved summary, task titles, category names) goes in as written.
 
 /// Builds the exact same shape of data the corresponding Client Portal
 /// screen shows, for an arbitrary [from,to) window - reused for both the
@@ -317,7 +318,7 @@ async function buildSnapshot(clientId: string, reportType: ClientReportType, fro
   }
 }
 
-function renderEmailBody(
+export function renderEmailBody(
   reportType: ClientReportType,
   clientName: string,
   from: Date,
@@ -327,9 +328,11 @@ function renderEmailBody(
   /// one. Null covers both "nobody wrote it" and "nobody approved it in
   /// time", which the spec treats the same way on purpose - the report
   /// goes out either way, and a summary nobody signed does not travel.
-  summary?: string | null
+  summary?: string | null,
+  out: Outgoing = HEBREW
 ): { subject: string; text: string } {
-  const label = REPORT_TYPE_LABELS[reportType];
+  const t = out.t;
+  const label = t(`reports.types.${reportType}`);
   // Phase 8 fix: from/to are UTC instants representing LOCAL midnight
   // boundaries (see computeReportingPeriod) - formatting them with
   // toISOString() would show the wrong calendar date for the same reason
@@ -339,12 +342,13 @@ function renderEmailBody(
   // numbers (not by subtracting a fixed 24h, which would land on the
   // wrong wall-clock time across a DST transition night) and only then
   // converted back to a Date purely so localDateKey can format it.
+  // The dates stay YYYY-MM-DD in every language: unambiguous either way.
   const [toY, toM, toD] = localDateKey(to).split("-").map(Number);
   const inclusiveTo = new Date(Date.UTC(toY, toM - 1, toD - 1));
   const period = `${localDateKey(from)} - ${localDateKey(inclusiveTo, "UTC")}`;
-  const subject = `Ankora - ${label} - ${clientName} (${period})`;
+  const subject = t("reports.subject", { label, client: clientName, period });
 
-  const lines = [`${label} עבור ${clientName}`, `תקופה: ${period}`, ""];
+  const lines = [t("reports.heading", { label, client: clientName }), t("reports.period", { period }), ""];
   // First, above the numbers: it is the part a person reads, and the rows
   // below it are what it rests on.
   if (summary) lines.push(summary, "");
@@ -354,41 +358,49 @@ function renderEmailBody(
     const hours = (m: number) => (Math.abs(m) / 60).toFixed(2);
     if (cycle && cycle.kind === "PREPAID" && live) {
       lines.push(
-        `חבילת שעות שנטענה ב-${localDateKey(new Date(cycle.cycleStart))}: ${hours(cycle.purchasedMinutes)} שעות`,
+        t("reports.prepaidLoaded", { date: localDateKey(new Date(cycle.cycleStart)), hours: hours(cycle.purchasedMinutes) }),
         ...(cycle.rolloverInMinutes < 0
-          ? [`קוזזה חריגה מהחבילה הקודמת: ${hours(cycle.rolloverInMinutes)} שעות`]
+          ? [t("reports.rolloverOffset", { hours: hours(cycle.rolloverInMinutes) })]
           : cycle.rolloverInMinutes > 0
-            ? [`עברה יתרה מהחבילה הקודמת: ${hours(cycle.rolloverInMinutes)} שעות`]
+            ? [t("reports.rolloverCarried", { hours: hours(cycle.rolloverInMinutes) })]
             : []),
-        `נוצלו בתקופה: ${hours(snapshot.periodConsumedMinutes ?? 0)} שעות`,
-        `נוצלו מהחבילה: ${live.utilizationPct}%`,
+        t("reports.periodUsed", { hours: hours(snapshot.periodConsumedMinutes ?? 0) }),
+        t("reports.packageUsedPct", { pct: String(live.utilizationPct) }),
         live.remainingMinutes < 0
-          ? `חריגה: ${hours(live.remainingMinutes)} שעות, תקוזז מהטעינה הבאה`
-          : `נותרו: ${hours(live.remainingMinutes)} שעות`
+          ? t("reports.overageOffset", { hours: hours(live.remainingMinutes) })
+          : t("reports.remaining", { hours: hours(live.remainingMinutes) })
       );
     } else if (cycle && live) {
       lines.push(
-        `סה"כ במחזור: ${hours(live.totalMinutes)} שעות`,
-        `נוצלו בתקופה: ${hours(snapshot.periodConsumedMinutes ?? 0)} שעות`,
-        `נוצלו במחזור: ${hours(live.consumedMinutes)} שעות (${live.utilizationPct}%)`,
-        live.remainingMinutes < 0 ? `חריגה: ${hours(live.remainingMinutes)} שעות` : `נותרו: ${hours(live.remainingMinutes)} שעות`
+        t("reports.cycleTotal", { hours: hours(live.totalMinutes) }),
+        t("reports.periodUsed", { hours: hours(snapshot.periodConsumedMinutes ?? 0) }),
+        t("reports.cycleUsed", { hours: hours(live.consumedMinutes), pct: String(live.utilizationPct) }),
+        live.remainingMinutes < 0
+          ? t("reports.overage", { hours: hours(live.remainingMinutes) })
+          : t("reports.remaining", { hours: hours(live.remainingMinutes) })
       );
     } else if (cycle) {
       // A run frozen before 12.10.2026 has only the row.
-      lines.push(`נרכשו: ${cycle.purchasedMinutes} דקות`, `נוצל (מטמון): ${cycle.consumedMinutes} דקות`, `סטטוס מחזור: ${cycle.status}`);
+      lines.push(
+        t("reports.legacyPurchased", { minutes: String(cycle.purchasedMinutes) }),
+        t("reports.legacyConsumed", { minutes: String(cycle.consumedMinutes) }),
+        t("reports.legacyStatus", { status: String(cycle.status) })
+      );
     } else {
-      lines.push("אין מחזור פעיל בתקופה זו.");
+      lines.push(t("reports.noCycle"));
     }
   } else if (reportType === "HOURS_BY_CATEGORY") {
-    for (const row of snapshot.rows) lines.push(`${row.category}: ${row.minutes} דקות`);
+    for (const row of snapshot.rows) lines.push(t("reports.categoryRow", { category: row.category, minutes: String(row.minutes) }));
   } else {
-    lines.push(`סה"כ שורות: ${snapshot.rows.length}`);
+    lines.push(t("reports.rowCount", { count: String(snapshot.rows.length) }));
     for (const row of snapshot.rows.slice(0, 20)) {
-      lines.push(`${row.date} | ${row.activity} | ${row.category} | ${row.billableMinutes} דק'${row.employee ? " | " + row.employee : ""}`);
+      lines.push(
+        `${row.date} | ${row.activity} | ${row.category} | ${t("reports.minutesShort", { minutes: String(row.billableMinutes) })}${row.employee ? " | " + row.employee : ""}`
+      );
     }
-    if (snapshot.rows.length > 20) lines.push(`... ועוד ${snapshot.rows.length - 20} שורות (ראו את פורטל הלקוח לפרטים המלאים).`);
+    if (snapshot.rows.length > 20) lines.push(t("reports.more", { count: String(snapshot.rows.length - 20) }));
   }
-  lines.push("", "לצפייה מלאה: https://www.ankora.co.il/app/portal");
+  lines.push("", t("reports.fullView", { url: "https://www.ankora.co.il/app/portal" }));
 
   return { subject, text: lines.join("\n") };
 }
@@ -433,16 +445,27 @@ export async function sendReportSchedule(
     select: { draft: true },
   });
 
-  const { subject, text } = renderEmailBody(
-    schedule.reportType,
-    client.name,
-    period.from,
-    period.to,
-    snapshot,
-    approved?.draft ?? null
-  );
-
-  const result = await sendEmail({ to: schedule.recipients, subject, text });
+  // One email per language among the recipients (ADR 0006, outgoing
+  // channels): an app user in their own, everyone else in the client's.
+  // A list that reads one language is one email, exactly as before.
+  const groups = await groupEmailsByLocale(schedule.recipients, client.communicationLocale);
+  const sends: { to: string[]; subject: string; text: string; result: Awaited<ReturnType<typeof sendEmail>> }[] = [];
+  for (const group of groups) {
+    const { subject, text } = renderEmailBody(
+      schedule.reportType,
+      client.name,
+      period.from,
+      period.to,
+      snapshot,
+      approved?.draft ?? null,
+      group.out
+    );
+    sends.push({ to: group.to, subject, text, result: await sendEmail({ to: group.to, subject, text }) });
+  }
+  // Sent when every language's email went out; the first failure is the
+  // one reported.
+  const failure = sends.find((s) => !s.result.ok);
+  const result = failure ? failure.result : { ok: true as const, error: undefined };
 
   let reportRunId: string | null = null;
   if (persist) {
@@ -457,18 +480,20 @@ export async function sendReportSchedule(
     reportRunId = run.id;
   }
 
-  await prisma.emailDelivery.create({
-    data: {
-      reportRunId,
-      template: persist ? `report.${schedule.reportType.toLowerCase()}` : `report.${schedule.reportType.toLowerCase()}.test`,
-      recipients: schedule.recipients,
-      subject,
-      body: text,
-      status: result.ok ? "SENT" : "FAILED",
-      providerMessageId: result.providerMessageId,
-      error: result.error,
-    },
-  });
+  for (const send of sends) {
+    await prisma.emailDelivery.create({
+      data: {
+        reportRunId,
+        template: persist ? `report.${schedule.reportType.toLowerCase()}` : `report.${schedule.reportType.toLowerCase()}.test`,
+        recipients: send.to,
+        subject: send.subject,
+        body: send.text,
+        status: send.result.ok ? "SENT" : "FAILED",
+        providerMessageId: send.result.providerMessageId,
+        error: send.result.error,
+      },
+    });
+  }
 
   if (persist && result.ok) {
     await prisma.reportSchedule.update({ where: { id: schedule.id }, data: { lastSentAt: new Date() } });
@@ -514,13 +539,16 @@ export async function rebuildReportRunEmail(reportRunId: string): Promise<{ subj
     },
     select: { draft: true },
   });
+  // Rebuilt in the client's communication language: a row old enough to
+  // need this stored no recipient's language either.
   return renderEmailBody(
     run.schedule.reportType,
     client.name,
     run.periodStart,
     run.periodEnd,
     run.snapshotJson,
-    approved?.draft ?? null
+    approved?.draft ?? null,
+    translatorFor(client.communicationLocale)
   );
 }
 
@@ -562,15 +590,29 @@ export async function sendReportScheduleNow(actor: User, scheduleId: string) {
 /// להישאר קריאה"). Reused here rather than duplicated so the portal
 /// screen and its export can never disagree, same pattern as Phase 5's
 /// runReport/export route pairing.
-export function monthlyDetailedToCsv(rows: { date: string; activity: string; category: string; billableMinutes: number; employee?: string }[]): string {
+export function monthlyDetailedToCsv(
+  rows: { date: string; activity: string; category: string; billableMinutes: number; employee?: string }[],
+  /// ADR 0006: the headers in the language of whoever downloads it.
+  out: Outgoing = HEBREW
+): string {
+  const { headers, body } = monthlyDetailedTable(rows, out);
+  return toCsv(headers, body);
+}
+
+/// The monthly detailed report as headers and rows, shared by its CSV,
+/// XLSX and PDF. The rows are what was recorded, as recorded.
+export function monthlyDetailedTable(
+  rows: { date: string; activity: string; category: string; billableMinutes: number; employee?: string }[],
+  out: Outgoing = HEBREW
+): { headers: string[]; body: (string | number)[][] } {
+  const t = out.t;
   const showEmployee = rows.some((r) => r.employee !== undefined);
-  const headers = showEmployee
-    ? ["תאריך", "פעילות", "קטגוריה", "דקות לחיוב", "איש צוות"]
-    : ["תאריך", "פעילות", "קטגוריה", "דקות לחיוב"];
+  const base = [t("exports.monthly.date"), t("exports.monthly.activity"), t("exports.monthly.category"), t("exports.monthly.billableMinutes")];
+  const headers = showEmployee ? [...base, t("exports.monthly.employee")] : base;
   const body = rows.map((r) =>
     showEmployee
       ? [r.date, r.activity, r.category, r.billableMinutes, r.employee ?? ""]
       : [r.date, r.activity, r.category, r.billableMinutes]
   );
-  return toCsv(headers, body);
+  return { headers, body };
 }

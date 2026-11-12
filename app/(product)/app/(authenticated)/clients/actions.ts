@@ -41,6 +41,10 @@ async function errorText() {
   return getTranslations("clients.page.errors");
 }
 
+function parseCommunicationLocale(value: FormDataEntryValue | null): "he" | "en" | undefined {
+  return value === "he" || value === "en" ? value : undefined;
+}
+
 export async function createClientAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const name = String(formData.get("name") || "").trim();
@@ -92,6 +96,9 @@ export async function updateClientAction(_prev: FormState | undefined, formData:
       aiExcluded: formData.get("aiExcluded") === "on",
       // 31.10.2026: separation in approving procedures. Always on the form.
       procedureApprovalSeparation: formData.get("procedureApprovalSeparation") === "on",
+      // 12.11.2026: the language for the client's people without an
+      // account (ADR 0006). An unknown value leaves it untouched.
+      communicationLocale: parseCommunicationLocale(formData.get("communicationLocale")),
       // Org brain (spec 3.3). Always on the form.
       kind: formData.get("kind") === "PRIVATE" ? "PRIVATE" : "BUSINESS",
       industry: String(formData.get("industry") || "") || null,
