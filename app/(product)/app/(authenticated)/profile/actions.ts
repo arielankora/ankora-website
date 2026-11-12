@@ -18,6 +18,7 @@ import {
 import { PASSWORD_MIN_LENGTH } from "@/lib/app-auth/password";
 import { APP_LOCALE_COOKIE, APP_LOCALE_COOKIE_MAX_AGE } from "@/lib/i18n/config";
 import { authErrorText } from "@/lib/i18n/auth-errors";
+import { isProductionBuild } from "@/lib/env";
 
 type FormState = { error?: string; ok?: boolean };
 type ToggleState = { ok: true } | { ok: false; error: string };
@@ -88,7 +89,7 @@ export async function updateLocaleAction(_prev: FormState | undefined, formData:
     path: "/",
     maxAge: APP_LOCALE_COOKIE_MAX_AGE,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isProductionBuild(),
     httpOnly: true,
   });
   return { ok: true };
