@@ -4,6 +4,8 @@ import { createTestUser, createTestClient, createTestCategory, createTestClientU
 import {
   resolvePortalClient,
   getWeeklyActivity,
+  getMonthlyDetailed,
+  getPortalTaskReport,
   updatePortalScheduleRecipients,
 } from "@/lib/app-domain/client-portal";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
@@ -238,5 +240,78 @@ describe("updatePortalScheduleRecipients() - spec 13's Client Admin recipients m
 
     const unchanged = await prisma.reportSchedule.findUnique({ where: { id: scheduleB.id } });
     expect(unchanged?.recipients).toEqual(["b@client.test"]);
+  });
+});
+
+// 11.11.2026 (Hadas's portal review): the week showed 12:53 beside 12.87 on
+// the bank for the same entries. The bank sums seconds and rounds once; the
+// portal rounded every entry to minutes and then summed. Two entries of 90
+// seconds are 3 minutes, not 2 + 2.
+describe("portal totals round once, like the hour bank", () => {
+  it("sums billable seconds before rounding, in every total the week and the month show", async () => {
+    const client = await createTestClient({ name: "Client Rounding" });
+    const category = await createTestCategory({ clientId: client.id, name: "Category Rounding" });
+    const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    const { user: clientUser } = await createTestClientUser({ clientId: client.id });
+
+    const start = new Date("2026-11-02T08:00:00Z"); // Monday 2.11.2026, Israel time
+    for (let i = 0; i < 2; i++) {
+      const at = new Date(start.getTime() + i * 3600_000);
+      await prisma.timeEntry.create({
+        data: {
+          userId: employee.id,
+          clientId: client.id,
+          categoryId: category.id,
+          startAt: at,
+          endAt: new Date(at.getTime() + 90_000),
+          actualSeconds: 90,
+          billableSeconds: 90,
+        },
+      });
+    }
+
+    const week = await getWeeklyActivity(clientUser, start);
+    expect(week.totalMinutes).toBe(3);
+    expect(week.dailyTotals.find((d) => d.date === "2026-11-02")?.minutes).toBe(3);
+    expect(week.topActivities[0].minutes).toBe(3);
+    expect(week.activitiesByDay["2026-11-02"]).toEqual([{ activity: "Category Rounding", minutes: 3 }]);
+    expect(week.activitiesByDay["2026-11-03"]).toEqual([]);
+    // Each row still shows its own minutes, and never the seconds behind them.
+    expect(week.rows.map((r) => r.billableMinutes)).toEqual([2, 2]);
+    expect(week.rows[0]).not.toHaveProperty("billableSeconds");
+
+    const month = await getMonthlyDetailed(clientUser, start);
+    expect(month.totalMinutes).toBe(3);
+  });
+});
+
+describe("getPortalTaskReport() - the tasks tab", () => {
+  it("counts tasks closed in the month and those open today, visible ones only", async () => {
+    const client = await createTestClient({ name: "Client Tasks" });
+    const other = await createTestClient({ name: "Client Other" });
+    const { user: clientUser } = await createTestClientUser({ clientId: client.id });
+
+    const inMonth = new Date("2026-11-05T10:00:00Z");
+    const lastMonth = new Date("2026-10-20T10:00:00Z");
+    await prisma.task.createMany({
+      data: [
+        { clientId: client.id, title: "נסגרה החודש", clientVisible: true, status: "DONE", completedAt: inMonth },
+        { clientId: client.id, title: "נסגרה בחודש שעבר", clientVisible: true, status: "DONE", completedAt: lastMonth },
+        { clientId: client.id, title: "בטיפול", clientVisible: true, status: "IN_PROGRESS" },
+        { clientId: client.id, title: "מחכה ללקוח", clientVisible: true, status: "IN_PROGRESS", blockedOn: "CLIENT" },
+        { clientId: client.id, title: "פנימית", clientVisible: false, status: "IN_PROGRESS" },
+        { clientId: other.id, title: "של לקוח אחר", clientVisible: true, status: "IN_PROGRESS" },
+      ],
+    });
+
+    const report = await getPortalTaskReport(clientUser, inMonth);
+    expect(report.closed.map((p) => p.title)).toEqual(["נסגרה החודש"]);
+    // Waiting on the client first.
+    expect(report.open.map((p) => p.title)).toEqual(["מחכה ללקוח", "בטיפול"]);
+    expect(report.waitingOnClient).toBe(1);
+
+    const october = await getPortalTaskReport(clientUser, lastMonth);
+    expect(october.closed.map((p) => p.title)).toEqual(["נסגרה בחודש שעבר"]);
+    expect(october.open).toHaveLength(2);
   });
 });

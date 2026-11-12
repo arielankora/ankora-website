@@ -1,165 +1,84 @@
-import { requireUser } from "@/lib/app-auth/session";
-import { parsePeriodOffset, MAX_MONTH_OFFSET, israelMonthReference } from "@/lib/period-offset";
-import { ForbiddenError } from "@/lib/app-auth/permissions";
+import type { User } from "@prisma/client";
+import { israelMonthReference } from "@/lib/period-offset";
 import { getMonthlyDetailed } from "@/lib/app-domain/client-portal";
 import { getApprovedSummaries } from "@/lib/app-domain/portal-summary";
-import { Forbidden } from "@/components/app/Forbidden";
 import { ExportMenu } from "@/components/app/ExportMenu";
-import { ViewTabs } from "@/components/app/ViewTabs";
-import { HOURS_TABS } from "../hours/tabs";
-
-
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
-}
-
-function formatHours(minutes: number) {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${h}:${String(m).padStart(2, "0")}`;
-}
+import { formatDecimalHours } from "@/lib/hours-format";
+import { MONTHLY_REPORT_ANCHOR } from "../hours/tabs";
 
 function formatMonthTitle(date: Date) {
   return new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "Asia/Jerusalem" }).format(date);
 }
 
-// Spec 13's Monthly Detailed report / spec 14.1's row-per-entry table.
-// App redesign (handoff README, screen 16 "דוח חודשי"): title + auto-send
-// note + KPI tiles, same as before but restyled - see
-// lib/app-domain/client-portal.ts's getMonthlyDetailed comment for why
-// the prototype's "ספקים שתואמו" tile was not reproduced.
-//
-// Portal phase 3 brings back the other half of that note. "סיכום מנהל
-// התיק" was left out because there was no field behind it and the prose
-// would have been fabricated; it is here now because it is assembled from
-// the month's own rows and signed by a person before the client can read
-// it. Above the numbers, because a sentence about what happened is what
-// someone opens this screen for - the table is the evidence under it.
-// 19.10.2026: the body of the old monthly report screen, now the
-// "דוח חודשי" view of /app/portal/hours (see ../hours/page.tsx).
-export async function MonthlyView({ searchParams }: { searchParams: { monthOffset?: string } }) {
-  const user = await requireUser();
+function monthKey(date: Date) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit" }).format(date);
+}
 
-  const monthOffset = parsePeriodOffset(searchParams.monthOffset, MAX_MONTH_OFFSET);
+// Spec 13's Monthly Detailed report.
+//
+// 11.11.2026 (Hadas's portal review): this was the "דוח חודשי" tab: a
+// title, two tiles and the same row-per-entry table as the week by days.
+// The tab is gone, and what only it had stays here, at the bottom of
+// "שעות": a month to pick, the export of that month (the same file the
+// monthly email sends), and the account manager's summary once a person
+// approved it. The tasks tile moved to the "משימות" tab, the table to
+// "לפי ימים".
+//
+// The hours page resolves the portal client before rendering this, so a
+// refusal is already handled there.
+export async function MonthlyReportSection({ user, monthOffset }: { user: User; monthOffset: number }) {
   // Israeli month, mid-month reference: see israelMonthReference.
   const { referenceDate } = israelMonthReference(monthOffset);
+  const [report, summaries] = await Promise.all([getMonthlyDetailed(user, referenceDate), getApprovedSummaries(user)]);
 
-  let report;
-  let summaries: Awaited<ReturnType<typeof getApprovedSummaries>> = [];
-  try {
-    [report, summaries] = await Promise.all([getMonthlyDetailed(user, referenceDate), getApprovedSummaries(user)]);
-  } catch (err) {
-    if (err instanceof ForbiddenError) {
-      return (
-        <>
-          <Forbidden />
-        </>
-      );
-    }
-    throw err;
-  }
-
-  // The summary belongs to a calendar month, and this screen moves by
-  // offset - so it is matched on the month rather than taken as "the
+  // The summary belongs to a calendar month, and this section moves by
+  // offset, so it is matched on the month rather than taken as "the
   // latest", which would show September's words above August's numbers.
-  const shownMonth = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Jerusalem",
-    year: "numeric",
-    month: "2-digit",
-  }).format(referenceDate);
-  const summary = summaries.find(
-    (s) =>
-      new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit" }).format(
-        s.periodStart
-      ) === shownMonth
-  );
+  // An unapproved draft never reaches getApprovedSummaries.
+  const shownMonth = monthKey(referenceDate);
+  const summary = summaries.find((s) => monthKey(s.periodStart) === shownMonth);
+  const hoursHref = (offset: number) => `/app/portal/hours?monthOffset=${offset}#${MONTHLY_REPORT_ANCHOR}`;
 
   return (
-    <div className="space-y-4">
-        <ViewTabs label="שעות ודוחות" active="monthly" tabs={HOURS_TABS} />
-
-      {summary && (
-        // Only for the month on screen, and only when a person approved
-        // it. An unapproved draft does not exist as far as this page is
-        // concerned - which is the whole of the spec's first rule about
-        // generated text, expressed as a query rather than as a promise.
-        <div className="rounded-[20px] border border-gold/28 bg-app-surface-sunken p-6 sm:p-7">
-          <p className="text-[13.5px] leading-relaxed text-app-text-primary">{summary.draft}</p>
+    <section id={MONTHLY_REPORT_ANCHOR} className="scroll-mt-6 rounded-2xl border border-app-border bg-white p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-[15px] font-medium text-app-text-primary">דוח {formatMonthTitle(referenceDate)}</h2>
+          <p className="mt-1.5 text-xs text-app-text-secondary">
+            {report.autoSendLabel ?? "פירוט מלא של החודש, להורדה."}
+          </p>
         </div>
-      )}
-
-      <div className="rounded-2xl border border-app-border bg-white p-5 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-[15px] font-medium text-app-text-primary">דוח {formatMonthTitle(referenceDate)}</p>
-            {report.autoSendLabel && <p className="mt-1.5 text-xs text-app-text-secondary">{report.autoSendLabel}</p>}
-          </div>
-          <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={hoursHref(monthOffset - 1)}
+            className="rounded-full border border-app-border-strong px-4 py-2 text-sm text-app-text-primary hover:border-app-accent"
+          >
+            חודש קודם
+          </a>
+          {monthOffset < 0 && (
             <a
-              href={`/app/portal/hours?view=monthly&monthOffset=${monthOffset - 1}`}
+              href={hoursHref(monthOffset + 1)}
               className="rounded-full border border-app-border-strong px-4 py-2 text-sm text-app-text-primary hover:border-app-accent"
             >
-              חודש קודם
+              חודש הבא
             </a>
-            {monthOffset < 0 && (
-              <a
-                href={`/app/portal/hours?view=monthly&monthOffset=${monthOffset + 1}`}
-                className="rounded-full border border-app-border-strong px-4 py-2 text-sm text-app-text-primary hover:border-app-accent"
-              >
-                חודש הבא
-              </a>
-            )}
-            <ExportMenu baseHref={`/api/portal/export?monthOffset=${monthOffset}`} primary />
-          </div>
-        </div>
-
-        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-app-border p-3.5">
-            <span className="text-[11.5px] text-app-text-secondary">שעות החודש</span>
-            <p className="mt-1.5 font-jbmono text-xl text-app-text-primary">{formatHours(report.totalMinutes)}</p>
-          </div>
-          <div className="rounded-xl border border-app-border p-3.5">
-            <span className="text-[11.5px] text-app-text-secondary">משימות שהושלמו</span>
-            <p className="mt-1.5 font-jbmono text-xl text-app-text-primary">{report.tasksCompleted}</p>
-          </div>
+          )}
+          <ExportMenu baseHref={`/api/portal/export?monthOffset=${monthOffset}`} primary />
         </div>
       </div>
 
-      <p className="text-sm text-app-text-secondary">
-        {formatDate(report.from)} - {formatDate(new Date(report.to.getTime() - 86_400_000))}
+      <p className="mt-4 text-sm text-app-text-secondary">
+        שעות החודש:{" "}
+        <span dir="ltr" className="font-jbmono text-app-text-primary">
+          {formatDecimalHours(report.totalMinutes)}
+        </span>
       </p>
 
-      <div className="overflow-x-auto rounded-2xl border border-app-border bg-white">
-        <table className="w-full min-w-[640px] text-start text-sm">
-          <thead>
-            <tr className="border-b border-app-border text-xs text-app-text-tertiary">
-              <th className="px-5 py-3 font-medium">תאריך</th>
-              <th className="px-5 py-3 font-medium">פעילות</th>
-              <th className="px-5 py-3 font-medium">קטגוריה</th>
-              {report.showEmployeeNames && <th className="px-5 py-3 font-medium">איש צוות</th>}
-              <th className="px-5 py-3 font-medium">דקות לחיוב</th>
-            </tr>
-          </thead>
-          <tbody>
-            {report.rows.length === 0 && (
-              <tr>
-                <td colSpan={report.showEmployeeNames ? 5 : 4} className="px-5 py-8 text-center text-app-text-tertiary">
-                  אין עדיין דיווחים לחודש זה.
-                </td>
-              </tr>
-            )}
-            {report.rows.map((row, i) => (
-              <tr key={i} className="border-b border-app-border last:border-0">
-                <td className="px-5 py-3 text-app-text-secondary">{row.date}</td>
-                <td className="px-5 py-3 text-app-text-primary">{row.activity}</td>
-                <td className="px-5 py-3 text-app-text-secondary">{row.category}</td>
-                {report.showEmployeeNames && <td className="px-5 py-3 text-app-text-secondary">{row.employee}</td>}
-                <td className="px-5 py-3 text-app-text-secondary">{row.billableMinutes}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {summary && (
+        <p className="mt-4 rounded-xl border border-gold/28 bg-app-surface-sunken p-4 text-[13.5px] leading-relaxed text-app-text-primary">
+          {summary.draft}
+        </p>
+      )}
+    </section>
   );
 }
