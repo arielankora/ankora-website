@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canManageClients } from "@/lib/app-auth/permissions";
@@ -129,14 +130,14 @@ export async function reviewProcessesDaily(now = new Date()): Promise<{ flagged:
 /// A manager looked at the procedure and it stands. Not while it fails the
 /// client's rules: that takes a new version or an exception.
 export async function markProcessReviewed(actor: User, processId: string, now = new Date()) {
-  if (!canManageClients(actor.role)) throw new Error("רק מנהל מסמן נוהל כנסקר.");
+  if (!canManageClients(actor.role)) throw new DomainError("processReview.managerOnly", "רק מנהל מסמן נוהל כנסקר.");
   const p = await prisma.process.findUnique({ where: { id: processId }, include: { versions: { where: { status: "APPROVED" }, take: 1 } } });
-  if (!p || p.deletedAt) throw new Error("התהליך לא נמצא.");
+  if (!p || p.deletedAt) throw new DomainError("processReview.notFound", "התהליך לא נמצא.");
   await assertClientAccess(actor, p.clientId);
   const v = p.versions[0];
-  if (!v) throw new Error("לתהליך עוד אין נוהל מאושר לסקור.");
+  if (!v) throw new DomainError("processReview.noApproved", "לתהליך עוד אין נוהל מאושר לסקור.");
   const failing = holdsApproval(processChecks({ steps: readSteps(v.steps), highlights: v.highlights, outputs: v.outputs }, p, await ruleContext(p.clientId, { now })));
-  if (failing.length) throw new Error(`${REVIEW_REASON_LABELS.RULES}. כותבים גרסה חדשה, או מבקשים חריגה לכלל.`);
+  if (failing.length) throw new DomainError("processReview.failsRules", `${REVIEW_REASON_LABELS.RULES}. כותבים גרסה חדשה, או מבקשים חריגה לכלל.`);
   await prisma.process.update({ where: { id: processId }, data: { needsReview: false, reviewReason: null, lastReviewedAt: now } });
   await recordAudit({ actorId: actor.id, action: "process.reviewed", entityType: "Process", entityId: processId, clientId: p.clientId, after: { version: v.version } });
 }

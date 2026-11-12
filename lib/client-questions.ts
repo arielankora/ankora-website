@@ -20,10 +20,28 @@
 /// wrote its source. As a question it asks whether the line is right.
 const ANKORA_SOURCE_PREFIX = "אישור מהלקוח";
 
+export type QuestionItemKind = "question" | "fact" | "contact" | "organization" | "system" | "entity" | "requestType" | "process" | "policy";
+
+/// What each kind of line is called in Hebrew, where it is content (the
+/// MCP tools and the approvals screen read `what`).
+export const QUESTION_ITEM_WHAT: Record<QuestionItemKind, string> = {
+  question: "שאלה פתוחה",
+  fact: "פריט",
+  contact: "איש קשר",
+  organization: "ארגון",
+  system: "מערכת",
+  entity: "ישות",
+  requestType: "סוג פנייה",
+  process: "תהליך",
+  policy: "כלל",
+};
+
 export type QuestionItem = {
   id: string;
   /// "פריט", "איש קשר", "מערכת"...
   what: string;
+  /// The same, by name, for a screen that words it itself (ADR 0006).
+  kind?: QuestionItemKind;
   title: string;
   toResolve: string | null;
   /// An open question in the file (section 13), not an uncertain item.
@@ -145,11 +163,24 @@ export function readSnoozes(events: Event[]): Map<string, Date> {
 
 /// A date to put a question off to: tomorrow at the earliest, a year at
 /// most. Null when it is fine.
-export function snoozeError(until: Date, now: Date): string | null {
-  if (Number.isNaN(until.getTime())) return "צריך לבחור תאריך.";
-  if (until.getTime() <= now.getTime()) return "התאריך צריך להיות בעתיד.";
-  if (until.getTime() > now.getTime() + 366 * 86_400_000) return "אפשר לדחות עד שנה קדימה.";
+export type SnoozeProblem = "date" | "past" | "tooFar";
+
+const SNOOZE_MESSAGES: Record<SnoozeProblem, string> = {
+  date: "צריך לבחור תאריך.",
+  past: "התאריך צריך להיות בעתיד.",
+  tooFar: "אפשר לדחות עד שנה קדימה.",
+};
+
+export function snoozeProblem(until: Date, now: Date): SnoozeProblem | null {
+  if (Number.isNaN(until.getTime())) return "date";
+  if (until.getTime() <= now.getTime()) return "past";
+  if (until.getTime() > now.getTime() + 366 * 86_400_000) return "tooFar";
   return null;
+}
+
+export function snoozeError(until: Date, now: Date): string | null {
+  const problem = snoozeProblem(until, now);
+  return problem ? SNOOZE_MESSAGES[problem] : null;
 }
 
 /// The answer a question closed as not relevant keeps, with why.

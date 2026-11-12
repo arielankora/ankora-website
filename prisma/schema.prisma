@@ -75,6 +75,24 @@ enum AppLocale {
   en
 }
 
+/// Who opens the communications screen, and how much of it (12.11.2026).
+/// Until today it lived in Vercel's environment (COMMS_FULL_VIEWERS,
+/// COMMS_CALL_VIEWERS), so every new person meant an edit and a redeploy.
+/// Those lists are still honoured; this is the place to give access now.
+///   NONE  - the screen stays closed unless a number or a line is theirs.
+///   OWN   - opens the screen: their own number and line, and the
+///           conversations of the clients they manage.
+///   CALLS - also every call recording on the Aloha line.
+///   FULL  - every conversation and every call.
+/// CALLS and FULL are given only after the confidentiality undertaking is
+/// signed in both channels (lib/app-domain/comms-access.ts).
+enum CommsAccessLevel {
+  NONE
+  OWN
+  CALLS
+  FULL
+}
+
 enum UserStatus {
   INVITED
   ACTIVE
@@ -155,6 +173,8 @@ model User {
   /// page direction. Only the interface: what people write (client files,
   /// tasks, notes) stays in the language it was written in.
   locale       AppLocale  @default(he)
+  /// The communications screen (see enum CommsAccessLevel).
+  commsAccessLevel CommsAccessLevel @default(NONE)
 
   /// Employee agreements: a private address, collected at hiring. The
   /// work account is suspended the day someone leaves, and that is the
@@ -292,6 +312,7 @@ model User {
   @@index([role, status])
   @@map("users")
   commsChannels CommsChannel[] @relation("CommsChannelOwner")
+  commsLines    CommsLineOwner[] @relation("CommsLineOwner")
 }
 
 /// Spec 4.2: "Forgot password באמצעות link חד-פעמי עם expiry." Only the
@@ -4475,6 +4496,22 @@ model CommsChannel {
   blocks        CommsBlock[]
 
   @@map("comms_channels")
+}
+
+/// Whose Aloha line is whose (12.11.2026), set on the person's page in the
+/// app. Overrides ALOHA_LINE_OWNERS for the lines it names. A row with no
+/// user says "nobody in particular", so an owner set in the environment
+/// can be taken off too.
+model CommsLineOwner {
+  /// The line, E.164 (one of ALOHA_LINE_NUMBER).
+  line      String   @id
+  userId    String?
+  updatedAt DateTime @updatedAt
+
+  user User? @relation("CommsLineOwner", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("comms_line_owners")
 }
 
 model CommsConversation {

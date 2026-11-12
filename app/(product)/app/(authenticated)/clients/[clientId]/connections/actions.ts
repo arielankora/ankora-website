@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { addAppPasswordConnection, disconnect, testConnection } from "@/lib/app-domain/connections";
 
@@ -9,7 +11,14 @@ import { addAppPasswordConnection, disconnect, testConnection } from "@/lib/app-
 
 type Result = { error?: string; ok?: string };
 
-const fail = (err: unknown): Result => ({ error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." });
+/// ADR 0006: a refusal in the reader's language. A DomainError is worded
+/// from its code; anything else keeps its message, as before.
+async function fail(err: unknown): Promise<Result> {
+  const domain = await domainErrorText(err);
+  if (domain) return { error: domain };
+  if (err instanceof Error) return { error: err.message };
+  return { error: (await getTranslations("clients.connections.result"))("generic") };
+}
 
 export async function addAppPasswordAction(_prev: Result | undefined, f: FormData): Promise<Result> {
   const user = await requireUser();
@@ -22,10 +31,10 @@ export async function addAppPasswordAction(_prev: Result | undefined, f: FormDat
       consentText: String(f.get("consentText") ?? ""),
     });
   } catch (err) {
-    return fail(err);
+    return await fail(err);
   }
   revalidatePath(`/app/clients/${clientId}/connections`);
-  return { ok: "החיבור נשמר. הסיסמה בכספת." };
+  return { ok: (await getTranslations("clients.connections.result"))("saved") };
 }
 
 export async function disconnectAction(clientId: string, id: string): Promise<Result> {
@@ -33,17 +42,22 @@ export async function disconnectAction(clientId: string, id: string): Promise<Re
   try {
     await disconnect(user, id);
   } catch (err) {
-    return fail(err);
+    return await fail(err);
   }
   revalidatePath(`/app/clients/${clientId}/connections`);
-  return { ok: "החיבור נותק, וההרשאה בוטלה." };
+  return { ok: (await getTranslations("clients.connections.result"))("disconnected") };
 }
 
 export async function testConnectionAction(id: string, folderId: string | null): Promise<Result> {
   const user = await requireUser();
   try {
-    return { ok: await testConnection(user, id, { folderId }) };
+    const r = await testConnection(user, id, { folderId });
+    const t = await getTranslations("clients.connections.result");
+    if (r.kind === "appPassword") return { ok: t("appPasswordNotTestable") };
+    if (r.kind === "sent") return { ok: t("testSent", { account: r.account }) };
+    const mail = t("mailConnected", { threads: r.threads === null ? "?" : String(r.threads) });
+    return { ok: r.driveFiles === null ? t("mailOnly", { mail }) : t("mailAndDrive", { mail, drive: t("driveFiles", { count: String(r.driveFiles) }) }) };
   } catch (err) {
-    return fail(err);
+    return await fail(err);
   }
 }

@@ -1,5 +1,6 @@
 "use client";
 import { useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { toggleHolidayCalendarSubscriptionAction } from "../important-dates/actions";
 import { StatusBadge } from "@/components/app/StatusBadge";
 
@@ -24,6 +25,7 @@ export function HolidayCalendarsPanel({
   calendars: Calendar[];
   subscriptions: Subscription[];
 }) {
+  const t = useTranslations("clients.holidays");
   const [isPending, startTransition] = useTransition();
   const subscribedByKey = new Map(subscriptions.map((s) => [s.calendarKey, s.enabled]));
 
@@ -35,10 +37,10 @@ export function HolidayCalendarsPanel({
           <li key={cal.calendarKey} className="flex items-center justify-between gap-3 text-sm">
             <div>
               <span className="text-app-text-primary">{cal.label}</span>
-              <span className="ms-2 text-xs text-app-text-tertiary">({cal.holidayCount} מועדים)</span>
+              <span className="ms-2 text-xs text-app-text-tertiary">{t("count", { count: cal.holidayCount })}</span>
             </div>
             <div className="flex items-center gap-3">
-              <StatusBadge label={enabled ? "רשום" : "לא רשום"} tone={enabled ? "green" : "gray"} />
+              <StatusBadge label={enabled ? t("subscribed") : t("notSubscribed")} tone={enabled ? "green" : "gray"} />
               <button
                 type="button"
                 disabled={isPending}
@@ -47,7 +49,7 @@ export function HolidayCalendarsPanel({
                 }
                 className="text-xs font-medium text-app-text-secondary underline decoration-app-border-strong underline-offset-2 disabled:opacity-50"
               >
-                {enabled ? "ביטול רישום" : "רישום"}
+                {enabled ? t("unsubscribe") : t("subscribe")}
               </button>
             </div>
           </li>

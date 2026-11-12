@@ -1,7 +1,8 @@
 "use client";
 import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
-import { ROLE_LABELS, type GuideGroup, type GuideRole } from "./content";
+import { useTranslations } from "next-intl";
+import type { GuideGroup, GuideRole } from "./content";
 import { filterGuide, highlightParts, queryWords } from "./search";
 
 // The table of contents and the sections, behind one search box.
@@ -11,10 +12,12 @@ import { filterGuide, highlightParts, queryWords } from "./search";
 // text stays server-rendered on first load; only the filtering is here.
 
 function RoleBadges({ roles }: { roles: GuideRole[] | "all" }) {
+  const t = useTranslations("guide.section");
+  const tRoles = useTranslations("shell.roles");
   if (roles === "all") {
     return (
       <span className="inline-flex items-center rounded-full bg-app-accent px-3 py-1 text-xs font-medium text-app-text-primary">
-        כל המשתמשים
+        {t("allUsers")}
       </span>
     );
   }
@@ -22,7 +25,7 @@ function RoleBadges({ roles }: { roles: GuideRole[] | "all" }) {
     <div className="flex flex-wrap gap-1.5">
       {roles.map((role) => (
         <span key={role} className="inline-flex items-center rounded-full bg-app-surface-sunken px-2.5 py-1 text-xs font-medium text-app-text-secondary">
-          {ROLE_LABELS[role]}
+          {tRoles(role)}
         </span>
       ))}
     </div>
@@ -46,6 +49,7 @@ function Hl({ text, words }: { text: string; words: string[] }) {
 }
 
 export function GuideBrowser({ groups }: { groups: GuideGroup[] }) {
+  const t = useTranslations("guide");
   const [query, setQuery] = useState("");
   const words = useMemo(() => queryWords(query), [query]);
   const shown = useMemo(() => filterGuide(groups, query), [groups, query]);
@@ -56,7 +60,7 @@ export function GuideBrowser({ groups }: { groups: GuideGroup[] }) {
     <>
       <div role="search" className="space-y-2">
         <label htmlFor="guide-search" className="sr-only">
-          חיפוש במדריך
+          {t("search.label")}
         </label>
         <div className="relative">
           <Search size={16} strokeWidth={1.75} className="pointer-events-none absolute start-4 top-1/2 -translate-y-1/2 text-app-text-tertiary" />
@@ -68,14 +72,14 @@ export function GuideBrowser({ groups }: { groups: GuideGroup[] }) {
             onKeyDown={(e) => {
               if (e.key === "Escape") setQuery("");
             }}
-            placeholder="חיפוש במדריך, למשל: מפקח, בנק שעות, ייצוא"
+            placeholder={t("search.placeholder")}
             className="w-full rounded-full border border-app-border-strong bg-white py-3 pe-11 ps-11 text-sm text-app-text-primary outline-none focus:border-gold [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery("")}
-              aria-label="ניקוי החיפוש"
+              aria-label={t("search.clear")}
               className="absolute end-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-app-text-tertiary hover:text-app-text-primary"
             >
               <X size={16} strokeWidth={1.75} />
@@ -84,14 +88,14 @@ export function GuideBrowser({ groups }: { groups: GuideGroup[] }) {
         </div>
         {words.length > 0 && (
           <p aria-live="polite" className="text-[12.5px] text-app-text-secondary">
-            {count === 0 ? "לא נמצאו סעיפים. נסו מילה אחרת, או פחות מילים." : count === 1 ? "נמצא סעיף אחד" : `נמצאו ${count} סעיפים`}
+            {count === 0 ? t("search.noResults") : count === 1 ? t("search.foundOne") : t("search.foundMany", { count })}
           </p>
         )}
       </div>
 
 {GUIDE_GROUPS.length > 0 && (
-        <nav aria-label="תוכן עניינים" className="rounded-2xl border border-app-border bg-white p-6">
-          <h2 className="text-sm font-medium text-app-text-primary">תוכן העניינים</h2>
+        <nav aria-label={t("toc.label")} className="rounded-2xl border border-app-border bg-white p-6">
+          <h2 className="text-sm font-medium text-app-text-primary">{t("toc.title")}</h2>
           <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
             {GUIDE_GROUPS.map((group) => (
               <div key={group.id}>
@@ -141,7 +145,7 @@ export function GuideBrowser({ groups }: { groups: GuideGroup[] }) {
 
                 {section.steps && section.steps.length > 0 && (
                   <div>
-                    <p className="text-xs font-semibold text-app-text-tertiary">איך עושים את זה</p>
+                    <p className="text-xs font-semibold text-app-text-tertiary">{t("section.howTo")}</p>
                     <ol className="mt-2 list-decimal space-y-1.5 ps-5 text-sm leading-relaxed text-app-text-secondary">
                       {section.steps.map((step, i) => (
                         <li key={i}>

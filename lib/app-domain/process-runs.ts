@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import type { Prisma, ProcessStepMode, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
@@ -31,12 +32,12 @@ export const FINISHED_RUN_STATUSES = ["DONE", "ARCHIVED"] as const;
 /// A second run asked for a day that already has an unfinished one. The
 /// screen shows the message; start_process answers with the run that is
 /// there (`existing`) instead of a failure.
-export class SameDayRunError extends Error {
+export class SameDayRunError extends DomainError {
   constructor(
     code: string,
     readonly existing: { id: string; title: string }
   ) {
-    super(`כבר יש ריצה פתוחה של ${code} ליום הזה: "${existing.title}" (${existing.id}). אפשר לעבוד עליה, או לסגור אותה ואז לפתוח חדשה.`);
+    super("processRuns.sameDay", `כבר יש ריצה פתוחה של ${code} ליום הזה: "${existing.title}" (${existing.id}). אפשר לעבוד עליה, או לסגור אותה ואז לפתוח חדשה.`, { code, title: existing.title, id: existing.id });
     this.name = "SameDayRunError";
   }
 }
@@ -220,14 +221,14 @@ export async function openProcessRun(input: OpenRunInput) {
 export async function startProcessRun(actor: User, processId: string, day: Date) {
   assertCan(actor.role, "time_entry.create_self");
   const process = await prisma.process.findUnique({ where: { id: processId } });
-  if (!process || process.deletedAt) throw new Error("התהליך לא נמצא.");
+  if (!process || process.deletedAt) throw new DomainError("processRuns.notFound", "התהליך לא נמצא.");
   await assertClientAccess(actor, process.clientId);
-  if (process.status === "PAUSED") throw new Error("התהליך מושהה. מנהל מחדש אותו לפני שפותחים ריצה.");
-  if (process.status !== "ACTIVE") throw new Error("לתהליך עוד אין נוהל מאושר.");
+  if (process.status === "PAUSED") throw new DomainError("processRuns.paused", "התהליך מושהה. מנהל מחדש אותו לפני שפותחים ריצה.");
+  if (process.status !== "ACTIVE") throw new DomainError("processRuns.noApprovedProcedure", "לתהליך עוד אין נוהל מאושר.");
   if (process.triggerKinds.length === 1 && process.triggerKinds[0] === "CONTINUOUS") {
-    throw new Error("תהליך שוטף לא נפתח כריצה. הוא רץ כל הזמן, ונבדק בסקירה התקופתית.");
+    throw new DomainError("processRuns.continuous", "תהליך שוטף לא נפתח כריצה. הוא רץ כל הזמן, ונבדק בסקירה התקופתית.");
   }
-  if (Number.isNaN(day.getTime())) throw new Error("צריך תאריך לריצה.");
+  if (Number.isNaN(day.getTime())) throw new DomainError("processRuns.dateRequired", "צריך תאריך לריצה.");
   // 3.11.2026: P7 of Grantor had two runs for 4.11, opened five minutes
   // apart, and the calendar showed both. One run of a process per day: a
   // second one for a day that already has an unfinished run is refused,
@@ -239,7 +240,7 @@ export async function startProcessRun(actor: User, processId: string, day: Date)
   const existing = await sameDayRun(processId, day);
   if (existing) throw new SameDayRunError(process.code, existing);
   const run = await openProcessRun({ processId, occurrence: day, actorId: actor.id, fallbackAssigneeId: actor.id, oneADay: true });
-  if (!run) throw new Error("לא ניתן לפתוח ריצה לתהליך הזה.");
+  if (!run) throw new DomainError("processRuns.cannotOpen", "לא ניתן לפתוח ריצה לתהליך הזה.");
   return run;
 }
 

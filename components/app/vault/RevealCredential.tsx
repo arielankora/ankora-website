@@ -51,9 +51,10 @@ async function postJson(url: string, body: unknown) {
 
 export function RevealCredential({ credentialId, taskId }: { credentialId: string; taskId?: string }) {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
-  // ADR 0006: only the passkey failures are worded by the dictionary so
-  // far; the rest of this screen is translated with the credentials area.
+  // ADR 0006: the passkey failures are worded by auth.webauthn, the rest
+  // by vault.reveal.
   const tWebauthn = useTranslations("auth.webauthn");
+  const t = useTranslations("vault.reveal");
   const [now, setNow] = useState(() => Date.now());
   const copied = useRef(false);
 
@@ -70,9 +71,10 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
       const methods: Methods = { passkey: Boolean(data.methods?.passkey), password: Boolean(data.methods?.password) };
       return setPhase({ kind: "step-up", methods });
     }
-    if (status === 404) return setPhase({ kind: "error", message: "הגישה לא נמצאה." });
-    if (status === 401) return setPhase({ kind: "error", message: "פג תוקף ההתחברות. יש להתחבר מחדש." });
-    setPhase({ kind: "error", message: data?.message ?? "לא ניתן להציג את פרטי הגישה כרגע." });
+    if (status === 404) return setPhase({ kind: "error", message: t("errors.notFound") });
+    if (status === 401) return setPhase({ kind: "error", message: t("errors.sessionExpired") });
+    if (status === 429 && data?.error === "rate_limited") return setPhase({ kind: "error", message: t("errors.rateLimited") });
+    setPhase({ kind: "error", message: data?.message ?? t("errors.unavailable") });
   }
 
   async function stepUpWithPasskey(methods: Methods) {
@@ -93,7 +95,7 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
     if (status === 401 && data?.error === "wrong_password" && phase.kind === "step-up") {
       return setPhase({ kind: "step-up", methods: phase.methods, error: data.message });
     }
-    setPhase({ kind: "error", message: data?.message ?? "האימות נכשל." });
+    setPhase({ kind: "error", message: data?.message ?? t("errors.stepUpFailed") });
   }
 
   // Countdown, then forget.
@@ -122,7 +124,7 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
           className="inline-flex items-center gap-1.5 rounded-full border border-app-border px-3 py-1.5 text-xs font-medium text-app-text-primary hover:bg-app-surface-sunken"
         >
           <KeyRound size={14} strokeWidth={1.75} />
-          הצגת פרטי גישה
+          {t("show")}
         </button>
         {phase.kind === "error" && <p className="text-xs text-app-error">{phase.message}</p>}
       </div>
@@ -130,7 +132,7 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
   }
 
   if (phase.kind === "loading") {
-    return <p className="text-xs text-app-text-secondary">רגע...</p>;
+    return <p className="text-xs text-app-text-secondary">{t("loading")}</p>;
   }
 
   if (phase.kind === "step-up") {
@@ -139,7 +141,7 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
       <div className="w-full max-w-sm rounded-xl border border-app-border bg-cream-dim p-3">
         <p className="flex items-center gap-1.5 text-xs font-medium text-app-text-primary">
           <Lock size={13} strokeWidth={1.75} />
-          אימות זהות
+          {t("stepUp.title")}
         </p>
         {methods.passkey && (
           <button
@@ -148,13 +150,13 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
             className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-app-surface-nav px-4 py-1.5 text-xs font-medium text-cream"
           >
             <Fingerprint size={14} strokeWidth={1.75} />
-            אימות עם Touch ID
+            {t("stepUp.passkey")}
           </button>
         )}
         {methods.password && (
           <form onSubmit={stepUp} className="mt-2">
             <p className="text-xs text-app-text-secondary">
-              {methods.passkey ? "או הסיסמה שלך לאנקורה." : "הקלידו את הסיסמה שלכם לאנקורה. האימות תקף ל-5 דקות."}
+              {methods.passkey ? t("stepUp.orPassword") : t("stepUp.passwordOnly")}
             </p>
             <div className="mt-2 flex gap-2">
               <input
@@ -163,25 +165,25 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
                 autoComplete="current-password"
                 required
                 autoFocus={!methods.passkey}
-                aria-label="הסיסמה שלך לאנקורה"
+                aria-label={t("stepUp.passwordLabel")}
                 className="min-w-0 flex-1 rounded-lg border border-app-border-strong bg-white px-3 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
               />
               <button type="submit" className="rounded-full bg-app-surface-nav px-4 py-1.5 text-xs font-medium text-cream">
-                אימות
+                {t("stepUp.verify")}
               </button>
             </div>
           </form>
         )}
         {!methods.passkey && !methods.password && (
           <p className="mt-2 text-xs text-app-text-secondary">
-            צפייה בגישות דורשת passkey (Touch ID).{" "}
+            {t("stepUp.needsPasskey")}{" "}
             <Link href="/app/profile#passkeys" className="underline">
-              להגדרה בפרופיל
+              {t("stepUp.setUp")}
             </Link>
           </p>
         )}
         <button type="button" onClick={() => setPhase({ kind: "idle" })} className="mt-2 text-xs text-app-text-secondary">
-          ביטול
+          {t("cancel")}
         </button>
         {phase.error && <p className="mt-2 text-xs text-app-error">{phase.error}</p>}
       </div>
@@ -193,21 +195,21 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
   return (
     <div className="w-full max-w-md rounded-xl border border-app-border bg-cream-dim p-3">
       <dl className="flex flex-col gap-2">
-        <SecretLine label="שם משתמש" value={secret.username} onCopy={() => (copied.current = true)} />
-        <SecretLine label="סיסמה" value={secret.password} onCopy={() => (copied.current = true)} />
+        <SecretLine label={t("username")} value={secret.username} onCopy={() => (copied.current = true)} />
+        <SecretLine label={t("password")} value={secret.password} onCopy={() => (copied.current = true)} />
         {secret.notes && (
           <div>
-            <dt className="text-[11px] text-app-text-secondary">הערות</dt>
-            <dd className="whitespace-pre-wrap text-sm text-app-text-primary">{secret.notes}</dd>
+            <dt className="text-[11px] text-app-text-secondary">{t("notes")}</dt>
+            <dd dir="auto" className="whitespace-pre-wrap text-sm text-app-text-primary">{secret.notes}</dd>
           </div>
         )}
       </dl>
       <div className="mt-3 flex items-center justify-between text-[11px] text-app-text-tertiary">
-        <span>הצפייה נרשמה.</span>
+        <span>{t("logged")}</span>
         <span>
-          נעלם בעוד {seconds} שניות ·{" "}
+          {t("disappearsIn", { seconds })} ·{" "}
           <button type="button" onClick={() => setPhase({ kind: "idle" })} className="underline">
-            להסתיר עכשיו
+            {t("hideNow")}
           </button>
         </span>
       </div>
@@ -216,12 +218,13 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
 }
 
 function SecretLine({ label, value, onCopy }: { label: string; value: string | null; onCopy: () => void }) {
+  const t = useTranslations("vault.reveal");
   const [done, setDone] = useState(false);
   if (value === null) {
     return (
       <div>
         <dt className="text-[11px] text-app-text-secondary">{label}</dt>
-        <dd className="text-sm text-app-text-tertiary">לא נשמר</dd>
+        <dd className="text-sm text-app-text-tertiary">{t("notSaved")}</dd>
       </div>
     );
   }
@@ -245,7 +248,7 @@ function SecretLine({ label, value, onCopy }: { label: string; value: string | n
         <button
           type="button"
           onClick={copy}
-          aria-label={`העתקת ${label}`}
+          aria-label={t("copy", { label })}
           className="shrink-0 rounded-md p-1.5 text-app-text-secondary hover:bg-app-surface-sunken hover:text-app-text-primary"
         >
           {done ? <Check size={14} /> : <Copy size={14} />}

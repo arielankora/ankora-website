@@ -15,6 +15,7 @@
 //    would confirm it.
 
 import type { KnowledgeStatusLike } from "@/lib/knowledge";
+import { DomainError } from "@/lib/domain-error";
 
 export type SourceKindLike = "TRANSCRIPT" | "CLIENT_DOCUMENT" | "TASK" | "PERSON" | "ANKORA_DOCUMENT" | "EMAIL";
 export type SourceWeightLike = "PRIMARY" | "SECONDARY";
@@ -141,13 +142,39 @@ export function checkSources(
   /// behind.
   confirmedByPerson = false
 ): SourceCheck {
+  const r = sourcesVerdict(status, refs, register, texts, confirmedByPerson);
+  return r.ok ? r : { ok: false, error: r.refusal.message };
+}
+
+/// checkSources for the domain: the refusal thrown as a DomainError, so a
+/// screen can word it in the reader's language (ADR 0006).
+export function assertSources(...args: Parameters<typeof checkSources>): { status: KnowledgeStatusLike; lowered: boolean } {
+  const r = sourcesVerdict(...args);
+  if (!r.ok) throw r.refusal;
+  return { status: r.status, lowered: r.lowered };
+}
+
+function sourcesVerdict(
+  status: KnowledgeStatusLike,
+  refs: SourceRef[],
+  register: RegisterEntry[],
+  texts: (string | null | undefined)[] = [],
+  confirmedByPerson = false
+): { ok: true; status: KnowledgeStatusLike; lowered: boolean } | { ok: false; refusal: DomainError } {
   const known = new Map(register.map((r) => [r.code, r.weight]));
   const unknown = [...new Set([...refs.map((r) => r.code), ...texts.flatMap(citedCodes)])].filter((c) => !known.has(c));
   if (unknown.length > 0) {
-    return { ok: false, error: `${unknown.length === 1 ? "המקור" : "המקורות"} ${unknown.join(", ")} לא ${unknown.length === 1 ? "קיים" : "קיימים"} במרשם של הלקוח.` };
+    return {
+      ok: false,
+      refusal: new DomainError(
+        "clientSources.unknownCodes",
+        `${unknown.length === 1 ? "המקור" : "המקורות"} ${unknown.join(", ")} לא ${unknown.length === 1 ? "קיים" : "קיימים"} במרשם של הלקוח.`,
+        { count: unknown.length, codes: unknown.join(", ") }
+      ),
+    };
   }
   if (refs.length === 0 && status !== "MISSING" && status !== "SUPERSEDED") {
-    return { ok: false, error: 'צריך מקור: מאיפה זה ידוע? אם עוד לא ידוע, סמנו "חסר".' };
+    return { ok: false, refusal: new DomainError("clientSources.sourceRequired", 'צריך מקור: מאיפה זה ידוע? אם עוד לא ידוע, סמנו "חסר".') };
   }
   if (!confirmedByPerson && status === "CONFIRMED" && refs.length > 0 && refs.every((r) => known.get(r.code) === "SECONDARY")) {
     return { ok: true, status: "UNCERTAIN", lowered: true };

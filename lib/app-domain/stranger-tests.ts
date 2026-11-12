@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import type { FactTopic, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
@@ -35,7 +36,7 @@ export async function recordStrangerTest(actor: User, processId: string, input: 
     where: { id: processId },
     include: { versions: { orderBy: { version: "desc" }, take: 1 } },
   });
-  if (!process || process.deletedAt) throw new Error("התהליך לא נמצא.");
+  if (!process || process.deletedAt) throw new DomainError("strangerTests.processNotFound", "התהליך לא נמצא.");
   await assertClientAccess(actor, process.clientId);
   const latest = process.versions[0] ?? null;
   const read = readStrangerQuestions(input.questions, latest ? readSteps(latest.steps).length : 0);
@@ -109,11 +110,11 @@ async function sourceFor(actor: User, test: { id: string; clientId: string; sour
 export async function answerStrangerQuestion(actor: User, questionId: string, input: StrangerAnswerInput) {
   assertCan(actor.role, "time_entry.create_self");
   const question = await prisma.processStrangerQuestion.findUnique({ where: { id: questionId }, include: { test: true } });
-  if (!question) throw new Error("השאלה לא נמצאה.");
+  if (!question) throw new DomainError("strangerTests.questionNotFound", "השאלה לא נמצאה.");
   await assertClientAccess(actor, question.clientId);
-  if (question.status !== "OPEN") throw new Error("השאלה כבר נסגרה.");
+  if (question.status !== "OPEN") throw new DomainError("strangerTests.questionClosed", "השאלה כבר נסגרה.");
   const process = await prisma.process.findUnique({ where: { id: question.processId }, select: { code: true, deletedAt: true } });
-  if (!process || process.deletedAt) throw new Error("התהליך לא נמצא.");
+  if (!process || process.deletedAt) throw new DomainError("strangerTests.processNotFound", "התהליך לא נמצא.");
   const now = new Date();
 
   if (input.notRelevant) {
@@ -126,10 +127,10 @@ export async function answerStrangerQuestion(actor: User, questionId: string, in
   }
 
   const answer = input.answer?.trim();
-  if (!answer) throw new Error("צריך תשובה, או לסמן שהשאלה לא רלוונטית.");
-  if (answer.length > MAX_STRANGER_TEXT * 2) throw new Error("התשובה ארוכה מדי.");
+  if (!answer) throw new DomainError("strangerTests.answerRequired", "צריך תשובה, או לסמן שהשאלה לא רלוונטית.");
+  if (answer.length > MAX_STRANGER_TEXT * 2) throw new DomainError("strangerTests.answerTooLong", "התשובה ארוכה מדי.");
   const kind = input.kind ?? "NOTE";
-  if (!ANSWER_FACT_KINDS.includes(kind)) throw new Error("סוג התשובה לא מתאים לתיק.");
+  if (!ANSWER_FACT_KINDS.includes(kind)) throw new DomainError("strangerTests.kindNotAllowed", "סוג התשובה לא מתאים לתיק.");
 
   let factId: string | null = null;
   let policyId: string | null = null;
@@ -137,11 +138,11 @@ export async function answerStrangerQuestion(actor: User, questionId: string, in
   if (input.ruleChange) {
     if (!input.ruleChange.userConfirmed) throw new Error(RULE_CHANGE_NEEDS_YES);
     const policy = await prisma.clientPolicy.findFirst({ where: { id: input.ruleChange.policyId, clientId: question.clientId, deletedAt: null } });
-    if (!policy) throw new Error("הכלל לא נמצא בתיק של הלקוח.");
-    if (policy.status === "RETIRED") throw new Error("הכלל בוטל. כותבים כלל חדש.");
+    if (!policy) throw new DomainError("strangerTests.ruleNotFound", "הכלל לא נמצא בתיק של הלקוח.");
+    if (policy.status === "RETIRED") throw new DomainError("strangerTests.ruleRetired", "הכלל בוטל. כותבים כלל חדש.");
     const client = await prisma.client.findUnique({ where: { id: question.clientId }, select: { accountManagerId: true } });
     if (!approvesProceduresOf({ userId: actor.id, isManager: canManageClients(actor.role), accountManagerId: client?.accountManagerId ?? null })) {
-      throw new Error("רק מנהל או מנהל התיק של הלקוח משנים כלל של לקוח. רושמים את התשובה בלי שינוי הכלל, והם יחליטו.");
+      throw new DomainError("strangerTests.ruleChangeNotAllowed", "רק מנהל או מנהל התיק של הלקוח משנים כלל של לקוח. רושמים את התשובה בלי שינוי הכלל, והם יחליטו.");
     }
     const code = await sourceFor(actor, question.test, process.code, input.toldBy ?? null);
     const refs = readSourceRefs(policy.sources).filter((r) => r.code !== code);

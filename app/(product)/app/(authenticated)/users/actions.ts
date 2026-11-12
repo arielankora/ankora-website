@@ -20,6 +20,7 @@ import { CURRENT_AGREEMENTS } from "@/lib/agreements";
 import { localDateTimeToUtc } from "@/lib/timezone";
 import { revokeClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 import { setUserCanApproveExceptions } from "@/lib/app-domain/rule-approvals";
+import { setCommsAccess } from "@/lib/app-domain/comms-access";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import type { UserRole, UserStatus, ClientUserRole } from "@prisma/client";
 
@@ -253,6 +254,23 @@ export async function setExceptionApproverAction(_prev: FormState | undefined, f
   if (!userId) return { error: "משתמש לא נמצא." };
   try {
     await setUserCanApproveExceptions(actor, userId, formData.get("canApproveExceptions") === "on");
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  revalidatePath(`/app/users/${userId}`);
+  return { ok: true };
+}
+
+/// The communications screen: level and Aloha lines, from the person's page.
+export async function setCommsAccessAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const actor = await requireUser();
+  const userId = String(formData.get("userId") || "");
+  if (!userId) return { error: "משתמש לא נמצא." };
+  try {
+    await setCommsAccess(actor, userId, {
+      level: String(formData.get("level") || "NONE"),
+      lines: formData.getAll("line").map(String).filter(Boolean),
+    });
   } catch (err) {
     return { error: friendlyError(err) };
   }

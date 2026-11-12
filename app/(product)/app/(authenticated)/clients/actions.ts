@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { parseSubprocessorNotice } from "@/lib/subprocessor-notice";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
@@ -24,16 +26,25 @@ import type { ClientDocumentKind } from "@prisma/client";
 
 type FormState = { error?: string; ok?: boolean };
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
+/// ADR 0006: every refusal in the reader's language. A DomainError is
+/// worded from its code; anything else keeps its message, as before.
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("clients.page.errors");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  const domain = await domainErrorText(err);
+  if (domain) return domain;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
+}
+
+async function errorText() {
+  return getTranslations("clients.page.errors");
 }
 
 export async function createClientAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const name = String(formData.get("name") || "").trim();
-  if (!name) return { error: "יש להזין שם לקוח." };
+  if (!name) return { error: (await errorText())("nameRequired") };
 
   try {
     await createClient(user, {
@@ -43,7 +54,7 @@ export async function createClientAction(_prev: FormState | undefined, formData:
       primaryContact: String(formData.get("primaryContact") || ""),
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/clients");
@@ -53,7 +64,7 @@ export async function createClientAction(_prev: FormState | undefined, formData:
 export async function updateClientAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") || "");
-  if (!clientId) return { error: "לקוח לא נמצא." };
+  if (!clientId) return { error: (await errorText())("clientNotFound") };
 
   try {
     await updateClient(user, clientId, {
@@ -98,7 +109,7 @@ export async function updateClientAction(_prev: FormState | undefined, formData:
       })(),
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/clients");
@@ -119,7 +130,7 @@ export async function archiveClientAction(clientId: string) {
   try {
     await archiveClient(user, clientId);
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
   revalidatePath("/app/clients");
   return { ok: true as const };
@@ -130,7 +141,7 @@ export async function restoreClientAction(clientId: string) {
   try {
     await restoreClient(user, clientId);
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
   revalidatePath("/app/clients");
   revalidatePath(`/app/clients/${clientId}`);
@@ -159,7 +170,7 @@ function readOptions(formData: FormData) {
 export async function createDecisionAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") || "");
-  if (!clientId) return { error: "לקוח לא נמצא." };
+  if (!clientId) return { error: (await errorText())("clientNotFound") };
 
   const dueAtRaw = String(formData.get("dueAt") || "");
 
@@ -176,7 +187,7 @@ export async function createDecisionAction(_prev: FormState | undefined, formDat
       options: readOptions(formData),
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath(`/app/clients/${clientId}`);
@@ -193,7 +204,7 @@ export async function cancelDecisionAction(input: { decisionId: string }) {
     revalidatePath("/app/portal/decisions");
     return { ok: true as const };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -215,10 +226,10 @@ export async function addClientDocumentAction(
 ): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") || "");
-  if (!clientId) return { error: "לקוח לא נמצא." };
+  if (!clientId) return { error: (await errorText())("clientNotFound") };
 
   const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) return { error: "יש לבחור קובץ." };
+  if (!(file instanceof File) || file.size === 0) return { error: (await errorText())("fileRequired") };
 
   try {
     await addClientDocument(user, {
@@ -240,8 +251,8 @@ export async function addClientDocumentAction(
     // The one error worth its own sentence: the Drive folder has not been
     // created yet, which is a setup step and not a fault of whoever just
     // pressed the button.
-    if (err instanceof DriveNotConfiguredError) return { error: err.message };
-    return { error: friendlyError(err) };
+    if (err instanceof DriveNotConfiguredError) return { error: (await domainErrorText(err)) ?? err.message };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath(`/app/clients/${clientId}`);
@@ -255,7 +266,7 @@ export async function setClientDocumentVisibilityAction(documentId: string, clie
     revalidatePath(`/app/clients/${doc.clientId}`);
     return { ok: true as const, clientVisible: doc.clientVisible };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -266,7 +277,7 @@ export async function setClientDocumentAiExcludedAction(documentId: string, aiEx
     revalidatePath(`/app/clients/${doc.clientId}`);
     return { ok: true as const, aiExcluded: doc.aiExcluded };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -277,7 +288,7 @@ export async function setClientDocumentKindAction(documentId: string, kind: Clie
     revalidatePath(`/app/clients/${doc.clientId}`);
     return { ok: true as const, kind: doc.kind };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
@@ -288,19 +299,19 @@ export async function removeClientDocumentAction(documentId: string) {
     revalidatePath(`/app/clients/${doc.clientId}`);
     return { ok: true as const };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }
 
 export async function generateSummaryAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") || "");
-  if (!clientId) return { error: "לקוח לא נמצא." };
+  if (!clientId) return { error: (await errorText())("clientNotFound") };
 
   try {
     await generatePortalSummary(user, clientId);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath(`/app/clients/${clientId}`);
@@ -313,13 +324,13 @@ export async function generateSummaryAction(_prev: FormState | undefined, formDa
 export async function approveSummaryAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const summaryId = String(formData.get("summaryId") || "");
-  if (!summaryId) return { error: "הסיכום לא נמצא." };
+  if (!summaryId) return { error: (await errorText())("summaryNotFound") };
 
   try {
     const summary = await approvePortalSummary(user, summaryId, String(formData.get("draft") || ""));
     revalidatePath(`/app/clients/${summary.clientId}`);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   return { ok: true };
@@ -332,6 +343,6 @@ export async function discardSummaryAction(summaryId: string) {
     revalidatePath(`/app/clients/${summary.clientId}`);
     return { ok: true as const };
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
 }

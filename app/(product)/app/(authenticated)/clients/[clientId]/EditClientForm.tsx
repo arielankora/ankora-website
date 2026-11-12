@@ -1,18 +1,20 @@
 "use client";
+import { useFormatter, useTranslations } from "next-intl";
 import { updateClientAction } from "../actions";
 import { useActionForm } from "@/components/app/useActionForm";
 import { formatMinor } from "@/lib/money";
 import type { Client } from "@prisma/client";
-import { SUBPROCESSOR_NOTICE_LABELS, SUBPROCESSOR_NOTICE_VALUES } from "@/lib/subprocessor-notice";
+import { SUBPROCESSOR_NOTICE_VALUES } from "@/lib/subprocessor-notice";
 
 function SubmitButton({ pending }: { pending: boolean }) {
+  const t = useTranslations("clients.page.edit");
   return (
     <button
       type="submit"
       disabled={pending}
       className="rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
-      {pending ? "נשמר..." : "שמירת שינויים"}
+      {pending ? t("saving") : t("save")}
     </button>
   );
 }
@@ -34,13 +36,17 @@ export function EditClientForm({
   /// Who last set the sub-processor notice answer, by name.
   noticeCheckedByName?: string | null;
 }) {
+  const t = useTranslations("clients.page.edit");
+  const tNotice = useTranslations("clients.subprocessors.notice");
+  const format = useFormatter();
   const { onSubmit, pending, error, ok } = useActionForm(updateClientAction);
+  const noticeDate = (d: Date) => format.dateTime(new Date(d), { day: "numeric", month: "numeric", year: "numeric" });
 
   return (
     <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <input type="hidden" name="clientId" value={client.id} />
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">שם הלקוח</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("name")}</label>
         <input
           name="name"
           defaultValue={client.name}
@@ -49,7 +55,7 @@ export function EditClientForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">שם משפטי</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("legalName")}</label>
         <input
           name="legalName"
           defaultValue={client.legalName ?? ""}
@@ -57,7 +63,7 @@ export function EditClientForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">איש קשר</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("primaryContact")}</label>
         <input
           name="primaryContact"
           defaultValue={client.primaryContact ?? ""}
@@ -65,7 +71,7 @@ export function EditClientForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">אזור זמן</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("timezone")}</label>
         <input
           name="timezone"
           defaultValue={client.timezone}
@@ -73,35 +79,35 @@ export function EditClientForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">סטטוס</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("status")}</label>
         <select
           name="status"
           defaultValue={client.status}
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
-          <option value="ACTIVE">פעיל</option>
-          <option value="PAUSED">מושהה</option>
-          <option value="ARCHIVED">בארכיון</option>
+          <option value="ACTIVE">{t("statuses.ACTIVE")}</option>
+          <option value="PAUSED">{t("statuses.PAUSED")}</option>
+          <option value="ARCHIVED">{t("statuses.ARCHIVED")}</option>
         </select>
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">סוג לקוח</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("kind")}</label>
         <select
           name="kind"
           defaultValue={client.kind}
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
-          <option value="BUSINESS">עסקי</option>
-          <option value="PRIVATE">פרטי</option>
+          <option value="BUSINESS">{t("kinds.BUSINESS")}</option>
+          <option value="PRIVATE">{t("kinds.PRIVATE")}</option>
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">תחום</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("industry")}</label>
         <input
           name="industry"
           defaultValue={client.industry ?? ""}
-          placeholder="חברה, סטארטאפ AI"
+          placeholder={t("industryPlaceholder")}
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
@@ -114,9 +120,9 @@ export function EditClientForm({
           className="mt-0.5 h-4 w-4 shrink-0 accent-app-text-primary"
         />
         <span>
-          <span className="block text-sm text-app-text-primary">לקוח פנימי</span>
+          <span className="block text-sm text-app-text-primary">{t("internal")}</span>
           <span className="block text-[11px] text-app-text-tertiary">
-            עבודה של Ankora עצמה. השעות נרשמות ומופיעות בדוחות, אבל לא בגרף השעות במסך הבית.
+            {t("internalHint")}
           </span>
         </span>
       </label>
@@ -129,9 +135,9 @@ export function EditClientForm({
           className="mt-0.5 h-4 w-4 shrink-0 accent-app-text-primary"
         />
         <span>
-          <span className="block text-sm text-app-text-primary">בלי AI</span>
+          <span className="block text-sm text-app-text-primary">{t("aiExcluded")}</span>
           <span className="block text-[11px] text-app-text-tertiary">
-            הלקוח ביקש ששום דבר שלו לא יעבור דרך מערכות AI: משימות, מסמכים ותיק הלקוח. הכול מטופל בידי אדם.
+            {t("aiExcludedHint")}
           </span>
         </span>
       </label>
@@ -144,9 +150,9 @@ export function EditClientForm({
           className="mt-0.5 h-4 w-4 shrink-0 accent-app-text-primary"
         />
         <span>
-          <span className="block text-sm text-app-text-primary">הפרדה באישור נהלים</span>
+          <span className="block text-sm text-app-text-primary">{t("separation")}</span>
           <span className="block text-[11px] text-app-text-tertiary">
-            מי שכתב גרסה של נוהל לא מאשר אותה. ללקוח שהמבקר שלו מבקש הפרדה. כבוי: מנהל התיק או מנהל מאשרים כל נוהל.
+            {t("separationHint")}
           </span>
         </span>
       </label>
@@ -155,13 +161,13 @@ export function EditClientForm({
           Ankora to tell it by email about a new sub-processor. Internal:
           the client does not see it on the portal. */}
       <div className="rounded-lg border border-app-border bg-cream-dim/40 p-4 sm:col-span-2">
-        <p className="text-xs font-medium text-app-text-primary">התחייבות לעדכון יזום על תת-מעבד</p>
+        <p className="text-xs font-medium text-app-text-primary">{t("notice.title")}</p>
         <p className="mt-1 text-[11px] text-app-text-tertiary">
-          רק התחייבות מפורשת בחוזה של הלקוח נחשבת. סעיף 6 בנספח עיבוד המידע שבאתר לא נחשב לבד. לא נבדק: הלקוח מקבל מייל ליתר ביטחון.
+          {t("notice.hint")}
         </p>
         <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <label className="block">
-            <span className="block text-xs font-medium text-app-text-secondary">מצב</span>
+            <span className="block text-xs font-medium text-app-text-secondary">{t("notice.state")}</span>
             <select
               name="subprocessorNotice"
               defaultValue={client.subprocessorNotice}
@@ -169,42 +175,43 @@ export function EditClientForm({
             >
               {SUBPROCESSOR_NOTICE_VALUES.map((v) => (
                 <option key={v} value={v}>
-                  {SUBPROCESSOR_NOTICE_LABELS[v]}
+                  {tNotice(v)}
                 </option>
               ))}
             </select>
           </label>
           <label className="block">
-            <span className="block text-xs font-medium text-app-text-secondary">מקור: חוזה וסעיף</span>
+            <span className="block text-xs font-medium text-app-text-secondary">{t("notice.source")}</span>
             <input
               name="subprocessorNoticeSource"
               defaultValue={client.subprocessorNoticeSource ?? ""}
-              placeholder="הסכם שירות 3.2026, סעיף 9"
+              placeholder={t("notice.sourcePlaceholder")}
               className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
-            <span className="mt-1 block text-[11px] text-app-text-tertiary">חובה כשמסמנים יש או אין.</span>
+            <span className="mt-1 block text-[11px] text-app-text-tertiary">{t("notice.sourceHint")}</span>
           </label>
           <label className="block">
-            <span className="block text-xs font-medium text-app-text-secondary">החוזה בתיק</span>
+            <span className="block text-xs font-medium text-app-text-secondary">{t("notice.document")}</span>
             <select
               name="subprocessorNoticeDocumentId"
               defaultValue={client.subprocessorNoticeDocumentId ?? ""}
               className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             >
-              <option value="">לא נבחר</option>
+              <option value="">{t("notice.noDocument")}</option>
               {noticeDocuments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.title}
                 </option>
               ))}
             </select>
-            <span className="mt-1 block text-[11px] text-app-text-tertiary">רשות.</span>
+            <span className="mt-1 block text-[11px] text-app-text-tertiary">{t("notice.optional")}</span>
           </label>
         </div>
         {client.subprocessorNoticeCheckedAt && (
           <p className="mt-3 text-[11px] text-app-text-tertiary">
-            עודכן ב-{new Date(client.subprocessorNoticeCheckedAt).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}
-            {noticeCheckedByName ? ` על ידי ${noticeCheckedByName}` : ""}.
+            {noticeCheckedByName
+              ? t("notice.updatedBy", { date: noticeDate(client.subprocessorNoticeCheckedAt), name: noticeCheckedByName })
+              : t("notice.updated", { date: noticeDate(client.subprocessorNoticeCheckedAt) })}
           </p>
         )}
       </div>
@@ -213,27 +220,27 @@ export function EditClientForm({
           portal, grouped so they read as one subject rather than as more
           client settings. */}
       <div className="rounded-lg border border-app-border bg-cream-dim/40 p-4 sm:col-span-2">
-        <p className="text-xs font-medium text-app-text-primary">פורטל הלקוח</p>
+        <p className="text-xs font-medium text-app-text-primary">{t("portal.title")}</p>
         <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <label className="block">
-            <span className="block text-xs font-medium text-app-text-secondary">מנהל התיק</span>
+            <span className="block text-xs font-medium text-app-text-secondary">{t("portal.manager")}</span>
             <select
               name="accountManagerId"
               defaultValue={client.accountManagerId ?? ""}
               className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             >
-              <option value="">לא הוגדר</option>
+              <option value="">{t("portal.noManager")}</option>
               {staff.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>
               ))}
             </select>
-            <span className="mt-1 block text-[11px] text-app-text-tertiary">מופיע בפורטל כשם האדם שאחראי על התיק.</span>
+            <span className="mt-1 block text-[11px] text-app-text-tertiary">{t("portal.managerHint")}</span>
           </label>
 
           <label className="block">
-            <span className="block text-xs font-medium text-app-text-secondary">וואטסאפ ייעודי</span>
+            <span className="block text-xs font-medium text-app-text-secondary">{t("portal.whatsapp")}</span>
             <input
               name="whatsappNumber"
               dir="ltr"
@@ -242,12 +249,12 @@ export function EditClientForm({
               className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-end text-sm text-app-text-primary outline-none focus:border-gold"
             />
             <span className="mt-1 block text-[11px] text-app-text-tertiary">
-              הקו שהלקוח כבר מתכתב איתו. ריק: הפורטל יציג שהערוץ עוד לא מחובר.
+              {t("portal.whatsappHint")}
             </span>
           </label>
 
           <label className="block">
-            <span className="block text-xs font-medium text-app-text-secondary">תקרת אישור (₪)</span>
+            <span className="block text-xs font-medium text-app-text-secondary">{t("portal.ceiling")}</span>
             <input
               name="approvalCeiling"
               dir="ltr"
@@ -258,8 +265,8 @@ export function EditClientForm({
             />
             <span className="mt-1 block text-[11px] text-app-text-tertiary">
               {client.approvalCeilingMinor !== null
-                ? `כרגע: ${formatMinor(client.approvalCeilingMinor)}. מעל הסכום הזה נדרש אישור הלקוח.`
-                : "ריק: כל החלטה עם סכום תוצג כדורשת אישור."}
+                ? t("portal.ceilingNow", { amount: formatMinor(client.approvalCeilingMinor) ?? "" })
+                : t("portal.ceilingEmpty")}
             </span>
           </label>
         </div>
@@ -272,13 +279,13 @@ export function EditClientForm({
           notification - the notice goes the other way, to the account
           manager, when the CLIENT edits. */}
       <div className="sm:col-span-2">
-        <p className="text-xs font-medium text-app-text-secondary">העדפות שירות</p>
+        <p className="text-xs font-medium text-app-text-secondary">{t("preferences.title")}</p>
         <p className="mt-1 text-[11px] text-app-text-tertiary">
-          מופיע ללקוח במסך &quot;התיק שלי&quot;, והוא יכול לערוך שם בעצמו.
+          {t("preferences.hint")}
         </p>
         <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label className="block">
-            <span className="block text-[11px] text-app-text-secondary">איך לדבר איתו</span>
+            <span className="block text-[11px] text-app-text-secondary">{t("preferences.contact")}</span>
             <textarea
               name="preferenceContact"
               rows={2}
@@ -287,7 +294,7 @@ export function EditClientForm({
             />
           </label>
           <label className="block">
-            <span className="block text-[11px] text-app-text-secondary">מה חשוב לו</span>
+            <span className="block text-[11px] text-app-text-secondary">{t("preferences.matters")}</span>
             <textarea
               name="preferenceMatters"
               rows={2}
@@ -296,7 +303,7 @@ export function EditClientForm({
             />
           </label>
           <label className="block">
-            <span className="block text-[11px] text-app-text-secondary">מה אסור שיקרה</span>
+            <span className="block text-[11px] text-app-text-secondary">{t("preferences.never")}</span>
             <textarea
               name="preferenceNever"
               rows={2}
@@ -309,7 +316,7 @@ export function EditClientForm({
 
       <div className="flex items-center gap-4 sm:col-span-2">
         {error && <p className="text-sm text-app-error">{error}</p>}
-        {ok && <p className="text-sm text-app-success">נשמר בהצלחה.</p>}
+        {ok && <p className="text-sm text-app-success">{t("saved")}</p>}
         <div className="ms-auto">
           <SubmitButton pending={pending} />
         </div>

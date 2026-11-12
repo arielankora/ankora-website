@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError, assertCan } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
@@ -29,6 +31,7 @@ export async function recordClientMessageAction(input: {
   body: string;
 }) {
   const user = await requireUser();
+  const t = await getTranslations("clients.page.errors");
   try {
     assertCan(user.role, "time_entry.create_self");
 
@@ -47,7 +50,7 @@ export async function recordClientMessageAction(input: {
         select: { user: { select: { email: true } } },
       });
       if (recipients.length === 0) {
-        return { ok: false as const, error: "אין ללקוח הזה משתמש פורטל לשלוח אליו מייל." };
+        return { ok: false as const, error: t("noPortalUser") };
       }
       // Plain text, exactly as the person wrote it. The invite and the
       // decision mails render a styled template because they are the
@@ -62,7 +65,7 @@ export async function recordClientMessageAction(input: {
         // Not recorded: a message that failed to send is not a message
         // that was sent, and a log that says otherwise is worse than no
         // log.
-        return { ok: false as const, error: "המייל לא נשלח. אפשר להעתיק ולשלוח ידנית." };
+        return { ok: false as const, error: t("emailNotSent") };
       }
     }
 
@@ -79,8 +82,8 @@ export async function recordClientMessageAction(input: {
     return { ok: true as const };
   } catch (err) {
     if (err instanceof ForbiddenError) {
-      return { ok: false as const, error: "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך." };
+      return { ok: false as const, error: t("forbiddenNotAssigned") };
     }
-    return { ok: false as const, error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
+    return { ok: false as const, error: (await domainErrorText(err)) ?? (err instanceof Error ? err.message : t("generic")) };
   }
 }
