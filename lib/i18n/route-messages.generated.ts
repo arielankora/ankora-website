@@ -20,6 +20,10 @@ export const GLOBAL_MESSAGE_PATHS = [
 ] as const;
 
 export const AREA_MESSAGE_PATHS = {
+  "approvals": [
+    "approvals",
+    "knowledge",
+  ],
   "clients": [
     "clients.connections",
     "clients.control",
@@ -47,6 +51,7 @@ export const AREA_MESSAGE_PATHS = {
     "clients.subprocessors",
     "clients.systems",
     "clients.tasks",
+    "knowledge",
     "messageClient",
     "tasks.create",
   ],
@@ -62,6 +67,9 @@ export const AREA_MESSAGE_PATHS = {
   ],
   "integrations": [
     "claude",
+  ],
+  "knowledge": [
+    "knowledge",
   ],
   "my-time": [
     "myTime.closedBank",

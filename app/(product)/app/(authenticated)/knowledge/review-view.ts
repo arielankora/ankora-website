@@ -1,18 +1,27 @@
-import { readSourceRefs, formatSourceRef, SOURCE_KIND_LABELS } from "@/lib/knowledge-sources";
-import { defaultTaskDue, firefliesLink, proposalHeadline, reviewConfidence, reviewRank, revertBlocker, taskBlocker, taskFromProposal, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { readSourceRefs, formatSourceRef } from "@/lib/knowledge-sources";
+import {
+  bulkApproveBlockerCode,
+  defaultTaskDue,
+  firefliesLink,
+  proposalDetailParts,
+  proposalHeadline,
+  reviewConfidence,
+  reviewConfidenceReasons,
+  reviewRank,
+  revertBlocker,
+  taskBlocker,
+  taskFromProposal,
+  type ProposalTargetLike,
+} from "@/lib/knowledge-proposals";
 import { localDateKey } from "@/lib/timezone";
 import type { listOpenBatches } from "@/lib/app-domain/knowledge-proposals";
-import type { ReviewProposal } from "./ReviewBatch";
+import type { ReviewProposal, SourceDetails } from "./ReviewBatch";
 
 // One batch as the review card reads it, shared by "ממתין לאישור" and the
 // client screen's file tab (spec 5.2: one screen for the team, and a tab
 // in every client).
 
 export type OpenBatch = Awaited<ReturnType<typeof listOpenBatches>>[number];
-
-function day(d: Date | null): string | null {
-  return d ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }).format(d) : null;
-}
 
 export function reviewProposals(b: OpenBatch): ReviewProposal[] {
   const fireflies =
@@ -25,9 +34,13 @@ export function reviewProposals(b: OpenBatch): ReviewProposal[] {
     const flags = (Array.isArray(p.flags) ? p.flags : []) as ReviewProposal["flags"];
     // Spec 5.2: how sure, as the reviewer should read it, and where it
     // goes on the card.
-    const confidence = reviewConfidence({ confidence: p.confidence, flags, payload, at, sourceKind: b.source?.kind ?? null, sourceRestriction: b.source?.restriction ?? null });
+    const confidenceInput = { confidence: p.confidence, flags, payload, at, sourceKind: b.source?.kind ?? null, sourceRestriction: b.source?.restriction ?? null };
+    const confidence = { ...reviewConfidence(confidenceInput), reasons: reviewConfidenceReasons(confidenceInput) };
     return {
       confidence,
+      // ADR 0006: why it is approved alone, as a code the card words.
+      aloneBecause: bulkApproveBlockerCode({ target: p.target as ProposalTargetLike, action: p.action, flags, payload, level: confidence.level }),
+      details: proposalDetailParts(p.target as ProposalTargetLike, payload),
       rank: reviewRank({ target: p.target as ProposalTargetLike, action: p.action, flags, payload, level: confidence.level }),
       id: p.id,
       target: p.target as ProposalTargetLike,
@@ -49,6 +62,7 @@ export function reviewProposals(b: OpenBatch): ReviewProposal[] {
       revertible: revertBlocker(p) === null,
       rejectReason: p.rejectReason,
       hiddenFor: p.hiddenFor,
+      hiddenApprovers: p.hiddenApprovers,
       task: {
         ...taskFromProposal({
           target: p.target as ProposalTargetLike,
@@ -72,13 +86,18 @@ export function reviewProposals(b: OpenBatch): ReviewProposal[] {
   return proposals;
 }
 
-/// The card's header.
-export function batchHeader(b: OpenBatch) {
+/// The card's header. ADR 0006: the parts, worded on the card in the
+/// reader's language; the source's code and title are content.
+export function batchHeader(b: OpenBatch): { sourceLabel: string | null; sourceDetails: SourceDetails; note: string | null; droppedCount: number } {
   return {
-    sourceLabel: b.source ? `${b.source.code} ${b.source.title}` : "בלי מקור",
-    sourceDetails: [b.source ? SOURCE_KIND_LABELS[b.source.kind] : null, b.source ? day(b.source.occurredAt) : null, b.source?.restriction === "TOPICS_ONLY" ? "נושאים בלבד" : null, b.createdByName ? `נשלח על ידי ${b.createdByName}` : null]
-      .filter(Boolean)
-      .join(" · "),
+    sourceLabel: b.source ? `${b.source.code} ${b.source.title}` : null,
+    sourceDetails: {
+      kind: b.source?.kind ?? null,
+      occurredAt: b.source?.occurredAt ?? null,
+      participants: [],
+      topicsOnly: b.source?.restriction === "TOPICS_ONLY",
+      sentBy: b.createdByName ?? null,
+    },
     note: b.note,
     droppedCount: Array.isArray(b.dropped) ? b.dropped.length : 0,
   };

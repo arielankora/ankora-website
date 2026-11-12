@@ -239,7 +239,7 @@ describe("knowledge proposals", () => {
 
     // Approving makes no second copy, and several at once wait for one at a time.
     await expect(approveProposal(user, org.id)).rejects.toThrow("כבר בתיק");
-    expect((await decideProposals(user, [org.id], { approve: true })).failed).toEqual([{ id: org.id, error: expect.stringContaining("אחת אחת") }]);
+    expect((await decideProposals(user, [org.id], { approve: true })).failed).toEqual([{ id: org.id, error: expect.stringContaining("אחת אחת"), code: "knowledgeProposals.approveOneByOne", values: { reason: expect.any(String) } }]);
 
     const closed = await attachProposalToExisting(user, org.id);
     expect(closed).toMatchObject({ state: "APPROVED", attached: true, edited: false, resultId: ibi.id });
@@ -288,7 +288,7 @@ describe("knowledge proposals", () => {
 
     const approved = await decideProposals(user, [a.id, b.id, dup.id], { approve: true });
     expect(approved.done.sort()).toEqual([a.id, b.id].sort());
-    expect(approved.failed).toEqual([{ id: dup.id, error: expect.stringContaining("אחת אחת") }]);
+    expect(approved.failed).toEqual([{ id: dup.id, error: expect.stringContaining("אחת אחת"), code: "knowledgeProposals.approveOneByOne", values: { reason: expect.any(String) } }]);
     expect((await listClientFacts(user, client.id)).current.map((f) => f.body).sort()).toEqual(["9 עובדים שכירים בישראל", "SOC 2 הושג", "דוח שבועי לאורן"].sort());
     const audit = await prisma.auditEvent.findFirst({ where: { entityId: a.id, action: "knowledge_proposal.approve" } });
     expect(audit!.afterJson).toMatchObject({ bulk: true });
@@ -296,7 +296,7 @@ describe("knowledge proposals", () => {
     await expect(decideProposals(user, [dup.id, chat.id], { approve: false, reason: " " })).rejects.toThrow("למה");
     const rejected = await decideProposals(user, [dup.id, chat.id, a.id], { approve: false, reason: "כבר בתיק, או לא לעבודה" });
     expect(rejected.done.sort()).toEqual([dup.id, chat.id].sort());
-    expect(rejected.failed).toEqual([{ id: a.id, error: expect.stringContaining("כבר הוחלט") }]);
+    expect(rejected.failed).toEqual([{ id: a.id, error: expect.stringContaining("כבר הוחלט"), code: "knowledgeProposals.alreadyDecided", values: {} }]);
     expect(await countPendingProposals(user, client.id)).toBe(0);
 
     const { user: stranger } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
@@ -320,8 +320,9 @@ describe("knowledge proposals", () => {
     const out = await decideProposals(user, [ok.id, low.id, task.id], { approve: true });
     expect(out.done).toEqual([ok.id]);
     expect(out.failed).toEqual([
-      { id: low.id, error: "מאשרים אחת אחת: רמת בדיקה נמוכה." },
-      { id: task.id, error: "מאשרים אחת אחת: משימה נפתחת לאדם אחר." },
+      // ADR 0006: the code lets the screen say it in the reader's language.
+      { id: low.id, error: "מאשרים אחת אחת: רמת בדיקה נמוכה.", code: "knowledgeProposals.approveOneByOne", values: { reason: expect.any(String) } },
+      { id: task.id, error: "מאשרים אחת אחת: משימה נפתחת לאדם אחר.", code: "knowledgeProposals.approveOneByOne", values: { reason: expect.any(String) } },
     ]);
     // One at a time, each is still approved.
     await approveProposal(user, low.id);
