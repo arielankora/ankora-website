@@ -25,7 +25,17 @@ function daysSince(iso) {
   return Math.round((Date.now() - new Date(iso).getTime()) / 86_400_000);
 }
 
-async function runSuite(dir, env = {}, extraArgs = [], reportName = path.basename(dir)) {
+/// 30 minutes for each integration pass (12.11.2026, approved in the
+/// session that hit it). Split four ways, integration-3 runs 13 to 16
+/// minutes on a typical runner, because vitest's --shard divides by files
+/// and not by time; on a slow runner the same files took about 1.5 times as
+/// long and passed 20 minutes three times that day (#480 once, #485 twice),
+/// with no test stuck and the same shard at 13 minutes locally. The job's
+/// own limit in the workflow is 75 minutes, so this still stops a real hang
+/// well inside it. A fifth shard would need a workflow change.
+export const INTEGRATION_BUDGET_MS = 30 * 60_000;
+
+async function runSuite(dir, env = {}, extraArgs = [], reportName = path.basename(dir), timeoutMs = 20 * 60_000) {
   const outFile = path.join(ROOT, "qa", "reports", `vitest-${reportName}.json`);
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   const r = await sh(
@@ -36,7 +46,10 @@ async function runSuite(dir, env = {}, extraArgs = [], reportName = path.basenam
     // against a 15-minute budget that had never once been enforced (see
     // lib/sh.mjs). Sharded three ways a shard is about 8; the UTC pass still
     // runs whole and needs the room.
-    { env, timeoutMs: 20 * 60_000 },
+    //
+    // 12.11.2026: the integration passes get INTEGRATION_BUDGET_MS instead
+    // (see there).
+    { env, timeoutMs },
   );
   let parsed = null;
   try {
@@ -221,7 +234,7 @@ export async function integration(split = null) {
   const args = ["--no-file-parallelism"];
   if (split) args.push(`--shard=${split[0]}/${split[1]}`);
   const name = split ? `integration-${split[0]}of${split[1]}` : "integration";
-  const { r, parsed } = await runSuite("tests/integration", integrationEnv(), args, name);
+  const { r, parsed } = await runSuite("tests/integration", integrationEnv(), args, name, INTEGRATION_BUDGET_MS);
   const out = analyse(parsed, r, split ? `integration (${split[0]}/${split[1]})` : "integration");
   out.push(...shardFileCount(parsed, split, "integration"));
   return out;
@@ -283,7 +296,7 @@ export async function integrationUtc(level, split = null) {
   // The report file carries the shard, so two shards cannot read each
   // other's results if they ever do land on one machine.
   const name = split ? `integration-utc-${split[0]}of${split[1]}` : "integration-utc";
-  const { r, parsed } = await runSuite(first, { ...integrationEnv(), TZ: "UTC" }, args, name);
+  const { r, parsed } = await runSuite(first, { ...integrationEnv(), TZ: "UTC" }, args, name, INTEGRATION_BUDGET_MS);
   const out = analyse(parsed, r, split ? `integration (UTC, ${split[0]}/${split[1]})` : "integration (UTC)");
   out.push(...shardFileCount(parsed, split, "integration (UTC)"));
   return out;
