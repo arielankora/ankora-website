@@ -86,14 +86,22 @@ export type AdvancePromptSources = {
   keywords: string[];
   driveFolderId: string | null;
   conversationsDocId: string | null;
-  /// 90 days before the task opened: the oldest material worth reading.
+  /// 30 days before the task opened: where the search starts.
   fromLabel: string;
   /// The same day as YYYY-MM-DD, for search filters (after:, from:).
   fromIso: string;
+  /// 90 days before the task opened: how far a search that found nothing
+  /// may widen (12.11.2026).
+  wideFromLabel: string;
+  wideFromIso: string;
 };
 
-/// How far back the search goes, from the day the task opened.
-export const SOURCES_LOOKBACK_DAYS = 90;
+/// How far back the search goes, from the day the task opened. It starts
+/// at 30 days and widens to 90 only when the first window found nothing
+/// (12.11.2026: the operations managers ran out of Claude usage, and a
+/// 90-day search on every conversation was a large part of it).
+export const SOURCES_LOOKBACK_DAYS = 30;
+export const SOURCES_WIDE_LOOKBACK_DAYS = 90;
 
 export type AdvancePromptInput = {
   taskId: string;
@@ -243,9 +251,11 @@ export function timerRules(
 /// though NUX mail reaches him forwarded; Ariel sees every recording in
 /// Fireflies and others may see only their own. So nothing here assumes a
 /// connector is there. Claude looks at what this conversation actually
-/// has, uses all of it, and says in one line what the plan rests on. When
-/// a source is connected, using it is not optional: the thread with the
-/// supplier is usually where the task really stands.
+/// has, and says in one line what the plan rests on. Since 12.11.2026 a
+/// source is read only when Ankora's own data leaves a gap (where the task
+/// stands now counts as one, since the thread with the supplier is often
+/// where it really stands), and then sparingly: previews before threads,
+/// summaries before transcripts, 30 days before 90.
 ///
 /// The anchors say where to look, never what may be read: each person's
 /// own connectors decide that. The seven rules are the privacy decision
@@ -263,12 +273,17 @@ export function sourcesRules(input: Pick<AdvancePromptInput, "clientName" | "tas
 
   return [
     "## מקורות נוספים: מייל, דרייב והקלטות",
-    "מה מחובר שונה מעובד לעובד ומלקוח ללקוח. לכן אל תניח שמקור מחובר, ואל תוותר על מקור שמחובר.",
-    "- **לפני שאתה מתכנן:** תבדוק אילו כלים יש לך בשיחה הזו: מייל (Gmail), דרייב (Google Drive) והקלטות (Fireflies). בכל מקור מחובר תריץ חיפוש קצר לפי העוגנים שלמטה, ותקרא את מה שרלוונטי למשימה. כשהמקור מחובר, זה חובה ולא רשות.",
+    "מה מחובר שונה מעובד לעובד ומלקוח ללקוח, ולכן אל תניח שמקור מחובר. כל מה שנקרא מהמקורות נשאר בשיחה ומכביד על כל תשובה אחריו, ולכן קוראים רק מה שצריך.",
+    // 12.11.2026: the search used to be mandatory on every conversation,
+    // and the operations managers ran out of Claude usage. Ankora's own
+    // data comes first; the sources fill a gap, they are not a ritual.
+    "- **סדר העבודה:** קודם נתוני המשימה מאנקורה (בסוף ההודעה) והקבצים שלה. מחפשים במקורות רק אם חסר בהם מידע שבלעדיו אי אפשר לתכנן, ורק את מה שחסר. חסר זה גם כשלא ברור איפה המשימה עומדת היום, למשל כשהיא ממתינה לספק או ללקוח, או כשהעדכון האחרון בה ישן משבועיים. כשהנתונים מספיקים, לא מחפשים.",
+    "- **כשצריך לחפש:** תבדוק אילו כלים יש לך בשיחה הזו: מייל (Gmail), דרייב (Google Drive) והקלטות (Fireflies), ותחפש לפי העוגנים שלמטה רק במקורות שיכולים לענות על מה שחסר.",
     // Hadas's run (23.10.2026): with the client's own mailbox connected
     // (office@nux.ai) the client's domain matched almost every thread, and
     // only words from the task narrowed it down.
     "- **מייל:** קודם תבדוק של מי התיבה המחוברת. תיבה בדומיין של הלקוח (למשל office@ של הלקוח) שייכת ללקוח, ולכן הדומיין לא מסנן בה כלום: מחפשים בה לפי מילים מכותרת המשימה ומהתיאור, ולפי מילות המפתח. תיבה של אנקורה: המייל של הלקוח מגיע אליה בהעברה או בהעתק, ומחפשים לפי הדומיינים בשולח, בנמענים ובגוף ההודעה, יחד עם מילים מהמשימה.",
+    "- **מייל, כמה לקרוא:** קודם קטעי התצוגה מתוצאות החיפוש (בתצוגה שמראה את ההודעה האחרונה בכל שרשור, אם יש כזו), ולא פותחים כל שרשור. פותחים עד חמישה שרשורים, הרלוונטיים ביותר למה שחסר.",
     // The conversations folder lives in one person's Drive; another
     // person's connected account may not see it, while a search by the
     // task's own words found the one relevant file (23.10.2026).
@@ -276,11 +291,13 @@ export function sourcesRules(input: Pick<AdvancePromptInput, "clientName" | "tas
     // Keyword search in Fireflies missed the key meeting ("Guy / Ariel",
     // the client's name transcribed as Nax); only participants found it.
     "- **הקלטות (Fireflies):** החשבון משותף לכמה לקוחות, ולכן אף פעם לא מחפשים לפי תאריך בלבד. מחפשים לפי משתתפים מהלקוח (כתובות בדומיין של הלקוח שעלו במיילים שנמצאו או במשימה), ולפי מילות המפתח בכותרת ובתמלול. התמלול כותב שמות לפעמים אחרת, ולכן כדאי לנסות כמה כתיבים. פגישה של לקוח אחר שעלתה בחיפוש: לא פותחים אותה.",
+    "- **הקלטות, כמה לקרוא:** קודם רשימת הפגישות שנמצאו, ואז רק הסיכום של הפגישות הרלוונטיות (למשל fireflies_get_summary). תמלול מלא פותחים רק לפגישה אחת או שתיים שהסיכום שלהן לא מספיק, ומשתמשים רק בקטע שעוסק במשימה.",
     // 28.10.2026: "בלי AI" in a recorded meeting (lib/ai-exclusion.ts).
     NO_AI_MEETING_RULE,
     `- טווח: מ-${src.fromLabel} (${SOURCES_LOOKBACK_DAYS} יום לפני פתיחת המשימה) ועד היום. במייל: after:${src.fromIso.replace(/-/g, "/")}. ב-Fireflies: from:${src.fromIso}.`,
+    `- רק אם בטווח הזה לא נמצא כלום רלוונטי, מרחיבים פעם אחת ל-${src.wideFromLabel} (${SOURCES_WIDE_LOOKBACK_DAYS} יום). במייל: after:${src.wideFromIso.replace(/-/g, "/")}. ב-Fireflies: from:${src.wideFromIso}.`,
     "- מקור שלא מחובר: שורה אחת שהוא לא היה זמין, וממשיכים. לא עוצרים בגללו.",
-    "- **בתוכנית:** בחלק \"מה ידוע\", שורה ראשונה שמתחילה ב\"מקורות:\". מה נבדק ומאיזה חשבון (למשל איזו תיבת מייל), מה נמצא (מספר שרשורים, קבצים ופגישות), ומה לא היה זמין או לא היה משותף.",
+    "- **בתוכנית:** בחלק \"מה ידוע\", שורה ראשונה שמתחילה ב\"מקורות:\". מה נבדק ומאיזה חשבון (למשל איזו תיבת מייל), מה נמצא (מספר שרשורים, קבצים ופגישות), ומה לא היה זמין או לא היה משותף. אם לא חיפשת כי הנתונים מאנקורה הספיקו, לכתוב את זה, ואני אבקש חיפוש אם צריך.",
     "",
     "### העוגנים של הלקוח",
     ...anchors,

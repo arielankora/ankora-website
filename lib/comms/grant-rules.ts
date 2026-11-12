@@ -23,7 +23,9 @@ export function levelNeedsConfidentiality(level: CommsAccessLevel): boolean {
   return level === "CALLS" || level === "FULL";
 }
 
-export type GrantCheck = { ok: true } | { ok: false; error: string };
+/// `code` is the domainErrors key the screen shows in the reader's language
+/// (ADR 0006); `error` stays the Hebrew sentence for MCP and logs.
+export type GrantCheck = { ok: true } | { ok: false; error: string; code: "commsAccess.staffOnly" | "commsAccess.needsConfidentiality" };
 
 export function checkCommsGrant(input: {
   level: CommsAccessLevel;
@@ -31,10 +33,11 @@ export function checkCommsGrant(input: {
   confidentialitySigned: boolean;
 }): GrantCheck {
   if (input.level === "NONE") return { ok: true };
-  if (input.targetRole === "CLIENT_USER") return { ok: false, error: "גישה למסך התקשורת ניתנת רק לאנשי צוות של אנקורה." };
+  if (input.targetRole === "CLIENT_USER") return { ok: false, code: "commsAccess.staffOnly", error: "גישה למסך התקשורת ניתנת רק לאנשי צוות של אנקורה." };
   if (levelNeedsConfidentiality(input.level) && !input.confidentialitySigned) {
     return {
       ok: false,
+      code: "commsAccess.needsConfidentiality",
       error: "אפשר לתת את הרמה הזו רק אחרי שההתחייבות לסודיות חתומה בשני הערוצים: באפליקציה וב-PDF. עד אז אפשר לתת \"המספר שלו והלקוחות שהוא מנהל\".",
     };
   }

@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import type { AdvanceUsage } from "@/lib/app-domain/task-plans";
 
 // "קדם עם קלוד" (10.10.2026): is the flow used, and does it finish?
@@ -21,43 +22,44 @@ function Stat({ label, value, hint }: { label: string; value: number; hint?: str
 export function AdvanceUsageCard({ usage }: { usage: AdvanceUsage }) {
   const copies = usage.copiesPlan + usage.copiesLessons;
   const plans = usage.plansViaClaude + usage.plansInApp;
+  const t = useTranslations("integrations.advance");
 
   return (
     <div className="rounded-2xl border border-app-border bg-white p-6" data-testid="advance-usage">
-      <h2 className="text-base font-medium text-app-text-primary">קדם עם קלוד</h2>
-      <p className="mt-1 text-sm text-app-text-secondary">שימוש ב-{usage.days} הימים האחרונים, בכל הלקוחות.</p>
+      <h2 className="text-base font-medium text-app-text-primary">{t("title")}</h2>
+      <p className="mt-1 text-sm text-app-text-secondary">{t("period", { days: String(usage.days) })}</p>
 
       {copies === 0 && plans === 0 ? (
-        <p className="mt-4 text-sm text-app-text-secondary">עדיין אין שימוש בתקופה הזו.</p>
+        <p className="mt-4 text-sm text-app-text-secondary">{t("empty")}</p>
       ) : (
         <>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <Stat
-              label="פרומטים שהועתקו"
+              label={t("copies")}
               value={copies}
-              hint={usage.copiesLessons > 0 ? `מתוכם ${usage.copiesLessons} לסיכום ולקחים` : undefined}
+              hint={usage.copiesLessons > 0 ? t("copiesLessons", { count: String(usage.copiesLessons) }) : undefined}
             />
             <Stat
-              label="תוכניות שנשמרו"
+              label={t("plans")}
               value={plans}
-              hint={`${usage.plansViaClaude} דרך קלוד, ${usage.plansInApp} במערכת · ${usage.tasksWithPlan} משימות`}
+              hint={t("plansHint", { viaClaude: String(usage.plansViaClaude), inApp: String(usage.plansInApp), tasks: usage.tasksWithPlan })}
             />
-            <Stat label="תוכניות שהפכו לשלבים" value={usage.plansApplied} />
+            <Stat label={t("applied")} value={usage.plansApplied} />
           </div>
 
           {usage.people.length > 0 && (
             <table className="mt-5 w-full text-start text-[13px]">
               <thead>
                 <tr className="text-[12px] text-app-text-tertiary">
-                  <th className="pb-2 text-start font-normal">מי</th>
-                  <th className="pb-2 text-start font-normal">פרומטים</th>
-                  <th className="pb-2 text-start font-normal">גרסאות תוכנית</th>
+                  <th className="pb-2 text-start font-normal">{t("who")}</th>
+                  <th className="pb-2 text-start font-normal">{t("prompts")}</th>
+                  <th className="pb-2 text-start font-normal">{t("planVersions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-app-border">
                 {usage.people.map((p) => (
                   <tr key={p.name}>
-                    <td className="py-2 text-app-text-primary">{p.name}</td>
+                    <td dir="auto" className="py-2 text-app-text-primary">{p.name}</td>
                     <td className="py-2 font-jbmono text-app-text-secondary">{p.copies}</td>
                     <td className="py-2 font-jbmono text-app-text-secondary">{p.plans}</td>
                   </tr>

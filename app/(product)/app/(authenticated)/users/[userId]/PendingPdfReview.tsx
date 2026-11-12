@@ -1,4 +1,5 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { dismissPdfUploadAction, recordPdfUploadAction } from "../actions";
@@ -39,31 +40,39 @@ function PendingPdfItem({ userId, userName, item }: { userId: string; userName: 
   const [recordState, recordAction] = useFormState(recordPdfUploadAction, {});
   const [dismissState, dismissAction] = useFormState(dismissPdfUploadAction, {});
   const [returning, setReturning] = useState(false);
+  const t = useTranslations("users.pendingPdf");
 
-  if (recordState.ok) return <p className="text-sm text-app-success">החתימה נרשמה, והאישור ירד מרשימת האישורים.</p>;
-  if (dismissState.ok) return <p className="text-sm text-app-success">הקובץ הוחזר. הסיבה נרשמה במשימת הקליטה.</p>;
+  if (recordState.ok) return <p className="text-sm text-app-success">{t("recorded")}</p>;
+  if (dismissState.ok) return <p className="text-sm text-app-success">{t("returned")}</p>;
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-app-text-primary">
-        ב-{item.uploadedLabel} הועלתה {item.kindLabel} חתומה של {userName}. צריך לפתוח את הקובץ, לבדוק אותו ולרשום אותו.
+        {t("uploaded", { date: item.uploadedLabel, kind: item.kindLabel, name: userName })}
         {item.fileUrl && (
           <>
             {" "}
             <a href={item.fileUrl} target="_blank" rel="noopener noreferrer" className="text-app-text-accent underline underline-offset-2 hover:text-app-text-primary">
-              פתיחת הקובץ
+              {t("openFile")}
             </a>
           </>
         )}
       </p>
 
       <div>
-        <p className="text-xs font-medium text-app-text-primary">מה לבדוק בקובץ</p>
+        <p className="text-xs font-medium text-app-text-primary">{t("whatToCheck")}</p>
         <ul className="mt-1 list-disc space-y-0.5 ps-5 text-xs text-app-text-secondary">
           <li>
-            בתחתית כל עמוד מופיע הקוד <span dir="ltr" className="font-jbmono">{item.code}</span>. קוד אחר הוא גרסה ישנה, ומחזירים.
+            {t.rich("checkCode", {
+              code: item.code,
+              mono: (chunks) => (
+                <span dir="ltr" className="font-jbmono">
+                  {chunks}
+                </span>
+              ),
+            })}
           </li>
-          <li>בעמוד החתימות, בעמודת החותם: שם, תאריך וחתימה גלויה.</li>
+          <li>{t("checkSignature")}</li>
         </ul>
       </div>
 
@@ -72,7 +81,7 @@ function PendingPdfItem({ userId, userName, item }: { userId: string; userName: 
         <input type="hidden" name="documentId" value={item.documentId} />
         <div className="flex flex-wrap gap-3">
           <label className="block min-w-[200px] flex-1">
-            <span className="mb-1.5 block text-xs text-app-text-secondary">השם כפי שנכתב בקובץ</span>
+            <span className="mb-1.5 block text-xs text-app-text-secondary">{t("signedName")}</span>
             <input
               name="signedName"
               required
@@ -81,7 +90,7 @@ function PendingPdfItem({ userId, userName, item }: { userId: string; userName: 
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-xs text-app-text-secondary">תאריך החתימה בקובץ</span>
+            <span className="mb-1.5 block text-xs text-app-text-secondary">{t("signedAt")}</span>
             <input
               name="signedAt"
               type="date"
@@ -93,13 +102,15 @@ function PendingPdfItem({ userId, userName, item }: { userId: string; userName: 
         </div>
         <label className="flex items-center gap-2 text-xs text-app-text-secondary">
           <input type="checkbox" name="checked" required className="h-4 w-4 accent-gold" />
-          פתחתי את הקובץ, והקוד והחתימה במקום.
+          {t("checkedConfirm")}
         </label>
         <div className="flex flex-wrap items-center gap-3">
-          <Submit primary pendingText="רושם...">לרשום את החתימה</Submit>
+          <Submit primary pendingText={t("recording")}>
+            {t("record")}
+          </Submit>
           {!returning && (
             <button type="button" onClick={() => setReturning(true)} className="min-h-[44px] text-sm text-app-text-secondary hover:text-app-text-primary">
-              משהו לא תקין? להחזיר עם סיבה
+              {t("returnPrompt")}
             </button>
           )}
         </div>
@@ -111,19 +122,19 @@ function PendingPdfItem({ userId, userName, item }: { userId: string; userName: 
           <input type="hidden" name="userId" value={userId} />
           <input type="hidden" name="documentId" value={item.documentId} />
           <label className="block">
-            <span className="mb-1.5 block text-xs text-app-text-secondary">למה הקובץ מוחזר (נרשם במשימת הקליטה)</span>
+            <span className="mb-1.5 block text-xs text-app-text-secondary">{t("reasonLabel")}</span>
             <input
               name="reason"
               required
               dir="auto"
-              placeholder="למשל: אין חתימה בעמוד האחרון"
+              placeholder={t("reasonPlaceholder")}
               className="w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </label>
           <div className="flex flex-wrap items-center gap-3">
-            <Submit pendingText="מחזיר...">להחזיר את הקובץ</Submit>
+            <Submit pendingText={t("returning")}>{t("returnSubmit")}</Submit>
             <button type="button" onClick={() => setReturning(false)} className="min-h-[44px] text-sm text-app-text-secondary hover:text-app-text-primary">
-              ביטול
+              {t("cancel")}
             </button>
           </div>
           {dismissState.error && <p className="text-sm text-app-error">{dismissState.error}</p>}
@@ -134,11 +145,12 @@ function PendingPdfItem({ userId, userName, item }: { userId: string; userName: 
 }
 
 export function PendingPdfReview({ userId, userName, items }: { userId: string; userName: string; items: PendingPdf[] }) {
+  const t = useTranslations("users.pendingPdf");
   return (
     <section className="rounded-2xl border border-gold/40 bg-gold/[0.04] p-6" data-testid="pending-pdf-review">
-      <h2 className="text-sm font-medium text-app-text-primary">ממתין לך: בדיקת מסמך חתום</h2>
+      <h2 className="text-sm font-medium text-app-text-primary">{t("title")}</h2>
       <p className="mt-1 text-xs text-app-text-secondary">
-        זה הדבר היחיד שמחכה לך בדף הזה. שאר ההגדרות למטה כבר שמורות, ואין צורך לגעת בהן.
+        {t("intro")}
       </p>
       <div className="mt-4 space-y-6">
         {items.map((item) => (

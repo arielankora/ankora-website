@@ -1,3 +1,4 @@
+import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { listCredentials, listVaultClients } from "@/lib/app-domain/credentials";
@@ -24,11 +25,7 @@ export const metadata = { robots: { index: false, follow: false } };
 // listCredentials() selects no secret column, and every row is mapped to
 // an explicit plain object below before it touches a client component.
 
-const DATE = new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Jerusalem" });
-
-function fmt(d: Date | null) {
-  return d ? DATE.format(d) : null;
-}
+const DATE = { day: "numeric", month: "numeric", year: "numeric" } as const;
 
 export default async function CredentialsPage(props: { searchParams: Promise<{ clientId?: string }> }) {
   const searchParams = await props.searchParams;
@@ -38,13 +35,16 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
   const clients = (await listVaultClients(user)).map((c) => ({ id: c.id, name: c.name }));
   const configured = isVaultConfigured();
   const canManage = can(user.role, "credential.manage");
+  const t = await getTranslations("credentials");
+  const format = await getFormatter();
+  const fmt = (d: Date | null) => (d ? format.dateTime(d, DATE) : null);
 
   if (clients.length === 0) {
     return (
       <div className="space-y-6">
-        <Header />
+        <Header title={t("title")} intro={t("intro")} />
         <p className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary">
-          אין לקוחות שמשויכים אליך, ולכן אין גישות להצגה.
+          {t("noClients")}
         </p>
       </div>
     );
@@ -66,9 +66,9 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
-        <Header />
+        <Header title={t("title")} intro={t("intro")} />
         {configured && canManage && (
-          <Drawer triggerLabel="גישה חדשה" title="גישה חדשה למערכת" openKey="credential">
+          <Drawer triggerLabel={t("add")} title={t("addTitle")} openKey="credential">
             <CredentialForm clients={clients} clientId={selected} />
           </Drawer>
         )}
@@ -76,7 +76,7 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
 
       {!configured && (
         <p className="rounded-2xl border border-app-border bg-cream-dim p-4 text-sm text-app-text-secondary">
-          הכספת עוד לא הוגדרה בסביבה הזו, ולכן אי אפשר להוסיף או להציג גישות.
+          {t("notConfigured")}
         </p>
       )}
 
@@ -85,14 +85,14 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
       <div className="space-y-3">
         {rows.length === 0 ? (
           <p className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary">
-            עוד לא נשמרו גישות ללקוח הזה.
+            {t("empty")}
           </p>
         ) : (
           rows.map((row) => (
             <CredentialRowShell key={row.id} id={row.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[15px] font-medium text-app-text-primary">{row.systemName}</p>
+                  <p dir="auto" className="text-[15px] font-medium text-app-text-primary">{row.systemName}</p>
                   {row.url && (
                     <a
                       href={row.url}
@@ -106,11 +106,13 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
                   )}
                   <p className="mt-1 text-xs text-app-text-tertiary">
                     {[
-                      [row.hasUsername && "שם משתמש", row.hasPassword && "סיסמה", row.hasNotes && "הערות"]
+                      [row.hasUsername && t("row.username"), row.hasPassword && t("row.password"), row.hasNotes && t("row.notes")]
                         .filter(Boolean)
-                        .join(", ") || "אין פרטים שמורים",
-                      row.secretUpdatedAt && `עודכן ${row.secretUpdatedAt}`,
-                      row.lastRevealedBy ? `נצפה לאחרונה: ${row.lastRevealedBy}, ${row.lastRevealedAt}` : "עוד לא נצפה",
+                        .join(", ") || t("row.nothingSaved"),
+                      row.secretUpdatedAt && t("row.updated", { date: row.secretUpdatedAt }),
+                      row.lastRevealedBy
+                        ? t("row.lastViewed", { name: row.lastRevealedBy, date: row.lastRevealedAt ?? "" })
+                        : t("row.notViewed"),
                     ]
                       .filter(Boolean)
                       .join(" · ")}
@@ -118,7 +120,7 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
                 </div>
                 {canManage && configured && (
                   <div className="flex items-center gap-3">
-                    <Drawer triggerLabel="עריכה" title={`עריכת הגישה ל${row.systemName}`} variant="link">
+                    <Drawer triggerLabel={t("row.edit")} title={t("row.editTitle", { system: row.systemName })} variant="link">
                       <CredentialForm clients={clients} clientId={selected} existing={row} />
                     </Drawer>
                     <DeleteCredentialButton id={row.id} systemName={row.systemName} />
@@ -136,17 +138,17 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
       </div>
 
       <p className="text-xs text-app-text-tertiary">
-        שם המשתמש, הסיסמה וההערות מוצפנים. כל צפייה דורשת אימות זהות ונרשמת ביומן הפעולות.
+        {t("footer")}
       </p>
     </div>
   );
 }
 
-function Header() {
+function Header({ title, intro }: { title: string; intro: string }) {
   return (
     <div>
-      <h1 className="text-xl font-medium text-app-text-primary">מערכות וגישות</h1>
-      <p className="mt-1 text-sm text-app-text-secondary">פרטי הגישה של הלקוחות למערכות שלהם, במקום אחד ומוצפן.</p>
+      <h1 className="text-xl font-medium text-app-text-primary">{title}</h1>
+      <p className="mt-1 text-sm text-app-text-secondary">{intro}</p>
     </div>
   );
 }

@@ -1,17 +1,19 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { useFormState, useFormStatus } from "react-dom";
 import { updateUserRoleStatusAction } from "../actions";
 import type { User } from "@prisma/client";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
+  const t = useTranslations("users.roleStatus");
   return (
     <button
       type="submit"
       disabled={pending}
       className="rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
-      {pending ? "נשמר..." : "שמירת שינויים"}
+      {pending ? t("saving") : t("save")}
     </button>
   );
 }
@@ -29,6 +31,8 @@ export function EditRoleStatusForm({
   targetUser: Pick<User, "id" | "role" | "status">;
   isSelf: boolean;
 }) {
+  const t = useTranslations("users.roleStatus");
+  const tRoles = useTranslations("shell.roles");
   const [state, formAction] = useFormState(updateUserRoleStatusAction, {});
 
   // What the selects show: the action's own answer once there is one,
@@ -48,7 +52,7 @@ export function EditRoleStatusForm({
     <form action={formAction} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <input type="hidden" name="userId" value={targetUser.id} />
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">תפקיד</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("role")}</label>
         <select
           key={`role|${key}`}
           name="role"
@@ -56,14 +60,14 @@ export function EditRoleStatusForm({
           disabled={isSelf}
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
         >
-          <option value="SUPER_ADMIN">מנהל-על</option>
-          <option value="ANKORA_ADMIN">מנהל Ankora</option>
-          <option value="ANKORA_EMPLOYEE">ספק פנימי אנקורה</option>
-          <option value="CLIENT_USER">לקוח</option>
+          <option value="SUPER_ADMIN">{tRoles("SUPER_ADMIN")}</option>
+          <option value="ANKORA_ADMIN">{tRoles("ANKORA_ADMIN")}</option>
+          <option value="ANKORA_EMPLOYEE">{tRoles("ANKORA_EMPLOYEE")}</option>
+          <option value="CLIENT_USER">{tRoles("CLIENT_USER")}</option>
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">סטטוס</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("status")}</label>
         <select
           key={`status|${key}`}
           name="status"
@@ -71,22 +75,22 @@ export function EditRoleStatusForm({
           disabled={isSelf}
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
         >
-          <option value="INVITED">הוזמן</option>
-          <option value="ACTIVE">פעיל</option>
-          <option value="SUSPENDED">מושהה</option>
-          <option value="ARCHIVED">בארכיון</option>
+          <option value="INVITED">{t("statusOption.INVITED")}</option>
+          <option value="ACTIVE">{t("statusOption.ACTIVE")}</option>
+          <option value="SUSPENDED">{t("statusOption.SUSPENDED")}</option>
+          <option value="ARCHIVED">{t("statusOption.ARCHIVED")}</option>
         </select>
       </div>
 
       {isSelf && (
         <p className="text-xs text-app-text-tertiary sm:col-span-2">
-          לא ניתן לשנות תפקיד או סטטוס עבור המשתמש המחובר, כדי למנוע נעילה עצמית בטעות.
+          {t("selfNote")}
         </p>
       )}
 
       <div className="flex items-center gap-4 sm:col-span-2">
         {state?.error && <p className="text-sm text-app-error">{state.error}</p>}
-        {state?.ok && <p className="text-sm text-app-success">נשמר בהצלחה.</p>}
+        {state?.ok && <p className="text-sm text-app-success">{t("saved")}</p>}
         {!isSelf && (
           <div className="ms-auto">
             <SubmitButton />

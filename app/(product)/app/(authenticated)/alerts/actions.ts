@@ -11,13 +11,19 @@ import {
   unresolveAlertEvent,
 } from "@/lib/app-domain/alerts";
 import type { AlertThresholdType } from "@prisma/client";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 
 type FormState = { error?: string; ok?: boolean };
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
+/// ADR 0006: in the reader's language.
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("alerts.errors");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  const text = await domainErrorText(err);
+  if (text) return text;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
 }
 
 function parseEmailList(value: FormDataEntryValue | null): string[] {
@@ -31,7 +37,7 @@ function parseEmailList(value: FormDataEntryValue | null): string[] {
 export async function createAlertRuleAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") || "");
-  if (!clientId) return { error: "יש לבחור לקוח." };
+  if (!clientId) return { error: (await getTranslations("alerts.errors"))("pickClient") };
 
   const type = String(formData.get("type") || "UTILIZATION_PCT") as AlertThresholdType;
   const thresholdValue = Number(formData.get("thresholdValue") || 0);
@@ -39,7 +45,7 @@ export async function createAlertRuleAction(_prev: FormState | undefined, formDa
   const recipientsClient = parseEmailList(formData.get("recipientsClient"));
 
   if (recipientsAnkora.length === 0 && recipientsClient.length === 0) {
-    return { error: "יש להזין לפחות נמען אחד (Ankora ו/או לקוח)." };
+    return { error: (await getTranslations("alerts.errors"))("recipientsRequired") };
   }
 
   try {
@@ -51,7 +57,7 @@ export async function createAlertRuleAction(_prev: FormState | undefined, formDa
       allowRetrigger: formData.get("allowRetrigger") === "on",
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/alerts");
@@ -68,7 +74,7 @@ export async function toggleAlertRuleAction(ruleId: string, enabled: boolean): P
   try {
     await updateAlertRule(user, ruleId, { enabled });
   } catch (err) {
-    return { ok: false, error: friendlyError(err) };
+    return { ok: false, error: await friendlyError(err) };
   }
   revalidatePath("/app/alerts");
   return { ok: true };
@@ -79,7 +85,7 @@ export async function deleteAlertRuleAction(ruleId: string): Promise<{ ok: boole
   try {
     await deleteAlertRule(user, ruleId);
   } catch (err) {
-    return { ok: false, error: friendlyError(err) };
+    return { ok: false, error: await friendlyError(err) };
   }
   revalidatePath("/app/alerts");
   return { ok: true };
@@ -94,9 +100,11 @@ export async function retryEmailDeliveryAction(deliveryId: string): Promise<{ ok
   try {
     const updated = await retryEmailDelivery(user, deliveryId);
     revalidatePath("/app/alerts");
-    return updated.status === "SENT" ? { ok: true } : { ok: false, error: updated.error ?? "השליחה נכשלה שוב." };
+    if (updated.status === "SENT") return { ok: true };
+    // The provider's own error text is passed on as it is.
+    return { ok: false, error: updated.error ?? (await getTranslations("alerts.errors"))("sendFailedAgain") };
   } catch (err) {
-    return { ok: false, error: friendlyError(err) };
+    return { ok: false, error: await friendlyError(err) };
   }
 }
 
@@ -109,7 +117,7 @@ export async function resolveAlertEventAction(eventId: string): Promise<{ ok: bo
   try {
     await resolveAlertEvent(user, eventId);
   } catch (err) {
-    return { ok: false, error: friendlyError(err) };
+    return { ok: false, error: await friendlyError(err) };
   }
   revalidatePath("/app/alerts");
   return { ok: true };
@@ -120,7 +128,7 @@ export async function unresolveAlertEventAction(eventId: string): Promise<{ ok: 
   try {
     await unresolveAlertEvent(user, eventId);
   } catch (err) {
-    return { ok: false, error: friendlyError(err) };
+    return { ok: false, error: await friendlyError(err) };
   }
   revalidatePath("/app/alerts");
   return { ok: true };

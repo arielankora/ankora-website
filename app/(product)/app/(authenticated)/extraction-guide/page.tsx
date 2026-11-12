@@ -1,3 +1,4 @@
+import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { currentGuide, listGuideVersions } from "@/lib/app-domain/extraction-guide";
@@ -9,61 +10,62 @@ import { DecideGuide, ProposeGuide } from "./GuideActions";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-const STATE_LABEL = { DRAFT: "ממתינה לאישור", APPROVED: "אושרה", REJECTED: "נדחתה" } as const;
-
-function when(d: Date | null) {
-  return d ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Jerusalem" }).format(d) : "";
-}
+// ADR 0006: the guidance itself (the current text and every version's
+// text) is what each extraction prompt carries to Claude. It is content
+// and stays as written; only the screen around it is translated.
 
 export default async function ExtractionGuidePage() {
   const user = await requireUser();
   const [current, versions] = await Promise.all([currentGuide(), listGuideVersions(user)]);
   const body = current?.body ?? DEFAULT_EXTRACTION_GUIDE();
   const canDecide = canManageClients(user.role);
+  const t = await getTranslations("extractionGuide");
+  const format = await getFormatter();
+  const when = (d: Date | null) => (d ? format.dateTime(d, { day: "numeric", month: "numeric", year: "numeric" }) : "");
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="text-xl font-medium text-app-text-primary">הנחיות החילוץ</h1>
+        <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
         <p className="mt-1 text-sm text-app-text-secondary">
-          מה Claude מכניס לתיק הלקוח ומה לא. כל פרומט של &quot;חלץ ידע עם קלוד&quot; נושא את הגרסה המאושרת האחרונה. מה שהשרת אוכף נשאר בקוד ולא משתנה כאן.
+          {t("intro")}
         </p>
       </div>
 
       <section className="rounded-2xl border border-app-border bg-white p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-medium text-app-text-primary">{current ? `בשימוש: גרסה ${current.version}` : "בשימוש: ההנחיות המקוריות"}</h2>
+          <h2 className="text-sm font-medium text-app-text-primary">{current ? t("inUseVersion", { version: String(current.version) }) : t("inUseOriginal")}</h2>
           <ProposeGuide current={body} />
         </div>
         <ul className="mt-3 list-disc space-y-1.5 ps-5 text-sm leading-relaxed text-app-text-primary">
           {guideLines(body).map((l, i) => (
-            <li key={i}>{l}</li>
+            <li key={i} dir="auto">{l}</li>
           ))}
         </ul>
       </section>
 
       {versions.length > 0 && (
         <section className="rounded-2xl border border-app-border bg-white p-6">
-          <h2 className="text-sm font-medium text-app-text-primary">גרסאות</h2>
+          <h2 className="text-sm font-medium text-app-text-primary">{t("versions")}</h2>
           <ul className="mt-3 divide-y divide-app-border">
             {versions.map((v) => (
               <li key={v.id} className="py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm text-app-text-primary">
-                      גרסה {v.version} · {STATE_LABEL[v.state]}
+                      {t("versionLine", { version: String(v.version), state: t(`states.${v.state}`) })}
                     </p>
                     <p className="text-xs text-app-text-secondary">
-                      {[v.createdByName ? `הוצעה על ידי ${v.createdByName}, ${when(v.createdAt)}` : when(v.createdAt), v.decidedByName ? `הוחלט על ידי ${v.decidedByName}` : null].filter(Boolean).join(" · ")}
+                      {[v.createdByName ? t("proposedBy", { name: v.createdByName, date: when(v.createdAt) }) : when(v.createdAt), v.decidedByName ? t("decidedBy", { name: v.decidedByName }) : null].filter(Boolean).join(" · ")}
                     </p>
-                    {v.note && <p className="mt-1 text-xs text-app-text-secondary">{v.note}</p>}
-                    {v.rejectReason && <p className="mt-1 text-xs text-app-text-secondary">למה נדחתה: {v.rejectReason}</p>}
+                    {v.note && <p dir="auto" className="mt-1 text-xs text-app-text-secondary">{v.note}</p>}
+                    {v.rejectReason && <p className="mt-1 text-xs text-app-text-secondary">{t("rejectReason", { reason: v.rejectReason })}</p>}
                     {v.state === "DRAFT" && (
                       <details className="mt-1.5">
-                        <summary className="cursor-pointer text-xs text-app-text-accent">הטקסט המוצע</summary>
+                        <summary className="cursor-pointer text-xs text-app-text-accent">{t("proposedText")}</summary>
                         <ul className="mt-1.5 list-disc space-y-1 ps-5 text-xs text-app-text-primary">
                           {guideLines(v.body).map((l, i) => (
-                            <li key={i}>{l}</li>
+                            <li key={i} dir="auto">{l}</li>
                           ))}
                         </ul>
                       </details>

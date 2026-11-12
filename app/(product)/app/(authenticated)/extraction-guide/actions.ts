@@ -2,24 +2,29 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
+import { getTranslations } from "next-intl/server";
 import { approveGuide, proposeGuide, rejectGuide } from "@/lib/app-domain/extraction-guide";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 
 // Org brain, decision 3: propose, approve and reject versions of the
 // extraction guidance.
 
 type FormState = { error?: string; ok?: boolean };
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "רק מנהל מאשר או דוחה גרסה של ההנחיות.";
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("extractionGuide.errors");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  const domain = await domainErrorText(err);
+  if (domain) return domain;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
 }
 
 async function run(fn: () => Promise<unknown>): Promise<FormState> {
   try {
     await fn();
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath("/app/extraction-guide");
   return { ok: true };

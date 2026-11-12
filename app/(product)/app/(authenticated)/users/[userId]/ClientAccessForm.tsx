@@ -1,17 +1,19 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { useRef } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { setUserClientAccessAction } from "../actions";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
+  const t = useTranslations("users.clientAccess");
   return (
     <button
       type="submit"
       disabled={pending}
       className="rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
-      {pending ? "נשמר..." : "עדכון גישה"}
+      {pending ? t("saving") : t("save")}
     </button>
   );
 }
@@ -25,6 +27,7 @@ export function ClientAccessForm({
   clients: { id: string; name: string }[];
   assignedClientIds: string[];
 }) {
+  const t = useTranslations("users.clientAccess");
   const [state, formAction] = useFormState(setUserClientAccessAction, {});
   const checkboxContainerRef = useRef<HTMLDivElement>(null);
 
@@ -49,15 +52,15 @@ export function ClientAccessForm({
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="userId" value={userId} />
       {clients.length === 0 ? (
-        <p className="text-sm text-app-text-tertiary">אין עדיין לקוחות במערכת.</p>
+        <p className="text-sm text-app-text-tertiary">{t("noClients")}</p>
       ) : (
         <>
           <div className="flex items-center gap-3 text-xs">
             <button type="button" onClick={() => setAllChecked(true)} className="text-app-text-accent underline">
-              בחר הכל
+              {t("selectAll")}
             </button>
             <button type="button" onClick={() => setAllChecked(false)} className="text-app-text-tertiary underline">
-              נקה הכל
+              {t("clearAll")}
             </button>
           </div>
           <div ref={checkboxContainerRef} className="flex flex-wrap gap-3">
@@ -70,7 +73,7 @@ export function ClientAccessForm({
                   defaultChecked={assignedClientIds.includes(c.id)}
                   className="h-4 w-4 rounded border-app-border"
                 />
-                {c.name}
+                <span dir="auto">{c.name}</span>
               </label>
             ))}
           </div>
@@ -79,7 +82,7 @@ export function ClientAccessForm({
 
       <div className="flex items-center gap-4">
         {state?.error && <p className="text-sm text-app-error">{state.error}</p>}
-        {state?.ok && <p className="text-sm text-app-success">עודכן בהצלחה.</p>}
+        {state?.ok && <p className="text-sm text-app-success">{t("saved")}</p>}
         {clients.length > 0 && <SubmitButton />}
       </div>
     </form>

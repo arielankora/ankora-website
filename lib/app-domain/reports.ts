@@ -51,6 +51,24 @@ export const REPORT_DEFINITIONS: { id: ReportType; label: string; usage: string 
   { id: "capacity", label: "קיבולת צוות", usage: "שעות איש צוות בתקופה + חלוקה ללקוחות" },
 ];
 
+/// The words report rows carry as values (they go into the CSV, XLSX and
+/// PDF exports as they are). Exported so the screen can recognise them and
+/// show its own words in the reader's language (ADR 0006).
+export const REPORT_TEXT = {
+  yes: "כן",
+  no: "לא",
+  package: "חבילה",
+  cycle: "מחזור",
+  overage: "חריגה",
+  atRisk: "בסיכון",
+} as const;
+
+/// How a screen wants dates inside cells written. Exports leave it out.
+export interface ReportDisplay {
+  locale?: string;
+  timeZone?: string;
+}
+
 export interface ReportFilters {
   from?: Date;
   to?: Date;
@@ -209,7 +227,7 @@ async function hoursByEmployee(filters: ReportFilters): Promise<ReportResult> {
 /// so applying an arbitrary from/to range to them would produce numbers
 /// that don't match the Hour Banks screen an admin would cross-check
 /// against. Documented as a deliberate choice in the ADR addendum.
-async function hoursByClient(filters: ReportFilters): Promise<ReportResult> {
+async function hoursByClient(filters: ReportFilters, display: ReportDisplay = {}): Promise<ReportResult> {
   const clients = filters.clientId
     ? (await listClients()).filter((c) => c.id === filters.clientId)
     : (await listClients()).filter((c) => c.status === "ACTIVE");
@@ -223,8 +241,8 @@ async function hoursByClient(filters: ReportFilters): Promise<ReportResult> {
           client: client.name,
           // 12.10.2026: a prepaid package's percentage is of the package
           // size, and the question that matters is when it runs out.
-          kind: snapshot.bank.kind === "PREPAID" ? "חבילה" : "מחזור",
-          forecast: forecastCell(await getPrepaidForecast(snapshot)),
+          kind: snapshot.bank.kind === "PREPAID" ? REPORT_TEXT.package : REPORT_TEXT.cycle,
+          forecast: forecastCell(await getPrepaidForecast(snapshot), display.timeZone, display.locale),
           totalMinutes: snapshot.utilization.totalMinutes,
           usedMinutes: snapshot.utilization.consumedMinutes,
           remainingMinutes: snapshot.utilization.remainingMinutes,
@@ -372,8 +390,8 @@ async function manualEdits(filters: ReportFilters): Promise<ReportResult> {
       employee: e.user.name,
       client: e.client.name,
       category: e.category.name,
-      manual: e.isManual ? "כן" : "לא",
-      edited: e.isEdited ? "כן" : "לא",
+      manual: e.isManual ? REPORT_TEXT.yes : REPORT_TEXT.no,
+      edited: e.isEdited ? REPORT_TEXT.yes : REPORT_TEXT.no,
       actor: lastRevision?.changedBy?.name ?? e.user.name,
       reason: lastRevision?.reason ?? "",
     };
@@ -459,7 +477,7 @@ async function overageAtRisk(filters: ReportFilters): Promise<ReportResult> {
 
     rows.push({
       client: client.name,
-      status: classification === "OVERAGE" ? "חריגה" : "בסיכון",
+      status: classification === "OVERAGE" ? REPORT_TEXT.overage : REPORT_TEXT.atRisk,
       utilizationPct,
       remainingMinutes: snapshot.utilization.remainingMinutes,
       totalMinutes: snapshot.utilization.totalMinutes,
@@ -505,7 +523,7 @@ async function activeTimers(filters: ReportFilters): Promise<ReportResult> {
       category: t.category.name,
       startedAt: t.startAt.toISOString(),
       elapsedMinutes,
-      longRunning: elapsedMinutes >= LONG_TIMER_HOURS * 60 ? "כן" : "לא",
+      longRunning: elapsedMinutes >= LONG_TIMER_HOURS * 60 ? REPORT_TEXT.yes : REPORT_TEXT.no,
     };
   });
 
@@ -580,7 +598,12 @@ async function capacity(filters: ReportFilters): Promise<ReportResult> {
 /// Single entry point for both the Reports screen and the CSV export
 /// route, so the two can never drift on what a given report type means.
 /// Spec 4.1: every server endpoint checks Authorization itself.
-export async function runReport(actor: User, type: ReportType, filters: ReportFilters): Promise<ReportResult> {
+export async function runReport(
+  actor: User,
+  type: ReportType,
+  filters: ReportFilters,
+  display: ReportDisplay = {}
+): Promise<ReportResult> {
   assertCan(actor.role, "report.internal.view");
 
   switch (type) {
@@ -589,7 +612,7 @@ export async function runReport(actor: User, type: ReportType, filters: ReportFi
     case "hours_by_employee":
       return hoursByEmployee(filters);
     case "hours_by_client":
-      return hoursByClient(filters);
+      return hoursByClient(filters, display);
     case "hours_by_category":
       return hoursByCategory(filters);
     case "employee_client_matrix":
