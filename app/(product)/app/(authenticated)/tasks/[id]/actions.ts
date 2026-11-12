@@ -20,7 +20,7 @@ import {
   NoteRequiredError,
 } from "@/lib/app-domain/time-entries";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
-import { ClosedBankError, stoppedAcrossClosureMessage } from "@/lib/app-domain/closed-bank-guard";
+import { ClosedBankError } from "@/lib/app-domain/closed-bank-guard";
 import { applyPlanSteps, approveTaskPlan, recordAdvancePromptCopied, saveTaskPlan } from "@/lib/app-domain/task-plans";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
@@ -30,6 +30,7 @@ import { decideVendorCheck } from "@/lib/app-domain/vendor-detections";
 import {
   friendlyError as entryError,
   closedBankNoticeFrom,
+  stoppedAcrossClosureText,
   closedBankOptionsFrom,
   overlapWarningFrom,
   type ManualEntryFormState,
@@ -337,7 +338,7 @@ export async function createTaskManualEntryAction(
     revalidatePath("/app/timer");
     return { ok: true };
   } catch (err) {
-    if (err instanceof ClosedBankError) return { closedBank: closedBankNoticeFrom(err) };
+    if (err instanceof ClosedBankError) return { closedBank: await closedBankNoticeFrom(err) };
     if (err instanceof OverlapError && !err.sameClient) {
       return { overlapWarning: overlapWarningFrom(err) };
     }
@@ -361,7 +362,7 @@ export async function stopTimerForTaskAction(input: { taskId: string; timeEntryI
     revalidatePath("/app");
     // 3.11.2026: see stopTimerAction.
     const crossed = await closedBankForStoppedEntry(entry);
-    return { ok: true as const, closedBank: crossed ? { message: stoppedAcrossClosureMessage(crossed) } : null };
+    return { ok: true as const, closedBank: crossed ? { message: await stoppedAcrossClosureText(crossed) } : null };
   } catch (err) {
     return { ok: false as const, error: await friendlyError(err) };
   }

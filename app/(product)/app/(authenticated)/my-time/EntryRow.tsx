@@ -277,7 +277,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
         </p>
         <p className="mt-0.5 truncate text-[11.5px] text-app-text-tertiary">
           {entry.clientName} · {entry.categoryName} · {timeKey(entry.startAt)}
-          {entry.endAt ? `–${timeKey(entry.endAt)}` : ""}
+          {entry.endAt ? `-${timeKey(entry.endAt)}` : ""}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2.5">

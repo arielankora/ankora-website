@@ -182,7 +182,7 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
                       isToday ? "font-medium text-app-text-primary" : daySeconds > 0 ? "text-app-text-primary" : "text-app-text-tertiary"
                     }`}
                   >
-                    {daySeconds > 0 ? formatDuration(daySeconds, active) : "—"}
+                    {daySeconds > 0 ? formatDuration(daySeconds, active) : "-"}
                   </span>
                   <span
                     className="mt-2 block h-[3px] rounded-full"

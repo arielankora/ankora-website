@@ -5,6 +5,14 @@ import { DomainError } from "@/lib/domain-error";
 // ADR 0006: the sentence for a DomainError, in the reader's language.
 // Anything else returns null, and the caller keeps deciding what a fault
 // looks like, exactly as it did before.
+/// A message under `domainErrors` by its full key, for the sentences the
+/// domain hands a screen without throwing them (closed-bank-guard's
+/// OVERRIDE_WARNING_KEY and STOPPED_ACROSS_CLOSURE_KEY).
+export async function domainText(key: string, values?: Record<string, string | number>): Promise<string> {
+  const t = (await getTranslations()) as unknown as (key: string, values?: Record<string, string | number>) => string;
+  return t(key, values);
+}
+
 export async function domainErrorText(err: unknown): Promise<string | null> {
   if (!(err instanceof DomainError)) return null;
   // The code is a dynamic key, so it is looked up from the root and not

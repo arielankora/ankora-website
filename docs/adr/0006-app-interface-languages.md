@@ -1,6 +1,6 @@
 # ADR 0006: the app's interface in Hebrew and English
 
-Status: accepted (phase 1, infrastructure, and phase 2, the frame, built)
+Status: accepted (phases 1 to 3 built: infrastructure, the frame, tasks with the timer and my time)
 Date: 2026-11-12
 Context: an English-speaking product manager joins on 12.11.2026 with full
 permissions, to work on the product and on client work. The app was Hebrew
@@ -43,7 +43,11 @@ added, and a dependency that new has not had time to be looked at.
 ### 3. Dates in English are en-IL
 
 Day first, 24 hours, shekels: the work is in Israel, and an English screen
-should not show 03/04 meaning April when the Hebrew one means March. The
+should not show 03/04 meaning April when the Hebrew one means March. For
+that, next-intl's locale is the Intl tag (`he-IL`, `en-IL`), not the bare
+language; the page's `lang` and `dir` come from the person's setting. (In
+phase 1 it was the bare language, and English dates came out US style;
+fixed with phase 2, with a test.) The
 time zone is the person's own (`User.timezone`), checked against Intl,
 with Jerusalem as the fallback.
 
@@ -84,6 +88,16 @@ Route handlers send the translated sentence in their JSON `message`. A
 failure that happens in the browser (a cancelled passkey prompt) comes
 back from `components/app/vault/webauthn-client.ts` as a `reason`, and the
 screen words it.
+
+From phase 3 the general form is `DomainError(code, message, values)`
+(`lib/domain-error.ts`): an Error whose message is unchanged, so MCP tools
+and tests that read it are unaffected, with a code under `domainErrors` in
+the dictionaries. `domainErrorText(err)` (`lib/i18n/domain-errors.ts`) words
+it for the reader. The typed errors behind the timer and time entries
+(`OverlapError`, `ClosedBankError` and the rest) extend it.
+`tests/unit/i18n-domain-errors.test.ts` checks that every code thrown,
+directly or through a subclass, exists in both dictionaries with the
+placeholders the throw fills.
 
 Tests that call a server action or a route handler outside a Next request
 get `next-intl/server` from `tests/__mocks__/next-intl-server.ts`: the
@@ -129,11 +143,30 @@ are always left to right, align to the page's side (`text-page-start`).
 The legal links on the sign-in page point at the marketing site in the
 reader's language.
 
+## Phase 3, what was built
+
+Tasks (list, board, the new task form, the single task screen with its
+steps, plan, thread, sharing and notes), the timer, and my time, with the
+refusals behind them (tasks, time entries, closed hour banks, plans, portal
+notes, run lessons, vendor checks) and the small shared components they use
+(drawer, not found, forbidden, loading and error states, the action form's
+fallback). Dictionary fragments are merged with
+`scripts/i18n/merge-messages.mjs`, which refuses to overwrite a key.
+
+Left in Hebrew on purpose, because it is content and not interface: the
+message a colleague receives from "share" on a task, the notes a client
+reads in the portal, the prompt "advance with Claude" copies, the text
+"message the client" sends, and the line written into a moved entry's
+note. Still in Hebrew because the source is shared with screens not yet
+translated: the waiting-on labels from `lib/app-domain/portal-labels.ts`,
+thread event labels built in lib, the reminder after a task is closed
+(`procedure-to-file`), and the calendar's copy of the "mine" scopes.
+
 ## What comes next, in order
 
-1. Screens, one pull request per area: tasks with the timer and my time,
-   then client files and processes, knowledge and approvals, then reports
-   and the admin screens.
+1. Screens, one pull request per area: client files and processes,
+   knowledge and approvals, then the calendar, reports and the admin
+   screens.
 2. The guide: translated, or a short English guide in its place.
 3. The process flow editor (`FlowEditor.tsx`) sets its cards to `rtl` and
    orders their exits for Hebrew; it needs its own change for English.

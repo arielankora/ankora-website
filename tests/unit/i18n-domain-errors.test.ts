@@ -85,3 +85,63 @@ describe("domain error codes (ADR 0006)", () => {
     expect(problems).toEqual([]);
   });
 });
+
+/**
+ * The codes a subclass passes to super(...) (OverlapError, ClosedBankError,
+ * TaskPlanRuleError...) and the full keys the domain hands a screen
+ * (OVERRIDE_WARNING_KEY) are not `new DomainError` calls, so the test above
+ * cannot see them. These are: every string literal in the first argument
+ * of `super(...)` or `new <Something>Error(...)` that has the shape of a
+ * code ("area.name"), through conditionals, and every string that starts
+ * with "domainErrors.".
+ */
+function subclassCodes(file: string): { file: string; line: number; code: string }[] {
+  const src = readFileSync(file, "utf8");
+  if (!src.includes("DomainError") && !src.includes("domainErrors.")) return [];
+  const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const out: { file: string; line: number; code: string }[] = [];
+  const at = (node: ts.Node) => sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+  const literalsIn = (node: ts.Node): ts.StringLiteral[] => {
+    if (ts.isStringLiteral(node)) return [node];
+    if (ts.isConditionalExpression(node)) return [...literalsIn(node.whenTrue), ...literalsIn(node.whenFalse)];
+    if (ts.isParenthesizedExpression(node)) return literalsIn(node.expression);
+    return [];
+  };
+  const visit = (node: ts.Node) => {
+    const isSuper = ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.SuperKeyword;
+    const isNewError =
+      ts.isNewExpression(node) && ts.isIdentifier(node.expression) && /Error$/.test(node.expression.text) && node.expression.text !== "DomainError";
+    if ((isSuper || isNewError) && (node as ts.CallExpression).arguments?.[0]) {
+      for (const lit of literalsIn((node as ts.CallExpression).arguments[0])) {
+        if (/^[a-z][A-Za-z]*\.[A-Za-z_][\w.]*$/.test(lit.text)) out.push({ file, line: at(lit), code: lit.text });
+      }
+    }
+    if (ts.isStringLiteral(node) && node.text.startsWith("domainErrors.")) {
+      out.push({ file, line: at(node), code: node.text.slice("domainErrors.".length) });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
+}
+
+describe("domain error codes thrown through subclasses and constants (ADR 0006)", () => {
+  const found = [...sourceFiles("lib"), ...sourceFiles("app"), ...sourceFiles("components")].flatMap(subclassCodes);
+
+  it("are found at all, so this test is not passing on nothing", () => {
+    expect(found.map((f) => f.code)).toEqual(expect.arrayContaining(["timeEntries.overlap", "closedBank.closedChange", "closedBank.overrideWarning"]));
+  });
+
+  it("exist in both dictionaries", () => {
+    const missing: string[] = [];
+    for (const f of found) {
+      for (const [name, dict] of [
+        ["he", he],
+        ["en", en],
+      ] as const) {
+        if (lookup(dict as Tree, f.code) === undefined) missing.push(`${f.file}:${f.line} ${f.code} is missing from ${name}.json`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+});

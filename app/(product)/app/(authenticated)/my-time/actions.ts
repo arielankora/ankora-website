@@ -70,7 +70,7 @@ export async function createManualEntryAction(_prev: FormState | undefined, form
       ...closedBankOptionsFrom(formData),
     });
   } catch (err) {
-    if (err instanceof ClosedBankError) return { closedBank: closedBankNoticeFrom(err) };
+    if (err instanceof ClosedBankError) return { closedBank: await closedBankNoticeFrom(err) };
     if (err instanceof OverlapError && !err.sameClient) {
       return { overlapWarning: overlapWarningFrom(err) };
     }
@@ -107,7 +107,7 @@ export async function updateMyEntryAction(_prev: UpdateState | undefined, formDa
       closedBankOverride: closedBankOptionsFrom(formData).closedBankOverride,
     });
   } catch (err) {
-    if (err instanceof ClosedBankError) return { closedBank: closedBankNoticeFrom(err) };
+    if (err instanceof ClosedBankError) return { closedBank: await closedBankNoticeFrom(err) };
     if (err instanceof OverlapError && !err.sameClient) {
       return { overlapWarning: overlapWarningFrom(err) };
     }
@@ -142,7 +142,7 @@ export async function deleteMyEntryAction(timeEntryId: string, closedBankOverrid
       closedBankOverride: closedBankOverrideReason?.trim() ? { reason: closedBankOverrideReason.trim() } : null,
     });
   } catch (err) {
-    if (err instanceof ClosedBankError) return { closedBank: closedBankNoticeFrom(err) };
+    if (err instanceof ClosedBankError) return { closedBank: await closedBankNoticeFrom(err) };
     return { error: await friendlyError(err) };
   }
   revalidatePath("/app/timer");

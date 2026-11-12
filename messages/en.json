@@ -478,8 +478,8 @@
         "mappingOn": "Marked as a mapping task",
         "mappingOff": "No longer a mapping task",
         "mappingHint": "What a mapping task learns is proposed to the client file before it closes.",
-        "aiOn": "Task marked No AI",
-        "aiOff": "No AI mark removed",
+        "aiOn": "Task marked \"No AI\"",
+        "aiOff": "\"No AI\" mark removed",
         "aiOnHint": "The task, its steps and its documents will not go through any AI system.",
         "descriptionUpdated": "Description updated",
         "descriptionRemoved": "Description removed"
@@ -1281,20 +1281,6 @@
       "noAccess": "You don't have access to this task.",
       "alreadyDecided": "This detection was already decided.",
       "vendorNameRequired": "Opening a P8 run needs the vendor's name."
-    },
-    "advanceTimer": {
-      "labels": {
-        "plan": "Advance with Claude and start timer",
-        "lessons": "Summary and lessons with Claude, and start timer"
-      },
-      "notices": {
-        "started": "The timer started on this task.",
-        "running_on_client": "A timer is already running for this client, so no new timer was started.",
-        "other_client": "A timer is running for another client, so no timer was started. Claude will ask what to do.",
-        "no_category": "The task has no category, so no timer was started. Claude will ask about the timer.",
-        "error": "The timer didn't start. Claude will ask about the timer.",
-        "errorWithReason": "The timer didn't start: {error} Claude will ask about the timer."
-      }
     }
   }
 }

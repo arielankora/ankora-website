@@ -7,9 +7,15 @@ import {
   ConflictError,
 } from "@/lib/app-domain/time-entries";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import { ClosedBankError, OVERRIDE_WARNING } from "@/lib/app-domain/closed-bank-guard";
+import {
+  ClosedBankError,
+  OVERRIDE_WARNING_KEY,
+  STOPPED_ACROSS_CLOSURE_KEY,
+  closedBankValues,
+  type ClosedBankHit,
+} from "@/lib/app-domain/closed-bank-guard";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { domainErrorText } from "@/lib/i18n/domain-errors";
+import { domainErrorText, domainText } from "@/lib/i18n/domain-errors";
 
 // What a manual-entry write answers with, shared by "הזמן שלי" and the
 // task screen (28.10.2026). Outside actions.ts because a "use server"
@@ -47,8 +53,21 @@ export type ManualEntryFormState = {
   closedBank?: ClosedBankNoticeState;
 };
 
-export function closedBankNoticeFrom(err: ClosedBankError): ClosedBankNoticeState {
-  return { message: err.message, canMoveToOpen: err.canMoveToOpen, canOverride: err.canOverride, overrideWarning: OVERRIDE_WARNING };
+/// ADR 0006: async, because both sentences are in the reader's language.
+export async function closedBankNoticeFrom(err: ClosedBankError): Promise<ClosedBankNoticeState> {
+  return {
+    message: (await domainErrorText(err)) ?? err.message,
+    canMoveToOpen: err.canMoveToOpen,
+    canOverride: err.canOverride,
+    overrideWarning: await domainText(OVERRIDE_WARNING_KEY),
+  };
+}
+
+/// After a stop that crossed a closure (timer and task screens): the
+/// question the person is asked, in their language. The Hebrew original,
+/// stoppedAcrossClosureMessage, stays for MCP.
+export async function stoppedAcrossClosureText(hit: ClosedBankHit): Promise<string> {
+  return domainText(STOPPED_ACROSS_CLOSURE_KEY, closedBankValues(hit));
 }
 
 /// The two answers a form can send back after the notice.

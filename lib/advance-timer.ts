@@ -49,19 +49,3 @@ export function advanceTimerNotice(outcome: AdvanceTimerOutcome, error?: string 
       return `הטיימר לא הופעל${error ? `: ${error}` : "."} קלוד ישאל על הטיימר.`;
   }
 }
-
-/// ADR 0006: the same labels and notices as dictionary keys, for a screen
-/// that speaks the reader's language. The Hebrew in the dictionary is the
-/// text above, word for word.
-export const ADVANCE_TIMER_LABEL_KEYS = {
-  plan: "domainErrors.advanceTimer.labels.plan",
-  lessons: "domainErrors.advanceTimer.labels.lessons",
-} as const;
-
-export function advanceTimerNoticeKey(
-  outcome: AdvanceTimerOutcome,
-  error?: string | null
-): { key: string; values: Record<string, string> } {
-  if (outcome === "error" && error) return { key: "domainErrors.advanceTimer.notices.errorWithReason", values: { error } };
-  return { key: `domainErrors.advanceTimer.notices.${outcome}`, values: {} };
-}

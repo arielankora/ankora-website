@@ -18,7 +18,7 @@ import {
   EditWindowExpiredError,
 } from "@/lib/app-domain/time-entries";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
-import { stoppedAcrossClosureMessage } from "@/lib/app-domain/closed-bank-guard";
+import { stoppedAcrossClosureText } from "../my-time/entry-errors";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { updateTask } from "@/lib/app-domain/tasks";
 
@@ -91,7 +91,7 @@ export async function stopTimerAction(input: { timeEntryId: string; note?: strin
     // 3.11.2026: a timer still running when its bank closed always stops;
     // the person is then asked whether to move it into the open bank.
     const crossed = await closedBankForStoppedEntry(entry);
-    return { ok: true as const, entry, closedBank: crossed ? { message: stoppedAcrossClosureMessage(crossed) } : null };
+    return { ok: true as const, entry, closedBank: crossed ? { message: await stoppedAcrossClosureText(crossed) } : null };
   } catch (err) {
     return { ok: false as const, error: await friendlyError(err) };
   }
