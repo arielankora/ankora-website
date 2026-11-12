@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { collectApprovals, countMyPendingProposals } from "@/lib/app-domain/approvals";
 import { countAutoReview } from "@/lib/app-domain/auto-apply";
 import { ViewTabs } from "@/components/app/ViewTabs";
 import {
-  APPROVAL_TABS,
-  KIND_LABELS,
+  APPROVAL_DATE_FORMATS,
   KIND_TONES,
   approvalsHref,
   bulkRuleGroups,
@@ -16,9 +16,10 @@ import {
   questionsRedirect,
   tabCounts,
   visibleTabs,
-  waitedLabel,
+  waitedDays,
   withApprovalsBack,
   type ApprovalItem,
+  type ApprovalText,
 } from "@/lib/approvals";
 import { rankApprovals } from "@/lib/next-steps";
 import { ApprovalRow } from "./ApprovalRow";
@@ -48,6 +49,26 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
   const now = new Date();
   // "של כולם" stays while the tab or the client changes.
   const withScope = (href: string) => (everyone ? `${href}${href.includes("?") ? "&" : "?"}scope=all` : href);
+  const t = await getTranslations("approvals");
+  const format = await getFormatter();
+  // A row's words are keys under approvals.items that lib/app-domain/
+  // approvals.ts chose at runtime, so they are looked up untyped here;
+  // ApprovalItemKey checks them against he.json where they are written.
+  const tItems = t as unknown as (key: string, values?: Record<string, string | number>) => string;
+  const say = (m: ApprovalText): string =>
+    tItems(
+      `items.${m.key}`,
+      Object.fromEntries(
+        Object.entries(m.values ?? {}).map(([name, v]) => [
+          name,
+          typeof v === "string" || typeof v === "number" ? v : "key" in v ? say(v) : format.dateTime(v.date, APPROVAL_DATE_FORMATS[v.as]),
+        ])
+      )
+    );
+  const waited = (since: Date) => {
+    const days = waitedDays(since, now);
+    return days <= 0 ? t("waited.today") : days === 1 ? t("waited.yesterday") : t("waited.days", { count: String(days) });
+  };
 
   const [everything, knowledgeAll, knowledgeClient, autoReview] = await Promise.all([
     collectApprovals(user),
@@ -72,29 +93,38 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
   const counts = tabCounts(items, (clientId ? (knowledgeClient ?? 0) : knowledgeAll) + autoReview);
   const tabs = visibleTabs(counts, tab);
 
-  const rowOf = (i: ApprovalItem, showLabel: boolean) => ({
-    kind: i.kind,
-    id: i.id,
-    version: i.version,
-    clientId: i.clientId,
-    clientName: i.clientName,
-    title: i.title,
-    detail: i.detail,
-    waited: waitedLabel(i.since, now),
-    by: i.by,
-    // The way back from the item to this view, tab and client.
-    href: withApprovalsBack(i.href, tab, clientId),
-    actions: i.actions,
-    blocked: i.blocked,
-    failing: i.failing ?? null,
-    preview: i.preview ?? null,
-    label: KIND_LABELS[i.kind],
-    tone: KIND_TONES[i.kind],
-    showLabel,
-    recommend: i.recommend ?? null,
-    op: i.op ?? null,
-    go: i.go ? { label: i.go.label, href: withApprovalsBack(i.go.href, tab, clientId) } : null,
-  });
+  // The row in the reader's words: a key from `screen` where the domain
+  // gave one, otherwise the field as it is (a title someone wrote, a
+  // process decision's words from lib/next-steps.ts).
+  const rowOf = (i: ApprovalItem, showLabel: boolean) => {
+    const w = i.screen ?? {};
+    return {
+      kind: i.kind,
+      id: i.id,
+      version: i.version,
+      clientId: i.clientId,
+      clientName: i.clientName,
+      title: w.title ? say(w.title) : i.title,
+      detail: w.detail ? say(w.detail) : i.detail,
+      waited: waited(i.since),
+      by: i.by,
+      // The way back from the item to this view, tab and client.
+      href: withApprovalsBack(i.href, tab, clientId),
+      actions: {
+        approve: i.actions.approve && w.approve ? say(w.approve) : i.actions.approve,
+        reject: i.actions.reject ? { ...i.actions.reject, label: w.reject ? say(w.reject) : i.actions.reject.label } : null,
+      },
+      blocked: w.blocked ? say(w.blocked) : i.blocked,
+      failing: i.failing ?? null,
+      preview: i.preview ?? null,
+      label: t(`kinds.${i.kind}`),
+      tone: KIND_TONES[i.kind],
+      showLabel,
+      recommend: w.recommend ? { text: say(w.recommend.text), why: w.recommend.why ? say(w.recommend.why) : null } : (i.recommend ?? null),
+      op: i.op ?? null,
+      go: i.go ? { label: w.go ? say(w.go) : i.go.label, href: withApprovalsBack(i.go.href, tab, clientId) } : null,
+    };
+  };
 
   const ofTab = tab === "all" ? items : items.filter((i) => i.kind === tab);
   const ranked = rankApprovals(ofTab, now);
@@ -103,18 +133,18 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-medium text-app-text-primary">אישורים</h1>
-        <p className="mt-1 text-sm text-app-text-secondary">מה מחכה להחלטה שלך. בכל שורה: מה מומלץ ולמה, וכפתור שעושה את זה. מה שעוצר עבודה מופיע ראשון.</p>
+        <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
+        <p className="mt-1 text-sm text-app-text-secondary">{t("intro")}</p>
       </div>
 
       {clients.size > 0 && (
-        <nav aria-label="סינון לפי לקוח" className="flex flex-wrap items-center gap-1.5" data-testid="approvals-clients">
+        <nav aria-label={t("clientsNav")} className="flex flex-wrap items-center gap-1.5" data-testid="approvals-clients">
           <a
             href={withScope(approvalsHref(tab, null))}
             aria-current={!clientId ? "true" : undefined}
             className={`rounded-full border px-3 py-1 text-[12.5px] ${!clientId ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary hover:border-app-accent"}`}
           >
-            כל הלקוחות
+            {t("allClients")}
           </a>
           {[...clients.entries()]
             .sort((a, b) => b[1].count - a[1].count || a[1].name.localeCompare(b[1].name, "he"))
@@ -125,7 +155,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
                 aria-current={clientId === id ? "true" : undefined}
                 className={`rounded-full border px-3 py-1 text-[12.5px] ${clientId === id ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary hover:border-app-accent"}`}
               >
-                {c.name}
+                <span dir="auto">{c.name}</span>
                 {c.count > 0 && <span className="ms-1 text-app-text-tertiary">{c.count}</span>}
               </a>
             ))}
@@ -133,9 +163,12 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
       )}
 
       <ViewTabs
-        label="סוגי אישורים"
+        label={t("tabsLabel")}
         active={tab}
-        tabs={tabs.map((t) => ({ key: t.key, label: t.count > 0 ? `${t.label} (${t.count})` : t.label, href: withScope(approvalsHref(t.key, clientId)) }))}
+        tabs={tabs.map((v) => {
+          const label = t(`tabs.${v.key}`);
+          return { key: v.key, label: v.count > 0 ? t("tabWithCount", { label, count: String(v.count) }) : label, href: withScope(approvalsHref(v.key, clientId)) };
+        })}
       />
 
       {!clientId && (
@@ -144,6 +177,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
           mineHref={approvalsHref(tab, clientId)}
           allHref={`${approvalsHref(tab, clientId)}${approvalsHref(tab, clientId).includes("?") ? "&" : "?"}scope=all`}
           hidden={everything.length - allItems.length}
+          words={{ mine: t("scope.mine"), everyone: t("scope.everyone"), hidden: t("scope.hidden", { count: everything.length - allItems.length }) }}
         />
       )}
 
@@ -151,13 +185,13 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
         <KnowledgeReview searchParams={clientId ? { ...params, clientId } : params} mineOnly={!everyone && !clientId} />
       ) : ofTab.length === 0 ? (
         <div className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary" data-testid="approvals-empty">
-          {tab === "all" ? "אין כרגע שום דבר שמחכה להחלטה שלך." : `אין כרגע ${APPROVAL_TABS.find((t) => t.key === tab)?.label ?? ""} שמחכים לך.`}
+          {tab === "all" ? t("empty.all") : t("empty.tab", { tab: t(`tabs.${tab}`) })}
         </div>
       ) : (
         <div className="space-y-5">
           {groups.length > 0 && <BulkRules groups={groups} />}
           <section>
-            {tab === "all" && ranked.rest.length > 0 && <h2 className="mb-2 text-sm font-medium text-app-text-primary">היום</h2>}
+            {tab === "all" && ranked.rest.length > 0 && <h2 className="mb-2 text-sm font-medium text-app-text-primary">{t("today")}</h2>}
             <ul className="divide-y divide-app-border overflow-hidden rounded-2xl border border-app-border bg-white px-5" data-testid={tab === "all" ? "approvals-today" : "approvals-list"}>
               {(tab === "all" ? ranked.today : [...ranked.today, ...ranked.rest]).map((i) => (
                 <ApprovalRow key={`${i.kind}:${i.id}`} row={rowOf(i, tab === "all")} />
@@ -166,7 +200,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
           </section>
           {tab === "all" && ranked.rest.length > 0 && (
             <section>
-              <h2 className="mb-2 text-sm font-medium text-app-text-primary">כל השאר ({ranked.rest.length})</h2>
+              <h2 className="mb-2 text-sm font-medium text-app-text-primary">{t("rest", { count: String(ranked.rest.length) })}</h2>
               <ul className="divide-y divide-app-border overflow-hidden rounded-2xl border border-app-border bg-white px-5" data-testid="approvals-list">
                 {ranked.rest.map((i) => (
                   <ApprovalRow key={`${i.kind}:${i.id}`} row={rowOf(i, true)} />
@@ -182,17 +216,29 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
 
 /// "שלי" or "של כולם", on the decisions (22.10.2026): the meetings other
 /// people sent wait on them, and are here only on asking.
-function ScopeToggle({ everyone, mineHref, allHref, hidden }: { everyone: boolean; mineHref: string; allHref: string; hidden: number }) {
+function ScopeToggle({
+  everyone,
+  mineHref,
+  allHref,
+  hidden,
+  words,
+}: {
+  everyone: boolean;
+  mineHref: string;
+  allHref: string;
+  hidden: number;
+  words: { mine: string; everyone: string; hidden: string };
+}) {
   if (!everyone && hidden === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-[12.5px]" data-testid="approvals-scope">
       <a href={mineHref} aria-current={!everyone ? "true" : undefined} className={`rounded-full border px-3 py-1 ${!everyone ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary"}`}>
-        שלי
+        {words.mine}
       </a>
       <a href={allHref} aria-current={everyone ? "true" : undefined} className={`rounded-full border px-3 py-1 ${everyone ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary"}`}>
-        של כולם
+        {words.everyone}
       </a>
-      {!everyone && hidden > 0 && <span className="text-app-text-tertiary">{hidden === 1 ? "פגישה אחת של מישהו אחר" : `${hidden} פגישות של אחרים`} מחכות להם, לא לך.</span>}
+      {!everyone && hidden > 0 && <span className="text-app-text-tertiary">{words.hidden}</span>}
     </div>
   );
 }

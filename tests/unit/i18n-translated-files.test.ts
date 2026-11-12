@@ -169,6 +169,19 @@ const TRANSLATED_FILES = [
   // Not listed on purpose: clients/[clientId]/processes/[processId]/document/page.tsx
   // holds the Hebrew prompt it copies for Claude, and clients/process-actions.ts
   // writes a Hebrew reason into run comments and notifications (content).
+  "app/(product)/app/(authenticated)/approvals/ApprovalRow.tsx",
+  "app/(product)/app/(authenticated)/approvals/BulkRules.tsx",
+  "app/(product)/app/(authenticated)/approvals/actions.ts",
+  "app/(product)/app/(authenticated)/approvals/page.tsx",
+  "app/(product)/app/(authenticated)/knowledge/AutoApplied.tsx",
+  "app/(product)/app/(authenticated)/knowledge/AwaitingAssignment.tsx",
+  "app/(product)/app/(authenticated)/knowledge/KnowledgeReview.tsx",
+  "app/(product)/app/(authenticated)/knowledge/ReviewBatch.tsx",
+  "app/(product)/app/(authenticated)/knowledge/ReviewFilters.tsx",
+  "app/(product)/app/(authenticated)/knowledge/actions.ts",
+  "app/(product)/app/(authenticated)/knowledge/labels.ts",
+  "app/(product)/app/(authenticated)/knowledge/page.tsx",
+  "app/(product)/app/(authenticated)/knowledge/review-view.ts",
   // mine-scope.ts used to keep Hebrew fallbacks for the calendar; listed below since phase 7.
   "app/(product)/app/(authenticated)/calendar/CalendarClientSelect.tsx",
   "app/(product)/app/(authenticated)/calendar/CalendarGrid.tsx",

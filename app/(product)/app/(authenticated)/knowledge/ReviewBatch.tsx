@@ -1,16 +1,26 @@
 "use client";
 import { batchAnchor, proposalAnchor } from "@/lib/approval-links";
 import { useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { StatusBadge } from "@/components/app/StatusBadge";
-import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
-import { FACT_KIND_LABELS, type FactKindLike } from "@/lib/client-facts";
-import { POLICY_KIND_LABELS, type PolicyKindLike } from "@/lib/client-policies";
-import { ACTION_LABELS, CONFIDENCE_LABELS, MAX_BULK, NARRATIVE_KIND_LABELS, TARGET_LABELS, bulkApproveBlocker, EDIT_FIELD_LABELS, proposalDetails, reviewSummary, suggestedFix, type ConfidenceLike, type ProposalFlag, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
-import { COMBINED_APPROVE_LABEL } from "@/lib/procedure-approval";
+import type { KnowledgeStatusLike } from "@/lib/knowledge";
+import {
+  MAX_BULK,
+  reviewSummaryCounts,
+  suggestedFix,
+  type ConfidenceLike,
+  type ConfidenceReasonCode,
+  type DetailPart,
+  type ProposalFlag,
+  type ProposalActionLike,
+  type ProposalTargetLike,
+  type TierReasonCode,
+} from "@/lib/knowledge-proposals";
 import type { ProcedureAlongside } from "@/lib/app-domain/processes";
+import { detailLine, sourceKindLabel, targetLabel as kindLabelOf, type KnowledgeT } from "./labels";
 import { approveProposalAction, approveEditedProposalAction, approveWithSuggestionAction, approveProposalsAction, attachProposalAction, mergeProposalAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction, revertProposalAction } from "./actions";
 
 // One batch: one meeting or one document, and what Claude proposed from
@@ -46,8 +56,15 @@ export type ReviewProposal = {
   /// Sensitive and this person is not an approver (R6): who decides it.
   hiddenFor: string | null;
   /// Spec 5.2: how sure, with why it is lower, and its place on the card.
-  confidence: { level: ConfidenceLike; why: string[] };
+  /// `reasons` is `why` as codes (ADR 0006), which the card words.
+  confidence: { level: ConfidenceLike; why: string[]; reasons: ConfidenceReasonCode[] };
   rank: number;
+  /// Why it is approved on its own, not with others (bulkApproveBlockerCode).
+  aloneBecause: TierReasonCode | null;
+  /// What a reviewer needs beyond the headline (proposalDetailParts).
+  details: DetailPart[];
+  /// The approvers of a sensitive item hidden from this person, by name.
+  hiddenApprovers: string[];
   /// Something to do, not to know: the task it would open, why it cannot
   /// (taskBlocker), and the task it opened once it did.
   /// `needsTitle`: it was something to know, so the person writes what to
@@ -62,73 +79,118 @@ export type ReviewProposal = {
 
 export type ReviewStaff = { id: string; name: string }[];
 
-const INPUT = "mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
+/// The line under a card's source (ADR 0006: parts, worded here).
+export type SourceDetails = { kind: string | null; occurredAt: Date | null; participants: string[]; topicsOnly: boolean; sentBy: string | null };
 
-/// The fields a reviewer may change, per kind of item.
-/// The kind of item, as the reviewer reads it: a fact by its kind, a rule
-/// by its kind, everything else by what it is.
-function targetLabel(p: { target: ProposalTargetLike; payload: Record<string, unknown> }): string {
-  if (p.target === "FACT" && p.payload.kind) return FACT_KIND_LABELS[p.payload.kind as FactKindLike];
-  if (p.target === "POLICY" && p.payload.kind) return `כלל: ${POLICY_KIND_LABELS[p.payload.kind as PolicyKindLike] ?? ""}`;
-  if (p.target === "NARRATIVE" && p.payload.kind) return NARRATIVE_KIND_LABELS[p.payload.kind as keyof typeof NARRATIVE_KIND_LABELS] ?? TARGET_LABELS.NARRATIVE;
-  return TARGET_LABELS[p.target];
+/// "הקלטה · 12.11.2026 · נושאים בלבד · נשלח על ידי ...". Also the
+/// awaiting-assignment card's line.
+export function useSourceDetailsLine(d: SourceDetails): string {
+  const t = useTranslations("knowledge");
+  const format = useFormatter();
+  return [
+    d.kind ? sourceKindLabel(t, d.kind) : null,
+    // A date of the source, kept at midnight UTC.
+    d.occurredAt ? format.dateTime(d.occurredAt, { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }) : null,
+    d.participants.join(", ") || null,
+    d.topicsOnly ? t("source.topicsOnly") : null,
+    d.sentBy ? t("source.sentBy", { name: d.sentBy }) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
-const EDIT_FIELDS: Record<ProposalTargetLike, { key: string; label: string; long?: boolean }[]> = {
+const INPUT = "mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
+
+/// The fields a reviewer may change, per kind of item, with the key of
+/// each label under knowledge.edit.fields.
+type FieldLabel =
+  | "body"
+  | "validUntilEvent"
+  | "decidedBy"
+  | "decidedAt"
+  | "name"
+  | "role"
+  | "context"
+  | "orgRole"
+  | "notes"
+  | "requestTitle"
+  | "handling"
+  | "policyTitle"
+  | "statement"
+  | "interimStatement"
+  | "systemName"
+  | "systemPurpose"
+  | "blocker"
+  | "legalName"
+  | "registrationNumber"
+  | "narrativeBody"
+  | "processTitle"
+  | "processPurpose"
+  | "triggerText"
+  | "domain"
+  | "taskTitle"
+  | "description"
+  | "assigneeName"
+  | "dueDate"
+  | "dateTitle"
+  | "date"
+  | "responsibleName";
+
+const EDIT_FIELDS: Record<ProposalTargetLike, { key: string; label: FieldLabel; long?: boolean }[]> = {
   FACT: [
-    { key: "body", label: EDIT_FIELD_LABELS.body, long: true },
-    { key: "validUntilEvent", label: EDIT_FIELD_LABELS.validUntilEvent },
-    { key: "decidedBy", label: "מי החליט" },
-    { key: "decidedAt", label: `${EDIT_FIELD_LABELS.decidedAt} (2026-10-17)` },
+    { key: "body", label: "body", long: true },
+    { key: "validUntilEvent", label: "validUntilEvent" },
+    { key: "decidedBy", label: "decidedBy" },
+    { key: "decidedAt", label: "decidedAt" },
   ],
   CONTACT: [
-    { key: "name", label: "שם" },
-    { key: "role", label: "תפקיד" },
-    { key: "context", label: "מה צריך לדעת", long: true },
+    { key: "name", label: "name" },
+    { key: "role", label: "role" },
+    { key: "context", label: "context", long: true },
   ],
   ORGANIZATION: [
-    { key: "name", label: "שם" },
-    { key: "role", label: "מה הוא ללקוח" },
-    { key: "notes", label: "הערות", long: true },
+    { key: "name", label: "name" },
+    { key: "role", label: "orgRole" },
+    { key: "notes", label: "notes", long: true },
   ],
   REQUEST_TYPE: [
-    { key: "title", label: "סוג הפנייה" },
-    { key: "handling", label: "איך עונים ולאן מעבירים", long: true },
+    { key: "title", label: "requestTitle" },
+    { key: "handling", label: "handling", long: true },
   ],
   POLICY: [
-    { key: "title", label: "שם הכלל" },
-    { key: "statement", label: "הכלל", long: true },
-    { key: "interimStatement", label: EDIT_FIELD_LABELS.interimStatement, long: true },
+    { key: "title", label: "policyTitle" },
+    { key: "statement", label: "statement", long: true },
+    { key: "interimStatement", label: "interimStatement", long: true },
   ],
   SYSTEM: [
-    { key: "systemName", label: "מערכת" },
-    { key: "purpose", label: "למה היא משמשת" },
-    { key: "blocker", label: "מה חוסם" },
-    { key: "notes", label: "הערות", long: true },
+    { key: "systemName", label: "systemName" },
+    { key: "purpose", label: "systemPurpose" },
+    { key: "blocker", label: "blocker" },
+    { key: "notes", label: "notes", long: true },
   ],
   ENTITY: [
-    { key: "name", label: "שם" },
-    { key: "legalName", label: "שם משפטי" },
-    { key: "registrationNumber", label: "ח.פ. או EIN" },
+    { key: "name", label: "name" },
+    { key: "legalName", label: "legalName" },
+    { key: "registrationNumber", label: "registrationNumber" },
   ],
-  NARRATIVE: [{ key: "body", label: "הטקסט", long: true }],
+  NARRATIVE: [{ key: "body", label: "narrativeBody", long: true }],
   PROCESS: [
-    { key: "title", label: "שם התהליך" },
-    { key: "purpose", label: "למה הוא קיים" },
-    { key: "triggerText", label: "מה מפעיל אותו" },
+    { key: "title", label: "processTitle" },
+    { key: "purpose", label: "processPurpose" },
+    { key: "triggerText", label: "triggerText" },
   ],
-  DOMAIN: [{ key: "domain", label: "דומיין" }],
+  DOMAIN: [{ key: "domain", label: "domain" }],
   TASK: [
-    { key: "title", label: "מה עושים" },
-    { key: "description", label: "פירוט", long: true },
-    { key: "assigneeName", label: "אחראי באנקורה (שם)" },
-    { key: "dueDate", label: "תאריך יעד (2026-10-22)" },
+    { key: "title", label: "taskTitle" },
+    { key: "description", label: "description", long: true },
+    { key: "assigneeName", label: "assigneeName" },
+    { key: "dueDate", label: "dueDate" },
   ],
   DATE: [
-    { key: "title", label: "מה המועד" },
-    { key: "date", label: `${EDIT_FIELD_LABELS.date} (2026-10-22), לחד-פעמי או שנתי` },
-    { key: "responsibleName", label: "אחראי באנקורה (שם)" },
-    { key: "notes", label: "הערות", long: true },
+    { key: "title", label: "dateTitle" },
+    { key: "date", label: "date" },
+    { key: "responsibleName", label: "responsibleName" },
+    { key: "notes", label: "notes", long: true },
   ],
 };
 
@@ -138,19 +200,20 @@ function str(v: unknown): string {
 
 /// 3.11.2026: what approving a process proposal did to its procedure, as
 /// the toast says it. Null when it did nothing to it (as before).
-function procedureToast(procedure: ProcedureAlongside | null | undefined, headline: string) {
+function procedureToast(t: KnowledgeT, procedure: ProcedureAlongside | null | undefined, headline: string) {
   if (!procedure) return null;
   return procedure.approved
-    ? { tone: "info" as const, title: "התהליך והנוהל אושרו", description: headline.slice(0, 80) }
-    : { tone: "info" as const, title: "התהליך נכנס כטיוטה. הנוהל ממתין", description: procedure.reason };
+    ? { tone: "info" as const, title: t("toasts.processAndProcedureApproved"), description: headline.slice(0, 80) }
+    : { tone: "info" as const, title: t("toasts.processDraftProcedureWaits"), description: procedure.reason };
 }
 
 function EditForm({ p }: { p: ReviewProposal }) {
+  const t = useTranslations("knowledge");
   const close = useDrawerClose();
   const { showToast } = useToast();
   const { onSubmit, pending, error } = useActionForm(approveEditedProposalAction, (r) => {
-    const t = procedureToast(r.procedure, p.headline);
-    if (t) showToast(t);
+    const toast = procedureToast(t, r.procedure, p.headline);
+    if (toast) showToast(toast);
     close();
   });
   const status = (str(p.payload.knowledgeStatus) || "CONFIRMED") as KnowledgeStatusLike;
@@ -162,7 +225,7 @@ function EditForm({ p }: { p: ReviewProposal }) {
         .filter((f) => (f.key !== "decidedBy" && f.key !== "decidedAt") || p.payload.kind === "ONE_OFF_DECISION")
         .map((f) => (
           <label key={f.key} className="block">
-            <span className="block text-xs font-medium text-app-text-secondary">{f.label}</span>
+            <span className="block text-xs font-medium text-app-text-secondary">{t(`edit.fields.${f.label}`)}</span>
             {f.long ? (
               <textarea name={f.key} rows={3} defaultValue={str(p.payload[f.key])} className={INPUT} />
             ) : (
@@ -173,102 +236,106 @@ function EditForm({ p }: { p: ReviewProposal }) {
       {p.target !== "TASK" && p.target !== "DATE" && (p.target !== "FACT" || p.payload.kind !== "QUESTION") ? (
         <>
           <label className="block">
-            <span className="block text-xs font-medium text-app-text-secondary">סטטוס</span>
+            <span className="block text-xs font-medium text-app-text-secondary">{t("edit.status")}</span>
             <select name="knowledgeStatus" defaultValue={status} className={INPUT}>
-              <option value="CONFIRMED">{KNOWLEDGE_STATUS_LABELS.CONFIRMED}</option>
-              <option value="UNCERTAIN">{KNOWLEDGE_STATUS_LABELS.UNCERTAIN}</option>
-              <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
+              <option value="CONFIRMED">{t("statuses.CONFIRMED")}</option>
+              <option value="UNCERTAIN">{t("statuses.UNCERTAIN")}</option>
+              <option value="MISSING">{t("statuses.MISSING")}</option>
             </select>
           </label>
           <label className="block">
-            <span className="block text-xs font-medium text-app-text-secondary">{EDIT_FIELD_LABELS.toResolve} (אם לא מאושר)</span>
+            <span className="block text-xs font-medium text-app-text-secondary">{t("edit.toResolveIfNotConfirmed")}</span>
             <input name="toResolve" defaultValue={str(p.payload.toResolve)} className={INPUT} />
           </label>
         </>
       ) : p.target === "FACT" && p.payload.kind === "QUESTION" ? (
         // A question has no status, but what closes it may still be said.
         <label className="block">
-          <span className="block text-xs font-medium text-app-text-secondary">מה יסגור אותה</span>
+          <span className="block text-xs font-medium text-app-text-secondary">{t("edit.whatClosesQuestion")}</span>
           <input name="toResolve" defaultValue={str(p.payload.toResolve)} className={INPUT} />
         </label>
       ) : null}
       {p.target !== "NARRATIVE" && p.target !== "DOMAIN" && p.target !== "TASK" && p.target !== "DATE" && (
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="block text-xs font-medium text-app-text-secondary">בעלים באנקורה (שם)</span>
+            <span className="block text-xs font-medium text-app-text-secondary">{t("edit.ownerName")}</span>
             <input name="ownerName" defaultValue={str(p.payload.ownerName)} className={INPUT} />
           </label>
           <label className="block">
-            <span className="block text-xs font-medium text-app-text-secondary">{EDIT_FIELD_LABELS.clientVisible}</span>
+            <span className="block text-xs font-medium text-app-text-secondary">{t("edit.clientVisible")}</span>
             <select name="clientVisible" defaultValue={p.payload.clientVisible === true ? "yes" : "no"} className={INPUT}>
-              <option value="no">לא</option>
-              <option value="yes">כן</option>
+              <option value="no">{t("edit.no")}</option>
+              <option value="yes">{t("edit.yes")}</option>
             </select>
           </label>
         </div>
       )}
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : p.target === "TASK" ? "פתיחת המשימה" : p.combinedProcedure ? `${COMBINED_APPROVE_LABEL} עם השינויים` : "אישור עם השינויים"}
+        {pending ? t("saving") : p.target === "TASK" ? t("edit.openTask") : p.combinedProcedure ? t("edit.approveCombinedWithChanges") : t("edit.approveWithChanges")}
       </button>
     </form>
   );
 }
 
 function RejectForm({ p }: { p: ReviewProposal }) {
+  const t = useTranslations("knowledge");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(rejectProposalAction, close);
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="id" value={p.id} />
-      <p className="text-sm text-app-text-primary">{p.headline}</p>
+      <p className="text-sm text-app-text-primary" dir="auto">
+        {p.headline}
+      </p>
       <label className="block">
-        <span className="block text-xs font-medium text-app-text-secondary">למה, בשורה אחת *</span>
-        <input name="reason" required placeholder="שיחת חולין, לא רלוונטי לעבודה" className={INPUT} />
+        <span className="block text-xs font-medium text-app-text-secondary">{t("reject.whyLabel")}</span>
+        <input name="reason" required placeholder={t("reject.placeholder")} className={INPUT} />
       </label>
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : "דחייה"}
+        {pending ? t("saving") : t("reject.submit")}
       </button>
     </form>
   );
 }
 
 function TaskForm({ p, staff, meId }: { p: ReviewProposal; staff: ReviewStaff; meId: string }) {
+  const t = useTranslations("knowledge");
   const close = useDrawerClose();
   const { showToast } = useToast();
   const { onSubmit, pending, error } = useActionForm(proposalToTaskAction, () => {
-    showToast({ tone: "info", title: "נפתחה משימה", description: p.task.title.slice(0, 80) });
+    showToast({ tone: "info", title: t("toasts.taskOpened"), description: p.task.title.slice(0, 80) });
     close();
   });
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5" data-testid="proposal-task-form">
       <input type="hidden" name="id" value={p.id} />
-      <p className="text-xs text-app-text-secondary">ההצעה לא תיכנס לתיק. במקומה תיפתח משימה על הלקוח, וההצעה תסומן &quot;הפכה למשימה&quot;.</p>
+      <p className="text-xs text-app-text-secondary">{t("task.intro")}</p>
       <label className="block">
-        <span className="block text-xs font-medium text-app-text-secondary">מה עושים? כותרת המשימה *</span>
+        <span className="block text-xs font-medium text-app-text-secondary">{t("task.titleLabel")}</span>
         <input
           name="title"
           required
           maxLength={200}
           defaultValue={p.task.title}
-          placeholder={p.task.needsTitle ? "לברר עם... / לשלוח ל... / להזמין..." : undefined}
+          placeholder={p.task.needsTitle ? t("task.titlePlaceholder") : undefined}
           className={INPUT}
           data-testid="proposal-task-title"
         />
       </label>
       {p.task.needsTitle && p.task.said && (
         <p className="-mt-2 text-[11px] text-app-text-tertiary">
-          מה שנאמר: {p.task.said}. בכותרת כותבים מה צריך לעשות, לא את מה שנאמר.
+          {t("task.said", { said: p.task.said })}
         </p>
       )}
       <label className="block">
-        <span className="block text-xs font-medium text-app-text-secondary">תיאור</span>
+        <span className="block text-xs font-medium text-app-text-secondary">{t("task.description")}</span>
         <textarea name="description" rows={6} defaultValue={p.task.description} className={INPUT} />
       </label>
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="block text-xs font-medium text-app-text-secondary">אחראי</span>
+          <span className="block text-xs font-medium text-app-text-secondary">{t("task.assignee")}</span>
           <select name="assignedToId" defaultValue={meId} className={INPUT}>
             {staff.map((s) => (
               <option key={s.id} value={s.id}>
@@ -278,29 +345,30 @@ function TaskForm({ p, staff, meId }: { p: ReviewProposal; staff: ReviewStaff; m
           </select>
         </label>
         <label className="block">
-          <span className="block text-xs font-medium text-app-text-secondary">תאריך יעד</span>
+          <span className="block text-xs font-medium text-app-text-secondary">{t("task.dueDate")}</span>
           <input type="date" name="dueDate" defaultValue={p.task.due} className={INPUT} />
         </label>
       </div>
-      <p className="-mt-1.5 text-[11px] text-app-text-tertiary">הקטגוריה נבחרת לפי הכותרת, ואפשר לשנות אותה במשימה.</p>
+      <p className="-mt-1.5 text-[11px] text-app-text-tertiary">{t("task.categoryHint")}</p>
       <label className="block">
-        <span className="block text-xs font-medium text-app-text-secondary">עדיפות</span>
+        <span className="block text-xs font-medium text-app-text-secondary">{t("task.priority")}</span>
         <select name="priority" defaultValue="NORMAL" className={INPUT}>
-          <option value="LOW">נמוכה</option>
-          <option value="NORMAL">רגילה</option>
-          <option value="HIGH">גבוהה</option>
-          <option value="URGENT">דחופה</option>
+          <option value="LOW">{t("priority.LOW")}</option>
+          <option value="NORMAL">{t("priority.NORMAL")}</option>
+          <option value="HIGH">{t("priority.HIGH")}</option>
+          <option value="URGENT">{t("priority.URGENT")}</option>
         </select>
       </label>
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "פותח..." : "פתיחת משימה"}
+        {pending ? t("task.opening") : t("task.submit")}
       </button>
     </form>
   );
 }
 
 function RejectManyForm({ ids }: { ids: string[] }) {
+  const t = useTranslations("knowledge");
   // The selection is not cleared here. Clearing it empties `chosen`,
   // which unmounts this drawer in the same commit, and the drawer is the
   // one that refreshes the screen after a write (see Drawer). Rejected
@@ -313,14 +381,14 @@ function RejectManyForm({ ids }: { ids: string[] }) {
       {ids.map((id) => (
         <input key={id} type="hidden" name="id" value={id} />
       ))}
-      <p className="text-sm text-app-text-primary">{ids.length === 1 ? "הצעה אחת נדחית." : `${ids.length} הצעות נדחות, עם אותה סיבה.`}</p>
+      <p className="text-sm text-app-text-primary">{t("rejectMany.intro", { count: ids.length })}</p>
       <label className="block">
-        <span className="block text-xs font-medium text-app-text-secondary">למה, בשורה אחת *</span>
-        <input name="reason" required placeholder="כבר בתיק מהחילוץ היומי" className={INPUT} />
+        <span className="block text-xs font-medium text-app-text-secondary">{t("reject.whyLabel")}</span>
+        <input name="reason" required placeholder={t("rejectMany.placeholder")} className={INPUT} />
       </label>
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : "דחייה"}
+        {pending ? t("saving") : t("reject.submit")}
       </button>
     </form>
   );
@@ -330,13 +398,14 @@ function RejectManyForm({ ids }: { ids: string[] }) {
 /// the file again, and the proposal stays approved, marked reverted. Two
 /// steps on the row, not the browser's confirm() (see SetupForms.tsx).
 function RevertButton({ p }: { p: ReviewProposal }) {
+  const t = useTranslations("knowledge");
   const { showToast } = useToast();
   const [asking, setAsking] = useState(false);
   const [pending, setPending] = useState(false);
   if (!asking) {
     return (
       <button type="button" onClick={() => setAsking(true)} className="ms-1.5 text-app-text-accent hover:underline" data-testid="proposal-revert">
-        ביטול
+        {t("revert.button")}
       </button>
     );
   }
@@ -345,60 +414,80 @@ function RevertButton({ p }: { p: ReviewProposal }) {
     const r = await revertProposalAction(p.id);
     setPending(false);
     setAsking(false);
-    if (r.error) showToast({ tone: "error", title: "הביטול נכשל", description: r.error });
-    else showToast({ tone: "info", title: "בוטל: הפריט הוסר מהתיק", description: p.headline.slice(0, 80) });
+    if (r.error) showToast({ tone: "error", title: t("revert.failed"), description: r.error });
+    else showToast({ tone: "info", title: t("revert.done"), description: p.headline.slice(0, 80) });
   }
   return (
     <span className="ms-1.5 inline-flex flex-wrap items-center gap-2">
-      <span className="text-app-text-secondary">להסיר את הפריט מהתיק?</span>
+      <span className="text-app-text-secondary">{t("revert.confirm")}</span>
       <button type="button" disabled={pending} onClick={revert} className="font-medium text-app-error disabled:opacity-50" data-testid="proposal-revert-confirm">
-        {pending ? "מסיר..." : "להסיר"}
+        {pending ? t("revert.removing") : t("revert.remove")}
       </button>
       <button type="button" disabled={pending} onClick={() => setAsking(false)} className="text-app-text-secondary">
-        להשאיר
+        {t("revert.keep")}
       </button>
     </span>
   );
 }
 
 function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal; selected: boolean; onSelect: (on: boolean) => void; staff: ReviewStaff; meId: string }) {
+  const t = useTranslations("knowledge");
+  const format = useFormatter();
   const { showToast } = useToast();
   const status = (str(p.payload.knowledgeStatus) || (p.payload.kind === "QUESTION" ? "MISSING" : "CONFIRMED")) as KnowledgeStatusLike;
-  const kindLabel = targetLabel(p);
+  const kindLabel = kindLabelOf(t, p);
 
   async function approve() {
     const r = await approveProposalAction(p.id);
-    if (r.error) showToast({ tone: "error", title: "האישור נכשל", description: r.error });
-    else showToast(procedureToast(r.procedure, p.headline) ?? { tone: "info", title: p.target === "TASK" ? "נפתחה משימה" : "נכנס לתיק", description: p.headline.slice(0, 80) });
+    if (r.error) showToast({ tone: "error", title: t("toasts.approveFailed"), description: r.error });
+    else showToast(procedureToast(t, r.procedure, p.headline) ?? { tone: "info", title: p.target === "TASK" ? t("toasts.taskOpened") : t("toasts.enteredFile"), description: p.headline.slice(0, 80) });
   }
 
   async function approveSuggested() {
     const r = await approveWithSuggestionAction(p.id);
-    if (r.error) showToast({ tone: "error", title: "האישור נכשל", description: r.error });
-    else showToast(procedureToast(r.procedure, p.headline) ?? { tone: "info", title: "הושלם ונכנס לתיק", description: p.headline.slice(0, 80) });
+    if (r.error) showToast({ tone: "error", title: t("toasts.approveFailed"), description: r.error });
+    else showToast(procedureToast(t, r.procedure, p.headline) ?? { tone: "info", title: t("toasts.completedAndEntered"), description: p.headline.slice(0, 80) });
   }
 
   async function attach() {
     const r = await attachProposalAction(p.id);
-    if (r.error) showToast({ tone: "error", title: "לא נסגר", description: r.error });
-    else showToast({ tone: "info", title: p.alreadyIn?.addsSources ? "המקור נוסף לפריט שבתיק" : "נסגר: כבר בתיק", description: p.alreadyIn?.body.slice(0, 80) });
+    if (r.error) showToast({ tone: "error", title: t("toasts.notClosed"), description: r.error });
+    else showToast({ tone: "info", title: p.alreadyIn?.addsSources ? t("toasts.sourceAdded") : t("toasts.closedAlreadyIn"), description: p.alreadyIn?.body.slice(0, 80) });
   }
 
   async function merge(m: { id: string; name: string }) {
     const r = await mergeProposalAction(p.id, m.id);
-    if (r.error) showToast({ tone: "error", title: "ההוספה נכשלה", description: r.error });
-    else showToast({ tone: "info", title: `נוסף אל ${m.name}`, description: p.headline.slice(0, 80) });
+    if (r.error) showToast({ tone: "error", title: t("toasts.mergeFailed"), description: r.error });
+    else showToast({ tone: "info", title: t("toasts.merged", { name: m.name }), description: p.headline.slice(0, 80) });
   }
 
   if (p.state !== "PENDING") {
     return (
       <li id={proposalAnchor(p.id)} className="py-2.5 text-xs text-app-text-tertiary scroll-mt-24 rounded-lg target:bg-app-accent-soft">
-        {p.state === "APPROVED" ? (p.reverted ? "אושר ובוטל: " : p.autoApplied ? "נכנס אוטומטית: " : p.attached ? "כבר בתיק: " : p.target === "TASK" ? "נפתחה משימה: " : "אושר: ") : p.state === "TASK" ? "הפך למשימה: " : "נדחה: "}
-        {p.headline}
-        {p.rejectReason && ` (${p.rejectReason})`}
+        {p.state === "APPROVED"
+          ? p.reverted
+            ? t("decided.reverted")
+            : p.autoApplied
+              ? t("decided.autoApplied")
+              : p.attached
+                ? t("decided.alreadyIn")
+                : p.target === "TASK"
+                  ? t("decided.taskOpened")
+                  : t("decided.approved")
+          : p.state === "TASK"
+            ? t("decided.becameTask")
+            : t("decided.rejected")}{" "}
+        <bdi>{p.headline}</bdi>
+        {p.rejectReason && (
+          <>
+            {" ("}
+            <bdi>{p.rejectReason}</bdi>
+            {")"}
+          </>
+        )}
         {p.taskId && (
           <a href={`/app/tasks/${p.taskId}`} className="ms-1.5 text-app-text-accent hover:underline">
-            למשימה
+            {t("decided.toTask")}
           </a>
         )}
         {p.revertible && <RevertButton p={p} />}
@@ -410,7 +499,9 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
     return (
       <li id={proposalAnchor(p.id)} className="py-3.5 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
         <p className="text-xs text-app-text-tertiary">{kindLabel}</p>
-        <p className="mt-0.5 text-sm text-app-text-secondary">פריט רגיש. רק {p.hiddenFor} רואה אותו ומחליט עליו.</p>
+        <p className="mt-0.5 text-sm text-app-text-secondary">
+          {t("sensitiveHidden", { who: p.hiddenApprovers.length ? p.hiddenApprovers.join(` ${t("or")} `) : t("sensitiveApprovers") })}
+        </p>
       </li>
     );
   }
@@ -419,7 +510,7 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
   const blocked = p.flags.some((f) => f.block);
   // Every problem has a ready wording: one press completes and approves.
   const suggested = !p.alreadyIn && suggestedFix(p.flags) !== null;
-  const alone = bulkApproveBlocker({ ...p, level: p.confidence.level });
+  const alone = p.aloneBecause;
   return (
     <li id={proposalAnchor(p.id)} className={`py-3.5 scroll-mt-24 rounded-lg target:bg-app-accent-soft ${selected ? "bg-gold/[0.04]" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -427,69 +518,90 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
           type="checkbox"
           checked={selected}
           onChange={(e) => onSelect(e.target.checked)}
-          aria-label={`בחירה: ${p.headline.slice(0, 60)}`}
-          title={alone ? `אפשר לדחות יחד עם אחרות. לאשר: אחת אחת (${alone})` : undefined}
+          aria-label={t("proposal.select", { headline: p.headline.slice(0, 60) })}
+          title={alone ? t("proposal.aloneHint", { reason: t(`tierReasons.${alone}`) }) : undefined}
           className="mt-1 h-4 w-4 shrink-0 accent-gold"
         />
         <div className="min-w-0 flex-1">
           <p className="text-xs text-app-text-tertiary">
             {kindLabel}
-            {p.action !== "CREATE" && <span className="ms-1.5 text-app-warning">· {ACTION_LABELS[p.action]}</span>}
+            {p.action !== "CREATE" && <span className="ms-1.5 text-app-warning">· {t(`actions.${p.action}`)}</span>}
           </p>
-          <p className="mt-0.5 text-sm text-app-text-primary">{p.headline}</p>
-          {proposalDetails(p.target, p.payload).map((line, i) => (
-            <p key={i} className="mt-0.5 whitespace-pre-line text-xs text-app-text-secondary">
-              {line}
+          <p className="mt-0.5 text-sm text-app-text-primary" dir="auto">
+            {p.headline}
+          </p>
+          {p.details.map((part, i) => (
+            <p key={i} className="mt-0.5 whitespace-pre-line text-xs text-app-text-secondary" dir="auto">
+              {detailLine(t, part, (n) => format.number(n))}
             </p>
           ))}
           {p.alreadyIn && (
             <p className="mt-1 text-xs text-app-warning" data-testid="proposal-already-in">
-              כבר בתיק: <span className="text-app-text-secondary">{p.alreadyIn.body}</span>
+              {t("proposal.alreadyIn")}{" "}
+              <bdi className="text-app-text-secondary">{p.alreadyIn.body}</bdi>
             </p>
           )}
           {p.existing && (
             <p className="mt-1 text-xs text-app-text-secondary">
-              היום בתיק: <span className={p.action === "SUPERSEDE" ? "line-through" : ""}>{p.existing.body}</span>
+              {t("proposal.inFileToday")}{" "}
+              <bdi className={p.action === "SUPERSEDE" ? "line-through" : ""}>{p.existing.body}</bdi>
             </p>
           )}
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-app-text-secondary">
-            {status !== "CONFIRMED" && <StatusBadge label={KNOWLEDGE_STATUS_LABELS[status]} tone={status === "MISSING" ? "red" : "amber"} />}
-            {str(p.payload.toResolve) && <span>{str(p.payload.toResolve)}</span>}
+            {status !== "CONFIRMED" && (status === "UNCERTAIN" || status === "MISSING" || status === "SUPERSEDED") && (
+              <StatusBadge label={t(`statuses.${status}`)} tone={status === "MISSING" ? "red" : "amber"} />
+            )}
+            {str(p.payload.toResolve) && <span dir="auto">{str(p.payload.toResolve)}</span>}
             {p.state === "PENDING" && (
-              <span title={p.confidence.why.join(" · ") || undefined} data-testid="proposal-confidence">
-                <StatusBadge label={CONFIDENCE_LABELS[p.confidence.level]} tone={p.confidence.level === "HIGH" ? "green" : p.confidence.level === "LOW" ? "red" : "gray"} />
+              <span title={p.confidence.reasons.map((r) => t(`confidenceReasons.${r}`)).join(" · ") || undefined} data-testid="proposal-confidence">
+                <StatusBadge label={t(`confidence.${p.confidence.level}`)} tone={p.confidence.level === "HIGH" ? "green" : p.confidence.level === "LOW" ? "red" : "gray"} />
               </span>
             )}
-            {p.state === "PENDING" && p.confidence.why.length > 0 && p.confidence.level !== "HIGH" && <span>{p.confidence.why.join(", ")}</span>}
+            {p.state === "PENDING" && p.confidence.reasons.length > 0 && p.confidence.level !== "HIGH" && <span>{p.confidence.reasons.map((r) => t(`confidenceReasons.${r}`)).join(", ")}</span>}
             {p.sources.length > 0 && <span dir="ltr">[{p.sources.join(", ")}]</span>}
             {p.link && (
               <a href={p.link} target="_blank" rel="noreferrer" className="text-app-text-accent hover:underline">
-                לרגע בשיחה
+                {t("proposal.momentInCall")}
               </a>
             )}
           </div>
-          {p.reason && <p className="mt-1 text-xs text-app-text-secondary">למה: {p.reason}</p>}
-          {p.quote && <p className="mt-1 border-s-2 border-app-border ps-2 text-xs italic text-app-text-secondary">{p.quote}</p>}
+          {p.reason && (
+            <p className="mt-1 text-xs text-app-text-secondary">
+              {t("proposal.why")} <bdi>{p.reason}</bdi>
+            </p>
+          )}
+          {p.quote && (
+            <p className="mt-1 border-s-2 border-app-border ps-2 text-xs italic text-app-text-secondary" dir="auto">
+              {p.quote}
+            </p>
+          )}
           {/* "Already in the file" is said once, above, with what is there. */}
           {p.flags.filter((f) => !(p.alreadyIn && f.code === "DUPLICATE")).map((f, i) => (
+            // The flag's sentences are written by the domain in Hebrew and
+            // stored with the proposal (ADR 0006: not yet coded), so they
+            // read in their own direction.
             <p key={i} className={`mt-1 text-xs ${f.block ? "font-medium text-app-error" : "text-app-warning"}`} data-testid="proposal-flag">
-              {f.message}
-              {f.why && <span className="block font-normal text-app-text-secondary">למה: {f.why}</span>}
+              <bdi>{f.message}</bdi>
+              {f.why && (
+                <span className="block font-normal text-app-text-secondary">
+                  {t("proposal.why")} <bdi>{f.why}</bdi>
+                </span>
+              )}
               {f.fix && (
                 <span className="block font-normal text-app-text-secondary" data-testid="proposal-suggested">
-                  נוסח מוצע: <span className="text-app-text-primary">{f.fix.label}</span>
+                  {t("proposal.suggested")} <bdi className="text-app-text-primary">{f.fix.label}</bdi>
                 </span>
               )}
               {/* The same item under another spelling: added to it, not a second one. */}
               {/* A date is not merged: the existing one is opened and completed. */}
               {f.match && p.target === "DATE" && (
                 <a href={`/app/important-dates/${f.match.id}`} className="ms-2 font-medium text-app-text-accent hover:underline" data-testid="proposal-date-match">
-                  לפתוח את {f.match.name}
+                  {t("proposal.openDate", { name: f.match.name })}
                 </a>
               )}
               {f.match && !blocked && p.target !== "DATE" && (
                 <button type="button" onClick={() => merge(f.match!)} className="ms-2 font-medium text-app-text-accent hover:underline" data-testid="proposal-merge">
-                  להוסיף אל {f.match.name}
+                  {t("proposal.addTo", { name: f.match.name })}
                 </button>
               )}
             </p>
@@ -502,13 +614,13 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
               be refused. The primary action closes it onto the item there. */}
           {p.alreadyIn ? (
             <button type="button" onClick={attach} className="rounded-full bg-app-accent px-3.5 py-1.5 font-medium text-app-text-primary">
-              {p.alreadyIn.addsSources ? "כבר בתיק: הוספת המקור" : "כבר בתיק: סגירה"}
+              {p.alreadyIn.addsSources ? t("proposal.alreadyInAddSource") : t("proposal.alreadyInClose")}
             </button>
           ) : (
             <>
               {suggested && (
                 <button type="button" onClick={approveSuggested} className="rounded-full bg-app-accent px-3.5 py-1.5 font-medium text-app-text-primary" data-testid="proposal-approve-suggested">
-                  {p.combinedProcedure ? "להשלים בנוסח המוצע ולאשר את ההצעה והנוהל" : "להשלים בנוסח המוצע ולאשר"}
+                  {p.combinedProcedure ? t("proposal.approveSuggestedCombined") : t("proposal.approveSuggested")}
                 </button>
               )}
               {/* A process that only lacks a check enters as a draft: it may
@@ -519,22 +631,22 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
                   onClick={approve}
                   className={`rounded-full px-3.5 py-1.5 font-medium ${doubtful || suggested ? "border border-app-border text-app-text-secondary" : "bg-app-accent text-app-text-primary"}`}
                 >
-                  {p.combinedProcedure ? COMBINED_APPROVE_LABEL : "אישור"}
+                  {p.combinedProcedure ? t("proposal.approveCombined") : t("proposal.approve")}
                 </button>
               )}
             </>
           )}
-          <Drawer triggerLabel="עריכה ואישור" title="עריכה לפני אישור" variant="link">
+          <Drawer triggerLabel={t("proposal.editAndApprove")} title={t("proposal.editTitle")} variant="link">
             <EditForm p={p} />
           </Drawer>
           {/* Not knowledge but something to do: a task, not a rejection
               and not an item forced into the file. */}
           {!p.taskBlocked ? (
-            <Drawer triggerLabel="למשימה" title="הצעה שהיא משימה" variant="link">
+            <Drawer triggerLabel={t("proposal.toTask")} title={t("proposal.toTaskTitle")} variant="link">
               <TaskForm p={p} staff={staff} meId={meId} />
             </Drawer>
           ) : null}
-          <Drawer triggerLabel="דחייה" title="דחיית הצעה" variant="link">
+          <Drawer triggerLabel={t("reject.submit")} title={t("reject.title")} variant="link">
             <RejectForm p={p} />
           </Drawer>
         </div>
@@ -560,8 +672,9 @@ export function ReviewBatch({
   batchId?: string;
   clientId: string;
   clientName: string;
-  sourceLabel: string;
-  sourceDetails: string;
+  /// The source's code and title (content), or null: no source.
+  sourceLabel: string | null;
+  sourceDetails: SourceDetails;
   note: string | null;
   droppedCount: number;
   proposals: ReviewProposal[];
@@ -572,14 +685,16 @@ export function ReviewBatch({
   staff: ReviewStaff;
   meId: string;
 }) {
+  const t = useTranslations("knowledge");
+  const details = useSourceDetailsLine(sourceDetails);
   const { showToast } = useToast();
   const pending = proposals.filter((p) => p.state === "PENDING");
   // What this person may decide here: not a sensitive item hidden from them.
   const decidable = pending.filter((p) => !p.hiddenFor);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const chosen = decidable.filter((p) => selected.has(p.id));
-  const approvable = chosen.filter((p) => !bulkApproveBlocker({ ...p, level: p.confidence.level }));
-  const allTogether = decidable.filter((p) => !bulkApproveBlocker({ ...p, level: p.confidence.level }));
+  const approvable = chosen.filter((p) => !p.aloneBecause);
+  const allTogether = decidable.filter((p) => !p.aloneBecause);
   const select = (id: string, on: boolean) =>
     setSelected((all) => {
       const next = new Set(all);
@@ -594,16 +709,16 @@ export function ReviewBatch({
     const r = await approveProposalsAction(approvable.slice(0, MAX_BULK).map((p) => p.id));
     setBusy(false);
     if (r.error) {
-      showToast({ tone: "error", title: "האישור נכשל", description: r.error });
+      showToast({ tone: "error", title: t("toasts.approveFailed"), description: r.error });
       return;
     }
     setSelected(new Set((r.failed ?? []).map((f) => f.id)));
-    if (r.failed?.length) showToast({ tone: "error", title: `${r.done} נכנסו לתיק, ${r.failed.length} לא`, description: r.failed[0].error });
-    else showToast({ tone: "info", title: r.done === 1 ? "נכנס לתיק" : `${r.done} נכנסו לתיק` });
+    if (r.failed?.length) showToast({ tone: "error", title: t("toasts.someEntered", { done: r.done ?? 0, failed: r.failed.length }), description: r.failed[0].error });
+    else showToast({ tone: "info", title: t("toasts.entered", { count: r.done ?? 0 }) });
   }
   const counts = Object.entries(
     pending.reduce<Record<string, number>>((acc, p) => {
-      const k = targetLabel(p);
+      const k = kindLabelOf(t, p);
       acc[k] = (acc[k] ?? 0) + 1;
       return acc;
     }, {})
@@ -613,30 +728,39 @@ export function ReviewBatch({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-xs text-app-text-tertiary">
-            <a href={`/app/clients/${clientId}/client-file`} className="hover:text-app-text-accent">
+            <a href={`/app/clients/${clientId}/client-file`} className="hover:text-app-text-accent" dir="auto">
               {clientName}
             </a>
           </p>
-          <h2 className="text-sm font-medium text-app-text-primary">{sourceLabel}</h2>
-          {sourceDetails && <p className="text-xs text-app-text-secondary">{sourceDetails}</p>}
+          <h2 className="text-sm font-medium text-app-text-primary" dir="auto">
+            {sourceLabel ?? t("source.none")}
+          </h2>
+          {details && <p className="text-xs text-app-text-secondary">{details}</p>}
         </div>
-        <p className="text-xs text-app-text-secondary">{counts.map(([k, n]) => `${n} ${k}`).join(" · ")}</p>
+        <p className="text-xs text-app-text-secondary">{counts.map(([k, n]) => t("batch.kindCount", { count: n, kind: k })).join(" · ")}</p>
       </div>
       {/* Spec 5.2: how much of the card goes together, before reading it. */}
       {(() => {
-        const line = reviewSummary(decidable.map((p) => p.rank));
-        return line ? (
+        const c = reviewSummaryCounts(decidable.map((p) => p.rank));
+        if (!c) return null;
+        const line =
+          c.alone === 0
+            ? t("summary.allTogether", { count: c.together })
+            : c.together === 0
+              ? t("summary.allAlone", { count: c.alone })
+              : t("summary.mixed", { alone: t("summary.mixedAlone", { count: c.alone }), together: t("summary.mixedTogether", { count: c.together }) });
+        return (
           <p className="mt-2 text-xs font-medium text-app-text-secondary" data-testid="review-summary">
             {line}
           </p>
-        ) : null;
+        );
       })()}
-      {note && <p className="mt-2 text-xs text-app-text-secondary">{note}</p>}
-      {droppedCount > 0 && (
-        <p className="mt-2 text-xs text-app-warning">
-          {droppedCount === 1 ? "פריט אחד לא נכנס להצעות" : `${droppedCount} פריטים לא נכנסו להצעות`} (סוד, ציטוט ממקור מוגבל או מבנה שגוי). מה שנדחה לא נשמר.
+      {note && (
+        <p className="mt-2 text-xs text-app-text-secondary" dir="auto">
+          {note}
         </p>
       )}
+      {droppedCount > 0 && <p className="mt-2 text-xs text-app-warning">{t("batch.dropped", { count: droppedCount })}</p>}
       {decidable.length > 1 && (
         // No backdrop-blur here. A backdrop filter makes this bar the
         // containing block of every fixed descendant, so the reject
@@ -651,30 +775,28 @@ export function ReviewBatch({
               onChange={(e) => setSelected(new Set(e.target.checked ? decidable.map((p) => p.id) : []))}
               className="h-4 w-4 accent-gold"
             />
-            {filtered ? "כל מה שבסינון" : "הכול"} ({decidable.length})
+            {filtered ? t("batch.selectAllFiltered", { count: decidable.length }) : t("batch.selectAll", { count: decidable.length })}
           </label>
           {allTogether.length > 0 && allTogether.length < decidable.length && (
             <button type="button" onClick={() => setSelected(new Set(allTogether.map((p) => p.id)))} className="text-app-text-accent hover:underline">
-              רק מה שאפשר לאשר יחד ({allTogether.length})
+              {t("batch.selectTogether", { count: allTogether.length })}
             </button>
           )}
           {chosen.length > 0 && (
             <>
-              <span className="text-app-text-tertiary">נבחרו {chosen.length}</span>
+              <span className="text-app-text-tertiary">{t("batch.chosen", { count: chosen.length })}</span>
               <button
                 type="button"
                 onClick={approveChosen}
                 disabled={busy || approvable.length === 0}
                 className="rounded-full bg-app-accent px-3.5 py-1.5 font-medium text-app-text-primary disabled:opacity-40"
               >
-                {busy ? "מאשר..." : `אישור ${approvable.length}`}
+                {busy ? t("batch.approving") : t("batch.approveCount", { count: approvable.length })}
               </button>
-              <Drawer triggerLabel={`דחיית ${chosen.length}`} title="דחיית הצעות" variant="link">
+              <Drawer triggerLabel={t("batch.rejectCount", { count: chosen.length })} title={t("rejectMany.title")} variant="link">
                 <RejectManyForm ids={chosen.map((p) => p.id)} />
               </Drawer>
-              {approvable.length < chosen.length && (
-                <span className="text-app-text-tertiary">{chosen.length - approvable.length} מהנבחרות מאשרים אחת אחת: משנות פריט קיים, אולי כבר בתיק, או רגישות.</span>
-              )}
+              {approvable.length < chosen.length && <span className="text-app-text-tertiary">{t("batch.someAlone", { count: chosen.length - approvable.length })}</span>}
             </>
           )}
         </div>

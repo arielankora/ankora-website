@@ -7,7 +7,8 @@ import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { createTask } from "@/lib/app-domain/tasks";
 import { findSecrets } from "@/lib/secret-scan";
-import { missingRequired, payloadText, resolveKnowledgeStatus, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { missingRequired, payloadText, proposalHeadline, resolveKnowledgeStatus, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { DomainError } from "@/lib/domain-error";
 import { assignmentReasonError, candidatesError, itemsForClient, waitingItemLine } from "@/lib/batch-assignment";
 import { proposeKnowledge, type ProposalItemInput, type ProposeResult } from "@/lib/app-domain/knowledge-proposals";
 
@@ -168,9 +169,18 @@ export async function listAwaitingAssignment(actor: User) {
       note: b.note,
       reason: b.assignmentReason,
       proposedClientId: b.clientId,
-      candidates: b.candidateClientIds.map((id) => ({ id, name: clientName.get(id) ?? "לקוח שהוסר" })),
+      candidates: b.candidateClientIds.map((id) => ({ id, name: clientName.get(id) ?? "לקוח שהוסר", removed: !clientName.has(id) })),
       source: { title: input.source.title, occurredAt: input.source.occurredAt ? new Date(input.source.occurredAt) : null, participants: input.source.participants, topicsOnly: input.source.restriction === "TOPICS_ONLY" },
       items: input.items.map(({ item }) => waitingItemLine(item.target as ProposalTargetLike, item.payload)),
+      /// ADR 0006: `items` as parts, for a screen in another language: the
+      /// kind, and the line (null for a sensitive item, which says only
+      /// that it is there).
+      itemParts: input.items.map(({ item }) => {
+        const payload = item.payload as Record<string, unknown>;
+        if (payload.sensitivity === "SENSITIVE") return { target: item.target as ProposalTargetLike, headline: null };
+        const headline = proposalHeadline(item.target as ProposalTargetLike, payload).trim();
+        return { target: item.target as ProposalTargetLike, headline: headline.length > 140 ? `${headline.slice(0, 139)}…` : headline };
+      }),
       droppedCount: Array.isArray(b.dropped) ? b.dropped.length : 0,
     };
   });
@@ -178,7 +188,7 @@ export async function listAwaitingAssignment(actor: User) {
 
 async function findWaiting(actor: User, batchId: string) {
   const batch = await prisma.knowledgeBatch.findUnique({ where: { id: batchId } });
-  if (!batch || !batch.awaitingAssignment) throw new Error("השיחה כבר שויכה, או שהיא לא נמצאה.");
+  if (!batch || !batch.awaitingAssignment) throw new DomainError("batchAssignment.notWaiting", "השיחה כבר שויכה, או שהיא לא נמצאה.");
   for (const id of batch.candidateClientIds) await assertClientAccess(actor, id);
   return batch;
 }
@@ -189,10 +199,10 @@ async function findWaiting(actor: User, batchId: string) {
 export async function assignBatch(actor: User, batchId: string, clientId: string): Promise<ProposeResult & { clientId: string }> {
   assertCan(actor.role, "time_entry.create_self");
   const batch = await findWaiting(actor, batchId);
-  if (!batch.candidateClientIds.includes(clientId)) throw new Error("הלקוח שנבחר אינו אחד המועמדים.");
+  if (!batch.candidateClientIds.includes(clientId)) throw new DomainError("batchAssignment.notACandidate", "הלקוח שנבחר אינו אחד המועמדים.");
   // Two people deciding at once: the first one takes it.
   const claimed = await prisma.knowledgeBatch.updateMany({ where: { id: batchId, awaitingAssignment: true }, data: { awaitingAssignment: false } });
-  if (claimed.count === 0) throw new Error("השיחה כבר שויכה.");
+  if (claimed.count === 0) throw new DomainError("batchAssignment.alreadyAssigned", "השיחה כבר שויכה.");
 
   const input = batch.pendingInput as unknown as StoredInput;
   const same = clientId === batch.clientId;
@@ -242,9 +252,9 @@ export async function discardAwaiting(actor: User, batchId: string, why: string)
   assertCan(actor.role, "time_entry.create_self");
   const batch = await findWaiting(actor, batchId);
   const line = why.trim();
-  if (!line) throw new Error("כותבים בשורה אחת למה השיחה לא שייכת לאף אחד מהם.");
+  if (!line) throw new DomainError("batchAssignment.discardReasonRequired", "כותבים בשורה אחת למה השיחה לא שייכת לאף אחד מהם.");
   const removed = await prisma.knowledgeBatch.deleteMany({ where: { id: batchId, awaitingAssignment: true } });
-  if (removed.count === 0) throw new Error("השיחה כבר שויכה.");
+  if (removed.count === 0) throw new DomainError("batchAssignment.alreadyAssigned", "השיחה כבר שויכה.");
   await recordAudit({
     actorId: actor.id,
     action: "knowledge_batch.discard",

@@ -1549,6 +1549,58 @@
       "dismissReasonRequired": "Write in one line why this is not relevant.",
       "taskExists": "There is already a task for this question.",
       "snooze": "{problem, select, date {Choose a date.} past {The date must be in the future.} other {You can snooze up to a year ahead.}}"
+    },
+    "decideApproval": {
+      "procedureHere": "Procedures are approved here and fixed in the process itself.",
+      "planHere": "Plans are approved here and fixed in the task itself.",
+      "processNoOp": "There is no action to run here. Open the process.",
+      "internalHere": "Internal file items are approved here, or open the file.",
+      "checkWithClaude": "Signatures are checked with Claude, on the staff member's page.",
+      "knowledgeOneByOne": "File proposals are approved one by one, in the Extracted knowledge tab."
+    },
+    "procedureApproval": {
+      "notApprover": "Only a manager or the client's account manager can approve a procedure.",
+      "separationRequired": "This client requires separation: whoever wrote the procedure version doesn't approve it. Someone else approves."
+    },
+    "knowledgeProposals": {
+      "notFound": "The proposal was not found.",
+      "alreadyDecided": "This proposal has already been decided.",
+      "parentEntityMissing": "The parent entity \"{name}\" is not in the file. Add it first, or delete the name in the edit.",
+      "narrativeUnchanged": "This is already the text in the file. Reject the proposal.",
+      "narrativeChanged": "Someone changed the text since the proposal arrived. Reject it, and update the text on the client screen.",
+      "taskMalformed": "The task is not built correctly: {issues}",
+      "unknownKind": "Unknown item kind.",
+      "noSuggestion": "This proposal has no suggested wording. Complete it in the edit, or reject it.",
+      "secretInEdit": "The edit contains a password, key or card number. Secrets are kept in the vault, not in the file.",
+      "alreadyInFile": "{item}: already in the file. \"Already in the file: add the source\" adds the source to the item in the file.",
+      "noLongerInFile": "The item is no longer in the file. Approve the proposal as usual.",
+      "mergeOnlyNew": "Only a proposal for a new, named item can be added to an existing item.",
+      "existingGone": "The existing item is no longer in the file.",
+      "rejectReasonRequired": "Write in one line why the proposal is rejected.",
+      "taskBlocked": "{reason, select, alreadyTask {The proposal is already a task: approving it opens it.} sensitive {A sensitive item does not become a task: a task is visible to everyone working on the client.} other {An item only part of the team can see does not become a task.}}",
+      "taskTitle": "{reason, select, empty {Write what needs doing in the title.} other {The task title should say what needs doing, not repeat what was said. For example: \"Find out from Dikla when payroll is paid\".}}",
+      "secretInTask": "The text contains a password, key or card number. Remove them before opening a task.",
+      "noneChosen": "No proposals were selected.",
+      "tooMany": "Up to {max} proposals at a time.",
+      "bulkRejectReasonRequired": "Write in one line why the proposals are rejected.",
+      "approveOneByOne": "Approve one at a time: {reason, select, blocked {something in it blocks approval} changesExisting {it changes an item already in the file} maybeInFile {it may already be in the file} sensitive {sensitive information} doNotDisclose {it has something not to tell} clientVisible {visible to the client} taskForOther {it opens a task for someone else} domain {a domain changes which meetings belong to the client} other {low review level}}.",
+      "cannotRevert": "{reason, select, notApproved {Only an approved proposal can be undone.} alreadyReverted {The proposal was already undone.} notCreate {Undo is only possible for a proposal that added a new item, not for a change to an existing one.} nothingCreated {The proposal did not create a new item (it was already in the file), so there is nothing to undo.} other {Undo is only possible for a fact, contact, vendor or legal entity, not for {target, select, SYSTEM {a system} REQUEST_TYPE {a request type} POLICY {a client rule} NARRATIVE {an overview, background or our role} PROCESS {a process} DOMAIN {a domain} TASK {a task} DATE {a date} FACT {a fact} CONTACT {a contact} ORGANIZATION {a vendor or service provider} ENTITY {a legal entity} other {an item of this kind}}.}}",
+      "alreadyReverted": "The proposal was already undone.",
+      "notRemoved": "The item was not removed from the file: {error}",
+      "managersOnly": "Managers only."
+    },
+    "batchAssignment": {
+      "notWaiting": "The call was already assigned, or it was not found.",
+      "notACandidate": "The chosen client is not one of the candidates.",
+      "alreadyAssigned": "The call was already assigned.",
+      "discardReasonRequired": "Write in one line why the call does not belong to any of them."
+    },
+    "autoApply": {
+      "pauseAlreadyLifted": "The pause was already lifted.",
+      "notFound": "The proposal was not found.",
+      "notAutoApplied": "The proposal was not added automatically.",
+      "alreadyRemoved": "The item was already removed from the file.",
+      "alreadyMarked": "Already marked correct."
     }
   },
   "calendar": {
@@ -3948,6 +4000,588 @@
         "needsPasskey": "Viewing logins requires a passkey (Touch ID).",
         "setUp": "Set one up in your profile"
       }
+    }
+  },
+  "approvals": {
+    "title": "Approvals",
+    "intro": "What is waiting for your decision. Each row says what we recommend and why, with a button that does it. Whatever is holding up work comes first.",
+    "clientsNav": "Filter by client",
+    "allClients": "All clients",
+    "tabsLabel": "Approval types",
+    "tabWithCount": "{label} ({count})",
+    "tabs": {
+      "all": "All",
+      "task": "Tasks to sign off",
+      "exception": "Exceptions",
+      "rule": "Rules",
+      "procedure": "Procedures",
+      "process": "Processes",
+      "internal": "Internal file",
+      "knowledge": "Extracted knowledge",
+      "plan": "Task plans",
+      "summary": "Client summaries",
+      "guide": "Extraction guide",
+      "check": "To check"
+    },
+    "kinds": {
+      "task": "Task",
+      "exception": "Exception",
+      "rule": "Rule",
+      "procedure": "Procedure",
+      "process": "Process",
+      "internal": "Internal file",
+      "knowledge": "Knowledge",
+      "plan": "Plan",
+      "summary": "Summary",
+      "guide": "Guide",
+      "check": "To check"
+    },
+    "empty": {
+      "all": "Nothing is waiting for your decision right now.",
+      "tab": "No {tab} are waiting for you right now."
+    },
+    "today": "Today",
+    "rest": "Everything else ({count})",
+    "scope": {
+      "mine": "Mine",
+      "everyone": "Everyone's",
+      "hidden": "{count, plural, =1 {One meeting someone else sent is} other {# meetings other people sent are}} waiting on them, not on you."
+    },
+    "waited": {
+      "today": "Since today",
+      "yesterday": "Since yesterday",
+      "days": "{count} days now"
+    },
+    "row": {
+      "recommend": "Recommended: {text}.",
+      "toProcess": "Go to process",
+      "moreFailing": "{count} more checks, under \"{toggle}\".",
+      "hide": "Hide",
+      "from": "from {name}",
+      "reasonPlaceholder": "Why, in one line",
+      "reasonLabel": "Reason",
+      "saving": "Saving...",
+      "cancel": "Cancel",
+      "confirm": "Yes, {label}",
+      "open": "Open",
+      "otherwise": "Something else",
+      "approveFailed": "Approval failed",
+      "actionFailed": "Action failed",
+      "done": "Done",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "blockingTitle": "What is holding up approval"
+    },
+    "preview": {
+      "toggle": {
+        "procedure": "Show procedure",
+        "rule": "Show rule",
+        "plan": "Show plan"
+      },
+      "headings": {
+        "steps": "Steps",
+        "highlights": "Key points",
+        "outputs": "What should exist at the end",
+        "excepted": "Checks with an approved exception",
+        "rule": "The rule",
+        "interim": "Until approved",
+        "why": "Why",
+        "planSteps": "Steps the plan proposes"
+      }
+    },
+    "bulk": {
+      "label": "Approve {client}'s {count} rules",
+      "confirm": "Yes, {label}",
+      "approving": "Approving...",
+      "cancel": "Cancel",
+      "approveFailed": "Approval failed",
+      "approved": "{count} rules approved",
+      "notApproved": "Not approved: {list}"
+    },
+    "errors": {
+      "forbidden": "You don't have permission to decide on this.",
+      "generic": "Something went wrong. Please try again."
+    },
+    "items": {
+      "task": {
+        "detail": "Step in task: {title}",
+        "approve": "Approve and close",
+        "reject": "Send back",
+        "recommend": "Check the result, approve and close",
+        "why": "The work is done and was sent for sign-off. The task doesn't close without approval."
+      },
+      "exception": {
+        "detail": "Exception to the rule \"{rule}\" until {until}. Why: {reason}",
+        "approve": "Approve exception",
+        "reject": "Reject",
+        "recommend": "Approve if the reason is good enough",
+        "why": "The exception is limited until {until}, then the rule applies again."
+      },
+      "rule": {
+        "approve": "Approve rule",
+        "reject": "Remove",
+        "recommend": "Approve",
+        "whyInternal": "Internal file: Ankora is the client, so there is no one to ask. Approving marks the rule as confirmed and puts it in force.",
+        "whyInterim": "The client said this explicitly. Until approval the interim rule applies; after it, the rule itself is checked against every procedure and task.",
+        "whyConfirmed": "The client said this explicitly. Once approved, the rule is checked against every procedure and task."
+      },
+      "procedure": {
+        "detail": "{version} · {steps}",
+        "versionNote": "Version {version}: {note}",
+        "versionPlain": "Version {version} of the procedure",
+        "steps": "{count, plural, =1 {One step} other {# steps}}",
+        "blockedChecks": "The procedure doesn't pass its checks. Fix it in the process, then approve.",
+        "blocker": {
+          "notApprover": "Only a manager or the client's account manager can approve a procedure.",
+          "separationRequired": "This client requires separation: whoever wrote the procedure version doesn't approve it. Someone else approves."
+        },
+        "approve": "Approve procedure",
+        "recommendFix": "Fix it in the process, then approve",
+        "whyFix": "A procedure that doesn't meet the client's rules isn't approved.",
+        "recommendOther": "Someone else approves",
+        "whyOther": "The client asked to separate whoever writes a procedure from whoever approves it.",
+        "recommend": "Read and approve",
+        "why": "Passes every check against the client's rules. Without an approved procedure the process doesn't open runs."
+      },
+      "knowledge": {
+        "title": "{count, plural, =1 {One proposal} other {# proposals}} for the file",
+        "titleFrom": "{count, plural, =1 {One proposal} other {# proposals}} for the file from \"{source}\"",
+        "recommend": "Go through the proposals",
+        "why": "Each proposal enters the file only after approval, with its source.",
+        "go": "Review"
+      },
+      "plan": {
+        "detail": "Plan, version {version}: {body}",
+        "approve": "Approve plan",
+        "recommend": "Read and approve",
+        "why": "Whoever is doing the task is waiting for an approved plan to start."
+      },
+      "summary": {
+        "title": "Summary for {month}",
+        "approve": "Approve for portal",
+        "reject": "Discard draft",
+        "recommend": "Read and approve for the portal",
+        "why": "The client sees the summary in the portal only after approval."
+      },
+      "guide": {
+        "title": "Extraction guidelines, version {version}",
+        "approve": "Approve version",
+        "reject": "Reject",
+        "recommend": "Read the change and approve",
+        "why": "The guidelines decide what Claude extracts from every meeting, from now on."
+      },
+      "internal": {
+        "title": "{count, plural, =1 {One item} other {# items}} from \"{source}\"",
+        "detail": "Marked uncertain only because the source is an Ankora document.",
+        "approve": "Approve all",
+        "recommend": "Approve",
+        "why": "Internal file: Ankora is the client, so there is no one to ask. The approval is logged, with the source."
+      },
+      "check": {
+        "title": "{document} from {name}",
+        "documents": {
+          "CONFIDENTIALITY": "Confidentiality undertaking",
+          "DELETION_DECLARATION": "Deletion declaration",
+          "other": "Document"
+        },
+        "detail": "A signed PDF was uploaded and is waiting to be checked.",
+        "recommend": "Check and record",
+        "why": "At the top of the user's page: the file, what to check in it, and recording or returning it with a reason. You can also ask Claude to check.",
+        "go": "Check"
+      }
+    }
+  },
+  "knowledge": {
+    "saving": "Saving...",
+    "or": "or",
+    "sensitiveHidden": "Sensitive item. Only {who} can see it and decide on it.",
+    "sensitiveApprovers": "whoever approves sensitive information",
+    "policyKind": "Rule: {kind}",
+    "targets": {
+      "FACT": "Fact",
+      "CONTACT": "Contact",
+      "ORGANIZATION": "Vendor or service provider",
+      "SYSTEM": "System",
+      "REQUEST_TYPE": "Request type",
+      "POLICY": "Client rule",
+      "ENTITY": "Legal entity",
+      "NARRATIVE": "Overview, background or our role",
+      "PROCESS": "Process",
+      "DOMAIN": "Domain",
+      "TASK": "Task",
+      "DATE": "Date"
+    },
+    "factKinds": {
+      "SCOPE_IN": "In scope",
+      "SCOPE_OUT": "Out of scope",
+      "PREFERENCE": "Preference",
+      "REQUIREMENT": "Standing requirement",
+      "LOCATION": "Location",
+      "FINANCE": "Finance",
+      "TEMPORARY": "Temporary information",
+      "ONE_OFF_DECISION": "One-off decision",
+      "QUESTION": "Open question",
+      "NOTE": "Note"
+    },
+    "policyKinds": {
+      "DATA_HANDLING": "Data handling",
+      "DISCLOSURE": "Disclosure",
+      "COMMUNICATION": "Communication",
+      "SEPARATION": "Separation",
+      "APPROVAL_REQUIRED": "Approval required",
+      "THRESHOLD": "Threshold",
+      "REQUIRED_STEP": "Required step",
+      "TIMING": "Timing",
+      "FORBIDDEN": "Prohibition",
+      "INFO": "Working rule"
+    },
+    "narrativeKinds": {
+      "OVERVIEW": "Overview",
+      "BACKGROUND": "Background",
+      "OUR_ROLE": "Our role"
+    },
+    "actions": {
+      "CREATE": "New",
+      "SUPERSEDE": "New version of an existing item",
+      "CONTRADICT": "Contradicts an existing item"
+    },
+    "confidence": {
+      "HIGH": "High confidence",
+      "MEDIUM": "Medium confidence",
+      "LOW": "Low confidence"
+    },
+    "confidenceReasons": {
+      "notStated": "Claude did not say how sure it is",
+      "noMinute": "No minute in the recording",
+      "topicsOnly": "Topics-only source",
+      "secondary": "Secondary source",
+      "uncertain": "Uncertain according to Claude"
+    },
+    "statuses": {
+      "CONFIRMED": "Confirmed",
+      "UNCERTAIN": "Uncertain",
+      "MISSING": "Missing",
+      "SUPERSEDED": "Superseded"
+    },
+    "sourceKinds": {
+      "TRANSCRIPT": "Recording",
+      "CLIENT_DOCUMENT": "Client document",
+      "TASK": "Task",
+      "PERSON": "Told in person",
+      "ANKORA_DOCUMENT": "Ankora document",
+      "EMAIL": "Email"
+    },
+    "tierReasons": {
+      "blocked": "something in it blocks approval",
+      "changesExisting": "it changes an item already in the file",
+      "maybeInFile": "it may already be in the file",
+      "sensitive": "sensitive information",
+      "doNotDisclose": "it has something not to tell",
+      "clientVisible": "visible to the client",
+      "taskForOther": "it opens a task for someone else",
+      "domain": "a domain changes which meetings belong to the client",
+      "lowLevel": "low review level",
+      "simpleHigh": "a new, simple item with a high review level",
+      "medium": "medium review level",
+      "openQuestion": "open question",
+      "temporary": "temporary information",
+      "needsPerson": "does not go in without a person"
+    },
+    "priority": {
+      "LOW": "Low",
+      "NORMAL": "Normal",
+      "HIGH": "High",
+      "URGENT": "Urgent"
+    },
+    "billingCycle": {
+      "MONTHLY": "Monthly",
+      "ANNUAL": "Annual",
+      "OTHER": "Other"
+    },
+    "details": {
+      "refs": "References: {refs}",
+      "clientVisible": "Visible to the client",
+      "owner": "Owner: {name}",
+      "entity": "Entity: {name}",
+      "subject": "Of: {name}",
+      "routeTo": "Route to: {names}",
+      "triggersProcess": "Triggers: {name}",
+      "externalParty": "External party: {names}",
+      "systems": "Systems: {names}",
+      "approver": "Approver: {name}",
+      "approvalPolicies": "Approval rules: {titles}",
+      "invoiceTo": "Invoice to: {name}",
+      "dueDate": "Due date: {date}",
+      "assignee": "Assignee: {name}",
+      "trigger": "Triggered by: {text}",
+      "sla": "SLA: {text}",
+      "condition": "On condition: {text}",
+      "expectsReceipt": "Waiting for a receipt",
+      "expectsReceiptFrom": "Waiting for a receipt from {from}",
+      "businessDayBefore": "The business day before, if it falls on a day off",
+      "businessDayAfter": "The next business day, if it falls on a day off",
+      "responsible": "Responsible: {name}",
+      "taskSameDay": "Task on the day itself",
+      "taskDaysBefore": "Task {days} days before",
+      "parent": "Subsidiary of {name}",
+      "effectiveFrom": "In effect from {date}",
+      "reviewBy": "Review by {date}",
+      "partnerDomain": "Partner domain",
+      "clientDomain": "Client domain",
+      "priority": "Priority: {priority}",
+      "billing": "Billing: {details}",
+      "card": "card {last4}",
+      "requiresApproval": "(requires approval)"
+    },
+    "source": {
+      "none": "No source",
+      "topicsOnly": "Topics only",
+      "sentBy": "Sent by {name}"
+    },
+    "toasts": {
+      "processAndProcedureApproved": "Process and procedure approved",
+      "processDraftProcedureWaits": "The process went in as a draft. The procedure is waiting",
+      "taskOpened": "Task opened",
+      "approveFailed": "Approval failed",
+      "enteredFile": "Added to the file",
+      "completedAndEntered": "Completed and added to the file",
+      "notClosed": "Not closed",
+      "sourceAdded": "Source added to the item in the file",
+      "closedAlreadyIn": "Closed: already in the file",
+      "mergeFailed": "Adding failed",
+      "merged": "Added to {name}",
+      "someEntered": "{done} added to the file, {failed} not",
+      "entered": "{count, plural, =1 {Added to the file} other {# added to the file}}"
+    },
+    "edit": {
+      "fields": {
+        "body": "What",
+        "validUntilEvent": "Valid until (event)",
+        "decidedBy": "Who decided",
+        "decidedAt": "Decision date (2026-10-17)",
+        "name": "Name",
+        "role": "Role",
+        "context": "What to know",
+        "orgRole": "What they are to the client",
+        "notes": "Notes",
+        "requestTitle": "Request type",
+        "handling": "How to answer and where to route it",
+        "policyTitle": "Rule name",
+        "statement": "The rule",
+        "interimStatement": "Until it is approved",
+        "systemName": "System",
+        "systemPurpose": "What it is used for",
+        "blocker": "What is blocking",
+        "legalName": "Legal name",
+        "registrationNumber": "Company number or EIN",
+        "narrativeBody": "The text",
+        "processTitle": "Process name",
+        "processPurpose": "Why it exists",
+        "triggerText": "What triggers it",
+        "domain": "Domain",
+        "taskTitle": "What to do",
+        "description": "Details",
+        "assigneeName": "Owner at Ankora (name)",
+        "dueDate": "Due date (2026-10-22)",
+        "dateTitle": "What the date is",
+        "date": "Date (2026-10-22), one-off or yearly",
+        "responsibleName": "Owner at Ankora (name)"
+      },
+      "status": "Status",
+      "toResolveIfNotConfirmed": "What would settle it (if not confirmed)",
+      "whatClosesQuestion": "What would close it",
+      "ownerName": "Owner at Ankora (name)",
+      "clientVisible": "Visible to the client",
+      "no": "No",
+      "yes": "Yes",
+      "openTask": "Open the task",
+      "approveCombinedWithChanges": "Approve proposal and procedure with the changes",
+      "approveWithChanges": "Approve with the changes"
+    },
+    "reject": {
+      "whyLabel": "Why, in one line *",
+      "placeholder": "Small talk, not relevant to the work",
+      "submit": "Reject",
+      "title": "Reject proposal"
+    },
+    "rejectMany": {
+      "intro": "{count, plural, =1 {One proposal will be rejected.} other {# proposals will be rejected, with the same reason.}}",
+      "placeholder": "Already in the file from the daily extraction",
+      "title": "Reject proposals"
+    },
+    "task": {
+      "intro": "The proposal will not go into the file. Instead, a task opens on the client, and the proposal is marked \"became a task\".",
+      "titleLabel": "What needs doing? Task title *",
+      "titlePlaceholder": "Find out from... / Send to... / Order...",
+      "said": "What was said: {said}. The title says what needs doing, not what was said.",
+      "description": "Description",
+      "assignee": "Assignee",
+      "dueDate": "Due date",
+      "categoryHint": "The category is chosen from the title, and you can change it in the task.",
+      "priority": "Priority",
+      "opening": "Opening...",
+      "submit": "Open task"
+    },
+    "revert": {
+      "button": "Undo",
+      "failed": "Undo failed",
+      "done": "Undone: the item was removed from the file",
+      "confirm": "Remove the item from the file?",
+      "removing": "Removing...",
+      "remove": "Remove",
+      "keep": "Keep"
+    },
+    "decided": {
+      "reverted": "Approved and undone:",
+      "autoApplied": "Added automatically:",
+      "alreadyIn": "Already in the file:",
+      "taskOpened": "Task opened:",
+      "approved": "Approved:",
+      "becameTask": "Became a task:",
+      "rejected": "Rejected:",
+      "toTask": "Open task"
+    },
+    "proposal": {
+      "select": "Select: {headline}",
+      "aloneHint": "Can be rejected together with others. Approve one at a time ({reason})",
+      "alreadyIn": "Already in the file:",
+      "inFileToday": "In the file today:",
+      "momentInCall": "Jump to the moment in the call",
+      "why": "Why:",
+      "suggested": "Suggested wording:",
+      "openDate": "Open {name}",
+      "addTo": "Add to {name}",
+      "alreadyInAddSource": "Already in the file: add the source",
+      "alreadyInClose": "Already in the file: close",
+      "approveSuggestedCombined": "Complete with the suggested wording and approve proposal and procedure",
+      "approveSuggested": "Complete with the suggested wording and approve",
+      "approveCombined": "Approve proposal and procedure",
+      "approve": "Approve",
+      "editAndApprove": "Edit and approve",
+      "editTitle": "Edit before approving",
+      "toTask": "Make a task",
+      "toTaskTitle": "A proposal that is a task"
+    },
+    "batch": {
+      "kindCount": "{count} {kind}",
+      "dropped": "{count, plural, =1 {One item did not become a proposal} other {# items did not become proposals}} (a secret, a quote from a restricted source, or a malformed item). What was dropped was not saved.",
+      "selectAllFiltered": "Everything in the filter ({count})",
+      "selectAll": "All ({count})",
+      "selectTogether": "Only what can be approved together ({count})",
+      "chosen": "{count} selected",
+      "approving": "Approving...",
+      "approveCount": "Approve {count}",
+      "rejectCount": "Reject {count}",
+      "someAlone": "{count} of the selected are approved one at a time: they change an existing item, may already be in the file, or are sensitive."
+    },
+    "summary": {
+      "allTogether": "{count, plural, =1 {One proposal, ready to approve.} other {All # can be approved together.}}",
+      "allAlone": "{count, plural, =1 {One proposal to review on its own.} other {# proposals to review one at a time.}}",
+      "mixedAlone": "{count, plural, =1 {One to review on its own} other {# to review one at a time}}",
+      "mixedTogether": "{count, plural, =1 {and one can be approved together} other {and # can be approved together}}",
+      "mixed": "{alone}, {together}."
+    },
+    "awaiting": {
+      "label": "Waiting for a client",
+      "itemCount": "{count, plural, =1 {One item} other {# items}}",
+      "claudeThinks": "Claude thinks this call belongs to <b>{name}</b>.",
+      "claudeThinksBecause": "Claude thinks this call belongs to <b>{name}</b>: {reason}",
+      "removedClient": "Removed client",
+      "clientFallback": "the client",
+      "dropped": "{count, plural, =1 {One item was not saved} other {# items were not saved}} (a secret or a quote from a restricted source).",
+      "item": "{kind}: {text}",
+      "sensitiveItem": "{kind}: sensitive item",
+      "whose": "Whose call is it",
+      "claudesProposal": "(Claude's suggestion)",
+      "assigning": "Assigning...",
+      "assignTo": "Assign to {name}",
+      "assigned": "Assigned to {name}",
+      "assignedDescription": "The items now wait for approval, like any batch.",
+      "noneOfThem": "None of them",
+      "discardTitle": "Remove a call waiting for a client",
+      "discardIntro": "The call and its items will be removed, and will not go into any file.",
+      "discardWhy": "Why, in one line *",
+      "discardPlaceholder": "A vendor's call with a client that is not ours",
+      "removing": "Removing...",
+      "remove": "Remove",
+      "otherClientNote": "To a client other than the one Claude suggested: an item that changes a fact in the suggested client's file does not carry over, and its source codes are not kept."
+    },
+    "auto": {
+      "title": "Added automatically",
+      "titleCount": "Added automatically ({count})",
+      "intro": "New, simple items with a high review level go into the file without waiting. In the first two weeks, and in the week after new extraction guidelines, each one is checked here; after that, a 20% sample. \"Undo\" takes the item out of the file and counts as an error.",
+      "empty": "No automatically added items are waiting for a check right now.",
+      "pausesTitle": "Back to approval by a person",
+      "why": {
+        "firstDays": "First {days} days: every item is checked",
+        "newGuide": "New extraction guidelines: every item is checked for a week",
+        "sample": "{percent}% sample"
+      },
+      "entered": "Added {date}",
+      "toItem": "Go to the item in the file",
+      "ok": "Correct",
+      "marking": "Marking...",
+      "marked": "Marked correct",
+      "markFailed": "Marking failed",
+      "switchLabel": "Automatic adding to files:",
+      "on": "On",
+      "off": "Off",
+      "firstEnabled": "first turned on {date}",
+      "saving": "Saving...",
+      "turnOff": "Turn off for all clients",
+      "turnOn": "Turn on",
+      "switchFailed": "The change failed",
+      "switchedOff": "Automatic adding is off for all clients",
+      "switchedOn": "Automatic adding is on",
+      "pauseKind": "Kind:",
+      "pauseClient": "Client:",
+      "clientFallback": "Client",
+      "pausedSince": "paused {date}",
+      "pauseBar": "Since then: {decisions} decisions by a person one at a time, {approvedAsIs} approved as they were, lower bound {lowerBound}%. The bar to bring it back: 30 decisions and a lower bound of 85%.",
+      "lift": "Return to automatic adding",
+      "lifting": "Returning...",
+      "liftFailed": "Returning failed",
+      "lifted": "{label}: back to automatic adding"
+    },
+    "filters": {
+      "ariaLabel": "Filter proposals",
+      "client": "Client",
+      "allClients": "All clients",
+      "chosenClient": "Selected client",
+      "optionCount": "{label} ({count})",
+      "attention": "Needs attention",
+      "attentionHint": "Sensitive, changes an existing item, may already be in the file, or flagged by a rule",
+      "more": "More filters",
+      "source": "Source",
+      "allSources": "All sources",
+      "sentBy": "Sent by",
+      "everyone": "Everyone",
+      "waiting": "Waiting",
+      "anyTime": "Any time",
+      "olderThan": "More than {days} days",
+      "clear": "Clear filters"
+    },
+    "review": {
+      "intro": "What Claude proposed for client files. A new, simple item with a high review level goes into the file on its own and shows under \"Added automatically\"; everything else goes into the file only after someone approves it here.",
+      "extractionGuide": "Extraction guidelines",
+      "brainMetrics": "File metrics",
+      "unknownSender": "Unknown",
+      "empty": "No proposals are waiting for approval.",
+      "noMatch": "No proposals match the filter."
+    },
+    "quality": {
+      "none": "No proposals were decided in the last {days} days.",
+      "head": "In the last {days} days: {approved} approved, {edited} of them after editing ({pct}%), {rejected} rejected.",
+      "firstMonth": "{head} The first month ends on {date}. Then we decide whether light items may also be approved in a conversation (target: under 10% edited).",
+      "good": "{head} Under 10% were corrected: under decision 1, approving light items in a conversation can be considered.",
+      "warn": "{head} Over 10% were corrected: approvals stay here only."
+    },
+    "errors": {
+      "forbidden": "You do not have permission for this: the client is not assigned to you.",
+      "generic": "Something went wrong. Please try again.",
+      "notRejected": "{count} not rejected: {error}",
+      "managerSwitch": "Only a manager can turn automatic adding on or off.",
+      "managerLift": "Only a manager can return something to automatic adding."
     }
   }
 }

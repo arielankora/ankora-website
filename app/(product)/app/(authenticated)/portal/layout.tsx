@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { resolvePortalClient } from "@/lib/app-domain/client-portal";
 import { PortalContextBar } from "./PortalContextBar";
+import { ScopedMessages } from "@/components/app/ScopedMessages";
 
 // Portal phase 0. The context bar belongs to all four portal screens, so
 // it is resolved once here rather than repeated in each page. The layout
@@ -18,7 +19,9 @@ export default async function PortalLayout({ children }: { children: React.React
     if (!(err instanceof ForbiddenError)) throw err;
   }
 
+  // ADR 0006, decision 7: this area's part of the dictionary.
   return (
+    <ScopedMessages area="portal">
     <div className="space-y-4">
       {ctx && (
         <PortalContextBar
@@ -30,5 +33,6 @@ export default async function PortalLayout({ children }: { children: React.React
       )}
       {children}
     </div>
+    </ScopedMessages>
   );
 }

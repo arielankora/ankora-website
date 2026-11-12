@@ -489,22 +489,53 @@ export function isSimpleTarget(target: ProposalTargetLike, payload: Record<strin
 /// The tier a proposal is in, with the reason in a short Hebrew line.
 /// INDIVIDUAL is checked first and wins: one reason to look is enough.
 export function approvalTier(p: TierInput): { tier: ApprovalTier; reason: string } {
-  const one = (reason: string) => ({ tier: "INDIVIDUAL" as const, reason });
-  if (p.flags.some((f) => f.block)) return one("יש בה משהו שחוסם אישור");
-  if (p.action !== "CREATE") return one("משנה פריט שכבר בתיק");
-  if (p.flags.some((f) => f.code === "DUPLICATE" || f.code === "SIMILAR")) return one("ייתכן שכבר בתיק");
-  if (p.flags.some((f) => f.code === "R6") || p.payload.sensitivity === "SENSITIVE") return one("מידע רגיש");
-  if (typeof p.payload.doNotDisclose === "string" && p.payload.doNotDisclose.trim()) return one("יש בה מה לא לספר");
-  if (p.payload.clientVisible === true) return one("גלוי ללקוח");
-  if (p.target === "TASK") return one("משימה נפתחת לאדם אחר");
-  if (p.target === "DOMAIN") return one("דומיין משנה אילו פגישות שייכות ללקוח");
-  if (p.level === "LOW") return one("רמת בדיקה נמוכה");
+  const { tier, reason } = tierOf(p);
+  return { tier, reason };
+}
+
+/// Why a proposal is in its tier, as a code a screen words in the
+/// reader's language (ADR 0006). approvalTier's `reason` is the same in
+/// Hebrew, for Claude and the tests.
+export type TierReasonCode =
+  | "blocked"
+  | "changesExisting"
+  | "maybeInFile"
+  | "sensitive"
+  | "doNotDisclose"
+  | "clientVisible"
+  | "taskForOther"
+  | "domain"
+  | "lowLevel"
+  | "simpleHigh"
+  | "medium"
+  | "openQuestion"
+  | "temporary"
+  | "needsPerson";
+
+function tierOf(p: TierInput): { tier: ApprovalTier; reason: string; code: TierReasonCode } {
+  const one = (code: TierReasonCode, reason: string) => ({ tier: "INDIVIDUAL" as const, reason, code });
+  if (p.flags.some((f) => f.block)) return one("blocked", "יש בה משהו שחוסם אישור");
+  if (p.action !== "CREATE") return one("changesExisting", "משנה פריט שכבר בתיק");
+  if (p.flags.some((f) => f.code === "DUPLICATE" || f.code === "SIMILAR")) return one("maybeInFile", "ייתכן שכבר בתיק");
+  if (p.flags.some((f) => f.code === "R6") || p.payload.sensitivity === "SENSITIVE") return one("sensitive", "מידע רגיש");
+  if (typeof p.payload.doNotDisclose === "string" && p.payload.doNotDisclose.trim()) return one("doNotDisclose", "יש בה מה לא לספר");
+  if (p.payload.clientVisible === true) return one("clientVisible", "גלוי ללקוח");
+  if (p.target === "TASK") return one("taskForOther", "משימה נפתחת לאדם אחר");
+  if (p.target === "DOMAIN") return one("domain", "דומיין משנה אילו פגישות שייכות ללקוח");
+  if (p.level === "LOW") return one("lowLevel", "רמת בדיקה נמוכה");
   const simple = isSimpleTarget(p.target, p.payload);
-  if (simple && p.level === "HIGH") return { tier: "AUTO", reason: "פריט חדש ופשוט, ברמת בדיקה גבוהה" };
-  if (simple) return { tier: "QUICK", reason: "רמת בדיקה בינונית" };
-  if (p.target === "FACT" && p.payload.kind === "QUESTION") return { tier: "QUICK", reason: "שאלה פתוחה" };
-  if (p.target === "FACT" && p.payload.kind === "TEMPORARY") return { tier: "QUICK", reason: "מידע זמני" };
-  return { tier: "QUICK", reason: `${TARGET_LABELS[p.target]}: לא נכנס בלי אדם` };
+  if (simple && p.level === "HIGH") return { tier: "AUTO", reason: "פריט חדש ופשוט, ברמת בדיקה גבוהה", code: "simpleHigh" };
+  if (simple) return { tier: "QUICK", reason: "רמת בדיקה בינונית", code: "medium" };
+  if (p.target === "FACT" && p.payload.kind === "QUESTION") return { tier: "QUICK", reason: "שאלה פתוחה", code: "openQuestion" };
+  if (p.target === "FACT" && p.payload.kind === "TEMPORARY") return { tier: "QUICK", reason: "מידע זמני", code: "temporary" };
+  return { tier: "QUICK", reason: `${TARGET_LABELS[p.target]}: לא נכנס בלי אדם`, code: "needsPerson" };
+}
+
+/// bulkApproveBlocker as a code (ADR 0006), or null when it may be
+/// approved with others.
+export function bulkApproveBlockerCode(p: TierInput): TierReasonCode | null {
+  const t = tierOf(p);
+  return t.tier === "INDIVIDUAL" ? t.code : null;
 }
 
 /// Why the item an approved proposal created cannot be taken out again
@@ -519,11 +550,19 @@ export function revertBlocker(p: {
   resultId: string | null;
   revertedAt: Date | string | null;
 }): string | null {
-  if (p.state !== "APPROVED") return "אפשר לבטל רק הצעה שאושרה.";
-  if (p.revertedAt) return "ההצעה כבר בוטלה.";
-  if (p.action !== "CREATE") return "ביטול אפשרי רק להצעה שהוסיפה פריט חדש, לא לשינוי של פריט קיים.";
-  if (p.attached || !p.resultId) return "ההצעה לא יצרה פריט חדש (כבר היה בתיק), אז אין מה לבטל.";
-  if (!AUTO_TARGETS.includes(p.target as ProposalTargetLike)) return `ביטול אפשרי רק לעובדה, איש קשר, ספק או ישות משפטית, לא ל${TARGET_LABELS[p.target as ProposalTargetLike] ?? "פריט מהסוג הזה"}.`;
+  return revertBlockerOf(p)?.message ?? null;
+}
+
+export type RevertBlockerCode = "notApproved" | "alreadyReverted" | "notCreate" | "nothingCreated" | "wrongKind";
+
+/// revertBlocker with its code (ADR 0006): the screen words the code, the
+/// message stays for Claude and for callers that already show it.
+export function revertBlockerOf(p: Parameters<typeof revertBlocker>[0]): { code: RevertBlockerCode; message: string } | null {
+  if (p.state !== "APPROVED") return { code: "notApproved", message: "אפשר לבטל רק הצעה שאושרה." };
+  if (p.revertedAt) return { code: "alreadyReverted", message: "ההצעה כבר בוטלה." };
+  if (p.action !== "CREATE") return { code: "notCreate", message: "ביטול אפשרי רק להצעה שהוסיפה פריט חדש, לא לשינוי של פריט קיים." };
+  if (p.attached || !p.resultId) return { code: "nothingCreated", message: "ההצעה לא יצרה פריט חדש (כבר היה בתיק), אז אין מה לבטל." };
+  if (!AUTO_TARGETS.includes(p.target as ProposalTargetLike)) return { code: "wrongKind", message: `ביטול אפשרי רק לעובדה, איש קשר, ספק או ישות משפטית, לא ל${TARGET_LABELS[p.target as ProposalTargetLike] ?? "פריט מהסוג הזה"}.` };
   return null;
 }
 
@@ -614,26 +653,44 @@ export function reviewConfidence(p: {
   sourceKind?: string | null;
   sourceRestriction?: string | null;
 }): { level: ConfidenceLike; why: string[] } {
+  const { level, why } = confidenceOf(p);
+  return { level, why };
+}
+
+/// Why reviewConfidence lowered the level, as codes a screen words in the
+/// reader's language (ADR 0006), in the order of `why`.
+export type ConfidenceReasonCode = "notStated" | "noMinute" | "topicsOnly" | "secondary" | "uncertain";
+
+export function reviewConfidenceReasons(p: Parameters<typeof reviewConfidence>[0]): ConfidenceReasonCode[] {
+  return confidenceOf(p).reasons;
+}
+
+function confidenceOf(p: Parameters<typeof reviewConfidence>[0]): { level: ConfidenceLike; why: string[]; reasons: ConfidenceReasonCode[] } {
   let level: ConfidenceLike = CONFIDENCE_LEVELS.includes(p.confidence as ConfidenceLike) ? (p.confidence as ConfidenceLike) : "MEDIUM";
   const why: string[] = [];
-  if (!p.confidence) why.push("Claude לא ציין עד כמה הוא בטוח");
+  const reasons: ConfidenceReasonCode[] = [];
+  const add = (code: ConfidenceReasonCode, line: string) => {
+    reasons.push(code);
+    why.push(line);
+  };
+  if (!p.confidence) add("notStated", "Claude לא ציין עד כמה הוא בטוח");
   if (p.sourceKind === "TRANSCRIPT" && !p.at) {
     level = lower(level);
-    why.push("בלי דקה בהקלטה");
+    add("noMinute", "בלי דקה בהקלטה");
   }
   if (p.sourceRestriction === "TOPICS_ONLY") {
     level = lower(level);
-    why.push("מקור של נושאים בלבד");
+    add("topicsOnly", "מקור של נושאים בלבד");
   }
   if (p.flags.some((f) => f.code === "R14")) {
     level = lower(level);
-    why.push("מקור משני");
+    add("secondary", "מקור משני");
   }
   if (p.payload.knowledgeStatus === "UNCERTAIN" || p.payload.knowledgeStatus === "MISSING") {
     level = lower(level);
-    why.push("לא ודאי לפי Claude");
+    add("uncertain", "לא ודאי לפי Claude");
   }
-  return { level, why };
+  return { level, why, reasons };
 }
 
 /// reviewConfidence's level for a stored proposal and its batch's source:
@@ -664,6 +721,14 @@ export function reviewSummary(ranks: number[]): string | null {
   if (alone === 0) return together === 1 ? "הצעה אחת, אפשר לאשר ישר." : `אפשר לאשר את כל ה-${together} יחד.`;
   if (together === 0) return alone === 1 ? "הצעה אחת לבדוק לבד." : `${alone} הצעות לבדוק אחת אחת.`;
   return `${alone === 1 ? "אחת לבדוק לבד" : `${alone} לבדוק אחת אחת`}, ${together === 1 ? "ואחת אפשר לאשר יחד" : `ו-${together} אפשר לאשר יחד`}.`;
+}
+
+/// reviewSummary's numbers, for a screen that words them in the reader's
+/// language (ADR 0006): how many are read alone, how many go together.
+export function reviewSummaryCounts(ranks: number[]): { alone: number; together: number } | null {
+  if (ranks.length === 0) return null;
+  const together = ranks.filter((r) => r >= 2).length;
+  return { alone: ranks.length - together, together };
 }
 
 /// The line a proposal is known by, on its card and in a list.
@@ -770,6 +835,129 @@ function itemDetails(target: ProposalTargetLike, payload: Record<string, unknown
   return [];
 }
 
+/// proposalDetails as parts a screen words in the reader's language
+/// (ADR 0006): a key with its values, or text people or Claude wrote,
+/// shown as it is. The same lines, in the same order.
+export type DetailKey =
+  | "refs"
+  | "clientVisible"
+  | "owner"
+  | "entity"
+  | "subject"
+  | "routeTo"
+  | "triggersProcess"
+  | "externalParty"
+  | "systems"
+  | "approver"
+  | "approvalPolicies"
+  | "invoiceTo"
+  | "dueDate"
+  | "assignee"
+  | "trigger"
+  | "sla"
+  | "condition"
+  | "expectsReceipt"
+  | "expectsReceiptFrom"
+  | "businessDayBefore"
+  | "businessDayAfter"
+  | "responsible"
+  | "taskSameDay"
+  | "taskDaysBefore"
+  | "parent"
+  | "effectiveFrom"
+  | "reviewBy"
+  | "partnerDomain"
+  | "clientDomain";
+
+export type DetailPart =
+  | { kind: "key"; key: DetailKey; values?: Record<string, string | number> }
+  | { kind: "text"; text: string }
+  /// "חיוב: חודשי, 120 USD, כרטיס 1234": the cycle a code, the amount a number.
+  | { kind: "billing"; cycle: string; amount: number | null; currency: string; cardLast4: string }
+  | { kind: "priority"; priority: string }
+  | { kind: "step"; n: number; title: string; requiresApproval: boolean; systems: string[] };
+
+export function proposalDetailParts(target: ProposalTargetLike, payload: Record<string, unknown>): DetailPart[] {
+  const key = (k: DetailKey, values?: Record<string, string | number>): DetailPart => ({ kind: "key", key: k, ...(values ? { values } : {}) });
+  const s = (k: string) => (typeof payload[k] === "string" ? (payload[k] as string) : "");
+  const st = (k: string) => s(k).trim();
+  const l = (k: string) => (Array.isArray(payload[k]) ? (payload[k] as unknown[]).filter((x): x is string => typeof x === "string" && !!x.trim()) : []);
+  const text = (t: string): DetailPart[] => (t ? [{ kind: "text", text: t }] : []);
+  const items: DetailPart[] = [];
+  if (target === "TASK") {
+    items.push(...text(s("description")));
+    if (s("dueDate")) items.push(key("dueDate", { date: s("dueDate") }));
+    if (s("assigneeName")) items.push(key("assignee", { name: s("assigneeName") }));
+    if (s("priority") && s("priority") !== "NORMAL") items.push({ kind: "priority", priority: s("priority") });
+  } else if (target === "PROCESS") {
+    const steps = Array.isArray(payload.steps) ? (payload.steps as { title?: unknown; requiresApproval?: unknown; systemNames?: unknown }[]) : [];
+    if (s("triggerText")) items.push(key("trigger", { text: s("triggerText") }));
+    if (s("slaText")) items.push(key("sla", { text: s("slaText") }));
+    steps.forEach((step, i) =>
+      items.push({
+        kind: "step",
+        n: i + 1,
+        title: typeof step.title === "string" ? step.title : "",
+        requiresApproval: !!step.requiresApproval,
+        systems: Array.isArray(step.systemNames) ? step.systemNames.map(String) : [],
+      })
+    );
+  } else if (target === "DATE") {
+    const days = typeof payload.taskDaysBefore === "number" ? payload.taskDaysBefore : null;
+    if (s("conditionText")) items.push(key("condition", { text: s("conditionText") }));
+    if (payload.expectsReceipt === true) items.push(s("expectedFrom") ? key("expectsReceiptFrom", { from: s("expectedFrom") }) : key("expectsReceipt"));
+    if (s("ifNotBusinessDay")) items.push(key(s("ifNotBusinessDay") === "BEFORE" ? "businessDayBefore" : "businessDayAfter"));
+    if (s("responsibleName")) items.push(key("responsible", { name: s("responsibleName") }));
+    if (days !== null) items.push(days === 0 ? key("taskSameDay") : key("taskDaysBefore", { days: String(days) }));
+    items.push(...text(s("notes")));
+  } else if (target === "ENTITY") {
+    items.push(...text(s("registrationNumber")), ...text(s("country")), ...text(s("currency")));
+    if (s("parentName")) items.push(key("parent", { name: s("parentName") }));
+  } else if (target === "POLICY") {
+    if (s("effectiveFrom")) items.push(key("effectiveFrom", { date: s("effectiveFrom") }));
+    if (s("reviewBy")) items.push(key("reviewBy", { date: s("reviewBy") }));
+  } else if (target === "NARRATIVE") {
+    if (s("body").length > 160) items.push({ kind: "text", text: s("body") });
+  } else if (target === "DOMAIN") {
+    items.push(key(payload.kind === "PARTNER" ? "partnerDomain" : "clientDomain"));
+  }
+
+  const links: DetailPart[] = [];
+  if (st("entityName")) links.push(key("entity", { name: st("entityName") }));
+  if (st("subjectName")) links.push(key("subject", { name: st("subjectName") }));
+  if (l("routeToNames").length > 0) links.push(key("routeTo", { names: l("routeToNames").join(", ") }));
+  if (st("processName")) links.push(key("triggersProcess", { name: st("processName") }));
+  if (l("externalPartyNames").length > 0) links.push(key("externalParty", { names: l("externalPartyNames").join(", ") }));
+  if (l("systemNames").length > 0) links.push(key("systems", { names: l("systemNames").join(", ") }));
+  if (st("approverName")) links.push(key("approver", { name: st("approverName") }));
+  if (l("approvalPolicyTitles").length > 0) links.push(key("approvalPolicies", { titles: l("approvalPolicyTitles").join(", ") }));
+  const amount = typeof payload.billingCostMinor === "number" ? payload.billingCostMinor / 100 : null;
+  if (st("billingCycle") || amount !== null) links.push({ kind: "billing", cycle: st("billingCycle"), amount, currency: st("billingCurrency"), cardLast4: st("cardLast4") });
+  if (st("invoiceTo")) links.push(key("invoiceTo", { name: st("invoiceTo") }));
+
+  const common: DetailPart[] = [...links];
+  if (payload.clientVisible === true) common.push(key("clientVisible"));
+  if (typeof payload.ownerName === "string" && payload.ownerName.trim()) common.push(key("owner", { name: payload.ownerName.trim() }));
+  const refs = readExternalRefs(payload.externalRefs).map(refLabel);
+  if (refs.length) common.push(key("refs", { refs: refs.join(", ") }));
+  return [...items, ...common];
+}
+
+/// qualityLine's numbers, for a screen that words them in the reader's
+/// language (ADR 0006). `kind` is which sentence; `monthEnds` is set for
+/// "firstMonth" only.
+export function qualityParts(
+  q: { approved: number; editedBeforeApproval: number; rejected: number; firstDecidedAt: Date | null },
+  now: Date
+): { kind: "none" | "firstMonth" | "good" | "warn"; tone: "neutral" | "good" | "warn"; days: number; approved: number; edited: number; pct: number; rejected: number; monthEnds: Date | null } {
+  const share = q.approved ? q.editedBeforeApproval / q.approved : 0;
+  const base = { days: DECISION_1_DAYS, approved: q.approved, edited: q.editedBeforeApproval, pct: Math.round(share * 1000) / 10, rejected: q.rejected, monthEnds: null as Date | null };
+  if (q.approved === 0 && q.rejected === 0) return { ...base, kind: "none", tone: "neutral" };
+  const monthEnds = q.firstDecidedAt ? new Date(q.firstDecidedAt.getTime() + DECISION_1_DAYS * 86_400_000) : null;
+  if (monthEnds && monthEnds.getTime() > now.getTime()) return { ...base, kind: "firstMonth", tone: "neutral", monthEnds };
+  return share < DECISION_1_LIMIT ? { ...base, kind: "good", tone: "good" } : { ...base, kind: "warn", tone: "warn" };
+}
+
 /// Decision 1: after the first month, if fewer than 10% of approved
 /// proposals were edited first, light items may be approved in
 /// conversation too. The line a manager reads on the review screen.
@@ -840,6 +1028,14 @@ export function taskBlocker(p: { target?: ProposalTargetLike; payload: Record<st
   return null;
 }
 
+/// taskBlocker as a code (ADR 0006), or null.
+export function taskBlockerCode(p: { target?: ProposalTargetLike; payload: Record<string, unknown> }): "alreadyTask" | "sensitive" | "partialAudience" | null {
+  if (p.target === "TASK") return "alreadyTask";
+  if (p.payload.sensitivity === "SENSITIVE") return "sensitive";
+  if (p.payload.audience && p.payload.audience !== "ALL_STAFF") return "partialAudience";
+  return null;
+}
+
 export const TASK_TITLE_MAX = 200;
 
 // A task's title says what to do (21.10.2026). Tasks opened from proposals
@@ -880,6 +1076,13 @@ export function taskTitleProblem(title: string, from: { target: ProposalTargetLi
     return 'כותרת המשימה צריכה לומר מה עושים, לא לחזור על מה שנאמר. למשל: "לברר עם דקלה מתי השכר משולם".';
   }
   return null;
+}
+
+/// taskTitleProblem as a code (ADR 0006), or null.
+export function taskTitleProblemCode(title: string, from: { target: ProposalTargetLike; headline: string }): "empty" | "repeatsSaid" | null {
+  const problem = taskTitleProblem(title, from);
+  if (!problem) return null;
+  return title.trim() ? "repeatsSaid" : "empty";
 }
 
 /// Business days a task from a proposal gets when nobody said by when.

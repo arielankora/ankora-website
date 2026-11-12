@@ -91,6 +91,19 @@ export function autoReviewReason(
   return null;
 }
 
+/// autoReviewReason as a code with its numbers, for a screen that words
+/// it in the reader's language (ADR 0006), or null.
+export function autoReviewReasonCode(
+  p: { id: string; decidedAt: Date },
+  ctx: { firstEnabledAt: Date | null; guideApprovals: Date[] }
+): { code: "firstDays"; days: number } | { code: "newGuide" } | { code: "sample"; percent: number } | null {
+  const at = p.decidedAt.getTime();
+  if (!ctx.firstEnabledAt || at < ctx.firstEnabledAt.getTime() + AUTO_REVIEW_ALL_DAYS * DAY) return { code: "firstDays", days: AUTO_REVIEW_ALL_DAYS };
+  if (ctx.guideApprovals.some((g) => at >= g.getTime() && at < g.getTime() + GUIDE_REVIEW_DAYS * DAY)) return { code: "newGuide" };
+  if (inAutoSample(p.id)) return { code: "sample", percent: AUTO_REVIEW_SAMPLE_PERCENT };
+  return null;
+}
+
 /// When an auto-applied item turned out wrong, or null: taken out again,
 /// or changed in the file within ERROR_WINDOW_DAYS of entering.
 export function autoErrorAt(p: { decidedAt: Date; revertedAt: Date | null }, changes: Date[]): Date | null {

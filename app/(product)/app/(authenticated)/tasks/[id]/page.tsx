@@ -82,7 +82,7 @@ export default async function TaskDetailPage(props: {
   const rawFrom = sp.from;
   const from = typeof rawFrom === "string" ? rawFrom : undefined;
   // Opened from "אישורים": back there, to the same tab (22.10.2026).
-  const viaApprovals = approvalsBack(sp.fromApprovals);
+  const viaApprovals = approvalsBack(sp.fromApprovals, await getTranslations("approvals"));
   const backHref = viaApprovals?.href ?? tasksListHref(from);
   const listQuery = carriedListQuery(from);
   const tList = await getTranslations("tasks.list");
