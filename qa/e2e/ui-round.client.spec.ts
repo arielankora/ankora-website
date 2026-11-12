@@ -49,10 +49,10 @@ test("the week by days is the second tab, its old address keeps the week, and a 
   await tabs.getByRole("link", { name: "לפי ימים" }).click();
   await expect(page).toHaveURL(/\/app\/portal\/hours\?view=weekly$/);
   await expect(tabs.getByRole("link", { name: "לפי ימים" })).toHaveAttribute("aria-current", "page");
-  // No employee column and no minutes column (Hadas's review).
-  await expect(page.getByRole("columnheader", { name: "איש צוות" })).toHaveCount(0);
-  await expect(page.getByRole("columnheader", { name: "דקות לחיוב" })).toHaveCount(0);
-  await expect(page.getByRole("columnheader", { name: "שעות" })).toHaveCount(1);
+  // No employee column and no minutes column (Hadas's review). By the header
+  // row's text: Chromium exposes these <th> as "cell", not "columnheader",
+  // so a role query finds nothing and a toHaveCount(0) on it proves nothing.
+  await expect(page.locator("main table thead th")).toHaveText(["תאריך", "פעילות", "קטגוריה", "שעות"]);
   await page.goto("/app/portal/weekly?weekOffset=-2&next=https://evil.test", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/app\/portal\/hours\?view=weekly&weekOffset=-2$/);
   // A day in the address narrows the list to it, and "כל השבוע" brings the week back.
