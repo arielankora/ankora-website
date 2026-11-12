@@ -104,6 +104,16 @@ get `next-intl/server` from `tests/__mocks__/next-intl-server.ts`: the
 Hebrew dictionary, in Jerusalem time, which is what a reader who has not
 chosen a language gets.
 
+### 7. The browser gets only the namespaces it reads
+
+The root provider passes `pickMessages(messages)` (`lib/i18n/client-messages.ts`),
+not the whole dictionary: only the namespaces a component reads with the
+`useTranslations` hook. The dictionary is serialised into every page and into
+every server action response that re-renders the layout, and most of it
+(domain errors, server pages, the guide) is read only on the server. Found
+when the browser suite showed server action responses doubling in size
+after phase 3.
+
 ## Guards
 
 * `tests/unit/i18n-translated-files.test.ts`: a translated screen shows no
@@ -114,6 +124,9 @@ chosen a language gets.
   `dir=` variant are allowed, because those choose a side on purpose. The
   utilities `text-page-start` and `text-page-end` (`app/globals.css`) align
   to the page's side on elements whose own direction is `auto`.
+* `tests/unit/i18n-client-messages.test.ts`: every namespace passed to
+  `useTranslations` is in `CLIENT_MESSAGE_PATHS`, and nothing listed there is
+  unused. Component tests render with the same slice (`tests/helpers/intl.tsx`).
 * `tests/unit/i18n-messages.test.ts`: both dictionaries have the same keys,
   the same placeholders, nothing empty, no long dashes, no Hebrew in the
   English one, and every message formats.

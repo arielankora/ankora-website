@@ -22,10 +22,11 @@ function friendlyError(err: unknown): string {
   return "אירעה שגיאה. נסו שוב.";
 }
 
+/// A cycle date is an Israeli day: midnight Israel time, not midnight in
+/// the server's zone (UTC on Vercel), which moved the boundary by two or
+/// three hours.
 function parseDateInput(value: FormDataEntryValue | null): Date | null {
-  if (!value) return null;
-  const d = new Date(`${String(value)}T00:00:00`);
-  return isNaN(d.getTime()) ? null : d;
+  return dayStartInZone(value ? String(value) : null) ?? null;
 }
 
 export async function upsertBillingPolicyAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {

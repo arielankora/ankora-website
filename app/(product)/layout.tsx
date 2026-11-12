@@ -7,7 +7,8 @@ import "@fontsource/heebo/700.css";
 import "../globals.css";
 import { ToastProvider } from "@/components/app/toast/ToastProvider";
 import { NextIntlClientProvider } from "next-intl";
-import { getTranslations } from "next-intl/server";
+import { getMessages, getTranslations } from "next-intl/server";
+import { pickMessages } from "@/lib/i18n/client-messages";
 import { resolveRequestLocale } from "@/lib/i18n/resolve";
 import { directionOf, intlTag } from "@/lib/i18n/config";
 
@@ -77,10 +78,13 @@ export const viewport: Viewport = {
 // a client component and the server agree on every word and every date.
 export default async function ProductRootLayout({ children }: { children: React.ReactNode }) {
   const { locale } = await resolveRequestLocale();
+  // Only the namespaces a component in the browser reads; see
+  // lib/i18n/client-messages.ts for why not the whole dictionary.
+  const messages = pickMessages(await getMessages());
   return (
     <html lang={intlTag(locale)} dir={directionOf(locale)}>
       <body className="bg-app-surface-page text-app-text-primary antialiased">
-        <NextIntlClientProvider>
+        <NextIntlClientProvider messages={messages}>
           <ToastProvider>{children}</ToastProvider>
         </NextIntlClientProvider>
       </body>

@@ -205,10 +205,12 @@ function nextCustomIntervalGregorian(
   // Fast-forward in large jumps first so a decade-old anchor doesn't need
   // thousands of loop iterations, then step day-by-day near the target.
   if (candidateKey < fromKey) {
+    // The key is "YYYY-MM-DD": Date.UTC takes a zero-based month, so the month
+    // is read as month - 1, same as the anchor below. Without it the estimate
+    // measured to a date about a month late and the jump skipped occurrences.
+    const [fromYear, fromMonth, fromDay] = fromKey.split("-").map(Number);
     const roughDays = Math.floor(
-      (Date.UTC(...(fromKey.split("-").map(Number) as [number, number, number])) -
-        Date.UTC(candidate.year, candidate.month - 1, candidate.day)) /
-        86_400_000
+      (Date.UTC(fromYear, fromMonth - 1, fromDay) - Date.UTC(candidate.year, candidate.month - 1, candidate.day)) / 86_400_000
     );
     const jumps = Math.max(0, Math.floor(roughDays / intervalDays) - 1);
     if (jumps > 0) candidate = addDaysToCalendarDate(candidate.year, candidate.month, candidate.day, jumps * intervalDays);

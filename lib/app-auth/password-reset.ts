@@ -3,6 +3,8 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, validatePasswordPolicy } from "@/lib/app-auth/password";
 import { recordAudit } from "@/lib/app-auth/audit";
+import { sendEmail } from "@/lib/email";
+import { appBaseUrl, renderActionEmail } from "@/lib/email-templates";
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h for a self-service forgot-password request
 
@@ -13,9 +15,8 @@ function hashToken(raw: string) {
 /// Spec 4.2: "Forgot password באמצעות link חד-פעמי עם expiry." Always
 /// returns normally (never reveals whether the email exists) - the raw
 /// token is only returned to the caller when a matching, active user was
-/// found. Same limitation as invites (see lib/app-domain/users.ts): no
-/// email provider yet, so the caller is responsible for surfacing this
-/// link out-of-band until Phase 4.
+/// found, so tests and the dev screen can follow the link. The link is
+/// also mailed to the account's work address.
 export async function requestPasswordReset(identifier: string): Promise<string | null> {
   const email = identifier.trim().toLowerCase();
   const user = await prisma.user.findFirst({
@@ -35,7 +36,30 @@ export async function requestPasswordReset(identifier: string): Promise<string |
     data: { userId: user.id, tokenHash: hashToken(raw), expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS) },
   });
 
-  await recordAudit({ actorId: user.id, action: "password_reset.requested", entityType: "User", entityId: user.id });
+  // 12.11.2026: until today this function minted the link and nothing
+  // ever mailed it. The screen said "check your inbox" over an empty
+  // inbox, in production, for every staff member who forgot a password
+  // and for every invitee who tried this door. sendEmail never throws, so
+  // a mail-provider outage still leaves the same neutral screen.
+  const { html, text } = renderActionEmail({
+    title: "בחירת סיסמה חדשה למערכת Ankora",
+    body: [
+      `שלום ${user.name},`,
+      "התקבלה בקשה לבחור סיסמה חדשה לחשבון שלך. הקישור תקף לשעה ולשימוש אחד בלבד.",
+    ],
+    buttonLabel: "בחירת סיסמה",
+    url: `${appBaseUrl()}/app/reset-password?token=${raw}`,
+    footnote: "אם לא ביקשת את הקישור, אפשר להתעלם מההודעה. הסיסמה הנוכחית לא השתנתה.",
+  });
+  const mail = await sendEmail({ to: [user.email], subject: "בחירת סיסמה חדשה למערכת Ankora", text, html });
+
+  await recordAudit({
+    actorId: user.id,
+    action: "password_reset.requested",
+    entityType: "User",
+    entityId: user.id,
+    after: { emailSent: mail.ok },
+  });
   return raw;
 }
 
