@@ -3,7 +3,8 @@ import { TopBarBack } from "./BackSlot";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Plus } from "lucide-react";
-import type { NavItem } from "./Sidebar";
+import { useTranslations } from "next-intl";
+import type { NavItem } from "./nav-groups";
 import { ShellTimerPill } from "./ActiveTimerProvider";
 import { NotificationsBell, type NotificationSummary } from "./NotificationsBell";
 import { NEW_TASK_KEY, OPEN_DRAWER_EVENT, OPEN_DRAWER_PARAM, PENDING_OPEN_KEY, type OpenDrawerDetail } from "./drawer-keys";
@@ -31,6 +32,7 @@ export function TopBar({
   showPrimaryCta: boolean;
 }) {
   const pathname = usePathname();
+  const t = useTranslations("shell");
   const current = [...items].reverse().find((item) => (item.href === "/app" ? pathname === "/app" : pathname.startsWith(item.href)));
 
   return (
@@ -46,7 +48,7 @@ export function TopBar({
             className="flex items-center gap-1.5 rounded-full bg-app-accent px-4 py-2 text-[13px] font-medium text-app-text-primary"
           >
             <Plus size={15} strokeWidth={2.25} />
-            דיווח חדש
+            {t("topBar.newEntry")}
           </Link>
         )}
         {/* Ariel, 26.9.2026: a task is opened as often as time is
@@ -70,7 +72,7 @@ export function TopBar({
             className="flex items-center gap-1.5 rounded-full border border-gold/60 bg-white px-4 py-2 text-[13px] font-medium text-app-text-primary hover:border-gold"
           >
             <Plus size={15} strokeWidth={2.25} />
-            משימה חדשה
+            {t("topBar.newTask")}
           </Link>
         )}
       </div>
@@ -80,7 +82,7 @@ export function TopBar({
         {/* 19.10.2026: a detail screen's way back, registered by PageBack. */}
         <TopBarBack />
         <div className="min-w-0 text-end">
-          {current?.group && <p className="truncate text-[11px] text-app-text-tertiary">{current.group}</p>}
+          {current?.groupLabel && <p className="truncate text-[11px] text-app-text-tertiary">{current.groupLabel}</p>}
           <p className="truncate text-[16.5px] font-medium text-app-text-primary">{current?.label ?? "Ankora"}</p>
         </div>
       </div>

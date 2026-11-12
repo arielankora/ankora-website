@@ -484,9 +484,9 @@ export function TaskRow({
 
       {/* dir="auto" so an English client name truncates at its own end
           ("Rimed Medical Tech...") rather than losing its first word to
-          the right-to-left page; text-right keeps it aligned with the
-          Hebrew around it. */}
-      <p dir="auto" data-cell="client" className="min-w-0 truncate text-right text-[11.5px] font-medium text-app-text-secondary [grid-area:client] xl:text-[12.5px] xl:font-normal xl:text-app-text-secondary">
+          the right-to-left page; text-page-start keeps it aligned with
+          the page around it, in either direction (ADR 0006). */}
+      <p dir="auto" data-cell="client" className="min-w-0 truncate text-page-start text-[11.5px] font-medium text-app-text-secondary [grid-area:client] xl:text-[12.5px] xl:font-normal xl:text-app-text-secondary">
         {task.clientName}
       </p>
 
@@ -577,7 +577,7 @@ export function TaskRow({
                 type="button"
                 onClick={() => setEditingTitle(true)}
                 dir="auto"
-              className="mt-1 block max-w-full truncate text-right text-[11.5px] text-app-text-accent hover:underline"
+              className="mt-1 block max-w-full truncate text-start text-[11.5px] text-app-text-accent hover:underline"
               >
                 {clientTitle || "הוספת כותרת ללקוח"}
               </button>
@@ -723,7 +723,7 @@ export function TaskRow({
             aria-label="קטגוריה"
             title="שינוי הקטגוריה"
             onChange={(e) => changeCategory(e.target.value || null)}
-            className={`-mx-1 w-full min-w-0 cursor-pointer truncate rounded-[6px] border-0 bg-transparent px-1 py-0.5 text-right text-xs outline-none hover:bg-app-surface-sunken focus-visible:ring-1 focus-visible:ring-gold disabled:opacity-50 ${
+            className={`-mx-1 w-full min-w-0 cursor-pointer truncate rounded-[6px] border-0 bg-transparent px-1 py-0.5 text-start text-xs outline-none hover:bg-app-surface-sunken focus-visible:ring-1 focus-visible:ring-gold disabled:opacity-50 ${
               category.id ? "text-app-text-secondary" : "text-app-text-tertiary"
             }`}
           >
@@ -737,7 +737,7 @@ export function TaskRow({
             ))}
           </select>
         ) : (
-          <span dir="auto" className="block truncate text-right text-xs text-app-text-secondary">
+          <span dir="auto" className="block truncate text-page-start text-xs text-app-text-secondary">
             {category.name ?? <span className="text-app-text-tertiary">ללא קטגוריה</span>}
           </span>
         )}

@@ -142,7 +142,7 @@ export function GuideBrowser({ groups }: { groups: GuideGroup[] }) {
                 {section.steps && section.steps.length > 0 && (
                   <div>
                     <p className="text-xs font-semibold text-app-text-tertiary">איך עושים את זה</p>
-                    <ol className="mt-2 list-decimal space-y-1.5 pr-5 text-sm leading-relaxed text-app-text-secondary">
+                    <ol className="mt-2 list-decimal space-y-1.5 ps-5 text-sm leading-relaxed text-app-text-secondary">
                       {section.steps.map((step, i) => (
                         <li key={i}>
                           <Hl text={step} words={words} />

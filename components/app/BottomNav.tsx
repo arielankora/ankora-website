@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { MoreHorizontal, LogOut, Home } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { NAV_ICONS } from "./nav-icons";
 
 // Spec 11.1: "Bottom navigation עם 3-5 יעדים בלבד." AppShell.tsx computes
@@ -24,6 +25,7 @@ export function BottomNav({
   roleLabel: string;
 }) {
   const pathname = usePathname();
+  const t = useTranslations("shell");
   const [moreOpen, setMoreOpen] = useState(false);
 
   const direct = items.slice(0, 4);
@@ -37,7 +39,7 @@ export function BottomNav({
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-40 border-t border-app-border bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
-      aria-label="ניווט ראשי"
+      aria-label={t("mainNav")}
     >
       <div className="grid grid-cols-5">
         {direct.map((item) => {
@@ -63,12 +65,12 @@ export function BottomNav({
         <button
           type="button"
           onClick={() => setMoreOpen(true)}
-          aria-label="עוד אפשרויות"
+          aria-label={t("bottomNav.moreOptions")}
           aria-expanded={moreOpen}
           className="flex min-h-[56px] flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] text-app-text-tertiary"
         >
           <MoreHorizontal size={20} strokeWidth={1.75} />
-          <span>עוד</span>
+          <span>{t("bottomNav.more")}</span>
         </button>
       </div>
 
@@ -76,13 +78,13 @@ export function BottomNav({
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
           <button
             type="button"
-            aria-label="סגירה"
+            aria-label={t("close")}
             onClick={() => setMoreOpen(false)}
             className="absolute inset-0 bg-app-surface-nav/30"
           />
           <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-app-border bg-white px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6 shadow-lg">
             <div className="mb-4 border-b border-app-border pb-4">
-              <p className="text-sm font-medium text-app-text-primary">{userName}</p>
+              <p dir="auto" className="text-sm font-medium text-app-text-primary">{userName}</p>
               <p className="text-xs text-app-text-tertiary">{roleLabel}</p>
             </div>
             {overflow.length > 0 && (
@@ -109,7 +111,7 @@ export function BottomNav({
               className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-full border border-app-border px-4 text-sm font-medium text-app-text-secondary"
             >
               <LogOut size={16} strokeWidth={1.75} />
-              התנתקות
+              {t("logout")}
             </button>
           </div>
         </div>

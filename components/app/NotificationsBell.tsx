@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import { markAllNotificationsReadAction } from "@/app/(product)/app/(authenticated)/notifications/actions";
 
 export type NotificationSummary = {
@@ -15,16 +16,22 @@ export type NotificationSummary = {
   href?: string | null;
 };
 
-function relativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const minutes = Math.floor(diffMs / 60_000);
-  if (minutes < 1) return "עכשיו";
-  if (minutes < 60) return `לפני ${minutes} דק׳`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `לפני ${hours} שע׳`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `לפני ${days} ימים`;
-  return new Date(iso).toLocaleDateString("he-IL");
+/// The same steps as before ADR 0006, now worded by the dictionary. Past a
+/// week it is a date, in the person's own locale and time zone.
+function useRelativeTime(): (iso: string) => string {
+  const t = useTranslations("shell.notifications");
+  const format = useFormatter();
+  return (iso) => {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const minutes = Math.floor(diffMs / 60_000);
+    if (minutes < 1) return t("now");
+    if (minutes < 60) return t("minutesAgo", { count: minutes });
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return t("hoursAgo", { count: hours });
+    const days = Math.floor(hours / 24);
+    if (days < 7) return t("daysAgo", { count: days });
+    return format.dateTime(new Date(iso), { day: "numeric", month: "numeric", year: "numeric" });
+  };
 }
 
 // App redesign (handoff README, App Shell section): "פעמון עם תג מונה אדום
@@ -44,6 +51,8 @@ export function NotificationsBell({
   const [pending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const t = useTranslations("shell.notifications");
+  const relativeTime = useRelativeTime();
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -72,7 +81,7 @@ export function NotificationsBell({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="התראות"
+        aria-label={t("title")}
         aria-expanded={open}
         className="relative flex h-9 w-9 items-center justify-center rounded-full text-app-text-secondary hover:bg-app-surface-sunken hover:text-app-text-primary"
       >
@@ -87,7 +96,7 @@ export function NotificationsBell({
       {open && (
         <div className="absolute end-0 top-11 z-50 w-[330px] rounded-2xl border border-app-border bg-white shadow-[0_18px_44px_rgba(11,27,51,0.14)]">
           <div className="flex items-center justify-between border-b border-app-border px-4 py-3">
-            <p className="text-sm font-medium text-app-text-primary">התראות</p>
+            <p className="text-sm font-medium text-app-text-primary">{t("title")}</p>
             {unreadCount > 0 && (
               <button
                 type="button"
@@ -95,13 +104,13 @@ export function NotificationsBell({
                 disabled={pending}
                 className="text-xs font-medium text-app-text-accent hover:text-app-text-primary disabled:opacity-50"
               >
-                סימון הכל כנקרא
+                {t("markAllRead")}
               </button>
             )}
           </div>
           <div className="max-h-80 overflow-y-auto">
             {notifications.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-app-text-tertiary">אין התראות</p>
+              <p className="px-4 py-8 text-center text-sm text-app-text-tertiary">{t("empty")}</p>
             ) : (
               notifications.slice(0, 8).map((n) => {
                 const inner = (
@@ -140,7 +149,7 @@ export function NotificationsBell({
               onClick={() => setOpen(false)}
               className="text-xs font-medium text-app-text-accent hover:text-app-text-primary"
             >
-              כל ההתראות
+              {t("all")}
             </Link>
           </div>
         </div>

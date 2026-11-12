@@ -61,7 +61,7 @@ export function ClaudeGrantList({ grants }: { grants: GrantRow[] }) {
                 {grant.label}
                 {grant.isBridge ? " (גשר מקומי)" : ""}
               </span>
-              {grant.expiresLabel && <span className="mr-2">בתוקף עד {grant.expiresLabel}</span>}
+              {grant.expiresLabel && <span className="ms-2">בתוקף עד {grant.expiresLabel}</span>}
             </span>
 
             {confirming ? (

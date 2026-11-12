@@ -301,6 +301,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "mcp_grant.revoke": "ניתוק חיבור Claude",
   "mcp_grant.revoke_all": "ניתוק כל חיבורי Claude של משתמש",
   "profile.timezone_update": "עדכון אזור זמן",
+  "profile.locale_update": "עדכון שפת הממשק",
   "task.update": "עדכון משימה",
   "task.close_covered_by_process": "סגירת משימה שתהליך מכסה",
   "task.auto_create_from_important_date": "יצירת משימה אוטומטית ממועד חשוב",

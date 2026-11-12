@@ -1053,7 +1053,7 @@ export default async function CommunicationsPage(props: {
                       aria-label="חזרה לרשימה"
                       className="flex size-11 flex-none items-center justify-center rounded-lg text-app-text-primary lg:hidden"
                     >
-                      <ArrowRight className="size-5" aria-hidden="true" />
+                      <ArrowRight className="size-5 ltr:rotate-180" aria-hidden="true" />
                     </Link>
                     <div className="min-w-0">
                       <h2 className="truncate text-lg font-medium text-app-text-primary">

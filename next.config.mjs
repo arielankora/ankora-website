@@ -1,3 +1,10 @@
+import createNextIntlPlugin from 'next-intl/plugin';
+
+// ADR 0006: the app's interface languages. The plugin only points
+// next-intl at i18n/request.ts; it adds no routing and no middleware, so
+// the marketing site's own [locale] routing is untouched.
+const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
+
 // Vercel origins the Content-Security-Policy below allows on preview and
 // local builds only - never on production. See the CSP comment for why
 // each one is needed. Empty string on production so the directives it is
@@ -388,4 +395,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

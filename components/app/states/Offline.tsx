@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { WifiOff } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 /**
  * Tracks browser connectivity. Note this only reflects `navigator.onLine`
@@ -39,6 +40,7 @@ export function useOnlineStatus(): boolean {
 // assumed done by this banner's existence.
 export function OfflineBanner({ pendingSyncCount }: { pendingSyncCount?: number }) {
   const online = useOnlineStatus();
+  const t = useTranslations("shell.offline");
   if (online) return null;
 
   return (
@@ -48,9 +50,9 @@ export function OfflineBanner({ pendingSyncCount }: { pendingSyncCount?: number 
     >
       <WifiOff size={16} strokeWidth={1.75} className="shrink-0 text-app-warning" />
       <p>
-        אין חיבור לרשת. הטיימר ממשיך לרוץ מקומית.
+        {t("message")}
         {typeof pendingSyncCount === "number" && pendingSyncCount > 0 && (
-          <span className="font-jbmono"> {pendingSyncCount} ממתינים לסנכרון.</span>
+          <span className="font-jbmono"> {t("pending", { count: pendingSyncCount })}</span>
         )}
       </p>
     </div>

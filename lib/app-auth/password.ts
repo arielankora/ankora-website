@@ -33,12 +33,17 @@ const COMMON_WEAK_PASSWORDS = new Set([
   "iloveyou1",
 ]);
 
-export function validatePasswordPolicy(plain: string): { valid: boolean; reason?: string } {
+/// `code` names the rule that failed, so a screen in another language can
+/// say it in its own words (ADR 0006); `reason` stays the Hebrew sentence
+/// every existing caller already shows.
+export type PasswordPolicyCode = "too_short" | "too_common";
+
+export function validatePasswordPolicy(plain: string): { valid: boolean; reason?: string; code?: PasswordPolicyCode } {
   if (plain.length < PASSWORD_MIN_LENGTH) {
-    return { valid: false, reason: `הסיסמה חייבת להכיל לפחות ${PASSWORD_MIN_LENGTH} תווים.` };
+    return { valid: false, code: "too_short", reason: `הסיסמה חייבת להכיל לפחות ${PASSWORD_MIN_LENGTH} תווים.` };
   }
   if (COMMON_WEAK_PASSWORDS.has(plain.toLowerCase())) {
-    return { valid: false, reason: "הסיסמה נפוצה מדי. יש לבחור סיסמה חזקה יותר." };
+    return { valid: false, code: "too_common", reason: "הסיסמה נפוצה מדי. יש לבחור סיסמה חזקה יותר." };
   }
   return { valid: true };
 }

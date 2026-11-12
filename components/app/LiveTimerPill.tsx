@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 function formatElapsed(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
@@ -34,6 +35,7 @@ export function LiveTimerPill({
   className?: string;
 }) {
   const [elapsed, setElapsed] = useState(0);
+  const t = useTranslations("shell.timerPill");
 
   useEffect(() => {
     const startMs = new Date(startAt).getTime();
@@ -56,7 +58,7 @@ export function LiveTimerPill({
         <span
           className="rounded-full bg-gold/25 px-1.5 py-px font-jbmono text-[11px] text-gold-light"
           dir="ltr"
-          aria-label={`ועוד ${extraCount} טיימר פעיל`}
+          aria-label={t("extra", { count: extraCount })}
         >
           +{extraCount}
         </span>

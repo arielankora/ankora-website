@@ -259,7 +259,7 @@ export function TaskDetail({
               <button
                 type="button"
                 onClick={() => setEditingTitle(true)}
-                className="w-full text-right text-lg font-medium text-app-text-primary hover:text-app-text-secondary"
+                className="w-full text-start text-lg font-medium text-app-text-primary hover:text-app-text-secondary"
               >
                 {title}
               </button>
