@@ -7,6 +7,7 @@ import { hasSignedCurrent } from "@/lib/agreements";
 import { readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { COMMS_LEVELS, checkCommsGrant } from "@/lib/comms/grant-rules";
 import { lineOwnerEmails } from "@/lib/comms/grants";
+import { DomainError } from "@/lib/domain-error";
 
 // Giving access to the communications screen from the person's page
 // (12.11.2026, Ariel: "it makes no sense that this is a manual process for
@@ -27,18 +28,18 @@ export async function confidentialitySignedBothChannels(userId: string): Promise
 export async function setCommsAccess(actor: User, userId: string, input: { level: string; lines: string[] }) {
   assertCan(actor.role, "user.manage");
   const level = input.level as CommsAccessLevel;
-  if (!COMMS_LEVELS.includes(level)) throw new Error("רמת גישה לא מוכרת.");
+  if (!COMMS_LEVELS.includes(level)) throw new DomainError("commsAccess.unknownLevel", "רמת גישה לא מוכרת.");
 
   const target = await prisma.user.findFirst({
     where: { id: userId, deletedAt: null },
     select: { id: true, role: true, commsAccessLevel: true, email: true },
   });
-  if (!target) throw new Error("משתמש לא נמצא.");
+  if (!target) throw new DomainError("commsAccess.userNotFound", "משתמש לא נמצא.");
 
   const known = new Set(readPocConfig().lineNumbers);
   const wanted = [...new Set(input.lines)];
-  if (wanted.some((l) => !known.has(l))) throw new Error("קו טלפון לא מוכר.");
-  if (wanted.length > 0 && target.role === "CLIENT_USER") throw new Error("קו טלפון שייך רק לאיש צוות של אנקורה.");
+  if (wanted.some((l) => !known.has(l))) throw new DomainError("commsAccess.unknownLine", "קו טלפון לא מוכר.");
+  if (wanted.length > 0 && target.role === "CLIENT_USER") throw new DomainError("commsAccess.lineStaffOnly", "קו טלפון שייך רק לאיש צוות של אנקורה.");
 
   if (level !== target.commsAccessLevel) {
     const check = checkCommsGrant({
@@ -46,7 +47,11 @@ export async function setCommsAccess(actor: User, userId: string, input: { level
       targetRole: target.role,
       confidentialitySigned: await confidentialitySignedBothChannels(target.id),
     });
-    if (!check.ok) throw new Error(check.error);
+    // Each code written out, so tests/unit/i18n-domain-errors.test.ts can check it.
+    if (!check.ok)
+      throw check.code === "commsAccess.staffOnly"
+        ? new DomainError("commsAccess.staffOnly", check.error)
+        : new DomainError("commsAccess.needsConfidentiality", check.error);
   }
 
   const owners = await lineOwnerEmails();

@@ -1,5 +1,6 @@
 import { PageBack } from "@/components/app/BackSlot";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
@@ -25,15 +26,16 @@ export default async function CategoryDetailPage(props: { params: Promise<{ cate
     include: { client: true },
   });
   if (!category) notFound();
+  const t = await getTranslations("categories.detail");
 
   return (
     <>
       <div className="space-y-6">
         <div>
-          <PageBack href="/app/categories" label="קטגוריות" />
-          <h1 className="mt-3 text-xl font-medium text-app-text-primary">{category.name}</h1>
+          <PageBack href="/app/categories" label={t("back")} />
+          <h1 dir="auto" className="mt-3 text-xl font-medium text-app-text-primary">{category.name}</h1>
           <p className="mt-1 text-sm text-app-text-secondary">
-            {category.visibility === "GLOBAL" ? "קטגוריה כללית" : `ספציפית ללקוח: ${category.client?.name ?? ""}`}
+            {category.visibility === "GLOBAL" ? t("global") : t("clientSpecific", { client: category.client?.name ?? "" })}
           </p>
         </div>
 

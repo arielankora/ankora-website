@@ -8,7 +8,7 @@ import { formatDecimalHours } from "@/lib/hours-format";
 import { taskUrl } from "@/lib/mcp/serialize";
 import { appBaseUrl } from "@/lib/email-templates";
 import { taskAiExclusion } from "@/lib/ai-exclusion";
-import { buildAdvancePrompt, buildLessonsPrompt, fileSizeLabel, fileTypeLabel, SOURCES_LOOKBACK_DAYS, type AdvancePromptSources } from "@/lib/advance-prompt";
+import { buildAdvancePrompt, buildLessonsPrompt, fileSizeLabel, fileTypeLabel, SOURCES_LOOKBACK_DAYS, SOURCES_WIDE_LOOKBACK_DAYS, type AdvancePromptSources } from "@/lib/advance-prompt";
 
 // "קדם עם קלוד" (10.10.2026): turns what the task screen already loaded
 // into the prompt. One extra read, the decisions filed against the task;
@@ -98,8 +98,10 @@ export async function advancePromptFor(
         orderBy: { domain: "asc" },
       }),
     ]);
-    const from = new Date(task.createdAt.getTime() - SOURCES_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
-    const iso = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(from);
+    const daysBefore = (n: number) => new Date(task.createdAt.getTime() - n * 24 * 60 * 60 * 1000);
+    const isoDay = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+    const from = daysBefore(SOURCES_LOOKBACK_DAYS);
+    const wideFrom = daysBefore(SOURCES_WIDE_LOOKBACK_DAYS);
     sources = {
       clientDomains: domains.filter((d) => d.kind === "CLIENT").map((d) => d.domain),
       partnerDomains: domains.filter((d) => d.kind === "PARTNER").map((d) => d.domain),
@@ -107,7 +109,9 @@ export async function advancePromptFor(
       driveFolderId: anchors?.driveFolderId ?? null,
       conversationsDocId: anchors?.conversationsDocId ?? null,
       fromLabel: day.format(from),
-      fromIso: iso,
+      fromIso: isoDay.format(from),
+      wideFromLabel: day.format(wideFrom),
+      wideFromIso: isoDay.format(wideFrom),
     };
   }
 

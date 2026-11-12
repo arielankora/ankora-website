@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Eye, EyeOff } from "lucide-react";
 import { createCredentialAction, updateCredentialAction } from "./actions";
 import { useDrawerClose } from "@/components/app/Drawer";
@@ -40,7 +41,8 @@ export function CredentialForm({
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(existing ? updateCredentialAction : createCredentialAction, close);
   const [showPassword, setShowPassword] = useState(false);
-  const kept = "נשמר. להשאיר ריק ללא שינוי";
+  const t = useTranslations("credentials.form");
+  const kept = t("kept");
 
   return (
     <form onSubmit={onSubmit} autoComplete="off" className="flex flex-col gap-4">
@@ -48,7 +50,7 @@ export function CredentialForm({
         <input type="hidden" name="id" value={existing.id} />
       ) : (
         <div>
-          <label className={LABEL} htmlFor="cred-client">לקוח *</label>
+          <label className={LABEL} htmlFor="cred-client">{t("client")}</label>
           <select id="cred-client" name="clientId" defaultValue={clientId} required className={INPUT}>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
@@ -60,11 +62,11 @@ export function CredentialForm({
       )}
 
       <div>
-        <label className={LABEL} htmlFor="cred-name">שם המערכת *</label>
+        <label className={LABEL} htmlFor="cred-name">{t("systemName")}</label>
         <input id="cred-name" name="systemName" required maxLength={120} defaultValue={existing?.systemName} className={INPUT} />
       </div>
       <div>
-        <label className={LABEL} htmlFor="cred-url">קישור לאתר (לא חובה)</label>
+        <label className={LABEL} htmlFor="cred-url">{t("url")}</label>
         <input
           id="cred-url"
           name="url"
@@ -77,15 +79,15 @@ export function CredentialForm({
           className={INPUT}
         />
         <p id="cred-url-help" className="mt-1 text-xs text-app-text-tertiary">
-          כתובת האתר שנכנסים בו. לקובץ או למערכת בלי כתובת, להשאיר ריק ולכתוב את הפרטים בהערות.
+          {t("urlHelp")}
         </p>
       </div>
 
       <div className="rounded-xl border border-app-border bg-cream-dim p-4">
-        <p className="text-xs text-app-text-secondary">שלושת השדות האלה נשמרים מוצפנים, ומוצגים רק אחרי אימות זהות.</p>
+        <p className="text-xs text-app-text-secondary">{t("encryptedNote")}</p>
         <div className="mt-3 flex flex-col gap-4">
           <div>
-            <label className={LABEL} htmlFor="cred-user">שם משתמש</label>
+            <label className={LABEL} htmlFor="cred-user">{t("username")}</label>
             <input
               id="cred-user"
               name="username"
@@ -96,10 +98,10 @@ export function CredentialForm({
               placeholder={existing?.hasUsername ? kept : undefined}
               className={INPUT}
             />
-            {existing?.hasUsername && <ClearBox name="clear_username" label="להסיר את שם המשתמש השמור" />}
+            {existing?.hasUsername && <ClearBox name="clear_username" label={t("clearUsername")} />}
           </div>
           <div>
-            <label className={LABEL} htmlFor="cred-pass">סיסמה</label>
+            <label className={LABEL} htmlFor="cred-pass">{t("password")}</label>
             {/* The toggle sits at the end of the row, in the page's
                 direction (ADR 0006). The field itself is always LTR, so a
                 logical padding on it would resolve by the field's own
@@ -120,25 +122,25 @@ export function CredentialForm({
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "הסתרת הסיסמה שמוקלדת" : "הצגת הסיסמה שמוקלדת"}
+                aria-label={showPassword ? t("hidePassword") : t("showPassword")}
                 className="absolute inset-y-0 end-2 mt-1.5 flex items-center text-app-text-tertiary hover:text-app-text-primary"
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-            {existing?.hasPassword && <ClearBox name="clear_password" label="להסיר את הסיסמה השמורה" />}
+            {existing?.hasPassword && <ClearBox name="clear_password" label={t("clearPassword")} />}
           </div>
           <div>
-            <label className={LABEL} htmlFor="cred-notes">הערות</label>
+            <label className={LABEL} htmlFor="cred-notes">{t("notes")}</label>
             <textarea
               id="cred-notes"
               name="notes"
               rows={3}
               maxLength={4000}
-              placeholder={existing?.hasNotes ? kept : "שאלות אבטחה, קודי גיבוי, מי מקבל את קוד האימות"}
+              placeholder={existing?.hasNotes ? kept : t("notesPlaceholder")}
               className={INPUT}
             />
-            {existing?.hasNotes && <ClearBox name="clear_notes" label="להסיר את ההערות השמורות" />}
+            {existing?.hasNotes && <ClearBox name="clear_notes" label={t("clearNotes")} />}
           </div>
         </div>
       </div>
@@ -149,7 +151,7 @@ export function CredentialForm({
         disabled={pending}
         className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
       >
-        {pending ? "נשמר..." : existing ? "שמירת השינויים" : "הוספת הגישה"}
+        {pending ? t("saving") : existing ? t("saveChanges") : t("add")}
       </button>
     </form>
   );

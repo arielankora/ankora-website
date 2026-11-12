@@ -1,16 +1,18 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { useFormState, useFormStatus } from "react-dom";
 import { resendInviteAction } from "../actions";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
+  const t = useTranslations("users.resendInvite");
   return (
     <button
       type="submit"
       disabled={pending}
       className="rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-gold hover:text-app-text-primary disabled:opacity-50"
     >
-      {pending ? "שולח..." : "שליחת הזמנה מחדש"}
+      {pending ? t("sending") : t("send")}
     </button>
   );
 }
@@ -23,6 +25,7 @@ function SubmitButton() {
 // not a mail that arrived, and the admin should never have to come back
 // and press this a second time to find out where the person is stuck.
 export function ResendInviteForm({ userId }: { userId: string }) {
+  const t = useTranslations("users.resendInvite");
   const [state, formAction] = useFormState(resendInviteAction, {});
 
   return (
@@ -35,9 +38,7 @@ export function ResendInviteForm({ userId }: { userId: string }) {
       {state.inviteLink && (
         <div className="mt-3 rounded-xl border border-app-border bg-app-surface-page p-3">
           <p className="text-xs text-app-text-secondary">
-            {state.sent
-              ? "נשלח מייל עם קישור חדש. הקישור הקודם בוטל."
-              : "הקישור החדש נוצר, אבל שליחת המייל נכשלה. אפשר להעביר אותו ידנית:"}
+            {state.sent ? t("sent") : t("sendFailed")}
           </p>
           <p dir="ltr" className="mt-2 break-all text-[11px] text-app-text-secondary">
             {state.inviteLink}

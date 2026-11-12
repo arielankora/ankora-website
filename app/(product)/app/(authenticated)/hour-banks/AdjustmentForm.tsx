@@ -1,16 +1,18 @@
 "use client";
 import { useFormState, useFormStatus } from "react-dom";
 import { recordAdjustmentAction } from "./actions";
+import { useTranslations } from "next-intl";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
+  const t = useTranslations("hourBanks.adjustment");
   return (
     <button
       type="submit"
       disabled={pending}
       className="rounded-full border border-app-border px-3.5 py-2 text-xs text-app-text-primary transition-colors hover:border-gold disabled:opacity-50"
     >
-      {pending ? "שומר..." : "הוספה"}
+      {pending ? t("saving") : t("add")}
     </button>
   );
 }
@@ -22,6 +24,7 @@ function SubmitButton() {
 // visually flip.
 export function AdjustmentForm({ clientId, currentHourBankId }: { clientId: string; currentHourBankId?: string }) {
   const [state, formAction] = useFormState(recordAdjustmentAction, {});
+  const t = useTranslations("hourBanks.adjustment");
 
   return (
     <form action={formAction} className="flex flex-col gap-2.5">
@@ -30,7 +33,7 @@ export function AdjustmentForm({ clientId, currentHourBankId }: { clientId: stri
 
       <div className="flex flex-wrap items-end gap-2.5">
         <label className="block w-[84px]">
-          <span className="mb-1 block text-[11px] text-app-text-secondary">שעות</span>
+          <span className="mb-1 block text-[11px] text-app-text-secondary">{t("hours")}</span>
           <input
             name="hours"
             inputMode="decimal"
@@ -41,11 +44,11 @@ export function AdjustmentForm({ clientId, currentHourBankId }: { clientId: stri
           />
         </label>
         <label className="block min-w-0 flex-1">
-          <span className="mb-1 block text-[11px] text-app-text-secondary">סיבה</span>
+          <span className="mb-1 block text-[11px] text-app-text-secondary">{t("reason")}</span>
           <input
             name="reason"
             required
-            placeholder="למשל: זיכוי חד-פעמי"
+            placeholder={t("reasonPlaceholder")}
             className="w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
@@ -53,8 +56,8 @@ export function AdjustmentForm({ clientId, currentHourBankId }: { clientId: stri
       </div>
 
       {state?.error && <p className="text-xs text-app-error">{state.error}</p>}
-      {state?.ok && <p className="text-xs text-app-success">ההתאמה נוספה.</p>}
-      <p className="text-[11px] text-app-text-tertiary">כל התאמה נרשמת ביומן הפעולות עם שם המבצע.</p>
+      {state?.ok && <p className="text-xs text-app-success">{t("added")}</p>}
+      <p className="text-[11px] text-app-text-tertiary">{t("auditNote")}</p>
     </form>
   );
 }

@@ -10,6 +10,7 @@ import { credentialAad, generateDataKey, openSecret, sealSecret, ENC_VERSION, ty
 import { unwrapDataKey, wrapDataKey } from "@/lib/vault/keys";
 import { sendVaultAlert } from "@/lib/vault/alerts";
 import { cleanUrl } from "@/lib/vault/url";
+import { DomainError } from "@/lib/domain-error";
 export { cleanUrl };
 
 // Credentials vault, the rules (claude/credentials-vault-spec-2026-10-06.md,
@@ -36,9 +37,9 @@ export { cleanUrl };
 //   4. Editing is not revealing. Updating a credential never returns its
 //      current values; an empty field means "unchanged".
 
-export class CredentialNotFoundError extends Error {
+export class CredentialNotFoundError extends DomainError {
   constructor() {
-    super("הגישה לא נמצאה.");
+    super("credentials.notFound", "הגישה לא נמצאה.");
     this.name = "CredentialNotFoundError";
   }
 }
@@ -86,21 +87,63 @@ export async function listVaultClients(actor: User) {
 
 // ── Validation ────────────────────────────────────────────────────────
 
-function cleanText(value: unknown, max: number, label: string): string | null {
+// The field a refusal is about. The Hebrew label stays in the message, as
+// it always was; the code names the field, so a screen can word it in the
+// reader's language (ADR 0006).
+type CredentialField = "systemName" | "username" | "password" | "notes";
+
+const FIELD_LABEL: Record<CredentialField, string> = {
+  systemName: "שם המערכת",
+  username: "שם משתמש",
+  password: "סיסמה",
+  notes: "הערות",
+};
+
+function invalidValue(field: CredentialField): DomainError {
+  const message = `${FIELD_LABEL[field]}: ערך לא תקין.`;
+  switch (field) {
+    case "systemName":
+      return new DomainError("credentials.invalid.systemName", message);
+    case "username":
+      return new DomainError("credentials.invalid.username", message);
+    case "password":
+      return new DomainError("credentials.invalid.password", message);
+    case "notes":
+      return new DomainError("credentials.invalid.notes", message);
+  }
+}
+
+function tooLong(field: CredentialField, max: number): DomainError {
+  const message = `${FIELD_LABEL[field]}: עד ${max} תווים.`;
+  // A string, so the number reads as it always did, with no separator.
+  const values = { max: String(max) };
+  switch (field) {
+    case "systemName":
+      return new DomainError("credentials.tooLong.systemName", message, values);
+    case "username":
+      return new DomainError("credentials.tooLong.username", message, values);
+    case "password":
+      return new DomainError("credentials.tooLong.password", message, values);
+    case "notes":
+      return new DomainError("credentials.tooLong.notes", message, values);
+  }
+}
+
+function cleanText(value: unknown, max: number, field: CredentialField): string | null {
   if (value === undefined || value === null) return null;
-  if (typeof value !== "string") throw new Error(`${label}: ערך לא תקין.`);
+  if (typeof value !== "string") throw invalidValue(field);
   const v = value.trim();
   if (v.length === 0) return null;
-  if (v.length > max) throw new Error(`${label}: עד ${max} תווים.`);
+  if (v.length > max) throw tooLong(field, max);
   return v;
 }
 
 /// Secrets are not trimmed: a trailing space can be part of a password.
-function cleanSecret(value: unknown, max: number, label: string): string | null {
+function cleanSecret(value: unknown, max: number, field: CredentialField): string | null {
   if (value === undefined || value === null) return null;
-  if (typeof value !== "string") throw new Error(`${label}: ערך לא תקין.`);
+  if (typeof value !== "string") throw invalidValue(field);
   if (value.length === 0) return null;
-  if (value.length > max) throw new Error(`${label}: עד ${max} תווים.`);
+  if (value.length > max) throw tooLong(field, max);
   return value;
 }
 
@@ -193,13 +236,13 @@ export interface CredentialInput {
 
 export async function createCredential(actor: User, input: CredentialInput) {
   await assertClientAssigned(actor, input.clientId, "credential.manage");
-  const systemName = cleanText(input.systemName, LIMITS.systemName, "שם המערכת");
-  if (!systemName) throw new Error("חסר שם מערכת.");
+  const systemName = cleanText(input.systemName, LIMITS.systemName, "systemName");
+  if (!systemName) throw new DomainError("credentials.systemNameRequired", "חסר שם מערכת.");
   const url = cleanUrl(input.url);
   const secret: CredentialSecret = {
-    username: cleanSecret(input.username, LIMITS.username, "שם משתמש"),
-    password: cleanSecret(input.password, LIMITS.password, "סיסמה"),
-    notes: cleanSecret(input.notes, LIMITS.notes, "הערות"),
+    username: cleanSecret(input.username, LIMITS.username, "username"),
+    password: cleanSecret(input.password, LIMITS.password, "password"),
+    notes: cleanSecret(input.notes, LIMITS.notes, "notes"),
   };
 
   // The id is chosen here, before the insert, because the ciphertext's
@@ -259,8 +302,8 @@ export async function updateCredential(actor: User, id: string, patch: Credentia
   const data: Record<string, unknown> = { updatedById: actor.id };
 
   if (patch.systemName !== undefined) {
-    const systemName = cleanText(patch.systemName, LIMITS.systemName, "שם המערכת");
-    if (!systemName) throw new Error("חסר שם מערכת.");
+    const systemName = cleanText(patch.systemName, LIMITS.systemName, "systemName");
+    if (!systemName) throw new DomainError("credentials.systemNameRequired", "חסר שם מערכת.");
     if (systemName !== row.systemName) {
       data.systemName = systemName;
       changed.push("systemName");
@@ -275,9 +318,9 @@ export async function updateCredential(actor: User, id: string, patch: Credentia
   }
 
   const next = {
-    username: cleanSecret(patch.username, LIMITS.username, "שם משתמש"),
-    password: cleanSecret(patch.password, LIMITS.password, "סיסמה"),
-    notes: cleanSecret(patch.notes, LIMITS.notes, "הערות"),
+    username: cleanSecret(patch.username, LIMITS.username, "username"),
+    password: cleanSecret(patch.password, LIMITS.password, "password"),
+    notes: cleanSecret(patch.notes, LIMITS.notes, "notes"),
   };
   const clear = new Set(patch.clear ?? []);
   const secretFields = (["username", "password", "notes"] as const).filter((f) => next[f] !== null || clear.has(f));

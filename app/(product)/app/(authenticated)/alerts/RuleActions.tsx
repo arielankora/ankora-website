@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import { toggleAlertRuleAction, deleteAlertRuleAction } from "./actions";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { Switch } from "@/components/app/Switch";
+import { useTranslations } from "next-intl";
 
 // App redesign (handoff README, screen 13 "התראות" + Interactions &
 // Behavior rule 2): real 42x24px switch (see components/app/Switch.tsx)
@@ -11,6 +12,7 @@ import { Switch } from "@/components/app/Switch";
 // keeps its confirm() guard and gets a plain outcome toast.
 export function RuleActions({ ruleId, enabled }: { ruleId: string; enabled: boolean }) {
   const { showToast } = useToast();
+  const t = useTranslations("alerts.rule");
   const [isPending, startTransition] = useTransition();
   const [checked, setChecked] = useState(enabled);
 
@@ -20,40 +22,40 @@ export function RuleActions({ ruleId, enabled }: { ruleId: string; enabled: bool
       const result = await toggleAlertRuleAction(ruleId, next);
       if (!result.ok) {
         setChecked(!next);
-        showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
+        showToast({ tone: "error", title: t("updateFailed"), description: result.error });
         return;
       }
       if (isUndo) return;
       showToast({
         tone: next ? "success" : "warning",
-        title: next ? "כלל ההתראה הופעל" : "כלל ההתראה הושבת",
+        title: next ? t("enabled") : t("disabled"),
         undo: () => toggle(!next, true),
       });
     });
   }
 
   function handleDelete() {
-    if (!confirm("למחוק את כלל ההתראה? הפעולה בלתי הפיכה.")) return;
+    if (!confirm(t("confirmDelete"))) return;
     startTransition(async () => {
       const result = await deleteAlertRuleAction(ruleId);
       showToast(
         result.ok
-          ? { tone: "success", title: "כלל ההתראה נמחק" }
-          : { tone: "error", title: "המחיקה נכשלה", description: result.error }
+          ? { tone: "success", title: t("deleted") }
+          : { tone: "error", title: t("deleteFailed"), description: result.error }
       );
     });
   }
 
   return (
     <div className="flex items-center gap-3.5">
-      <Switch checked={checked} onChange={() => toggle(!checked)} disabled={isPending} label="הפעלה או כיבוי" />
+      <Switch checked={checked} onChange={() => toggle(!checked)} disabled={isPending} label={t("toggle")} />
       <button
         type="button"
         disabled={isPending}
         onClick={handleDelete}
         className="text-xs font-medium text-app-error underline decoration-app-error/30 underline-offset-2 disabled:opacity-50"
       >
-        מחיקה
+        {t("delete")}
       </button>
     </div>
   );

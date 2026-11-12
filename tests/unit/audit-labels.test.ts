@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { ACTION_LABEL, ENTITY_TYPES, auditSearchWhere, classifyAction } from "../../app/(product)/app/(authenticated)/audit-log/labels";
+import { ACTION_LABEL, ENTITY_TYPES, actionMessageKey, auditSearchWhere, classifyAction } from "../../app/(product)/app/(authenticated)/audit-log/labels";
+import he from "../../messages/he.json";
+import en from "../../messages/en.json";
 
 /**
  * `recordAudit` writes a row; the audit screen decides how to show it. Nothing
@@ -92,6 +94,35 @@ describe("audit log registries", () => {
     expect(missing).toEqual([]);
   });
 
+  // ADR 0006: the screen reads each label from the dictionaries, under
+  // auditLog.actions.<actionMessageKey(action)>, while ACTION_LABEL stays
+  // the Hebrew the client file writes. Every action needs a line in both
+  // languages, the Hebrew must be the same words, and no two actions may
+  // fold into the same key.
+  it("every labelled action has the same Hebrew and an English line in the dictionaries", () => {
+    const heActions = he.auditLog.actions as Record<string, string>;
+    const enActions = en.auditLog.actions as Record<string, string>;
+    const keys = Object.keys(ACTION_LABEL).map(actionMessageKey);
+    expect(new Set(keys).size).toBe(keys.length);
+    const mismatched = Object.entries(ACTION_LABEL)
+      .filter(([action, label]) => heActions[actionMessageKey(action)] !== label)
+      .map(([action]) => action);
+    expect(mismatched).toEqual([]);
+    const noEnglish = Object.keys(ACTION_LABEL).filter((action) => !enActions[actionMessageKey(action)]);
+    expect(noEnglish).toEqual([]);
+    // And nothing in the dictionaries for an action that is not registered.
+    expect(Object.keys(heActions).sort()).toEqual([...keys].sort());
+    expect(Object.keys(enActions).sort()).toEqual([...keys].sort());
+  });
+
+  it("every tag kind is worded in both languages", () => {
+    for (const action of [...Object.keys(ACTION_LABEL), "logout"]) {
+      const { kind } = classifyAction(action);
+      expect(he.auditLog.kinds[kind]).toBeTruthy();
+      expect(en.auditLog.kinds[kind]).toBeTruthy();
+    }
+  });
+
   // The reverse direction. A label for an action nobody writes any more is
   // dead weight that makes the registry harder to trust, and usually means a
   // call site was deleted without cleaning up after it.
@@ -110,24 +141,24 @@ describe("audit log registries", () => {
   // These are the six kinds the redesign specified; the assertions below pin
   // the ones where falling through would actively mislead an admin.
   it("tags access changes and failures distinctly, not as routine edits", () => {
-    expect(classifyAction("login.failure").label).toBe("כשלון");
-    expect(classifyAction("login.success").label).toBe("התחברות");
-    expect(classifyAction("user.logout_all_sessions").label).toBe("התחברות");
-    expect(classifyAction("user.role_status_change").label).toBe("הרשאות");
-    expect(classifyAction("mcp.oauth.granted").label).toBe("הרשאות");
-    expect(classifyAction("mcp_grant.revoke").label).toBe("הרשאות");
-    expect(classifyAction("mcp_grant.revoke_all").label).toBe("הרשאות");
-    expect(classifyAction("important_date.delete").label).toBe("מחיקה");
-    expect(classifyAction("important_date.create").label).toBe("יצירה");
-    expect(classifyAction("time_entry.update").label).toBe("עריכה");
+    expect(classifyAction("login.failure").kind).toBe("failure");
+    expect(classifyAction("login.success").kind).toBe("login");
+    expect(classifyAction("user.logout_all_sessions").kind).toBe("login");
+    expect(classifyAction("user.role_status_change").kind).toBe("access");
+    expect(classifyAction("mcp.oauth.granted").kind).toBe("access");
+    expect(classifyAction("mcp_grant.revoke").kind).toBe("access");
+    expect(classifyAction("mcp_grant.revoke_all").kind).toBe("access");
+    expect(classifyAction("important_date.delete").kind).toBe("delete");
+    expect(classifyAction("important_date.create").kind).toBe("create");
+    expect(classifyAction("time_entry.update").kind).toBe("edit");
     // Credentials vault: a reveal is not an edit, and a refused reveal or
     // a failed identity check is a failure.
-    expect(classifyAction("credential.reveal").label).toBe("חשיפה");
-    expect(classifyAction("credential.reveal_denied").label).toBe("כשלון");
-    expect(classifyAction("credential.stepup_failed").label).toBe("כשלון");
-    expect(classifyAction("credential.create").label).toBe("יצירה");
-    expect(classifyAction("credential.delete").label).toBe("מחיקה");
-    expect(classifyAction("credential.exposure_report").label).toBe("דוח");
+    expect(classifyAction("credential.reveal").kind).toBe("reveal");
+    expect(classifyAction("credential.reveal_denied").kind).toBe("failure");
+    expect(classifyAction("credential.stepup_failed").kind).toBe("failure");
+    expect(classifyAction("credential.create").kind).toBe("create");
+    expect(classifyAction("credential.delete").kind).toBe("delete");
+    expect(classifyAction("credential.exposure_report").kind).toBe("report");
   });
 });
 
@@ -135,6 +166,13 @@ describe("audit log registries", () => {
 describe("auditSearchWhere - what the audit search box looks in", () => {
   it("finds actions by their Hebrew label, not only by the English key", () => {
     const where = auditSearchWhere("יצירת משימה") as { OR: Record<string, unknown>[] };
+    const byLabel = where.OR.find((c) => "action" in c && (c.action as { in?: string[] }).in);
+    expect((byLabel?.action as { in: string[] }).in).toContain("task.create");
+  });
+
+  // ADR 0006: the English screen shows English labels, so they find rows too.
+  it("finds actions by their English label, ignoring case", () => {
+    const where = auditSearchWhere("task created") as { OR: Record<string, unknown>[] };
     const byLabel = where.OR.find((c) => "action" in c && (c.action as { in?: string[] }).in);
     expect((byLabel?.action as { in: string[] }).in).toContain("task.create");
   });

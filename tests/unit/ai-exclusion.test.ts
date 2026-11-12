@@ -56,7 +56,7 @@ describe("a meeting marked בלי AI", () => {
   it("the advance prompt's sources section says to leave it unopened", () => {
     const text = sourcesRules(
       { clientName: "NUX", taskId: "t1" },
-      { clientDomains: [], partnerDomains: [], keywords: [], driveFolderId: null, conversationsDocId: null, fromLabel: "13.07.2026", fromIso: "2026-07-13" }
+      { clientDomains: [], partnerDomains: [], keywords: [], driveFolderId: null, conversationsDocId: null, fromLabel: "13.07.2026", fromIso: "2026-07-13", wideFromLabel: "14.05.2026", wideFromIso: "2026-05-14" }
     ).join("\n");
     expect(text).toContain(NO_AI_MEETING_RULE);
     expect(text).toContain(NO_AI_MEETING_MARKER);

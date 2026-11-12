@@ -1,6 +1,7 @@
 import "server-only";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { DomainError } from "@/lib/domain-error";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 
@@ -56,7 +57,7 @@ export async function credentialExposureReport(
     where: { id: userId },
     select: { id: true, name: true, email: true },
   });
-  if (!subject) throw new Error("המשתמש לא נמצא.");
+  if (!subject) throw new DomainError("credentialExposure.userNotFound", "המשתמש לא נמצא.");
 
   const since = new Date(now.getTime() - days * 24 * 60 * 60_000);
   const reveals = await prisma.auditEvent.findMany({

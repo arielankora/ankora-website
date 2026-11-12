@@ -9,13 +9,19 @@ import {
   sendReportScheduleNow,
 } from "@/lib/app-domain/report-schedules";
 import type { ClientReportType, ReportFrequency } from "@prisma/client";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 
 type FormState = { error?: string; ok?: boolean };
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
+/// ADR 0006: in the reader's language.
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("reportSchedules.errors");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  const text = await domainErrorText(err);
+  if (text) return text;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
 }
 
 function parseEmailList(value: FormDataEntryValue | null): string[] {
@@ -29,12 +35,12 @@ function parseEmailList(value: FormDataEntryValue | null): string[] {
 export async function createReportScheduleAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") || "");
-  if (!clientId) return { error: "יש לבחור לקוח." };
+  if (!clientId) return { error: (await getTranslations("reportSchedules.errors"))("pickClient") };
 
   const reportType = String(formData.get("reportType") || "MONTHLY_DETAILED") as ClientReportType;
   const frequency = String(formData.get("frequency") || "MONTHLY") as ReportFrequency;
   const recipients = parseEmailList(formData.get("recipients"));
-  if (recipients.length === 0) return { error: "יש להזין לפחות נמען אחד." };
+  if (recipients.length === 0) return { error: (await getTranslations("reportSchedules.errors"))("recipientsRequired") };
 
   try {
     await createReportSchedule(user, clientId, {
@@ -46,7 +52,7 @@ export async function createReportScheduleAction(_prev: FormState | undefined, f
       hour: Number(formData.get("hour") || 7),
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/reports");
@@ -66,7 +72,7 @@ export async function toggleReportScheduleAction(
   try {
     await updateReportSchedule(user, scheduleId, { enabled });
   } catch (err) {
-    return { ok: false, error: friendlyError(err) };
+    return { ok: false, error: await friendlyError(err) };
   }
   revalidatePath("/app/reports");
   return { ok: true };
@@ -77,7 +83,7 @@ export async function deleteReportScheduleAction(scheduleId: string): Promise<{ 
   try {
     await deleteReportSchedule(user, scheduleId);
   } catch (err) {
-    return { ok: false, error: friendlyError(err) };
+    return { ok: false, error: await friendlyError(err) };
   }
   revalidatePath("/app/reports");
   return { ok: true };
