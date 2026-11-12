@@ -122,6 +122,10 @@
     },
     "actionForm": {
       "failed": "אירעה שגיאה. נסו שוב."
+    },
+    "exportMenu": {
+      "label": "ייצוא",
+      "close": "סגירה"
     }
   },
   "profile": {

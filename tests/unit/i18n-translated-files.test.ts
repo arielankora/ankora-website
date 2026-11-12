@@ -19,6 +19,7 @@ const TRANSLATED_FILES = [
   "app/(product)/layout.tsx",
   "app/(product)/error.tsx",
   "app/(product)/app/not-found.tsx",
+  "components/app/ExportMenu.tsx",
   "components/app/AppShell.tsx",
   "components/app/Sidebar.tsx",
   "components/app/TopBar.tsx",

@@ -122,6 +122,10 @@
     },
     "actionForm": {
       "failed": "Something went wrong. Try again."
+    },
+    "exportMenu": {
+      "label": "Export",
+      "close": "Close"
     }
   },
   "profile": {
