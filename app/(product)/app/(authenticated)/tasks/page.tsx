@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { taskAiExclusion } from "@/lib/ai-exclusion";
 import { cookies } from "next/headers";
 import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
@@ -424,5 +425,6 @@ function toRow(task: Awaited<ReturnType<typeof listTasks>>[number]): ListRow {
     clientOutcome: task.clientOutcome,
     stepsTotal: task.subtasks.length,
     stepsDone: task.subtasks.filter((s) => !OPEN_STATUSES.includes(s.status)).length,
+    aiExcluded: taskAiExclusion(task) !== null,
   };
 }

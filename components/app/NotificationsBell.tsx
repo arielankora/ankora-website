@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
@@ -14,6 +15,9 @@ export type NotificationSummary = {
   readAt: string | null;
   /// Where the row leads. Only tasks today; anything else stays text.
   href?: string | null;
+  /// ADR 0006: about something marked "בלי AI", so the row is kept from
+  /// the browser's translator.
+  aiExcluded?: boolean;
 };
 
 /// The same steps as before ADR 0006, now worded by the dictionary. Past a
@@ -131,12 +135,13 @@ export function NotificationsBell({
                     key={n.id}
                     href={n.href}
                     onClick={() => setOpen(false)}
+                    {...noTranslateProps(n.aiExcluded)}
                     className="block border-b border-app-border px-4 py-3 last:border-b-0 hover:bg-app-surface-sunken"
                   >
                     {inner}
                   </Link>
                 ) : (
-                  <div key={n.id} className="border-b border-app-border px-4 py-3 last:border-b-0">
+                  <div key={n.id} {...noTranslateProps(n.aiExcluded)} className="border-b border-app-border px-4 py-3 last:border-b-0">
                     {inner}
                   </div>
                 );

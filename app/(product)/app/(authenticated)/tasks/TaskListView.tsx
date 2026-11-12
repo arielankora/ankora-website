@@ -69,6 +69,7 @@ export function TaskListView({
           assignedToName: row.assignedToName,
           supervisorName: row.supervisorName,
           clientVisible: row.clientVisible,
+          aiExcluded: row.aiExcluded,
           // The board needs to know WHETHER there is an outcome, not what
           // it says: that is the difference between asking for the
           // sentence before a card lands on "הושלמו" and being refused

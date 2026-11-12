@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { withFrom } from "@/lib/list-back";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { setImportantDateStatusAction } from "./actions";
 import type { ImportantDateStatus } from "@prisma/client";
@@ -20,6 +21,9 @@ export type DateRow = {
   remind: string;
   status: ImportantDateStatus;
   previousStatus: ImportantDateStatus;
+  /// ADR 0006: the date's client is "בלי AI", so the row is kept from the
+  /// browser's translator.
+  aiExcluded?: boolean;
 };
 
 const TONE_CLASSES: Record<DateRow["tone"], string> = {
@@ -67,7 +71,7 @@ export function ImportantDateRow({ date, listQuery }: { date: DateRow; listQuery
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3.5 rounded-2xl border border-app-border bg-white p-4">
+    <div {...noTranslateProps(date.aiExcluded)} className="flex flex-wrap items-center gap-3.5 rounded-2xl border border-app-border bg-white p-4">
       <span className={`w-[46px] shrink-0 rounded-[10px] py-1.5 text-center ${TONE_CLASSES[isHandled ? "green" : date.tone]}`}>
         <span className="block font-jbmono text-[17px]">{date.day}</span>
         <span className="block text-[10.5px]">{date.month}</span>

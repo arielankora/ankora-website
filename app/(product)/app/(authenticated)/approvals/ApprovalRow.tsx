@@ -1,5 +1,6 @@
 "use client";
 import { approvalAnchor } from "@/lib/approval-links";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import { useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -50,6 +51,9 @@ export type RowView = {
   recommend?: { text: string; why: string | null } | null;
   op?: StepOp | null;
   go?: { label: string; href: string } | null;
+  /// ADR 0006: the row is of a client or task marked "בלי AI", so it is
+  /// kept from the browser's translator.
+  aiExcluded?: boolean;
 };
 
 export function ApprovalRow({ row }: { row: RowView }) {
@@ -77,7 +81,7 @@ export function ApprovalRow({ row }: { row: RowView }) {
   const reject = row.actions.reject;
 
   return (
-    <li id={approvalAnchor(row.kind, row.id)} className="-mx-5 flex flex-wrap items-start justify-between gap-3 px-5 py-3.5 scroll-mt-24 target:bg-app-accent-soft" data-testid="approval-row" data-kind={row.kind}>
+    <li id={approvalAnchor(row.kind, row.id)} {...noTranslateProps(row.aiExcluded)} className="-mx-5 flex flex-wrap items-start justify-between gap-3 px-5 py-3.5 scroll-mt-24 target:bg-app-accent-soft" data-testid="approval-row" data-kind={row.kind}>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           {row.showLabel && <KindLabel label={row.label} tone={row.tone} />}

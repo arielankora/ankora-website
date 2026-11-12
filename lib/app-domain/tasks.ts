@@ -19,7 +19,7 @@ import { findTemplate } from "@/lib/app-domain/sop-templates";
 import { notifyTaskPeople } from "@/lib/app-domain/notifications";
 import { alertIfUrgentComment, alertIfUrgentLanded } from "@/lib/app-domain/urgent-tasks";
 import { isMappingTask } from "@/lib/procedure-to-file";
-import { AI_ALLOWED_TASK_WHERE, AI_EXCLUSION_CLEAR_FORBIDDEN_MESSAGE, AI_EXCLUSION_ON_STEP_MESSAGE } from "@/lib/ai-exclusion";
+import { AI_ALLOWED_TASK_WHERE, AI_EXCLUSION_CLEAR_FORBIDDEN_MESSAGE, AI_EXCLUSION_ON_STEP_MESSAGE, taskAiExclusion } from "@/lib/ai-exclusion";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2): spec section 11's
 // dedicated "Tasks" screen - open/recent tasks, filterable by client/
@@ -294,7 +294,11 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
     // `getTaskDetail` below has been written this way since phase 1. This
     // is the older query catching up, not a new idea.
     include: {
-      client: { select: { id: true, name: true } },
+      // The two flags taskAiExclusion reads besides the task's own, so a
+      // screen can keep a "בלי AI" row from the browser's translator
+      // (ADR 0006). The MCP tools filter with `forAi` and never show them.
+      client: { select: { id: true, name: true, aiExcluded: true } },
+      parent: { select: { aiExcluded: true } },
       category: { select: { id: true, name: true } },
       assignedTo: { select: { id: true, name: true } },
       supervisor: { select: { id: true, name: true } },
@@ -468,7 +472,8 @@ export async function listMyOpenTasks(actor: User, take = 8) {
       clientVisible: true,
       dueDate: true,
       updatedAt: true,
-      client: { select: { name: true } },
+      aiExcluded: true,
+      client: { select: { name: true, aiExcluded: true } },
     },
   });
 
@@ -479,6 +484,9 @@ export async function listMyOpenTasks(actor: User, take = 8) {
     dueDate: t.dueDate,
     clientVisible: t.clientVisible,
     stale: t.clientVisible && t.updatedAt < cutoff,
+    // ADR 0006: top level only, so the task's and its client's marks are
+    // all there is. The row is kept from the browser's translator.
+    aiExcluded: taskAiExclusion(t) !== null,
   }));
 }
 

@@ -1,5 +1,6 @@
 "use client";
 import { batchAnchor, proposalAnchor } from "@/lib/approval-links";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import { useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
@@ -671,6 +672,7 @@ export function ReviewBatch({
   filtered = false,
   staff,
   meId,
+  aiExcluded = false,
 }: {
   /// The batch, for the link that opens it (lib/approval-links.ts).
   batchId?: string;
@@ -688,6 +690,9 @@ export function ReviewBatch({
   /// Who a task opened from a proposal may go to, and who it goes to by default.
   staff: ReviewStaff;
   meId: string;
+  /// ADR 0006: the batch's client is "בלי AI", so the card is kept from
+  /// the browser's translator.
+  aiExcluded?: boolean;
 }) {
   const t = useTranslations("knowledge");
   const details = useSourceDetailsLine(sourceDetails);
@@ -728,7 +733,7 @@ export function ReviewBatch({
     }, {})
   );
   return (
-    <section id={batchId ? batchAnchor(batchId) : undefined} className="scroll-mt-24 rounded-2xl border border-app-border bg-white p-6 target:border-app-accent target:ring-2 target:ring-app-accent">
+    <section id={batchId ? batchAnchor(batchId) : undefined} {...noTranslateProps(aiExcluded)} className="scroll-mt-24 rounded-2xl border border-app-border bg-white p-6 target:border-app-accent target:ring-2 target:ring-app-accent">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-xs text-app-text-tertiary">

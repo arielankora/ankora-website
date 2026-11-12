@@ -25,6 +25,7 @@ import { rankApprovals } from "@/lib/next-steps";
 import { ApprovalRow } from "./ApprovalRow";
 import { procedureWords, stepTextWords, type LooseT } from "./procedure-words";
 import { BulkRules } from "./BulkRules";
+import { aiExcludedClientIds, aiExcludedTaskIds } from "@/lib/app-domain/ai-exclusion-db";
 import { KnowledgeReview } from "../knowledge/KnowledgeReview";
 
 // "אישורים" (Ariel, 20.10.2026; simplified 22.10.2026): only decisions,
@@ -85,6 +86,17 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
   ]);
   const allItems = everyone ? everything : onlyMine(everything);
 
+  // ADR 0006: a row of a client marked "בלי AI", or of a marked task (a
+  // task's approval and a plan are decided on the task's id), is kept from
+  // the browser's translator. The rule is lib/ai-exclusion.ts's, asked
+  // through its database helpers.
+  const [excludedClients, excludedTasks] = await Promise.all([
+    aiExcludedClientIds(everything.flatMap((i) => (i.clientId ? [i.clientId] : []))),
+    aiExcludedTaskIds(everything.filter((i) => i.kind === "task" || i.kind === "plan").map((i) => i.id)),
+  ]);
+  const rowExcluded = (i: ApprovalItem) =>
+    (!!i.clientId && excludedClients.has(i.clientId)) || ((i.kind === "task" || i.kind === "plan") && excludedTasks.has(i.id));
+
   // The client chips count the decisions, the tabs count the chosen client.
   const clients = new Map<string, { name: string; count: number }>();
   for (const i of allItems) {
@@ -142,6 +154,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
           ? { text: stepTextWords(tProc, st.recommend, i.recommend.text), why: i.recommend.why ? stepTextWords(tProc, st.why, i.recommend.why) : null }
           : (i.recommend ?? null),
       op: i.op ?? null,
+      aiExcluded: rowExcluded(i),
       go: i.go ? { label: w.go ? say(w.go) : st ? stepTextWords(tProc, st.fix, i.go.label) : i.go.label, href: withApprovalsBack(i.go.href, tab, clientId) } : null,
     };
   };

@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import { Check, Eye, EyeOff, Hourglass } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import {
@@ -86,6 +87,9 @@ export function TaskRow({
     supplierExperience: SupplierExperience | null;
     // Team adoption: what came of it, in the client's language.
     clientOutcome: string | null;
+    /// ADR 0006: "בלי AI" (taskAiExclusion), so the row is kept from the
+    /// browser's translator.
+    aiExcluded?: boolean;
   };
 }) {
   // Outside the tasks screen there is no provider
@@ -451,6 +455,7 @@ export function TaskRow({
     // in either without cutting the title down to a word.
     <div
       data-task={task.id}
+      {...noTranslateProps(task.aiExcluded)}
       className={[
         "grid items-center gap-x-3 gap-y-1 px-4 py-3.5 xl:gap-y-0 xl:px-[18px]",
         "grid-cols-[20px_minmax(0,1fr)_auto]",

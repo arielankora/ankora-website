@@ -8,7 +8,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { commsAccess } from "@/lib/comms/access";
 import { can } from "@/lib/app-auth/permissions";
 import { getActiveTimers } from "@/lib/app-domain/time-entries";
-import { listNotificationsForUser, unreadNotificationCount } from "@/lib/app-domain/notifications";
+import { aiExcludedNotificationIds, listNotificationsForUser, unreadNotificationCount } from "@/lib/app-domain/notifications";
 import { listUpcomingImportantDates } from "@/lib/app-domain/important-dates";
 import { countOpenAlertEvents } from "@/lib/app-domain/alerts";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
@@ -100,6 +100,10 @@ export default async function AuthenticatedAppLayout({ children }: { children: R
       canTrackTime ? countApprovals(user).catch(() => 0) : Promise.resolve(0),
     ]);
 
+  // ADR 0006: the bell's rows about something marked "בלי AI" are kept
+  // from the browser's translator.
+  const excludedNotifications = await aiExcludedNotificationIds(notificationRows);
+
   // The communications screen's menu entry, for those it opens to
   // (lib/comms/access.ts). A failure leaves the entry out, never the page.
   const showComms = await commsAccess(user).then((a) => a.allowed).catch(() => false);
@@ -122,6 +126,7 @@ export default async function AuthenticatedAppLayout({ children }: { children: R
         createdAt: n.createdAt.toISOString(),
         readAt: n.readAt ? n.readAt.toISOString() : null,
         href: n.entityType === "Task" && n.entityId ? `/app/tasks/${n.entityId}` : null,
+        aiExcluded: excludedNotifications.has(n.id),
       }))}
       unreadCount={unreadCount}
       importantDatesCount={importantDates.length}

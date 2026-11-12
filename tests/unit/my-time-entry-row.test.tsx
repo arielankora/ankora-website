@@ -70,6 +70,16 @@ async function editNoteTo(note: string) {
   await settle();
 }
 
+describe("an entry marked \"בלי AI\" (ADR 0006)", () => {
+  it("is kept from the browser's translator; an unmarked one is not", () => {
+    const { container, unmount } = render(<EntryRow entry={{ ...entry, aiExcluded: true }} />, { wrapper: intlWrapper() });
+    expect(container.querySelector('[translate="no"]')?.textContent).toContain("before");
+    unmount();
+    const plain = render(<EntryRow entry={entry} />, { wrapper: intlWrapper() });
+    expect(plain.container.querySelector("[translate]")).toBeNull();
+  });
+});
+
 describe("editing an entry", () => {
   it("closes on an accepted save and shows what the server wrote, with no re-render arriving", async () => {
     updateMyEntryAction.mockResolvedValue({

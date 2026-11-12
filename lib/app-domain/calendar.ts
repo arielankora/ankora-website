@@ -2,6 +2,7 @@ import "server-only";
 
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { taskAiExclusion } from "@/lib/ai-exclusion";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listTasks, OPEN_STATUSES } from "@/lib/app-domain/tasks";
 import { mineFilters, type MineScope } from "@/app/(product)/app/(authenticated)/tasks/mine-scope";
@@ -38,6 +39,9 @@ export type CalendarTask = {
   status: string;
   clientVisible: boolean;
   assigneeName: string | null;
+  /// ADR 0006: "בלי AI" (taskAiExclusion), kept from the browser's
+  /// translator. Optional so a hand-built row means an unmarked one.
+  aiExcluded?: boolean;
 };
 
 export type CalendarDate = {
@@ -46,6 +50,8 @@ export type CalendarDate = {
   title: string;
   clientName: string;
   dayKey: string;
+  /// ADR 0006: the date's client is "בלי AI".
+  aiExcluded?: boolean;
 };
 
 export type CalendarData = {
@@ -84,6 +90,7 @@ function toCalendarTask(t: TaskRow): CalendarTask {
     status: t.status,
     clientVisible: t.clientVisible,
     assigneeName: t.assignedTo?.name ?? null,
+    aiExcluded: taskAiExclusion(t) !== null,
   };
 }
 
@@ -145,7 +152,7 @@ async function loadDates(actor: User, startKey: string, endKey: string, clientId
       status: { notIn: ["ARCHIVED", "PAUSED"] },
       ...(mine !== "all" ? { OR: [{ responsibleUserId: actor.id }, { additionalUserIds: { has: actor.id } }] } : {}),
     },
-    include: { client: { select: { name: true } } },
+    include: { client: { select: { name: true, aiExcluded: true } } },
   });
 
   const out: CalendarDate[] = [];
@@ -155,7 +162,7 @@ async function loadDates(actor: User, startKey: string, endKey: string, clientId
     // notes are redacted (canViewSensitiveDetails), and the calendar never
     // carries notes.
     for (const dayKey of occurrencesInRange(row, startKey, endKey)) {
-      out.push({ id: row.id, title: row.title, clientName: row.client.name, dayKey });
+      out.push({ id: row.id, title: row.title, clientName: row.client.name, dayKey, aiExcluded: row.client.aiExcluded });
     }
   }
   return out.sort((a, b) => (a.dayKey === b.dayKey ? a.title.localeCompare(b.title, "he") : a.dayKey < b.dayKey ? -1 : 1));

@@ -28,6 +28,8 @@ import { listUpcomingImportantDates } from "@/lib/app-domain/important-dates";
 import { ProgressBar } from "@/components/app/ProgressBar";
 import { ActiveTimerMiniRows, type ActiveTimerRow } from "@/components/app/ActiveTimersList";
 import { EmptyState } from "@/components/app/states/EmptyState";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
+import { aiExcludedClientIds } from "@/lib/app-domain/ai-exclusion-db";
 import { listMyOpenTasks, stalledPromisesByClient, STALE_PROMISE_HOURS } from "@/lib/app-domain/tasks";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 import { formatClockMinutes } from "@/lib/hours-format";
@@ -299,6 +301,10 @@ export default async function AppHomePage() {
     ])
   );
 
+  // ADR 0006: a routine of a client marked "בלי AI" is kept from the
+  // browser's translator. The tasks and dates above carry their own flag.
+  const routineExcluded = routines?.length ? await aiExcludedClientIds(routines.map((r) => r.clientId)) : new Set<string>();
+
   const stalledTotal = stalled?.reduce((sum, row) => sum + row.count, 0) ?? 0;
   const stalledOverdue = stalled?.reduce((sum, row) => sum + row.overdue, 0) ?? 0;
   // Tasks phase 5: the promises the CLIENT is sitting on. Deliberately
@@ -364,6 +370,7 @@ export default async function AppHomePage() {
                 <Link
                   key={task.id}
                   href={taskHref(task.id, "mine=1")}
+                  {...noTranslateProps(task.aiExcluded)}
                   className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-[18px] py-3 transition-colors hover:bg-app-surface-sunken"
                 >
                   <span className="flex min-w-0 items-baseline gap-2">
@@ -408,7 +415,7 @@ export default async function AppHomePage() {
             </div>
             <ul className="divide-y divide-app-border">
               {routines.map((r) => (
-                <li key={r.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-[18px] py-3">
+                <li key={r.id} {...noTranslateProps(routineExcluded.has(r.clientId))} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-[18px] py-3">
                   <span className="min-w-0">
                     <Link href={`/app/clients/${r.clientId}?tab=file#processes`} className="text-[13.5px] text-app-text-primary hover:text-app-text-accent">
                       <span className="font-mono text-[11.5px] text-app-text-tertiary">{r.code}</span> <bdi>{r.title}</bdi>
@@ -722,6 +729,7 @@ export default async function AppHomePage() {
                       <Link
                         key={d.id}
                         href={`/app/important-dates/${d.id}`}
+                        {...noTranslateProps(d.client.aiExcluded)}
                         className="flex items-center gap-3 py-2.5 transition-colors hover:bg-app-surface-page"
                       >
                         <div

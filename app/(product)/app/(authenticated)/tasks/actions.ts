@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { taskAiExclusion } from "@/lib/ai-exclusion";
 import { getTranslations } from "next-intl/server";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
@@ -58,6 +59,10 @@ export type CreatedTaskRow = {
   /// `assignedToName` is: one shape, not a near-miss of one.
   stepsTotal: number;
   stepsDone: number;
+  /// ADR 0006: the task is "בלי AI" (taskAiExclusion: its own mark, its
+  /// parent's or its client's), so its row is kept from the browser's
+  /// translator.
+  aiExcluded: boolean;
 };
 
 // ADR 0006: a refusal in the reader's language. A DomainError carries a
@@ -111,7 +116,7 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
   // a name the browser could have been wrong about.
   const peopleIds = [created.assignedToId, created.supervisorId].filter((id): id is string => Boolean(id));
   const [client, category, people] = await Promise.all([
-    prisma.client.findUnique({ where: { id: created.clientId }, select: { name: true } }),
+    prisma.client.findUnique({ where: { id: created.clientId }, select: { name: true, aiExcluded: true } }),
     created.categoryId
       ? prisma.category.findUnique({ where: { id: created.categoryId }, select: { name: true } })
       : Promise.resolve(null),
@@ -157,6 +162,9 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
       // keeps saying so when the shape grows again.
       stepsTotal: 0,
       stepsDone: 0,
+      // A new task has no parent here and is born unmarked; its client's
+      // mark is what can apply.
+      aiExcluded: taskAiExclusion({ aiExcluded: created.aiExcluded, client }) !== null,
     },
   };
 }

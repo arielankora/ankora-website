@@ -3,6 +3,7 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { listMyTimeEntries } from "@/lib/app-domain/time-entries";
+import { aiExcludedRowIds } from "@/lib/app-domain/ai-exclusion-db";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
 import { Forbidden } from "@/components/app/Forbidden";
@@ -98,6 +99,9 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
     listAccessibleClients(user),
     listCategories(),
   ]);
+  // ADR 0006: an entry of a client or task marked "בלי AI" is kept from
+  // the browser's translator.
+  const excludedEntries = await aiExcludedRowIds(entries);
 
   const clientIds = new Set(clients.map((c) => c.id));
   const categories = allCategories.filter(
@@ -261,6 +265,7 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
                         clientName: entry.client.name,
                         categoryName: entry.category.name,
                         updatedAt: entry.updatedAt.toISOString(),
+                        aiExcluded: excludedEntries.has(entry.id),
                       }}
                     />
                   ))}

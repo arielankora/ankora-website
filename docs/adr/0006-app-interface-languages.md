@@ -62,7 +62,9 @@ Translating content is a later phase, and it must go through the same
 "בלי AI" check every AI reader goes through (`lib/ai-exclusion.ts`):
 material a client asked to keep away from AI is never translated by AI.
 Until then, the new product manager does not work on clients marked
-"בלי AI" (Ariel, 12.11.2026).
+"בלי AI" (Ariel, 12.11.2026). Decided later the same day: content is
+translated by the browser, and "בלי AI" content tells the browser not to;
+see "Content in English" at the end.
 
 ### 5. Pages that stay in Hebrew
 
@@ -194,7 +196,8 @@ thread event labels built in lib, the reminder after a task is closed
    orders their exits for Hebrew; it needs its own change for English.
 4. Outgoing channels by the recipient's language: email, notifications,
    PDF and exports.
-5. Translating content on request, under the "בלי AI" rule above.
+5. Translating content: decided, by the browser and never for "בלי AI";
+   see "Content in English" below.
 6. The client portal: done, see "The client portal" below.
 
 ## The client portal (12.11.2026)
@@ -345,3 +348,46 @@ Stays Hebrew, and why:
   engagement ends) and the nightly backup email.
 * No PDF is attached to any email the app sends to a client today; when
   one is, it goes in the client's communication language.
+
+## Content in English: the browser translates, never "בלי AI" (12.11.2026)
+
+Decided by Ariel on 12.11.2026. Staff who want to read what people wrote
+(tasks, the client file, notes) in English use the browser's own
+translation (Chrome's "Translate to English" and the like). The app does
+not translate content. This replaces item 5 of "What comes next".
+
+The browser's translator is machine translation: the page's text goes to
+the browser vendor's service. So anything marked "בלי AI"
+(`lib/ai-exclusion.ts`: the client, the task with its steps, or the
+document) tells the browser not to translate it.
+
+* `components/app/NoMachineTranslation.tsx` wraps a page of one client or
+  one task: its content sits in an element with `translate="no"` (a
+  `display: contents` wrapper, so no layout changes), and the page gets
+  `<meta name="google" content="notranslate">`, so Chrome does not even
+  offer to translate it (React 19 puts the tag in `<head>`).
+* Pages of one client or one task: everything under
+  `clients/[clientId]` (one layout covers the client page with its tabs,
+  the client file, connections, handover, procedures and a process's
+  document and flow), the task page when `taskAiExclusion` finds a mark
+  on the task, its parent or its client, an important date's page, and
+  every portal screen when the client being viewed is marked.
+* Pages that list the work of many clients (tasks, the board, home,
+  calendar, approvals, knowledge review, important dates, time entries,
+  notifications and the bell) stay translatable. Only the row or card of
+  a marked item carries `translate="no"` (`noTranslateProps`), from a
+  flag the server computes with the helpers in `lib/ai-exclusion.ts` and
+  `lib/app-domain/ai-exclusion-db.ts`. A document row under a marked task
+  or with its own mark is marked the same way, on the client page, the
+  task thread and the portal's file.
+* An in-app "translate" button was considered and not built: it would
+  send content to a translation service the app does not use today,
+  which needs a new sub-processor run (notice to clients, the
+  sub-processor list) before it could exist.
+
+`translate="no"` is a request the browser honours, not a lock: a person
+can still copy the text into a translator; keeping "בלי AI" content out
+of translators by hand is a team rule, not something the app can enforce.
+Browser translation of ordinary client content goes to Google, which is
+already Ankora's vendor; decided 12.11.2026 that this adds no new
+sub-processor.

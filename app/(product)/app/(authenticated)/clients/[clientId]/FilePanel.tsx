@@ -14,6 +14,7 @@ import {
 import { useActionForm } from "@/components/app/useActionForm";
 import { MessageClient, type ComposerProps } from "@/components/app/MessageClient";
 import { DOCUMENT_KIND_LABELS } from "@/lib/app-domain/portal-labels";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import type { ClientDocumentKind } from "@prisma/client";
 
 // Portal phase 3, the staff side of the client's file.
@@ -87,7 +88,14 @@ export function DocumentsPanel({
       {documents.length > 0 && (
         <ul className="mt-4 divide-y divide-app-border">
           {documents.map((d) => (
-            <li key={d.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3">
+            <li
+              key={d.id}
+              // ADR 0006: a document marked "בלי AI", or under a marked
+              // task, is kept from the browser's translator. A client's
+              // own mark covers the whole page (clients/[clientId]/layout).
+              {...noTranslateProps(d.aiExcluded || d.aiExcludedByTask)}
+              className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3"
+            >
               <span className="text-sm text-app-text-primary">
                 <span dir="auto">{d.title}</span>
                 <span className="text-app-text-secondary">

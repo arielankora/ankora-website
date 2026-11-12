@@ -1,5 +1,6 @@
 import "server-only";
 import { outgoingOf } from "@/lib/i18n/recipients";
+import { documentAiExclusion } from "@/lib/ai-exclusion";
 import { prisma } from "@/lib/prisma";
 import { TOP_LEVEL_ONLY } from "@/lib/app-domain/tasks";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -53,6 +54,9 @@ export interface PortalDocument {
   mimeType: string;
   sizeBytes: number | null;
   addedAt: Date;
+  /// ADR 0006: "בלי AI" (documentAiExclusion), so the row is kept from the
+  /// browser's translator.
+  aiExcluded: boolean;
 }
 
 export interface PortalRecurringDate {
@@ -154,7 +158,18 @@ export async function getPortalFile(actor: User): Promise<PortalFile> {
       where: { clientId: client.id, deletedAt: null, clientVisible: true },
       orderBy: { createdAt: "desc" },
       take: DOCUMENT_TAKE,
-      select: { id: true, title: true, kind: true, mimeType: true, sizeBytes: true, createdAt: true },
+      select: {
+        id: true,
+        title: true,
+        kind: true,
+        mimeType: true,
+        sizeBytes: true,
+        createdAt: true,
+        // ADR 0006: what documentAiExclusion reads below the client (the
+        // client's own mark covers the whole portal).
+        aiExcluded: true,
+        task: { select: { aiExcluded: true, parent: { select: { aiExcluded: true } } } },
+      },
     }),
     // Two gates, not one. `clientVisible` is the opt-in someone ticked;
     // SENSITIVE is the rule that overrides them. A date marked sensitive
@@ -201,6 +216,7 @@ export async function getPortalFile(actor: User): Promise<PortalFile> {
       mimeType: d.mimeType,
       sizeBytes: d.sizeBytes,
       addedAt: d.createdAt,
+      aiExcluded: documentAiExclusion({ ...d, client }) !== null,
     })),
     dates: dates.map((d) => ({ id: d.id, title: d.title, nextAt: d.nextOccurrenceAt })),
     knowledge: await portalKnowledgeFor(client.id),

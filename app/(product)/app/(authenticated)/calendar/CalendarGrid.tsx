@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import { CalendarDays, Clock, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
@@ -346,6 +347,7 @@ function TaskChip({ task, today, from, disabled }: { task: CalendarTask; today: 
         e.dataTransfer.effectAllowed = "move";
       }}
       data-calendar-task={task.id}
+      {...noTranslateProps(task.aiExcluded)}
       title={`${task.title} · ${task.clientName}${task.assigneeName ? ` · ${task.assigneeName}` : ""}${overdue ? ` · ${t("overdue")}` : ""}`}
       className="cursor-grab rounded-lg border border-app-border bg-white px-2 py-1 active:cursor-grabbing"
     >
@@ -497,6 +499,7 @@ function DrawerRow({ task, from, disabled, showDue }: { task: CalendarTask; from
         e.dataTransfer.effectAllowed = "move";
       }}
       data-calendar-task={task.id}
+      {...noTranslateProps(task.aiExcluded)}
       title={`${task.title} · ${task.clientName}`}
       className="group flex cursor-grab items-start gap-1.5 rounded-lg px-1.5 py-2 hover:bg-app-surface-sunken active:cursor-grabbing"
     >
@@ -528,6 +531,7 @@ function DateChip({ date, from }: { date: CalendarDate; from: string }) {
       href={`/app/important-dates/${date.id}?from=${encodeURIComponent(from)}`}
       draggable={false}
       data-calendar-date={date.id}
+      {...noTranslateProps(date.aiExcluded)}
       title={`${date.title} · ${date.clientName}`}
       className="flex items-start gap-1.5 rounded-lg bg-gold/10 px-2 py-1 text-[12.5px] leading-snug text-app-text-primary hover:bg-gold/20"
     >

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useFormatter, useTranslations } from "next-intl";
 import { StatusBadge } from "@/components/app/StatusBadge";
+import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import { Drawer } from "@/components/app/Drawer";
 import { CreateTaskForm } from "../../tasks/CreateTaskForm";
 import { formatDuration } from "@/lib/time-entry-format";
@@ -21,6 +22,9 @@ export type ClientTaskRow = {
   assigneeName: string | null;
   dueDate: string | null;
   seconds: number;
+  /// ADR 0006: the task is "בלי AI", so its row is kept from the
+  /// browser's translator.
+  aiExcluded?: boolean;
 };
 
 /// Hadas, 23.9.2026: the work of a client, on the client's screen. Open
@@ -77,7 +81,7 @@ export function TasksPanel({
           {tasks.map((task) => {
             const overdue = task.dueDate !== null && new Date(task.dueDate).getTime() < now;
             return (
-              <li key={task.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
+              <li key={task.id} {...noTranslateProps(task.aiExcluded)} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
                 <div className="min-w-0 flex-1">
                   <Link href={`/app/tasks/${task.id}`} dir="auto" className="text-app-text-primary hover:text-app-text-accent">
                     {task.title}
