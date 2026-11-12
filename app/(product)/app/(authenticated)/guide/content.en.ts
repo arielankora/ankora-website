@@ -83,7 +83,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "On the \"Two-step verification\" screen, confirm on your device with a fingerprint, face recognition or the device code.",
           "On a new device: click \"This is a new device without a passkey\", type the code you created on the signed-in device, give the device a name and click \"Register the device and sign in\".",
         ],
-        images: [{ src: "/guide/login.png", alt: "The sign-in screen", caption: "The sign-in screen" }],
+        images: [{ src: "/guide/en/login.png", alt: "The sign-in screen", caption: "The sign-in screen" }],
         notes: [
           "After several failed attempts in a row, the system locks the account for a while, as protection against break-in attempts.",
           "You can \"install\" the app on your phone's home screen (like a regular app) straight from the browser. In Chrome on Android: the browser menu, then \"Add to Home screen\". On iPhone in Safari: the Share button, then \"Add to Home Screen\". It is still the same website in the browser, just with a handier shortcut and icon. Nothing is installed from an app store.",
@@ -118,7 +118,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "An Ankora internal provider sees their own tasks, their own routine work and their own upcoming key dates. When there is nothing to show yet, an empty state says there is no data to show yet. That is normal behaviour, not a bug.",
           "The Super admin also sees a direct link to the \"Activity log\" at the bottom of the screen.",
         ],
-        images: [{ src: "/guide/overview.png", alt: "The home screen with operational metrics and an hours chart", caption: "The home screen as the Super admin sees it" }],
+        images: [{ src: "/guide/en/overview.png", alt: "The home screen with operational metrics and an hours chart", caption: "The home screen as the Super admin sees it" }],
         notes: [
           "A user with the Client role never reaches this screen: they are taken straight to their client portal (see \"Client portal\" later in this guide).",
           "The KPI row and the hours chart are explained in detail in \"Home screen: operational KPIs\" and \"Home screen: recorded hours chart\", in the \"Reports and overview\" group.",
@@ -157,7 +157,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "A timer linked to a client commitment: instead of \"Undo\", the message asks \"Where does it stand now?\" and offers \"In progress\", \"Waiting on client\" or \"Done\", next to the field \"What should we tell the client happened?\". Your choice updates the task the client sees in the portal.",
           "A timer that is running when its package closes is stopped, and you are then asked \"Move it?\": \"Move\" records the time in the open package, \"Keep\" leaves it where it is.",
         ],
-        images: [{ src: "/guide/timer.png", alt: "The timer screen with the start and stop button", caption: "The timer screen, from a team member's point of view" }],
+        images: [{ src: "/guide/en/timer.png", alt: "The timer screen with the start and stop button", caption: "The timer screen, from a team member's point of view" }],
       },
       {
         id: "my-time",
@@ -178,7 +178,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "To edit: click \"Edit\" on the entry's row, within the 48-hour window.",
           "No recording in a closed package: a new entry that starts inside a package or cycle that has already closed is refused, and the message (saying that the package from a given date closed on a given date) offers \"Record in the open bank\". The moved entry starts at the moment the open package opened, keeps its length, and its note says when the work was actually done. If there is no open package, the entry cannot be recorded. Editing, deleting and restoring an entry in a closed package are blocked.",
         ],
-        images: [{ src: "/guide/my-time.png", alt: "The My time screen with a weekly list of time entries", caption: "The \"My time\" screen, weekly view" }],
+        images: [{ src: "/guide/en/my-time.png", alt: "The My time screen with a weekly list of time entries", caption: "The \"My time\" screen, weekly view" }],
       },
       {
         id: "tasks",
@@ -212,8 +212,8 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "A timer stopped from the task's page when its package or cycle has already closed shows the question \"Move it?\" with \"Move\" (the time is recorded in the open package) and \"Keep\". See also \"My time\".",
         ],
         images: [
-          { src: "/guide/tasks.png", alt: "The tasks screen with status tabs", caption: "The \"Tasks\" screen" },
-          { src: "/guide/task-detail.png", alt: "A task's details page with steps, a work plan and a thread", caption: "A task's page: supervision and approval, description, what the client sees, work plan, steps, hours and thread" },
+          { src: "/guide/en/tasks.png", alt: "The tasks screen with status tabs", caption: "The \"Tasks\" screen" },
+          { src: "/guide/en/task-detail.png", alt: "A task's details page with steps, a work plan and a thread", caption: "A task's page: supervision and approval, description, what the client sees, work plan, steps, hours and thread" },
         ],
       },
       {
@@ -272,7 +272,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "Key dates cannot be dragged. You change a key date's date on its own page.",
           "On a phone the calendar is shown as a list of days, without drag and drop. You change a due date on the task's page.",
         ],
-        images: [{ src: "/guide/calendar.png", alt: "The calendar screen in month view with key dates", caption: "The \"Calendar\" screen in month view" }],
+        images: [{ src: "/guide/en/calendar.png", alt: "The calendar screen in month view with key dates", caption: "The \"Calendar\" screen in month view" }],
       },
       {
         id: "important-dates",
@@ -305,7 +305,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "Four holiday catalogues are ready in advance (Israel, International, US, UK), but no client is subscribed to them automatically. Subscribing and unsubscribing happen on the client's details page, in the \"Holiday calendars\" section, and are a Super admin action only. Subscribing immediately creates a key date for every holiday in the calendar (for example the Israeli holidays, or Valentine's Day from the international catalogue), without waiting for the daily check, with default reminders 30 and 7 days before.",
           "You see and create key dates only for the clients assigned to you, exactly the same permission as for the timer and tasks, unless you have permission to manage clients.",
         ],
-        images: [{ src: "/guide/important-dates.png", alt: "The key dates screen", caption: "The \"Key dates\" screen, \"Upcoming\" tab" }],
+        images: [{ src: "/guide/en/important-dates.png", alt: "The key dates screen", caption: "The \"Key dates\" screen, \"Upcoming\" tab" }],
       },
     ],
   },
@@ -337,7 +337,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "To archive: the three-dot button at the bottom of the card, then \"Move to archive\". Right after the move, a message lets you undo it.",
           "To restore a client from the archive: open the \"Archived\" area at the bottom of the screen and click \"Make active again\" next to the client's name.",
         ],
-        images: [{ src: "/guide/clients.png", alt: "The client management screen", caption: "The \"Clients\" screen: a grid of cards with cycle usage" }],
+        images: [{ src: "/guide/en/clients.png", alt: "The client management screen", caption: "The \"Clients\" screen: a grid of cards with cycle usage" }],
       },
       {
         id: "credentials",
@@ -364,7 +364,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "Even when editing, the existing password is not shown. To see it, choose \"Show access details\".",
           "When an internal provider leaves: on the \"Users\" screen, on the internal provider's page, \"Produce a report of viewed access\" shows, per client, the access details they viewed in the last 90 days, with a ready message for each client. This is a commitment in the data processing addendum, section 4.",
         ],
-        images: [{ src: "/guide/credentials.png", alt: "The systems and access screen, with one entry whose details are shown after confirmation", caption: "The \"Systems and access\" screen" }],
+        images: [{ src: "/guide/en/credentials.png", alt: "The systems and access screen, with one entry whose details are shown after confirmation", caption: "The \"Systems and access\" screen" }],
       },
       {
         id: "categories",
@@ -380,7 +380,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "To add a category: click \"+ Category\" at the top of the screen. In the side panel that opens, fill in a name, choose a scope (global / a specific client) and click add.",
           "To turn a category off: click the category's row to open its page, clear the \"Active\" checkbox and click \"Save changes\". There is no dedicated button on the row itself: the screen is a table for reading. A category that is off is no longer offered, but existing time entries that used it stay unchanged.",
         ],
-        images: [{ src: "/guide/categories.png", alt: "The category management screen", caption: "The \"Categories\" screen" }],
+        images: [{ src: "/guide/en/categories.png", alt: "The category management screen", caption: "The \"Categories\" screen" }],
       },
     ],
   },
@@ -423,7 +423,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "If more than three working days pass without a new batch from extraction, the file manager gets one alert, until a new batch arrives. A client that has not had any batch yet does not get an alert.",
           "Once a week the file manager gets an alert about temporary information that has expired, uncertain items that have not changed for two weeks (of every kind: facts, people, vendors, systems, entities, request types, rules and processes), unanswered questions, and proposed rules waiting for approval for more than two weeks. Whoever is responsible for a question or for temporary information, and whoever owns an item, gets alerts only about their own.",
         ],
-        images: [{ src: "/guide/client-file-tab.png", alt: "The client file tab on a client's screen", caption: "The \"Client file\" tab" }],
+        images: [{ src: "/guide/en/client-file-tab.png", alt: "The client file tab on a client's screen", caption: "The \"Client file\" tab" }],
       },
       {
         id: "client-file-read",
@@ -489,7 +489,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "Two people editing the procedure at the same time do not overwrite each other: whoever saves second is asked to refresh and check what changed.",
           "A project that happens once is a task with a work plan, not a process.",
         ],
-        images: [{ src: "/guide/client-processes.png", alt: "The processes area in the client file", caption: "\"Processes\" on the client file tab" }],
+        images: [{ src: "/guide/en/client-processes.png", alt: "The processes area in the client file", caption: "\"Processes\" on the client file tab" }],
       },
       {
         id: "client-rules",
@@ -516,7 +516,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "For each rule you can set \"Takes effect on\" and \"Review by\". A rule that takes effect later is shown in the file, but is not checked against the procedures until that day. Moving the start date of an approved rule sends it back for a manager's approval, like any change in wording. When the review date passes, the file manager and the rule's owner get it in the weekly reminder, until someone sets a new date.",
           "Claude can propose a rule from a meeting. After approval on the \"Extracted knowledge\" tab of the \"Approvals\" screen, the rule enters the file as proposed, and a manager approves it separately, on the \"Rules\" tab of the same screen or in the client file.",
         ],
-        images: [{ src: "/guide/client-rules.png", alt: "The rules area in the client file", caption: "\"Client rules\" on the client file tab" }],
+        images: [{ src: "/guide/en/client-rules.png", alt: "The rules area in the client file", caption: "\"Client rules\" on the client file tab" }],
       },
       {
         id: "approvals",
@@ -541,7 +541,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "A rule that has not been verified yet is not a decision: it stays marked in the file, and you can ask the client about it from \"What to check with the client\" on the client's page. It reaches \"Rules\" after it has been verified. In Ankora's internal file there is nobody to ask: there \"Approve rule\" marks it as verified and approves it in one click, and it is recorded in the log.",
         ],
         notes: ["The old address of \"Waiting for approval\" still works, and leads to the \"Extracted knowledge\" tab with the same filter."],
-        images: [{ src: "/guide/approvals.png", alt: "The approvals screen with tabs and today's decisions", caption: "The \"Approvals\" screen: each row is a decision, with the recommendation and the button that carries it out" }],
+        images: [{ src: "/guide/en/approvals.png", alt: "The approvals screen with tabs and today's decisions", caption: "The \"Approvals\" screen: each row is a decision, with the recommendation and the button that carries it out" }],
       },
       {
         id: "knowledge-review",
@@ -581,7 +581,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "Three mistakes out of the last 30 items of one type, or two mistakes for one client within 14 days, send that type or client back to approval by a person, and they appear under \"Back to approval by a person\". \"Return to automatic entry\" brings them back.",
           "A proposal card shows \"Why:\" and \"Suggested wording:\", and the button \"Complete with the suggested wording and approve\". For a process proposal, when the client has not turned on separation between the writer and the approver, a manager clicks \"Approve the proposal and the procedure\", and the procedure is approved together with it if it passes the checks. Otherwise the process goes in as a draft.",
         ],
-        images: [{ src: "/guide/knowledge-review.png", alt: "The extracted knowledge tab with proposals for the file", caption: "The \"Extracted knowledge\" tab on the \"Approvals\" screen" }],
+        images: [{ src: "/guide/en/knowledge-review.png", alt: "The extracted knowledge tab with proposals for the file", caption: "The \"Extracted knowledge\" tab on the \"Approvals\" screen" }],
       },
       {
         id: "extraction-guide",
@@ -597,7 +597,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "A manager sees the version in the list, and approves it or rejects it with a reason.",
         ],
         notes: ["You can reach this screen from the \"Extracted knowledge\" tab on the \"Approvals\" screen, through the \"Extraction guidelines\" link. A proposed version also appears on the \"Extraction guide\" tab there."],
-        images: [{ src: "/guide/extraction-guide.png", alt: "The extraction guidelines screen", caption: "The \"Extraction guidelines\" screen" }],
+        images: [{ src: "/guide/en/extraction-guide.png", alt: "The extraction guidelines screen", caption: "The \"Extraction guidelines\" screen" }],
       },
     ],
   },
@@ -682,7 +682,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "To delete in bulk: select the rows you want and click \"Delete selected\" in the bar that opens.",
           "To export: click \"Export\" above the table and choose CSV, Excel or PDF from the menu that opens. The export follows the chosen filter.",
         ],
-        images: [{ src: "/guide/time-entries-admin.png", alt: "The admin time entries screen", caption: "The \"Time entries\" screen, management view" }],
+        images: [{ src: "/guide/en/time-entries-admin.png", alt: "The admin time entries screen", caption: "The \"Time entries\" screen, management view" }],
       },
       {
         id: "users",
@@ -710,7 +710,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "A user invited with the \"Client\" role gets access only to the client portal of the client chosen for them (see \"Client portal\" later in this guide). They see none of the internal management screens, including this one.",
           "An Ankora internal provider sees and records time only for the clients assigned to them here (spec 4.1). \"Select all\" checks all the clients that exist at the moment, but a client created in the future is not included automatically: you have to come back and check it (or click \"Select all\" again) for each relevant team member.",
         ],
-        images: [{ src: "/guide/users.png", alt: "The user management screen", caption: "The \"Users\" screen" }],
+        images: [{ src: "/guide/en/users.png", alt: "The user management screen", caption: "The \"Users\" screen" }],
       },
       {
         id: "audit-log",
@@ -729,7 +729,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "Choose an item type from the dropdown at the top of the screen, and/or type a search word to filter by the action's name, and click \"Filter\".",
           "To export the filtered log, click \"Export\".",
         ],
-        images: [{ src: "/guide/audit-log.png", alt: "The activity log screen", caption: "The \"Activity log\" screen" }],
+        images: [{ src: "/guide/en/audit-log.png", alt: "The activity log screen", caption: "The \"Activity log\" screen" }],
       },
       {
         id: "integrations",
@@ -745,7 +745,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
         notes: [
           "No permissions (OAuth) are requested from an outside provider before a connection with it actually exists.",
         ],
-        images: [{ src: "/guide/integrations.png", alt: "The integrations screen", caption: "The \"Integrations\" screen" }],
+        images: [{ src: "/guide/en/integrations.png", alt: "The integrations screen", caption: "The \"Integrations\" screen" }],
       },
     ],
   },
@@ -778,7 +778,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
         notes: [
           "The Ankora manager does not see this screen even with permission to manage clients. This separation of roles is deliberate (see \"Roles and permissions\" at the start of this guide).",
         ],
-        images: [{ src: "/guide/hour-banks.png", alt: "The hour banks screen", caption: "The \"Hour banks\" screen: policy, cycle and opening a new cycle" }],
+        images: [{ src: "/guide/en/hour-banks.png", alt: "The hour banks screen", caption: "The \"Hour banks\" screen: policy, cycle and opening a new cycle" }],
       },
     ],
   },
@@ -814,7 +814,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "The Ankora manager does not see this screen, for the same reason as hour banks and the activity log: managing alerts is for the Super admin only.",
           "The \"Forecast\" threshold type, mentioned in the specification as a future feature, is not available yet.",
         ],
-        images: [{ src: "/guide/alerts.png", alt: "The hour bank usage alerts screen", caption: "The \"Alerts\" screen: rules, open events and sending history" }],
+        images: [{ src: "/guide/en/alerts.png", alt: "The hour bank usage alerts screen", caption: "The \"Alerts\" screen: rules, open events and sending history" }],
       },
     ],
   },
@@ -843,7 +843,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
         notes: [
           "The Ankora internal provider and the Client do not see this screen: internal reports are for the management roles only.",
         ],
-        images: [{ src: "/guide/reports.png", alt: "The internal reports screen", caption: "The \"Reports\" screen, numeric reports tab" }],
+        images: [{ src: "/guide/en/reports.png", alt: "The internal reports screen", caption: "The \"Reports\" screen, numeric reports tab" }],
       },
       {
         id: "client-activity-summary",
@@ -919,7 +919,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
         notes: [
           "The Ankora internal provider does not see this screen. A Client user with the \"Client manager\" role can edit the recipient list of their own client's scheduled reports themselves (but not the report, frequency or on/off). See \"Client portal\" later in this guide.",
         ],
-        images: [{ src: "/guide/report-schedules.png", alt: "The scheduled reports screen", caption: "The \"Scheduled reports\" screen for a chosen client" }],
+        images: [{ src: "/guide/en/report-schedules.png", alt: "The scheduled reports screen", caption: "The \"Scheduled reports\" screen for a chosen client" }],
       },
       {
         id: "nightly-export",
@@ -960,7 +960,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "Navigation in the portal is the sidebar only (on a phone, the row at the bottom of the screen). There is no extra row of tabs in the portal.",
           "\"Waiting for you\" is set by the Ankora team with a manual mark on the task, and it takes precedence over the internal status: a task can be in progress on our side and still be waiting for an answer from the client.",
         ],
-        images: [{ src: "/guide/portal-home.png", alt: "The client portal home screen", caption: "Client portal: home screen" }],
+        images: [{ src: "/guide/en/portal-home.png", alt: "The client portal home screen", caption: "Client portal: home screen" }],
       },
       {
         id: "portal-decisions",
@@ -977,7 +977,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "When the amount of a decision is above the approval ceiling agreed with the client, a line on the card explains this. The ceiling is saved on the decision when it is opened, so a later change to the ceiling does not change what an old approval said.",
           "The \"Talk about it\" option opens the client's dedicated WhatsApp. If no number has been set, a note says the channel will be available soon instead.",
         ],
-        images: [{ src: "/guide/portal-decisions.png", alt: "The decisions screen in the client portal", caption: "Client portal: decisions" }],
+        images: [{ src: "/guide/en/portal-decisions.png", alt: "The decisions screen in the client portal", caption: "Client portal: decisions" }],
       },
       {
         id: "portal-activity",
@@ -988,7 +988,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "The same tasks as on the home screen, as one continuous list, sorted by what moved most recently. Each row shows its stage: received, in progress, waiting for you, or done.",
           "This screen replaced the table of time entries that used to be here. The breakdown by day, with billable hours, moved to the hours screen and is still one click away.",
         ],
-        images: [{ src: "/guide/portal-activity.png", alt: "The activity screen in the client portal", caption: "Client portal: activity" }],
+        images: [{ src: "/guide/en/portal-activity.png", alt: "The activity screen in the client portal", caption: "Client portal: activity" }],
       },
       {
         id: "portal-dashboard",
@@ -1005,7 +1005,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "At the bottom of the tab is the monthly report: a month picker, an \"Export\" button (CSV, Excel or PDF, the same file that is sent in the monthly email), the total hours in the month, and the file manager's written summary when a summary was written for that month and a person approved it. A draft that was not approved is never shown to the client. The monthly report link in the emails leads straight to this part.",
           "All hours in the portal are shown in decimal hours (for example 5.20), as in the hour bank, and all totals are calculated as in the hour bank, so the numbers on every tab match.",
         ],
-        images: [{ src: "/guide/portal-dashboard.png", alt: "The client portal dashboard", caption: "Client portal: dashboard" }],
+        images: [{ src: "/guide/en/portal-dashboard.png", alt: "The client portal dashboard", caption: "Client portal: dashboard" }],
       },
       {
         id: "portal-weekly",
@@ -1023,7 +1023,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "Use the \"Previous week\" / \"Next week\" buttons to move between weeks.",
           "Click a day in the strip to see only that day.",
         ],
-        images: [{ src: "/guide/portal-weekly.png", alt: "The weekly activity screen in the client portal", caption: "Client portal: weekly activity" }],
+        images: [{ src: "/guide/en/portal-weekly.png", alt: "The weekly activity screen in the client portal", caption: "Client portal: weekly activity" }],
       },
       {
         id: "portal-tasks",
@@ -1049,7 +1049,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "A client user with the \"Client manager\" role (as set for them by Ankora) also sees a \"Manage scheduled report recipients\" panel at the bottom of the screen, and can edit there the recipient list of each scheduled report, but not the report, the frequency, or turning it on or off, which stay under Ankora's control only.",
           "A cycle recalculated after an edit made after the fact is marked \"Recalculated\" in the table, so it is clear that its numbers were updated after it closed.",
         ],
-        images: [{ src: "/guide/portal-history.png", alt: "The history screen in the client portal", caption: "Client portal: history" }],
+        images: [{ src: "/guide/en/portal-history.png", alt: "The history screen in the client portal", caption: "Client portal: history" }],
       },
       {
         id: "portal-file",
@@ -1071,7 +1071,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "To change how often updates come: choose in the \"How often to update you\" block and click \"Save frequency\".",
           "To download a document: click \"Download\" on its row.",
         ],
-        images: [{ src: "/guide/portal-file.png", alt: "The My file tab in the client portal", caption: "Client portal: \"My file\"" }],
+        images: [{ src: "/guide/en/portal-file.png", alt: "The My file tab in the client portal", caption: "Client portal: \"My file\"" }],
       },
     ],
   },
@@ -1094,7 +1094,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "To mark a single notification as read, click \"Mark as read\" next to it.",
           "To mark all notifications as read at once, click \"Mark all as read\" at the top of the screen.",
         ],
-        images: [{ src: "/guide/notifications.png", alt: "The personal notifications screen", caption: "The \"My notifications\" screen" }],
+        images: [{ src: "/guide/en/notifications.png", alt: "The personal notifications screen", caption: "The \"My notifications\" screen" }],
       },
       {
         id: "profile",
@@ -1124,8 +1124,8 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "The new password must be at least 10 characters long, and cannot be one of the common, weak passwords the system blocks.",
         ],
         images: [
-          { src: "/guide/profile.png", alt: "The personal profile screen", caption: "The \"My profile\" screen" },
-          { src: "/guide/profile-passkeys.png", alt: "The Passkey (Touch ID) card at the bottom of the profile screen", caption: "The \"Passkey (Touch ID)\" card" },
+          { src: "/guide/en/profile.png", alt: "The personal profile screen", caption: "The \"My profile\" screen" },
+          { src: "/guide/en/profile-passkeys.png", alt: "The Passkey (Touch ID) card at the bottom of the profile screen", caption: "The \"Passkey (Touch ID)\" card" },
         ],
       },
       {
