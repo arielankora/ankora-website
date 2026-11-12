@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { intlWrapper } from "../helpers/intl";
 
 // The role and status form on a user's page. The property under test:
 // **after a save, the selects show what was saved, from the action's own
@@ -28,7 +29,7 @@ function selects() {
 describe("EditRoleStatusForm", () => {
   it("shows the saved status and role after the save, with the props unchanged", async () => {
     updateUserRoleStatusAction.mockResolvedValue({ ok: true, saved: { role: "ANKORA_ADMIN", status: "ACTIVE" } });
-    render(<EditRoleStatusForm targetUser={{ id: "u1", role: "ANKORA_EMPLOYEE", status: "SUSPENDED" }} isSelf={false} />);
+    render(<EditRoleStatusForm targetUser={{ id: "u1", role: "ANKORA_EMPLOYEE", status: "SUSPENDED" }} isSelf={false} />, { wrapper: intlWrapper() });
 
     fireEvent.change(selects().status, { target: { value: "ACTIVE" } });
     fireEvent.change(selects().role, { target: { value: "ANKORA_ADMIN" } });
@@ -49,7 +50,7 @@ describe("EditRoleStatusForm", () => {
   });
 
   it("starts from the row the page rendered", () => {
-    render(<EditRoleStatusForm targetUser={{ id: "u1", role: "ANKORA_EMPLOYEE", status: "INVITED" }} isSelf={false} />);
+    render(<EditRoleStatusForm targetUser={{ id: "u1", role: "ANKORA_EMPLOYEE", status: "INVITED" }} isSelf={false} />, { wrapper: intlWrapper() });
     expect(selects().status.value).toBe("INVITED");
     expect(selects().role.value).toBe("ANKORA_EMPLOYEE");
   });

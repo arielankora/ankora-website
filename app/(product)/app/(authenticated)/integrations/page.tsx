@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { getMyClaudeConnection, getClaudeOrgSummary } from "@/lib/app-domain/mcp-connections";
@@ -47,14 +48,15 @@ export default async function IntegrationsPage() {
     // so how it is used belongs beside it.
     advanceWithClaudeUsage(user),
   ]);
+  const t = await getTranslations("integrations");
 
   return (
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-app-text-primary">אינטגרציות</h1>
+          <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
           <p className="mt-1 text-sm text-app-text-secondary">
-            חיבור מערכות חיצוניות לאפליקציית ניהול הזמן.
+            {t("subtitle")}
           </p>
         </div>
 

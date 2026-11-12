@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 // docs/adr/0001 section 19.14. The prompt text itself is built server-side
 // in page.tsx (via lib/client-activity-prompt.ts, using real DB data) and
@@ -8,6 +9,7 @@ import { useState } from "react";
 // of labor as the rest of this app's server-component-fetches /
 // client-component-interacts pattern.
 export function ClientSummaryView({ text, filename }: { text: string; filename: string }) {
+  const t = useTranslations("reports.summary");
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -37,7 +39,7 @@ export function ClientSummaryView({ text, filename }: { text: string; filename: 
     <div className="space-y-3 rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-medium text-app-text-primary">
-          הטקסט מוכן להעתקה - הדביקו אותו ב-ChatGPT או Claude כדי לקבל סיכום קצר לשיתוף עם הלקוח.
+          {t("ready")}
         </h2>
         <div className="flex items-center gap-3">
           <button
@@ -45,14 +47,14 @@ export function ClientSummaryView({ text, filename }: { text: string; filename: 
             onClick={copy}
             className="rounded-full bg-app-accent px-4 py-2 text-sm font-medium text-app-text-primary"
           >
-            {copied ? "הועתק!" : "העתק ללוח"}
+            {copied ? t("copied") : t("copy")}
           </button>
           <button
             type="button"
             onClick={download}
             className="rounded-full border border-app-border px-4 py-2 text-sm font-medium text-app-text-primary transition-colors hover:border-gold"
           >
-            הורדה כקובץ טקסט
+            {t("download")}
           </button>
         </div>
       </div>

@@ -18,21 +18,38 @@ import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
 import { ClosedBankError } from "@/lib/app-domain/closed-bank-guard";
 import { closedBankNoticeFrom, closedBankOptionsFrom, type ClosedBankNoticeState } from "../my-time/entry-errors";
 import { timed } from "@/lib/slow-log";
-import { describeOverlapConflict } from "@/lib/time-entry-format";
+import { describeOverlapConflictIn } from "@/lib/time-entry-format";
+import { getFormatter, getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 
 type FormState = { error?: string; ok?: boolean; closedBank?: ClosedBankNoticeState };
 
-function friendlyError(err: unknown): string {
-  if (err instanceof OverlapError)
-    return `טווח הזמן חופף לדיווח קיים: ${describeOverlapConflict(err.conflicting)}.`;
-  if (err instanceof ConflictError)
-    return "הרשומה הזו עודכנה בינתיים על ידי מישהו אחר. יש לרענן את הדף ולנסות שוב.";
-  if (err instanceof EditWindowExpiredError) return "חלון העריכה העצמית הסתיים; נדרשת הרשאת מנהל.";
-  if (err instanceof BackdateReasonRequiredError) return "יש לציין סיבה לדיווח עבור יום קודם.";
-  if (err instanceof FutureEntryError) return "לא ניתן לדווח על זמן בעתיד.";
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
+/// ADR 0006: in the reader's language. The sentences are the ones
+/// "הזמן שלי" already uses (timeEntries.errors), except the overlap: on
+/// this screen it is any overlap, not only one with the same client.
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("timeEntries.errors");
+  if (err instanceof OverlapError) {
+    const conflict = describeOverlapConflictIn(
+      err.conflicting,
+      {
+        conflict: (values) => t("overlapConflict", values),
+        range: (values) => t("overlapRange", values),
+        rangeRunning: (values) => t("overlapRangeRunning", values),
+      },
+      await getFormatter()
+    );
+    return (await getTranslations("timeEntriesAdmin.errors"))("overlap", { conflict });
+  }
+  if (err instanceof ConflictError) return t("conflict");
+  if (err instanceof EditWindowExpiredError) return t("editWindowExpired");
+  if (err instanceof BackdateReasonRequiredError) return t("backdateReasonRequired");
+  if (err instanceof FutureEntryError) return t("futureEntry");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  const text = await domainErrorText(err);
+  if (text) return text;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
 }
 
 /// Spec 6.3: "אם אדמין מזין עבור עובד אחר, actor שונה מ-user_id ונרשם
@@ -47,7 +64,7 @@ export async function adminCreateEntryAction(_prev: FormState | undefined, formD
   const clientId = String(formData.get("clientId") || "");
   const categoryId = String(formData.get("categoryId") || "");
   if (!targetUserId || !date || !startTime || !endTime || !clientId || !categoryId) {
-    return { error: "יש למלא איש צוות, תאריך, שעות, לקוח וקטגוריה." };
+    return { error: (await getTranslations("timeEntriesAdmin.errors"))("missingFields") };
   }
 
   try {
@@ -64,7 +81,7 @@ export async function adminCreateEntryAction(_prev: FormState | undefined, formD
     }));
   } catch (err) {
     if (err instanceof ClosedBankError) return { closedBank: await closedBankNoticeFrom(err) };
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/time-entries");
@@ -78,7 +95,7 @@ export async function adminUpdateEntryAction(_prev: FormState | undefined, formD
   const startTime = String(formData.get("startTime") || "");
   const endTime = String(formData.get("endTime") || "");
   if (!timeEntryId || !date || !startTime || !endTime) {
-    return { error: "נתונים חסרים." };
+    return { error: (await getTranslations("timeEntriesAdmin.errors"))("missingData") };
   }
 
   const expectedUpdatedAtRaw = String(formData.get("expectedUpdatedAt") || "");
@@ -95,7 +112,7 @@ export async function adminUpdateEntryAction(_prev: FormState | undefined, formD
     });
   } catch (err) {
     if (err instanceof ClosedBankError) return { closedBank: await closedBankNoticeFrom(err) };
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/time-entries");
@@ -124,9 +141,10 @@ export async function deleteEntryAction(timeEntryId: string, closedBankOverrideR
     });
   } catch (err) {
     if (err instanceof ClosedBankError) {
-      return { ok: false as const, error: err.message, closedBank: await closedBankNoticeFrom(err) };
+      const closedBank = await closedBankNoticeFrom(err);
+      return { ok: false as const, error: closedBank.message, closedBank };
     }
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
   revalidatePath("/app/time-entries");
   return { ok: true as const };
@@ -141,7 +159,7 @@ export async function restoreEntryAction(timeEntryId: string, closedBankOverride
       closedBankOverride: closedBankOverrideReason?.trim() ? { reason: closedBankOverrideReason.trim() } : null,
     });
   } catch (err) {
-    return { ok: false as const, error: friendlyError(err) };
+    return { ok: false as const, error: await friendlyError(err) };
   }
   revalidatePath("/app/time-entries");
   return { ok: true as const };
@@ -195,7 +213,9 @@ export async function getEntryRevisionsAction(timeEntryId: string) {
     id: r.id,
     version: r.version,
     changedAt: r.changedAt.toISOString(),
-    changedByName: r.changedBy?.name ?? "מערכת",
+    /// null: a change by the system, which the row names in the reader's
+    /// language.
+    changedByName: r.changedBy?.name ?? null,
     reason: r.reason,
     beforeJson: r.beforeJson,
     afterJson: r.afterJson,

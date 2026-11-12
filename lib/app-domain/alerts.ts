@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { sendEmail } from "@/lib/email";
+import { DomainError } from "@/lib/domain-error";
 import { getCurrentHourBank } from "@/lib/app-domain/hour-banks";
 import { rebuildReportRunEmail } from "@/lib/app-domain/report-schedules";
 import {
@@ -660,12 +661,12 @@ export async function retryEmailDelivery(actor: User, deliveryId: string) {
 
   const delivery = await prisma.emailDelivery.findUniqueOrThrow({ where: { id: deliveryId } });
   if (delivery.status !== "FAILED") {
-    throw new Error("רק שליחות שנכשלו ניתנות לניסיון חוזר.");
+    throw new DomainError("alerts.retryNotFailed", "רק שליחות שנכשלו ניתנות לניסיון חוזר.");
   }
 
   const content = await retryContent(delivery);
   if (!content) {
-    throw new Error("אין עותק של ההודעה המקורית, ולכן אי אפשר לשלוח אותה שוב.");
+    throw new DomainError("alerts.retryNoCopy", "אין עותק של ההודעה המקורית, ולכן אי אפשר לשלוח אותה שוב.");
   }
 
   const { updated } = await resendDelivery(delivery, content);

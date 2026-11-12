@@ -20,9 +20,20 @@ export const GLOBAL_MESSAGE_PATHS = [
 ] as const;
 
 export const AREA_MESSAGE_PATHS = {
+  "alerts": [
+    "alerts.form",
+    "alerts.panel",
+    "alerts.picker",
+    "alerts.retry",
+    "alerts.rule",
+  ],
   "approvals": [
     "approvals",
     "knowledge",
+  ],
+  "categories": [
+    "categories.create",
+    "categories.edit",
   ],
   "clients": [
     "clients.connections",
@@ -57,16 +68,28 @@ export const AREA_MESSAGE_PATHS = {
   ],
   "credentials": [
     "auth.webauthn",
+    "credentials",
     "vault.reveal",
+  ],
+  "extraction-guide": [
+    "extractionGuide",
   ],
   "guide": [
     "guide",
+  ],
+  "hour-banks": [
+    "hourBanks.adjustment",
+    "hourBanks.cycleForm",
+    "hourBanks.loadForm",
+    "hourBanks.picker",
+    "hourBanks.policy",
   ],
   "important-dates": [
     "tasks.detail.advance",
   ],
   "integrations": [
     "claude",
+    "integrations.advance",
   ],
   "knowledge": [
     "knowledge",
@@ -81,6 +104,15 @@ export const AREA_MESSAGE_PATHS = {
     "auth.webauthn",
     "claude",
     "profile",
+  ],
+  "report-schedules": [
+    "reportSchedules",
+  ],
+  "reports": [
+    "reportSchedules",
+    "reports.filters",
+    "reports.summary",
+    "reports.values",
   ],
   "tasks": [
     "auth.webauthn",
@@ -99,6 +131,10 @@ export const AREA_MESSAGE_PATHS = {
   ],
   "time-entries": [
     "myTime.closedBank",
+    "timeEntriesAdmin.create",
+    "timeEntriesAdmin.filters",
+    "timeEntriesAdmin.row",
+    "timeEntriesAdmin.table",
   ],
   "timer": [
     "myTime.closedBank",
@@ -106,6 +142,18 @@ export const AREA_MESSAGE_PATHS = {
     "myTime.form",
     "myTime.overlap",
     "timer",
+  ],
+  "users": [
+    "users.clientAccess",
+    "users.commsAccess",
+    "users.deletionDeclaration",
+    "users.exceptionApprover",
+    "users.exposure",
+    "users.invite",
+    "users.pendingPdf",
+    "users.personalEmail",
+    "users.resendInvite",
+    "users.roleStatus",
   ],
 } as const satisfies Record<string, readonly string[]>;
 

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { bulkDeleteEntriesAction, bulkRestoreEntriesAction } from "./actions";
 import { AdminEntryRow, type Entry } from "./AdminEntryRow";
+import { useTranslations } from "next-intl";
 
 // App redesign (handoff README, screen 9 "דיווחי זמן (אדמין)"): "בחירה
 // מרובה: תיבת סימון בכל שורה; סרגל פעולות כהה (navy, radius 14px) מופיע רק
@@ -12,6 +13,7 @@ import { AdminEntryRow, type Entry } from "./AdminEntryRow";
 // actions.ts's bulkDeleteEntriesAction comment for why, not "approve").
 export function EntriesTable({ entries }: { entries: Entry[] }) {
   const { showToast } = useToast();
+  const t = useTranslations("timeEntriesAdmin.table");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState(false);
 
@@ -41,16 +43,15 @@ export function EntriesTable({ entries }: { entries: Entry[] }) {
     if (result.deleted.length > 0) {
       showToast({
         tone: result.failed.length > 0 ? "warning" : "success",
-        title: `${result.deleted.length} דיווחים נמחקו`,
-        description:
-          result.failed.length > 0 ? `${result.failed.length} דיווחים לא נמחקו עקב הרשאה או חלון עריכה.` : undefined,
+        title: t("bulkDeleted", { count: result.deleted.length }),
+        description: result.failed.length > 0 ? t("bulkPartial", { count: result.failed.length }) : undefined,
         undo: async () => {
           await bulkRestoreEntriesAction(result.deleted);
-          showToast({ tone: "info", title: "המחיקה בוטלה", description: `${result.deleted.length} דיווחים שוחזרו.` });
+          showToast({ tone: "info", title: t("undone"), description: t("restored", { count: result.deleted.length }) });
         },
       });
     } else {
-      showToast({ tone: "error", title: "המחיקה נכשלה", description: "לא ניתן היה למחוק את הדיווחים שנבחרו." });
+      showToast({ tone: "error", title: t("deleteFailed"), description: t("bulkDeleteFailed") });
     }
   }
 
@@ -58,7 +59,7 @@ export function EntriesTable({ entries }: { entries: Entry[] }) {
     <div className="space-y-3">
       {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-app-surface-nav px-4 py-3 text-cream-warm">
-          <span className="text-sm">{selected.size} דיווחים נבחרו</span>
+          <span className="text-sm">{t("selectedCount", { count: selected.size })}</span>
           <span className="flex-1" />
           <button
             type="button"
@@ -66,14 +67,14 @@ export function EntriesTable({ entries }: { entries: Entry[] }) {
             onClick={bulkDelete}
             className="rounded-full bg-app-accent px-4 py-2 text-xs font-medium text-app-text-primary disabled:opacity-50"
           >
-            מחיקת מסומנים
+            {t("deleteSelected")}
           </button>
           <button
             type="button"
             onClick={clearSelection}
             className="rounded-full border border-cream-warm/25 px-3.5 py-2 text-xs text-cream-warm/80"
           >
-            ניקוי בחירה
+            {t("clearSelection")}
           </button>
         </div>
       )}
@@ -83,13 +84,13 @@ export function EntriesTable({ entries }: { entries: Entry[] }) {
           <thead>
             <tr className="border-b border-app-border text-xs text-app-text-tertiary">
               <th className="w-10 px-5 py-3"></th>
-              <th className="px-5 py-3 font-medium">תאריך</th>
-              <th className="px-5 py-3 font-medium">איש צוות</th>
-              <th className="px-5 py-3 font-medium">לקוח</th>
-              <th className="px-5 py-3 font-medium">קטגוריה</th>
-              <th className="px-5 py-3 font-medium">משך</th>
-              <th className="px-5 py-3 font-medium">הערה</th>
-              <th className="px-5 py-3 font-medium">מקור</th>
+              <th className="px-5 py-3 font-medium">{t("date")}</th>
+              <th className="px-5 py-3 font-medium">{t("employee")}</th>
+              <th className="px-5 py-3 font-medium">{t("client")}</th>
+              <th className="px-5 py-3 font-medium">{t("category")}</th>
+              <th className="px-5 py-3 font-medium">{t("duration")}</th>
+              <th className="px-5 py-3 font-medium">{t("note")}</th>
+              <th className="px-5 py-3 font-medium">{t("source")}</th>
               <th className="px-5 py-3 font-medium"></th>
             </tr>
           </thead>
@@ -97,7 +98,7 @@ export function EntriesTable({ entries }: { entries: Entry[] }) {
             {entries.length === 0 && (
               <tr>
                 <td colSpan={9} className="px-5 py-8 text-center text-app-text-tertiary">
-                  אין דיווחים התואמים את הסינון.
+                  {t("empty")}
                 </td>
               </tr>
             )}

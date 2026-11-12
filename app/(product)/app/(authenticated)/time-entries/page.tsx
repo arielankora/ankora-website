@@ -10,6 +10,7 @@ import { FilterBar } from "./FilterBar";
 import { AdminCreateEntryForm } from "./AdminCreateEntryForm";
 import { EntriesTable } from "./EntriesTable";
 import { dayEndInZone, dayStartInZone } from "@/lib/timezone";
+import { getTranslations } from "next-intl/server";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -36,6 +37,7 @@ export default async function AdminTimeEntriesPage(
 ) {
   const searchParams = await props.searchParams;
   const user = await requireUser();
+  const t = await getTranslations("timeEntriesAdmin.page");
 
   if (!can(user.role, "time_entry.edit_others")) {
     return (
@@ -73,8 +75,8 @@ export default async function AdminTimeEntriesPage(
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-app-text-primary">דיווחי זמן</h1>
-          <p className="mt-1 text-sm text-app-text-secondary">טבלה חוצת לקוחות, עם עריכה והיסטוריית שינויים.</p>
+          <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">{t("subtitle")}</p>
         </div>
 
         <FilterBar

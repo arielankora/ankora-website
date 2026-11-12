@@ -1,16 +1,18 @@
 "use client";
 import { useFormState, useFormStatus } from "react-dom";
 import { upsertBillingPolicyAction } from "./actions";
+import { useTranslations } from "next-intl";
 
 function SubmitButton({ saved }: { saved: boolean }) {
   const { pending } = useFormStatus();
+  const t = useTranslations("hourBanks.policy");
   return (
     <button
       type="submit"
       disabled={pending}
       className="text-xs font-medium text-app-text-accent disabled:opacity-50"
     >
-      {pending ? "שומר..." : saved ? "נשמר ✓" : "שמירה"}
+      {pending ? t("saving") : saved ? t("saved") : t("save")}
     </button>
   );
 }
@@ -36,13 +38,14 @@ export function BillingPolicyForm({
   } | null;
 }) {
   const [state, formAction] = useFormState(upsertBillingPolicyAction, {});
+  const t = useTranslations("hourBanks.policy");
 
   return (
     <form action={formAction} className="flex flex-col gap-2.5">
       <input type="hidden" name="clientId" value={clientId} />
 
       <label className="flex items-center gap-2.5 text-[13px]">
-        <span className="flex-1 text-app-text-secondary">מינימום לדיווח</span>
+        <span className="flex-1 text-app-text-secondary">{t("minimum")}</span>
         <input
           type="number"
           name="minimumMinutes"
@@ -51,10 +54,10 @@ export function BillingPolicyForm({
           dir="ltr"
           className="w-[70px] rounded-lg border border-app-border-strong bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-app-text-primary outline-none focus:border-gold"
         />
-        <span className="text-xs text-app-text-tertiary">דק&apos;</span>
+        <span className="text-xs text-app-text-tertiary">{t("minutesShort")}</span>
       </label>
       <label className="flex items-center gap-2.5 text-[13px]">
-        <span className="flex-1 text-app-text-secondary">יחידת עיגול</span>
+        <span className="flex-1 text-app-text-secondary">{t("increment")}</span>
         <input
           type="number"
           name="incrementMinutes"
@@ -63,30 +66,30 @@ export function BillingPolicyForm({
           dir="ltr"
           className="w-[70px] rounded-lg border border-app-border-strong bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-app-text-primary outline-none focus:border-gold"
         />
-        <span className="text-xs text-app-text-tertiary">דק&apos;</span>
+        <span className="text-xs text-app-text-tertiary">{t("minutesShort")}</span>
       </label>
       <label className="flex items-center gap-2.5 text-[13px]">
-        <span className="flex-1 text-app-text-secondary">שיטת עיגול</span>
+        <span className="flex-1 text-app-text-secondary">{t("roundingMode")}</span>
         <select
           name="roundingMode"
           defaultValue={policy?.roundingMode ?? "EXACT"}
           className="rounded-lg border border-app-border-strong bg-white px-2 py-1.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
         >
-          <option value="EXACT">מדויק</option>
-          <option value="CEIL">כלפי מעלה</option>
-          <option value="NEAREST">לקרוב ביותר</option>
+          <option value="EXACT">{t("exact")}</option>
+          <option value="CEIL">{t("ceil")}</option>
+          <option value="NEAREST">{t("nearest")}</option>
         </select>
       </label>
       <label className="flex items-center gap-2.5 text-[13px]">
-        <span className="flex-1 text-app-text-secondary">רמת צבירה</span>
+        <span className="flex-1 text-app-text-secondary">{t("aggregation")}</span>
         <select
           name="aggregationScope"
           defaultValue={policy?.aggregationScope ?? "PER_ENTRY"}
           className="rounded-lg border border-app-border-strong bg-white px-2 py-1.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
         >
-          <option value="PER_ENTRY">לפי דיווח</option>
-          <option value="PER_TASK_PER_DAY">לפי משימה/יום</option>
-          <option value="PER_DAY">לפי יום</option>
+          <option value="PER_ENTRY">{t("perEntry")}</option>
+          <option value="PER_TASK_PER_DAY">{t("perTaskPerDay")}</option>
+          <option value="PER_DAY">{t("perDay")}</option>
         </select>
       </label>
 

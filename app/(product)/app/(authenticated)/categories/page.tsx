@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { listCategories, getCategoryMonthlyHours } from "@/lib/app-domain/categories";
@@ -43,31 +44,32 @@ export default async function CategoriesPage() {
     listClients(),
     getCategoryMonthlyHours(),
   ]);
+  const t = await getTranslations("categories.list");
 
   return (
     <>
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-medium text-app-text-primary">קטגוריות</h1>
+            <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
             <p className="mt-1 text-sm text-app-text-secondary">
-              קטגוריות גלובליות זמינות לכל הלקוחות. קטגוריה ייעודית מופיעה רק אצל הלקוח שלה.
+              {t("intro")}
             </p>
           </div>
-          <Drawer triggerLabel="קטגוריה" title="קטגוריה חדשה">
+          <Drawer triggerLabel={t("add")} title={t("addTitle")}>
             <CreateCategoryForm clients={clients.filter((c) => c.status === "ACTIVE")} />
           </Drawer>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-app-border bg-white">
           <div className="flex items-center gap-3.5 border-b border-app-border bg-app-surface-page px-[18px] py-2.5 text-[11.5px] text-app-text-secondary">
-            <span className="flex-1">קטגוריה</span>
-            <span className="w-[120px]">היקף</span>
-            <span className="w-[90px] text-end">שעות החודש</span>
-            <span className="w-[80px] text-end">סטטוס</span>
+            <span className="flex-1">{t("columns.category")}</span>
+            <span className="w-[120px]">{t("columns.scope")}</span>
+            <span className="w-[90px] text-end">{t("columns.monthHours")}</span>
+            <span className="w-[80px] text-end">{t("columns.status")}</span>
           </div>
           {categories.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-app-text-tertiary">אין עדיין קטגוריות. הוסיפו קטגוריה ראשונה למעלה.</p>
+            <p className="px-5 py-8 text-center text-sm text-app-text-tertiary">{t("empty")}</p>
           ) : (
             categories.map((cat, i) => (
               <a
@@ -81,10 +83,10 @@ export default async function CategoriesPage() {
                     style={{ backgroundColor: DOT_COLORS[i % DOT_COLORS.length] }}
                     aria-hidden="true"
                   />
-                  <span className="truncate">{cat.name}</span>
+                  <span dir="auto" className="truncate">{cat.name}</span>
                 </span>
                 <span className="w-[120px] truncate text-xs text-app-text-secondary">
-                  {cat.visibility === "GLOBAL" ? "גלובלית" : cat.client?.name ?? "ספציפית ללקוח"}
+                  {cat.visibility === "GLOBAL" ? t("global") : cat.client?.name ?? t("clientSpecific")}
                 </span>
                 <span dir="ltr" className="w-[90px] text-end font-jbmono text-app-text-primary">
                   {formatHM(monthlyHours.get(cat.id) ?? 0)}
@@ -95,7 +97,7 @@ export default async function CategoriesPage() {
                       cat.active ? "bg-app-success-soft text-app-success" : "bg-app-neutral-soft text-app-text-secondary"
                     }`}
                   >
-                    {cat.active ? "פעילה" : "כבויה"}
+                    {cat.active ? t("active") : t("inactive")}
                   </span>
                 </span>
               </a>

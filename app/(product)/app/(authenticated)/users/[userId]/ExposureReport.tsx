@@ -1,14 +1,18 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
+import { useFormatter } from "next-intl";
 import { credentialExposureReportAction, type ExposureReportView } from "../actions";
 
 // "גישות שנצפו": the DPA section 4 report, on the page of the person who
 // is leaving. One button, then one block per client with the list and the
 // message to send them. Nothing is sent from here.
 
-const DATE = new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Jerusalem" });
+const DATE = { day: "numeric", month: "numeric", year: "numeric" } as const;
 
 export function ExposureReport({ userId }: { userId: string }) {
+  const t = useTranslations("users.exposure");
+  const format = useFormatter();
   const [report, setReport] = useState<ExposureReportView | null>(null);
   const [pending, start] = useTransition();
 
@@ -20,7 +24,7 @@ export function ExposureReport({ userId }: { userId: string }) {
         onClick={() => start(async () => setReport(await credentialExposureReportAction(userId)))}
         className="rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-gold hover:text-app-text-primary disabled:opacity-50"
       >
-        {pending ? "מפיק..." : "הפקת דוח גישות שנצפו"}
+        {pending ? t("generating") : t("generate")}
       </button>
 
       {report && !report.ok && <p className="mt-3 text-sm text-app-error">{report.error}</p>}
@@ -28,10 +32,10 @@ export function ExposureReport({ userId }: { userId: string }) {
       {report?.ok && (
         <div className="mt-4 space-y-4" data-exposure-report>
           <p className="text-xs text-app-text-secondary">
-            {DATE.format(new Date(report.since))} עד {DATE.format(new Date(report.until))}. הפקת הדוח נרשמה ביומן הפעולות.
+            {t("period", { since: format.dateTime(new Date(report.since), DATE), until: format.dateTime(new Date(report.until), DATE) })}
           </p>
           {report.clients.length === 0 ? (
-            <p className="text-sm text-app-text-secondary">{report.userName} לא צפה/תה בפרטי גישה של אף לקוח בתקופה הזו.</p>
+            <p className="text-sm text-app-text-secondary">{t("none", { name: report.userName })}</p>
           ) : (
             report.clients.map((c) => <ClientBlock key={c.clientId} client={c} />)
           )}
@@ -42,24 +46,26 @@ export function ExposureReport({ userId }: { userId: string }) {
 }
 
 function ClientBlock({ client }: { client: Extract<ExposureReportView, { ok: true }>["clients"][number] }) {
+  const t = useTranslations("users.exposure");
+  const format = useFormatter();
   const [copied, setCopied] = useState(false);
   return (
     <div className="rounded-xl border border-app-border p-4">
-      <p className="text-sm font-medium text-app-text-primary">{client.clientName}</p>
+      <p dir="auto" className="text-sm font-medium text-app-text-primary">{client.clientName}</p>
       <ul className="mt-2 space-y-1 text-sm text-app-text-primary">
         {client.items.map((i) => (
           <li key={i.credentialId}>
-            {i.systemName}
+            <bdi>{i.systemName}</bdi>
             <span className="text-xs text-app-text-tertiary">
               {" "}
-              · {i.revealCount === 1 ? "צפייה אחת" : `${i.revealCount} צפיות`} · אחרונה {DATE.format(new Date(i.lastRevealedAt))}
-              {i.deleted ? " · נמחקה מהכספת מאז" : ""}
+              · {t("views", { count: i.revealCount })} · {t("lastView", { date: format.dateTime(new Date(i.lastRevealedAt), DATE) })}
+              {i.deleted ? ` · ${t("deletedSince")}` : ""}
             </span>
           </li>
         ))}
       </ul>
       <details className="mt-3">
-        <summary className="cursor-pointer text-xs text-app-text-secondary">הודעה ללקוח</summary>
+        <summary className="cursor-pointer text-xs text-app-text-secondary">{t("messageToClient")}</summary>
         <textarea
           readOnly
           value={client.message}
@@ -79,7 +85,7 @@ function ClientBlock({ client }: { client: Extract<ExposureReportView, { ok: tru
           }}
           className="mt-2 text-xs font-medium text-app-text-secondary hover:text-app-text-primary"
         >
-          {copied ? "הועתק" : "העתקת ההודעה"}
+          {copied ? t("copied") : t("copy")}
         </button>
       </details>
     </div>

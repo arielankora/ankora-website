@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { assertCan, canManageClients, ForbiddenError } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { findSecrets } from "@/lib/secret-scan";
+import { DomainError } from "@/lib/domain-error";
 import { guideLines } from "@/lib/extract-prompt";
 import type { User } from "@prisma/client";
 
@@ -39,9 +40,9 @@ export async function listGuideVersions(actor: User) {
 export async function proposeGuide(actor: User, input: { body: string; note?: string | null }) {
   assertCan(actor.role, "time_entry.create_self");
   const lines = guideLines(input.body);
-  if (lines.length === 0) throw new Error("ההנחיות ריקות.");
-  if (input.body.length > 20000) throw new Error("ההנחיות ארוכות מדי.");
-  if (findSecrets(input.body).length > 0) throw new Error("בהנחיות יש סיסמה, מפתח או מספר כרטיס.");
+  if (lines.length === 0) throw new DomainError("extractionGuide.empty", "ההנחיות ריקות.");
+  if (input.body.length > 20000) throw new DomainError("extractionGuide.tooLong", "ההנחיות ארוכות מדי.");
+  if (findSecrets(input.body).length > 0) throw new DomainError("extractionGuide.hasSecret", "בהנחיות יש סיסמה, מפתח או מספר כרטיס.");
   for (let attempt = 0; ; attempt++) {
     const last = await prisma.extractionGuide.findFirst({ orderBy: { version: "desc" }, select: { version: true } });
     try {
@@ -60,8 +61,8 @@ export async function proposeGuide(actor: User, input: { body: string; note?: st
 async function findDraft(actor: User, id: string) {
   if (!canManageClients(actor.role)) throw new ForbiddenError("רק מנהל מאשר הנחיות.");
   const row = await prisma.extractionGuide.findUnique({ where: { id } });
-  if (!row) throw new Error("הגרסה לא נמצאה.");
-  if (row.state !== "DRAFT") throw new Error("כבר הוחלט על הגרסה הזו.");
+  if (!row) throw new DomainError("extractionGuide.notFound", "הגרסה לא נמצאה.");
+  if (row.state !== "DRAFT") throw new DomainError("extractionGuide.alreadyDecided", "כבר הוחלט על הגרסה הזו.");
   return row;
 }
 
@@ -70,7 +71,7 @@ export async function approveGuide(actor: User, id: string) {
   // An older draft approved after a newer one would quietly roll the
   // guidance back. Only a draft newer than the version in use.
   const current = await currentGuide();
-  if (current && row.version < current.version) throw new Error(`גרסה ${current.version} כבר בשימוש, והיא חדשה יותר.`);
+  if (current && row.version < current.version) throw new DomainError("extractionGuide.newerInUse", `גרסה ${current.version} כבר בשימוש, והיא חדשה יותר.`, { version: String(current.version) });
   const updated = await prisma.extractionGuide.update({ where: { id }, data: { state: "APPROVED", decidedById: actor.id, decidedAt: new Date() } });
   await recordAudit({ actorId: actor.id, action: "extraction_guide.approve", entityType: "ExtractionGuide", entityId: id, after: { version: row.version } });
   return updated;
@@ -79,7 +80,7 @@ export async function approveGuide(actor: User, id: string) {
 export async function rejectGuide(actor: User, id: string, reason: string) {
   const row = await findDraft(actor, id);
   const why = reason.trim();
-  if (!why) throw new Error("צריך לכתוב בשורה אחת למה.");
+  if (!why) throw new DomainError("extractionGuide.reasonRequired", "צריך לכתוב בשורה אחת למה.");
   const updated = await prisma.extractionGuide.update({ where: { id }, data: { state: "REJECTED", decidedById: actor.id, decidedAt: new Date(), rejectReason: why } });
   await recordAudit({ actorId: actor.id, action: "extraction_guide.reject", entityType: "ExtractionGuide", entityId: id, after: { version: row.version, reason: why } });
   return updated;

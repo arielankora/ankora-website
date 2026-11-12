@@ -113,7 +113,9 @@ describe("the admin can reach it from the screen", () => {
   });
 
   it("and it tells the admin the previous link was revoked", async () => {
-    expect(await read(FORM)).toContain("הקישור הקודם בוטל");
+    // ADR 0006: the sentence lives in the dictionary, the form names it.
+    expect(await read(FORM)).toContain('t("sent")');
+    expect(JSON.parse(await read("messages/he.json")).users.resendInvite.sent).toContain("הקישור הקודם בוטל");
   });
 });
 

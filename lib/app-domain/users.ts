@@ -1,6 +1,7 @@
 import "server-only";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
+import { DomainError } from "@/lib/domain-error";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { hashPassword } from "@/lib/app-auth/password";
@@ -48,7 +49,7 @@ export async function inviteUser(
 
   const email = input.email.trim().toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) throw new Error("A user with this email already exists.");
+  if (existing) throw new DomainError("users.emailExists", "A user with this email already exists.");
 
   const personalEmail =
     input.role === "CLIENT_USER" ? null : parsePersonalEmail(input.personalEmail ?? "");
@@ -65,7 +66,7 @@ export async function inviteUser(
   // (spec 13 models one portal user -> one client for the MVP, see the
   // ADR addendum's resolvePortalClient note) - clientIds[1+] is ignored.
   if (input.role === "CLIENT_USER" && (!input.clientIds || input.clientIds.length === 0)) {
-    throw new Error("יש לבחור לקוח עבור משתמש בתפקיד לקוח.");
+    throw new DomainError("users.clientRequired", "יש לבחור לקוח עבור משתמש בתפקיד לקוח.");
   }
 
   // Placeholder hash for an account with no usable password yet - nobody
@@ -120,7 +121,7 @@ export async function inviteUser(
 function parsePersonalEmail(raw: string): string | null {
   if (!raw.trim()) return null;
   const email = normalizeEmail(raw);
-  if (!email) throw new Error("המייל הפרטי אינו כתובת תקינה.");
+  if (!email) throw new DomainError("users.personalEmailInvalid", "המייל הפרטי אינו כתובת תקינה.");
   return email;
 }
 
@@ -130,8 +131,8 @@ function parsePersonalEmail(raw: string): string | null {
 export async function setUserPersonalEmail(actor: User, userId: string, raw: string) {
   assertCan(actor.role, "user.manage");
   const before = await prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
-  if (!before) throw new Error("משתמש לא נמצא.");
-  if (before.role === "CLIENT_USER") throw new Error("מייל פרטי נשמר רק לאנשי אנקורה.");
+  if (!before) throw new DomainError("users.notFound", "משתמש לא נמצא.");
+  if (before.role === "CLIENT_USER") throw new DomainError("users.personalEmailStaffOnly", "מייל פרטי נשמר רק לאנשי אנקורה.");
 
   const personalEmail = parsePersonalEmail(raw);
   if (personalEmail === before.personalEmail) return before;
@@ -211,9 +212,9 @@ export async function resendInvite(actor: User, userId: string) {
   assertCan(actor.role, "user.manage");
 
   const user = await prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
-  if (!user) throw new Error("משתמש לא נמצא.");
+  if (!user) throw new DomainError("users.notFound", "משתמש לא נמצא.");
   if (user.status !== "INVITED") {
-    throw new Error("אפשר לשלוח הזמנה מחדש רק למשתמש שטרם בחר סיסמה.");
+    throw new DomainError("users.resendOnlyInvited", "אפשר לשלוח הזמנה מחדש רק למשתמש שטרם בחר סיסמה.");
   }
 
   const burned = await prisma.passwordResetToken.updateMany({
@@ -264,7 +265,7 @@ export async function updateUserRoleStatus(
       where: { role: "SUPER_ADMIN", status: "ACTIVE", deletedAt: null, id: { not: userId } },
     });
     if (otherActiveSuperAdmins === 0) {
-      throw new Error("לא ניתן להסיר את מנהל העל האחרון הפעיל במערכת.");
+      throw new DomainError("users.lastSuperAdmin", "לא ניתן להסיר את מנהל העל האחרון הפעיל במערכת.");
     }
   }
 
