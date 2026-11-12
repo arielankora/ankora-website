@@ -107,7 +107,7 @@ export class ProcessVersionConflictError extends DomainError {
 /// Each Hebrew message is the one it has always given.
 const NOT_IN_FILE = {
   contact: () => new DomainError("processes.contactNotInFile", "איש קשר שנבחר לא נמצא בתיק של הלקוח."),
-  system: () => new DomainError("processes.systemNotInFile", "מערכת שנבחר לא נמצא בתיק של הלקוח."),
+  system: () => new DomainError("processes.systemNotInFile", "המערכת שנבחרה לא נמצאה בתיק של הלקוח."),
   rule: () => new DomainError("processes.ruleNotInFile", "כלל שנבחר לא נמצא בתיק של הלקוח."),
   approver: () => new DomainError("processes.approverNotInFile", "המאשר שנבחר לא נמצא בתיק של הלקוח."),
   executor: () => new DomainError("processes.executorNotInFile", "המבצע שנבחר לא נמצא בתיק של הלקוח."),

@@ -1388,7 +1388,7 @@
     },
     "processes": {
       "contactNotInFile": "איש קשר שנבחר לא נמצא בתיק של הלקוח.",
-      "systemNotInFile": "מערכת שנבחר לא נמצא בתיק של הלקוח.",
+      "systemNotInFile": "המערכת שנבחרה לא נמצאה בתיק של הלקוח.",
       "ruleNotInFile": "כלל שנבחר לא נמצא בתיק של הלקוח.",
       "approverNotInFile": "המאשר שנבחר לא נמצא בתיק של הלקוח.",
       "executorNotInFile": "המבצע שנבחר לא נמצא בתיק של הלקוח.",

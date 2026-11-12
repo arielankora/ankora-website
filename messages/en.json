@@ -802,7 +802,7 @@
         "existing": "Recorded in the vendor's existing run",
         "notVendorSaved": "Recorded as not a new vendor",
         "title": "Looks like connecting a new vendor",
-        "body": "Detected: {matched}. If the vendor will access client data through the app or the service, a P8 run (adding a subprocessor) opens. With no answer within a business day, the run opens on its own.",
+        "body": "Detected: {matched}. If the vendor will access client data through the app or the service, a P8 run (adding a sub-processor) opens. With no answer within a business day, the run opens on its own.",
         "name": "Vendor name",
         "openRun": "Open P8 run",
         "notVendor": "Not a new vendor"
@@ -1193,7 +1193,7 @@
       "moveToOpen": "Record in the open bank",
       "overrideAnyway": "Change the closed bank anyway",
       "cancel": "Cancel",
-      "reasonLabel": "Reason (required, recorded in the audit log)",
+      "reasonLabel": "Reason (required, recorded in the activity log)",
       "confirm": "Yes, make the change",
       "back": "Back"
     },
@@ -1941,7 +1941,7 @@
       "clientSettingsChange": "Client settings updated",
       "clientAiExcluded": "Client marked no AI",
       "clientAiIncluded": "No AI mark removed from a client",
-      "clientSubprocessorNotice": "Commitment to proactive subprocessor notices updated",
+      "clientSubprocessorNotice": "Commitment to proactive sub-processor notices updated",
       "clientArchive": "Client archived",
       "clientRestore": "Client restored from the archive",
       "categoryCreate": "Category created",
@@ -2734,7 +2734,7 @@
       "scopeTitle": "What each role sees",
       "scopeNote": "A permission removed here is enforced on the actions themselves, not just the menu.",
       "scope": {
-        "SUPER_ADMIN": "Everything, including hour banks, the audit log and integrations",
+        "SUPER_ADMIN": "Everything, including hour banks, the activity log and integrations",
         "ANKORA_ADMIN": "Clients, categories, systems and access, time entries and reports",
         "ANKORA_EMPLOYEE": "Timer, my time, tasks, calendar, approvals, dates, and systems and access for their clients",
         "CLIENT_USER": "Portal only: work in progress, decisions to approve, hours and reports, history and their client file"
@@ -2848,7 +2848,7 @@
     "exposure": {
       "generating": "Generating...",
       "generate": "Generate report of viewed access details",
-      "period": "{since} to {until}. Generating this report was recorded in the audit log.",
+      "period": "{since} to {until}. Generating this report was recorded in the activity log.",
       "none": "{name} didn't view any client's access details in this period.",
       "views": "{count, plural, =1 {1 view} other {# views}}",
       "lastView": "last {date}",
@@ -2955,7 +2955,7 @@
     "addTitle": "New system access",
     "notConfigured": "The vault isn't set up in this environment yet, so access details can't be added or shown.",
     "empty": "No access details saved for this client yet.",
-    "footer": "The username, password and notes are encrypted. Every view requires identity verification and is recorded in the audit log.",
+    "footer": "The username, password and notes are encrypted. Every view requires identity verification and is recorded in the activity log.",
     "clientPicker": "Client",
     "row": {
       "username": "Username",
@@ -6608,7 +6608,7 @@
         "continue": "Continue",
         "currentOwner": "Current owner: {name}",
         "newOwner": "New owner: {name}",
-        "ownerNote": "The owner sees every conversation on the number. Conversations already stored and the block list don't change. The change is recorded in the audit log.",
+        "ownerNote": "The owner sees every conversation on the number. Conversations already stored and the block list don't change. The change is recorded in the activity log.",
         "changeOwnerYes": "Yes, change the owner",
         "back": "Back",
         "inFileOf": "In the file of {clients}",
