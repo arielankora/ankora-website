@@ -36,6 +36,7 @@ export const STEP_UP_FAIL_LIMIT = 5;
 export const STEP_UP_FAIL_WINDOW_MS = 15 * 60_000;
 
 export class StepUpLockedError extends Error {
+  readonly code = "step_up_locked" as const;
   constructor() {
     super("יותר מדי ניסיונות אימות. אפשר לנסות שוב בעוד רבע שעה.");
     this.name = "StepUpLockedError";
@@ -43,6 +44,7 @@ export class StepUpLockedError extends Error {
 }
 
 export class StepUpFailedError extends Error {
+  readonly code = "step_up_failed" as const;
   constructor() {
     super("הסיסמה שגויה.");
     this.name = "StepUpFailedError";
@@ -78,6 +80,7 @@ export function passwordStepUpAllowed(): boolean {
 }
 
 export class PasskeyRequiredError extends Error {
+  readonly code = "passkey_required" as const;
   constructor() {
     super("צפייה בגישות דורשת passkey (Touch ID). אפשר להגדיר אותו ב\"הפרופיל שלי\".");
     this.name = "PasskeyRequiredError";

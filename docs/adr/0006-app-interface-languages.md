@@ -1,6 +1,6 @@
 # ADR 0006: the app's interface in Hebrew and English
 
-Status: accepted (phase 1, infrastructure, built)
+Status: accepted (phase 1, infrastructure, and phase 2, the frame, built)
 Date: 2026-11-12
 Context: an English-speaking product manager joins on 12.11.2026 with full
 permissions, to work on the product and on client work. The app was Hebrew
@@ -63,8 +63,9 @@ Until then, the new product manager does not work on clients marked
 ### 5. Pages that stay in Hebrew
 
 `components/app/HebrewOnly.tsx` keeps a page in Hebrew and right to left
-for every reader: the agreements a person signs, the pages a client opens
-from a link, and, until they are translated, the sign-in screens. A
+for every reader: the agreements a person signs and the pages a client
+opens from a link. (The sign-in screens were kept this way in phase 1
+and translated in phase 2.) A
 translation of a legal text is a decision for a person to make, never a
 side effect of a language setting.
 
@@ -73,8 +74,21 @@ side effect of a language setting.
 A domain function that refuses says why with a code, and keeps its Hebrew
 message for callers that already show it. The screen turns the code into a
 sentence in the reader's language. Phase 1 does this for the profile
-(`ProfileError`, and `code` on `validatePasswordPolicy`); each screen that
-is translated does the same for its own domain.
+(`ProfileError`, and `code` on `validatePasswordPolicy`); phase 2 for
+sign-in and identity checks (`SecondFactorError`, `PasskeyError`, the
+step-up errors, the password reset and the Claude disconnect), worded in
+one place, `lib/i18n/auth-errors.ts`. Each screen that is translated does
+the same for its own domain.
+
+Route handlers send the translated sentence in their JSON `message`. A
+failure that happens in the browser (a cancelled passkey prompt) comes
+back from `components/app/vault/webauthn-client.ts` as a `reason`, and the
+screen words it.
+
+Tests that call a server action or a route handler outside a Next request
+get `next-intl/server` from `tests/__mocks__/next-intl-server.ts`: the
+Hebrew dictionary, in Jerusalem time, which is what a reader who has not
+chosen a language gets.
 
 ## Guards
 
@@ -104,13 +118,23 @@ client code, not the value, so the top bar printed a function on the
 profile, notifications and guide screens. The groups now live in
 `components/app/nav-groups.ts`, a plain module.
 
+## Phase 2, what was built
+
+The frame: every sign-in screen (password, two-step verification, adding
+a device, password reset, the emailed link), the Claude connection consent
+page, and the rest of the profile (the passkeys card and the Claude card,
+shared with the integrations screen). With it, everything from signing in
+to the profile is in the reader's language. Email and login fields, which
+are always left to right, align to the page's side (`text-page-start`).
+The legal links on the sign-in page point at the marketing site in the
+reader's language.
+
 ## What comes next, in order
 
-1. Screens, one pull request per area: tasks, client files, processes,
-   knowledge and approvals, then reports and the admin screens, then the
-   sign-in screens (and their `HebrewOnly` layouts go away).
-2. Still Hebrew on the profile: the passkeys card and the Claude
-   connection card, with the server messages behind them.
+1. Screens, one pull request per area: tasks with the timer and my time,
+   then client files and processes, knowledge and approvals, then reports
+   and the admin screens.
+2. The guide: translated, or a short English guide in its place.
 3. The process flow editor (`FlowEditor.tsx`) sets its cards to `rtl` and
    orders their exits for Hebrew; it needs its own change for English.
 4. Outgoing channels by the recipient's language: email, notifications,

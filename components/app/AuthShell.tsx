@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 
 // App redesign (handoff README, screen 17 "כניסה ושחזור סיסמה"): the
 // prototype's two-column auth layout - a dark `ink` column with the logo,
@@ -10,15 +11,16 @@ import type { ReactNode } from "react";
 // per the handoff's Responsive rule (no fixed-width columns) - below
 // ~640px the two columns stack instead of squeezing.
 export function AuthShell({ children }: { children: ReactNode }) {
+  const t = useTranslations("auth.shell");
   return (
     <div className="grid min-h-screen grid-cols-[repeat(auto-fit,minmax(320px,1fr))]">
       <div className="relative flex flex-col justify-between overflow-hidden bg-navy px-8 py-12 pt-[calc(3rem+env(safe-area-inset-top))] text-cream-warm sm:px-10">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_55%_at_65%_30%,rgba(176,141,87,0.24)_0%,rgba(176,141,87,0)_70%)]" />
         <span className="relative font-assistant text-sm font-semibold tracking-[0.2em] text-gold-light">ANKORA</span>
         <div className="relative max-w-[380px]">
-          <p className="text-2xl font-normal leading-relaxed">אינטליגנציה תפעולית שמחזירה זמן.</p>
+          <p className="text-2xl font-normal leading-relaxed">{t("tagline")}</p>
           <p className="mt-3.5 text-sm text-cream-warm/60">
-            מערכת התפעול הפנימית של Ankora. הגישה מוגבלת למשתמשים מורשים.
+            {t("restricted")}
           </p>
         </div>
         <span className="relative text-[11.5px] text-cream-warm/40">Tel Aviv, Israel</span>

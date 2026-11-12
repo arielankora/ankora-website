@@ -1,4 +1,5 @@
 "use server";
+import { getTranslations } from "next-intl/server";
 import { headers } from "next/headers";
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
@@ -23,7 +24,10 @@ const LINK_CONSUME_WINDOW_MS = 15 * 60 * 1000;
 export type RequestLinkState = { submitted?: boolean; devLink?: string };
 export type LinkLoginState = { error?: string; step?: "passkey" | "enroll"; token?: string; callbackUrl?: string };
 
-const LINK_ERROR = "הקישור אינו תקין או שפג תוקפו.";
+// ADR 0006: one sentence for every failure, in the reader's language.
+async function linkError(): Promise<string> {
+  return (await getTranslations("auth.link"))("invalid");
+}
 const PORTAL = "/app/portal";
 
 export async function requestLoginLinkAction(
@@ -56,11 +60,11 @@ export async function consumeLoginLinkAction(
 ): Promise<LinkLoginState> {
   const ip = clientIpFrom(await headers());
   if (!(await checkRateLimit(`login-link-consume:${ip}`, LINK_CONSUME_LIMIT, LINK_CONSUME_WINDOW_MS)).allowed) {
-    return { error: LINK_ERROR };
+    return { error: await linkError() };
   }
 
   const user = await consumeLoginLink(String(formData.get("token") || ""));
-  if (!user) return { error: LINK_ERROR };
+  if (!user) return { error: await linkError() };
 
   // A client's home is the portal, and a link is only ever issued to a
   // CLIENT_USER - so there is no callbackUrl to carry here, and nothing a
@@ -71,7 +75,7 @@ export async function consumeLoginLinkAction(
     await signIn("pending-login", { token, redirectTo: PORTAL });
     return {};
   } catch (err) {
-    if (err instanceof AuthError) return { error: LINK_ERROR };
+    if (err instanceof AuthError) return { error: await linkError() };
     throw err;
   }
 }

@@ -82,7 +82,7 @@ export default async function ProfilePage() {
               </span>
               <div className="min-w-0">
                 <p dir="auto" className="truncate text-base font-medium text-app-text-primary">{user.name}</p>
-                <p dir="ltr" className="truncate text-end text-xs text-app-text-tertiary">
+                <p dir="ltr" className="truncate text-page-start text-xs text-app-text-tertiary">
                   {user.email}
                 </p>
               </div>

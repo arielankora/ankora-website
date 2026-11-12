@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { revokeMyClaudeGrantAction } from "@/app/(product)/app/(authenticated)/mcp-actions";
 
 export type GrantRow = {
   id: string;
   label: string;
-  /// Pre-formatted on the server ("בתוקף עד 12 בדצמבר 2026"), so this
+  /// Pre-formatted on the server ("12 Dec 2026", in the reader's locale), so this
   /// component never has to agree with the rest of the app about date
   /// formatting or about which timezone "today" means.
   expiresLabel: string | null;
@@ -30,6 +31,7 @@ export type GrantRow = {
 //    the redesign removed everywhere else. Inline two-step costs one
 //    extra click and stays inside the card.
 export function ClaudeGrantList({ grants }: { grants: GrantRow[] }) {
+  const t = useTranslations("claude");
   const { showToast } = useToast();
   const [pending, startTransition] = useTransition();
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -39,13 +41,13 @@ export function ClaudeGrantList({ grants }: { grants: GrantRow[] }) {
     startTransition(async () => {
       const result = await revokeMyClaudeGrantAction(grant.id);
       if (!result.ok) {
-        showToast({ tone: "error", title: "הניתוק נכשל", description: result.error });
+        showToast({ tone: "error", title: t("revokeFailed"), description: result.error });
         return;
       }
       showToast({
         tone: "success",
-        title: "החיבור נותק",
-        description: `Claude כבר לא יכול לגשת לחשבון שלכם דרך "${grant.label}". לחיבור מחדש - אשרו שוב ב-Claude.`,
+        title: t("revoked"),
+        description: t("revokedDetail", { label: grant.label }),
       });
     });
   }
@@ -57,11 +59,11 @@ export function ClaudeGrantList({ grants }: { grants: GrantRow[] }) {
         return (
           <li key={grant.id} className="flex flex-wrap items-center justify-between gap-2 text-xs text-app-text-secondary">
             <span className="min-w-0">
-              <span className="font-medium text-app-text-primary">
+              <span dir="auto" className="font-medium text-app-text-primary">
                 {grant.label}
-                {grant.isBridge ? " (גשר מקומי)" : ""}
               </span>
-              {grant.expiresLabel && <span className="ms-2">בתוקף עד {grant.expiresLabel}</span>}
+              {grant.isBridge ? ` ${t("localBridge")}` : ""}
+              {grant.expiresLabel && <span className="ms-2">{t("validUntil", { date: grant.expiresLabel })}</span>}
             </span>
 
             {confirming ? (
@@ -72,7 +74,7 @@ export function ClaudeGrantList({ grants }: { grants: GrantRow[] }) {
                   onClick={() => revoke(grant)}
                   className="rounded-full bg-app-error-soft px-3 py-1 text-xs font-medium text-app-error transition-opacity hover:opacity-80 disabled:opacity-50"
                 >
-                  {pending ? "מנתק…" : "אישור ניתוק"}
+                  {pending ? t("revoking") : t("confirmRevoke")}
                 </button>
                 <button
                   type="button"
@@ -80,7 +82,7 @@ export function ClaudeGrantList({ grants }: { grants: GrantRow[] }) {
                   onClick={() => setConfirmingId(null)}
                   className="rounded-full px-2 py-1 text-xs text-app-text-tertiary hover:text-app-text-primary"
                 >
-                  ביטול
+                  {t("cancel")}
                 </button>
               </span>
             ) : (
@@ -90,7 +92,7 @@ export function ClaudeGrantList({ grants }: { grants: GrantRow[] }) {
                 onClick={() => setConfirmingId(grant.id)}
                 className="rounded-full border border-app-border px-3 py-1 text-xs font-medium text-app-text-secondary transition-colors hover:border-app-error hover:text-app-error disabled:opacity-50"
               >
-                ניתוק
+                {t("revoke")}
               </button>
             )}
           </li>

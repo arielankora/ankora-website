@@ -3,7 +3,8 @@ import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Fingerprint, Smartphone } from "lucide-react";
 import { startAuthentication } from "@simplewebauthn/browser";
-import { addPasskey, passkeysSupported } from "@/components/app/vault/webauthn-client";
+import { useFormatter, useTranslations } from "next-intl";
+import { addPasskey, passkeysSupported, webauthnFailureText } from "@/components/app/vault/webauthn-client";
 import { deviceLinkIssueAction, deviceLinkOptionsAction, removePasskeyAction, setLoginPasskeyRequiredAction } from "./actions";
 
 // "Passkey (Touch ID)". For Ankora staff: the second step of every sign-in
@@ -29,6 +30,9 @@ export function PasskeysCard({
   /// Staff: enforced on this deployment. Client: their own choice.
   loginRequired: boolean;
 }) {
+  const t = useTranslations("profile.passkeys");
+  const tWebauthn = useTranslations("auth.webauthn");
+  const format = useFormatter();
   const [toggling, setToggling] = useState(false);
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -57,12 +61,13 @@ export function PasskeysCard({
       response = await startAuthentication({ optionsJSON: opts.options as any });
     } catch {
       setLinking(false);
-      return setError("האימות בוטל.");
+      return setError(tWebauthn("verify_cancelled"));
     }
     const r = await deviceLinkIssueAction(response);
     setLinking(false);
     if (!r.ok) return setError(r.error);
-    const until = new Date(r.expiresAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" });
+    // ADR 0006: in the person's locale and time zone (i18n/request.ts).
+    const until = format.dateTime(new Date(r.expiresAt), { hour: "2-digit", minute: "2-digit" });
     setLink({ code: r.code, until });
   }
 
@@ -76,7 +81,7 @@ export function PasskeysCard({
     const r = await addPasskey(password, name);
     setBusy(false);
     form.reset();
-    if (!r.ok) return setError(r.message);
+    if (!r.ok) return setError(webauthnFailureText(r, tWebauthn));
     setAdding(false);
     router.refresh();
   }
@@ -88,18 +93,16 @@ export function PasskeysCard({
         Passkey (Touch ID)
       </h2>
       <p className="mt-1 text-xs text-app-text-secondary">
-        {audience === "staff"
-          ? "אימות דו-שלבי בכל כניסה, ואימות זהות לפני צפייה בפרטי גישה של לקוחות. בטביעת אצבע או בזיהוי פנים, והמפתח נשאר במכשיר שלך."
-          : "שכבת הגנה נוספת לפורטל: אחרי הסיסמה או הקישור במייל, אישור בטביעת אצבע או בזיהוי פנים. המפתח נשאר במכשיר שלך."}
+        {audience === "staff" ? t("introStaff") : t("introClient")}
       </p>
       {audience === "staff" && required && passkeys.length === 0 && (
         <p className="mt-3 rounded-lg bg-cream-dim p-3 text-xs text-app-text-primary">
-          כדי לצפות בגישות במערכות וגישות צריך להגדיר passkey אחד לפחות.
+          {t("requiredNote")}
         </p>
       )}
       {passkeys.length === 1 && (
         <p className="mt-3 rounded-lg bg-cream-dim p-3 text-xs text-app-text-primary">
-          מומלץ להוסיף מכשיר שני, למשל טלפון, כדי שאובדן של אחד מהם לא ינעל את הכניסה. מפיקים כאן קוד, ומקלידים אותו במכשיר החדש אחרי הסיסמה.
+          {t("secondDeviceNote")}
         </p>
       )}
 
@@ -108,11 +111,12 @@ export function PasskeysCard({
           {passkeys.map((p) => (
             <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
               <div className="min-w-0">
-                <p className="truncate text-sm text-app-text-primary">{p.name}</p>
+                <p dir="auto" className="truncate text-sm text-app-text-primary">{p.name}</p>
                 <p className="text-xs text-app-text-tertiary">
-                  נוסף {p.createdAt}
-                  {p.lastUsedAt ? ` · שימוש אחרון ${p.lastUsedAt}` : " · עוד לא בשימוש"}
-                  {p.backedUp ? " · מגובה בחשבון המכשיר" : ""}
+                  {t("added", { date: p.createdAt })}
+                  {" · "}
+                  {p.lastUsedAt ? t("lastUsed", { date: p.lastUsedAt }) : t("neverUsed")}
+                  {p.backedUp ? ` · ${t("backedUp")}` : ""}
                 </p>
               </div>
               <button
@@ -127,7 +131,7 @@ export function PasskeysCard({
                 }
                 className="shrink-0 text-xs text-app-text-tertiary hover:text-app-error"
               >
-                הסרה
+                {t("remove")}
               </button>
             </li>
           ))}
@@ -138,18 +142,17 @@ export function PasskeysCard({
         <div className="mt-4">
           <p className="flex items-center gap-1.5 text-sm text-app-text-primary">
             <Smartphone size={15} strokeWidth={1.75} />
-            הוספת מכשיר
+            {t("addDevice")}
           </p>
           <p className="mt-1 text-xs text-app-text-secondary">
-            לכניסה מטלפון או ממחשב אחר. מאשרים כאן בטביעת אצבע, ובמכשיר החדש מקלידים את הקוד אחרי הסיסמה, בלחיצה על
-            &quot;זה מכשיר חדש&quot;.
+            {t("addDeviceHint")}
           </p>
           {link ? (
             <div className="mt-3 rounded-lg bg-cream-dim p-4 text-center">
               <p dir="ltr" className="font-mono text-2xl tracking-[0.35em] text-app-text-primary">
                 {link.code.slice(0, 3)} {link.code.slice(3)}
               </p>
-              <p className="mt-1.5 text-xs text-app-text-secondary">תקף עד {link.until}, לשימוש אחד.</p>
+              <p className="mt-1.5 text-xs text-app-text-secondary">{t("codeValidUntil", { time: link.until })}</p>
             </div>
           ) : (
             <button
@@ -158,21 +161,21 @@ export function PasskeysCard({
               disabled={linking}
               className="mt-3 rounded-full bg-app-accent px-5 py-2 text-sm font-medium text-app-text-primary disabled:opacity-50"
             >
-              {linking ? "ממתין למכשיר..." : "הפקת קוד למכשיר חדש"}
+              {linking ? t("waiting") : t("createCode")}
             </button>
           )}
         </div>
       )}
       {!supported ? (
-        <p className="mt-4 text-xs text-app-text-secondary">הדפדפן הזה לא תומך ב-passkey.</p>
+        <p className="mt-4 text-xs text-app-text-secondary">{t("unsupported")}</p>
       ) : adding ? (
         <form onSubmit={onAdd} className="mt-4 flex flex-col gap-3">
           <div>
-            <label className="block text-xs font-medium text-app-text-secondary" htmlFor="pk-name">שם למכשיר</label>
+            <label className="block text-xs font-medium text-app-text-secondary" htmlFor="pk-name">{t("deviceName")}</label>
             <input id="pk-name" name="name" maxLength={60} placeholder="MacBook" className={INPUT} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-app-text-secondary" htmlFor="pk-pass">הסיסמה שלך לאנקורה</label>
+            <label className="block text-xs font-medium text-app-text-secondary" htmlFor="pk-pass">{t("yourPassword")}</label>
             <input id="pk-pass" name="password" type="password" required autoComplete="current-password" className={INPUT} />
           </div>
           <div className="flex gap-2">
@@ -181,10 +184,10 @@ export function PasskeysCard({
               disabled={busy}
               className="rounded-full bg-app-accent px-5 py-2 text-sm font-medium text-app-text-primary disabled:opacity-50"
             >
-              {busy ? "ממתין למכשיר..." : "המשך ל-Touch ID"}
+              {busy ? t("waiting") : t("continueTouchId")}
             </button>
             <button type="button" onClick={() => setAdding(false)} className="px-3 text-sm text-app-text-secondary">
-              ביטול
+              {t("cancel")}
             </button>
           </div>
         </form>
@@ -198,13 +201,15 @@ export function PasskeysCard({
               : "mt-4 rounded-full border border-app-border px-4 py-2 text-sm text-app-text-primary hover:bg-app-surface-sunken"
           }
         >
-          {passkeys.length > 0 ? "רישום מפתח נוסף בדפדפן או במכשיר הזה" : "הוספת passkey"}
+          {passkeys.length > 0 ? t("registerAnother") : t("addPasskey")}
         </button>
       )}
       {audience === "client" && passkeys.length > 0 && (
         <div className="mt-5 border-t border-app-border pt-4">
           <p className="text-sm text-app-text-primary">
-            אימות דו-שלבי בכל כניסה: <span className="font-medium">{loginRequired ? "פעיל" : "כבוי"}</span>
+            {t.rich("loginRequired", {
+              state: () => <span className="font-medium">{loginRequired ? t("on") : t("off")}</span>,
+            })}
           </p>
           {toggling ? (
             <form
@@ -222,7 +227,7 @@ export function PasskeysCard({
               }}
             >
               <div>
-                <label className="block text-xs font-medium text-app-text-secondary" htmlFor="lp-pass">הסיסמה שלך לאנקורה</label>
+                <label className="block text-xs font-medium text-app-text-secondary" htmlFor="lp-pass">{t("yourPassword")}</label>
                 <input id="lp-pass" name="password" type="password" required autoComplete="current-password" className={INPUT} />
               </div>
               <div className="flex gap-2">
@@ -231,10 +236,10 @@ export function PasskeysCard({
                   disabled={pending}
                   className="rounded-full bg-app-accent px-5 py-2 text-sm font-medium text-app-text-primary disabled:opacity-50"
                 >
-                  {loginRequired ? "כיבוי" : "הפעלה"}
+                  {loginRequired ? t("turnOff") : t("turnOn")}
                 </button>
                 <button type="button" onClick={() => setToggling(false)} className="px-3 text-sm text-app-text-secondary">
-                  ביטול
+                  {t("cancel")}
                 </button>
               </div>
             </form>
@@ -244,13 +249,13 @@ export function PasskeysCard({
               onClick={() => setToggling(true)}
               className="mt-3 rounded-full border border-app-border px-4 py-2 text-sm text-app-text-primary hover:bg-app-surface-sunken"
             >
-              {loginRequired ? "כיבוי אימות דו-שלבי" : "הפעלת אימות דו-שלבי"}
+              {loginRequired ? t("turnOffTwoStep") : t("turnOnTwoStep")}
             </button>
           )}
         </div>
       )}
       {audience === "staff" && loginRequired && (
-        <p className="mt-4 text-xs text-app-text-tertiary">לצוות אנקורה האימות הדו-שלבי פעיל תמיד.</p>
+        <p className="mt-4 text-xs text-app-text-tertiary">{t("staffAlwaysOn")}</p>
       )}
       {error && <p className="mt-3 text-xs text-app-error">{error}</p>}
     </div>

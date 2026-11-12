@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 // A read-only value plus a copy button. Same division of labor as
 // reports/ClientSummaryView.tsx: the text is produced on the server and
@@ -13,6 +14,7 @@ import { useState } from "react";
 // button next to text you cannot reach.
 export function CopyValue({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
+  const t = useTranslations("shell.copy");
 
   async function copy() {
     try {
@@ -35,7 +37,7 @@ export function CopyValue({ value, label }: { value: string; label: string }) {
         aria-label={label}
         className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-app-text-secondary transition-colors hover:bg-app-surface-sunken hover:text-app-text-primary"
       >
-        {copied ? "הועתק" : "העתק"}
+        {copied ? t("copied") : t("copy")}
       </button>
     </div>
   );

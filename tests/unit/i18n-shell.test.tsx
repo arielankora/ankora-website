@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { useFormatter } from "next-intl";
 import { intlWrapper } from "../helpers/intl";
 
 // ADR 0006: the shell speaks the reader's language, and a translation can
@@ -78,5 +79,19 @@ describe("the shell in Hebrew is unchanged", () => {
     expect(screen.getByRole("navigation", { name: "ניווט ראשי" })).toBeTruthy();
     expect(screen.getByText("חיפוש או פעולה")).toBeTruthy();
     expect(screen.getByText("התנתקות")).toBeTruthy();
+  });
+});
+
+describe("dates in English (ADR 0006 decision 3)", () => {
+  function When({ at }: { at: Date }) {
+    const format = useFormatter();
+    return <span data-testid="when">{format.dateTime(at, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>;
+  }
+
+  it("read day first and in 24 hours, the way the Hebrew screens do, not US style", () => {
+    render(<When at={new Date("2026-03-04T15:05:00Z")} />, { wrapper: intlWrapper("en") });
+    const text = screen.getByTestId("when").textContent ?? "";
+    expect(text).toMatch(/^04\/03\/2026/);
+    expect(text).toMatch(/17:05/);
   });
 });

@@ -30,6 +30,7 @@ export function NameForm({ name }: { name: string }) {
         <span className="mb-1.5 block text-xs font-medium text-app-text-secondary">{t("name.label")}</span>
         <input
           name="name"
+          dir="auto"
           defaultValue={name}
           required
           maxLength={100}

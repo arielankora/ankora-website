@@ -2,6 +2,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Fingerprint } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import {
   enrollFinishAction,
@@ -44,6 +45,7 @@ export function SecondFactorStep({
   callbackUrl: string;
   restartHref: string;
 }) {
+  const t = useTranslations("auth.secondFactor");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // An error that ended the pending sign-in: the only way on is back to
@@ -84,9 +86,7 @@ export function SecondFactorStep({
     } catch (err) {
       setBusy(false);
       return setError(
-        cancelled(err)
-          ? "האימות בוטל. אם אין passkey במכשיר הזה, בחרו למטה \"זה מכשיר חדש\"."
-          : "המכשיר לא השלים את האימות.",
+        cancelled(err) ? t("verifyCancelled") : t("verifyIncomplete"),
       );
     }
     // On success the action redirects, and this component is gone.
@@ -114,7 +114,7 @@ export function SecondFactorStep({
       response = await startRegistration({ optionsJSON: opts.options as any });
     } catch (err) {
       setBusy(false);
-      return setError(cancelled(err) ? "הרישום בוטל. אפשר לנסות שוב." : "המכשיר לא השלים את הרישום.");
+      return setError(cancelled(err) ? t("enrollCancelled") : t("enrollIncomplete"));
     }
     const done = await enrollFinishAction(token, response, name, callbackUrl);
     setBusy(false);
@@ -129,27 +129,25 @@ export function SecondFactorStep({
       <div className="flex items-center gap-2 text-app-text-primary">
         <Fingerprint size={20} strokeWidth={1.6} />
         <h2 className="text-[15px] font-medium">
-          {mode === "passkey" ? "אימות דו-שלבי" : mode === "code" ? "הוספת המכשיר הזה" : "הגדרת אימות דו-שלבי"}
+          {mode === "passkey" ? t("titlePasskey") : mode === "code" ? t("titleCode") : t("titleEnroll")}
         </h2>
       </div>
 
       {mode === "passkey" ? (
         <p className="mt-2 text-[13.5px] leading-relaxed text-app-text-secondary">
-          הסיסמה נכונה. עכשיו אישור במכשיר: טביעת אצבע, זיהוי פנים או קוד המכשיר.
+          {t("introPasskey")}
         </p>
       ) : mode === "code" ? (
         <p className="mt-2 text-[13.5px] leading-relaxed text-app-text-secondary">
-          במכשיר שבו אתם כבר מחוברים לאנקורה, למשל המחשב: הפרופיל שלי, &quot;הוספת מכשיר&quot;. אחרי טביעת אצבע יופיע שם
-          קוד של 6 ספרות. הקלידו אותו כאן.
+          {t("introCode")}
         </p>
       ) : linked ? (
         <p className="mt-2 text-[13.5px] leading-relaxed text-app-text-secondary">
-          הקוד אושר. עכשיו רושמים את המכשיר הזה, ומהפעם הבאה נכנסים ממנו בסיסמה ובזיהוי פנים או טביעת אצבע.
+          {t("introLinked")}
         </p>
       ) : (
         <p className="mt-2 text-[13.5px] leading-relaxed text-app-text-secondary">
-          החשבון הזה דורש אימות במכשיר בכל כניסה. רושמים את המכשיר פעם אחת, ומעכשיו נכנסים בסיסמה ובטביעת
-          אצבע. כדאי לרשום אחר כך גם מכשיר שני מתוך הפרופיל.
+          {t("introEnroll")}
         </p>
       )}
 
@@ -159,13 +157,13 @@ export function SecondFactorStep({
 
       {expired ? (
         <Link href={restartHref} className={BUTTON}>
-          חזרה לכניסה
+          {t("backToSignIn")}
         </Link>
       ) : mode === "passkey" ? (
         <>
           <button type="button" onClick={verify} disabled={busy} className={BUTTON}>
             <Fingerprint size={17} strokeWidth={1.75} />
-            {busy ? "ממתין למכשיר…" : "אימות במכשיר"}
+            {busy ? t("waitingForDevice") : t("verifyOnDevice")}
           </button>
           <button
             type="button"
@@ -175,7 +173,7 @@ export function SecondFactorStep({
             }}
             className="mt-4 block w-full text-center text-[13px] text-app-text-secondary underline-offset-4 hover:underline"
           >
-            זה מכשיר חדש, ואין בו passkey
+            {t("newDevice")}
           </button>
         </>
       ) : mode === "code" ? (
@@ -183,7 +181,7 @@ export function SecondFactorStep({
         // name field below, and the typed code becomes the device's name.
         <form key="code" onSubmit={redeem}>
           <label className="mt-4 block">
-            <span className="mb-1.5 block text-xs text-app-text-secondary">קוד מהמכשיר המחובר</span>
+            <span className="mb-1.5 block text-xs text-app-text-secondary">{t("codeLabel")}</span>
             <input
               name="code"
               type="text"
@@ -198,7 +196,7 @@ export function SecondFactorStep({
             />
           </label>
           <button type="submit" disabled={busy} className={BUTTON}>
-            {busy ? "בודק…" : "המשך"}
+            {busy ? t("checking") : t("continue")}
           </button>
           <button
             type="button"
@@ -208,25 +206,25 @@ export function SecondFactorStep({
             }}
             className="mt-4 block w-full text-center text-[13px] text-app-text-secondary underline-offset-4 hover:underline"
           >
-            חזרה לאימות במכשיר
+            {t("backToVerify")}
           </button>
         </form>
       ) : (
         <form key="enroll" onSubmit={enroll}>
           <label className="mt-4 block">
-            <span className="mb-1.5 block text-xs text-app-text-secondary">שם למכשיר</span>
+            <span className="mb-1.5 block text-xs text-app-text-secondary">{t("deviceNameLabel")}</span>
             <input
               name="name"
               type="text"
               required
               maxLength={60}
-              placeholder={linked ? "למשל: האייפון של דנה" : "למשל: MacBook של דנה"}
+              placeholder={linked ? t("deviceNamePhone") : t("deviceNameComputer")}
               className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </label>
           <button type="submit" disabled={busy} className={BUTTON}>
             <Fingerprint size={17} strokeWidth={1.75} />
-            {busy ? "ממתין למכשיר…" : "רישום המכשיר וכניסה"}
+            {busy ? t("waitingForDevice") : t("enrollAndSignIn")}
           </button>
         </form>
       )}

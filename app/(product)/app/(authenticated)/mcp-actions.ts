@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { revokeMyClaudeGrant } from "@/lib/app-domain/mcp-connections";
 
@@ -20,10 +21,13 @@ export async function revokeMyClaudeGrantAction(grantId: string): Promise<Revoke
   const actor = await requireUser();
   const result = await revokeMyClaudeGrant(actor, grantId);
 
-  if (result.ok) {
-    revalidatePath("/app/profile");
-    revalidatePath("/app/integrations");
+  if (!result.ok) {
+    // ADR 0006: the refusal in the reader's language.
+    const t = await getTranslations("claude.revokeErrors");
+    return { ok: false, error: t(result.code) };
   }
 
+  revalidatePath("/app/profile");
+  revalidatePath("/app/integrations");
   return result;
 }

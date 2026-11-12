@@ -17,6 +17,7 @@ import {
 } from "@/lib/app-domain/profile";
 import { PASSWORD_MIN_LENGTH } from "@/lib/app-auth/password";
 import { APP_LOCALE_COOKIE, APP_LOCALE_COOKIE_MAX_AGE } from "@/lib/i18n/config";
+import { authErrorText } from "@/lib/i18n/auth-errors";
 import { isProductionBuild } from "@/lib/env";
 
 type FormState = { error?: string; ok?: boolean };
@@ -158,8 +159,8 @@ export async function removePasskeyAction(id: string): Promise<FormState> {
   try {
     await removeMyPasskey(user, id);
   } catch (err) {
-    if (err instanceof PasskeyError) return { error: err.message };
-    return { error: "אירעה שגיאה. נסו שוב." };
+    if (err instanceof PasskeyError) return { error: (await authErrorText(err))! };
+    return { error: await errorMessage(err) };
   }
   revalidatePath("/app/profile");
   return { ok: true };
@@ -174,9 +175,9 @@ export async function setLoginPasskeyRequiredAction(enabled: boolean, password: 
     await setOwnLoginPasskeyRequired(user, Boolean(enabled), String(password ?? ""));
   } catch (err) {
     if (err instanceof SecondFactorError || err instanceof StepUpFailedError || err instanceof StepUpLockedError) {
-      return { error: err.message };
+      return { error: (await authErrorText(err))! };
     }
-    return { error: "אירעה שגיאה. נסו שוב." };
+    return { error: await errorMessage(err) };
   }
   revalidatePath("/app/profile");
   return { ok: true };
@@ -193,7 +194,7 @@ export async function deviceLinkOptionsAction(): Promise<{ ok: true; options: un
   try {
     return { ok: true, options: await deviceLinkOptions(user, relyingPartyFor(await headers())) };
   } catch (err) {
-    if (err instanceof PasskeyError || err instanceof StepUpLockedError) return { ok: false, error: err.message };
+    if (err instanceof PasskeyError || err instanceof StepUpLockedError) return { ok: false, error: (await authErrorText(err))! };
     throw err;
   }
 }
@@ -210,8 +211,8 @@ export async function deviceLinkIssueAction(
     const { code, expiresAt } = await issueDeviceLinkCode(user, response as any, relyingPartyFor(await headers()));
     return { ok: true, code, expiresAt: expiresAt.toISOString() };
   } catch (err) {
-    if (err instanceof StepUpFailedError) return { ok: false, error: "האימות נכשל." };
-    if (err instanceof PasskeyError || err instanceof StepUpLockedError) return { ok: false, error: err.message };
+    if (err instanceof StepUpFailedError) return { ok: false, error: (await getTranslations("auth.errors"))("stepUp.verify_failed") };
+    if (err instanceof PasskeyError || err instanceof StepUpLockedError) return { ok: false, error: (await authErrorText(err))! };
     throw err;
   }
 }

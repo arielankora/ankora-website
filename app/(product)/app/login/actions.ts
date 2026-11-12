@@ -2,6 +2,8 @@
 import { headers } from "next/headers";
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
+import { getTranslations } from "next-intl/server";
+import { authErrorText } from "@/lib/i18n/auth-errors";
 import { checkRateLimit, clientIpFrom } from "@/lib/rate-limit";
 import { safeCallbackUrl } from "@/lib/app-auth/callback-url";
 import { authenticateWithPassword } from "@/lib/app-auth/authenticate";
@@ -40,7 +42,11 @@ const LOGIN_IP_WINDOW_MS = 15 * 60 * 1000;
 // wrong - and by the same logic, a rate-limited caller should not learn
 // that they specifically tripped a limit, which would tell them the
 // threshold and let them tune their rate to stay under it.
-const GENERIC_ERROR = "פרטי ההתחברות שגויים, או שהחשבון חסום זמנית.";
+//
+// ADR 0006: worded by the dictionary, one sentence for every failure.
+async function genericError(): Promise<string> {
+  return (await getTranslations("auth.login"))("genericError");
+}
 
 /// This deployment's own origin, from the proxy headers Vercel sets.
 /// Used only to recognise an absolute callbackUrl as our own - never to
@@ -63,7 +69,7 @@ export type LoginState = {
 export async function loginAction(_prevState: LoginState | undefined, formData: FormData): Promise<LoginState> {
   const ip = clientIpFrom(await headers());
   if (!(await checkRateLimit(`app-login:${ip}`, LOGIN_IP_LIMIT, LOGIN_IP_WINDOW_MS)).allowed) {
-    return { error: GENERIC_ERROR };
+    return { error: await genericError() };
   }
 
   const identifier = String(formData.get("identifier") || "");
@@ -73,7 +79,7 @@ export async function loginAction(_prevState: LoginState | undefined, formData: 
   // The first step only. A right password produces a pending sign-in, not
   // a session (lib/app-auth/second-factor.ts).
   const user = await authenticateWithPassword(identifier, password, { recordSuccess: false });
-  if (!user) return { error: GENERIC_ERROR };
+  if (!user) return { error: await genericError() };
 
   const { token, step } = await startPendingLogin(user, "password");
   if (step !== "none") return { step, token, callbackUrl };
@@ -87,7 +93,7 @@ async function completeSignIn(token: string, callbackUrl: string): Promise<Login
     await signIn("pending-login", { token, redirectTo: callbackUrl });
     return {};
   } catch (err) {
-    if (err instanceof AuthError) return { error: "פג תוקף הכניסה. התחילו שוב מהסיסמה." };
+    if (err instanceof AuthError) return { error: (await getTranslations("auth.errors"))("secondFactor.expired") };
     throw err;
   }
 }
@@ -100,8 +106,8 @@ async function completeSignIn(token: string, callbackUrl: string): Promise<Login
 
 type StepResult<T> = { ok: true; options: T } | { ok: false; error: string };
 
-function stepError(err: unknown): { ok: false; error: string } {
-  if (err instanceof SecondFactorError) return { ok: false, error: err.message };
+async function stepError(err: unknown): Promise<{ ok: false; error: string }> {
+  if (err instanceof SecondFactorError) return { ok: false, error: (await authErrorText(err))! };
   throw err;
 }
 
@@ -109,7 +115,7 @@ export async function passkeyLoginOptionsAction(token: string): Promise<StepResu
   try {
     return { ok: true, options: await passkeyOptionsForLogin(String(token), relyingPartyFor(await headers())) };
   } catch (err) {
-    if (err instanceof PasskeyError) return { ok: false, error: err.message };
+    if (err instanceof PasskeyError) return { ok: false, error: (await authErrorText(err))! };
     return stepError(err);
   }
 }
@@ -118,7 +124,7 @@ export async function passkeyLoginVerifyAction(token: string, response: unknown,
   try {
     await verifyLoginPasskey(String(token), response as any, relyingPartyFor(await headers()));
   } catch (err) {
-    const e = stepError(err);
+    const e = await stepError(err);
     return { error: e.error };
   }
   return completeSignIn(String(token), safeCallbackUrl(callbackUrl, await selfOrigin()));
@@ -136,7 +142,7 @@ export async function enrollFinishAction(token: string, response: unknown, name:
   try {
     await finishLoginEnrollment(String(token), response as any, String(name ?? ""), relyingPartyFor(await headers()));
   } catch (err) {
-    const e = stepError(err);
+    const e = await stepError(err);
     return { error: e.error };
   }
   return completeSignIn(String(token), safeCallbackUrl(callbackUrl, await selfOrigin()));
@@ -154,7 +160,7 @@ export async function redeemDeviceCodeAction(
     await redeemDeviceLinkCode(String(token), code);
     return { ok: true };
   } catch (err) {
-    if (err instanceof SecondFactorError) return { ok: false, error: err.message, retry: !err.fatal };
+    if (err instanceof SecondFactorError) return { ok: false, error: (await authErrorText(err))!, retry: !err.fatal };
     throw err;
   }
 }

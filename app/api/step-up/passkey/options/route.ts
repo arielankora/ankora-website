@@ -1,3 +1,4 @@
+import { authErrorText } from "@/lib/i18n/auth-errors";
 import { can } from "@/lib/app-auth/permissions";
 import { beginPasskeyStepUp, relyingPartyFor, PasskeyError } from "@/lib/app-auth/passkeys";
 import { StepUpLockedError } from "@/lib/app-auth/step-up";
@@ -15,8 +16,8 @@ export async function POST(req: Request) {
   try {
     return json(await beginPasskeyStepUp(user, relyingPartyFor(req.headers)), 200);
   } catch (err) {
-    if (err instanceof StepUpLockedError) return json({ error: "locked", message: err.message }, 429);
-    if (err instanceof PasskeyError) return json({ error: "passkey_failed", message: err.message }, 400);
+    if (err instanceof StepUpLockedError) return json({ error: "locked", message: await authErrorText(err) }, 429);
+    if (err instanceof PasskeyError) return json({ error: "passkey_failed", message: await authErrorText(err) }, 400);
     throw err;
   }
 }

@@ -1,3 +1,4 @@
+import { authErrorText } from "@/lib/i18n/auth-errors";
 import { finishPasskeyRegistration, relyingPartyFor, PasskeyError } from "@/lib/app-auth/passkeys";
 import { json, openJsonRoute } from "@/lib/app-auth/json-route";
 
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
     );
     return json({ ok: true }, 200);
   } catch (err) {
-    if (err instanceof PasskeyError) return json({ error: "passkey_failed", message: err.message }, 400);
+    if (err instanceof PasskeyError) return json({ error: "passkey_failed", message: await authErrorText(err) }, 400);
     throw err;
   }
 }

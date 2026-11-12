@@ -7,8 +7,9 @@ import "@fontsource/heebo/700.css";
 import "../globals.css";
 import { ToastProvider } from "@/components/app/toast/ToastProvider";
 import { NextIntlClientProvider } from "next-intl";
-import { getLocale, getTranslations } from "next-intl/server";
-import { directionOf } from "@/lib/i18n/config";
+import { getTranslations } from "next-intl/server";
+import { resolveRequestLocale } from "@/lib/i18n/resolve";
+import { directionOf, intlTag } from "@/lib/i18n/config";
 
 // Second Next.js "root layout" - see ADR-0001 and the note in
 // app/[locale]/layout.tsx's sibling: this route group lives outside
@@ -75,9 +76,9 @@ export const viewport: Viewport = {
 // locale, time zone and dictionary to the client components below it, so
 // a client component and the server agree on every word and every date.
 export default async function ProductRootLayout({ children }: { children: React.ReactNode }) {
-  const locale = await getLocale();
+  const { locale } = await resolveRequestLocale();
   return (
-    <html lang={locale} dir={directionOf(locale)}>
+    <html lang={intlTag(locale)} dir={directionOf(locale)}>
       <body className="bg-app-surface-page text-app-text-primary antialiased">
         <NextIntlClientProvider>
           <ToastProvider>{children}</ToastProvider>

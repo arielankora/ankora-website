@@ -1,18 +1,20 @@
 "use client";
 import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
+import { useTranslations } from "next-intl";
 import { loginAction } from "./actions";
 import { SecondFactorStep } from "./SecondFactorStep";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
+  const t = useTranslations("auth.login");
   return (
     <button
       type="submit"
       disabled={pending}
       className="mt-5 min-h-[50px] w-full rounded-full bg-app-accent text-[15px] font-medium text-app-text-primary disabled:opacity-50"
     >
-      {pending ? "מתחבר…" : "כניסה"}
+      {pending ? t("submitting") : t("submit")}
     </button>
   );
 }
@@ -38,6 +40,7 @@ function SubmitButton() {
 // but a new one - out of scope for a visual pass.
 export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
   const [state, formAction] = useFormState(loginAction, {});
+  const t = useTranslations("auth.login");
 
   // The password was right and the account needs a passkey too.
   if (state?.step && state.token) {
@@ -59,7 +62,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
           /app. */}
       <input type="hidden" name="callbackUrl" value={callbackUrl ?? ""} />
       <label className="block">
-        <span className="mb-1.5 block text-xs text-app-text-secondary">אימייל או שם משתמש</span>
+        <span className="mb-1.5 block text-xs text-app-text-secondary">{t("identifier")}</span>
         <input
           name="identifier"
           type="text"
@@ -67,11 +70,11 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
           dir="ltr"
           required
           placeholder="name@ankora.co.il"
-          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-page-start text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </label>
       <label className="mt-3.5 block">
-        <span className="mb-1.5 block text-xs text-app-text-secondary">סיסמה</span>
+        <span className="mb-1.5 block text-xs text-app-text-secondary">{t("password")}</span>
         <input
           name="password"
           type="password"
@@ -79,7 +82,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
           dir="ltr"
           required
           placeholder="••••••••"
-          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-page-start text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </label>
 
@@ -93,14 +96,14 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
 
       <div className="mt-2 flex items-center justify-between gap-2.5">
         <Link href="/app/forgot-password" className="py-2 text-xs text-app-text-accent hover:underline">
-          שכחתי סיסמה
+          {t("forgot")}
         </Link>
         {/* Portal phase 0: clients open the portal a few times a month and
             will not remember a password. The link flow is offered here
             rather than replacing the form, because Ankora staff sign in on
             this same screen and keep password-only sign-in. */}
         <Link href="/app/login-link/request" className="py-2 text-xs text-app-text-accent hover:underline">
-          כניסה בקישור למייל
+          {t("emailLink")}
         </Link>
       </div>
     </form>

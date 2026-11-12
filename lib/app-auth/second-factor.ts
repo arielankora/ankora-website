@@ -20,6 +20,7 @@ import {
   finishPasskeyRegistration,
   verifyPasskeyLogin,
   PasskeyError,
+  type PasskeyErrorCode,
   type RelyingParty,
 } from "@/lib/app-auth/passkeys";
 
@@ -52,14 +53,33 @@ import {
 
 export const PENDING_LOGIN_TTL_MS = 5 * 60_000;
 
+/// ADR 0006: why a sign-in step was refused, for a screen in either
+/// language. A passkey failure carried over from enrolment keeps the
+/// passkey's own code.
+export type SecondFactorErrorCode =
+  | "expired"
+  | "passkey_not_verified"
+  | "no_device_code"
+  | "too_many_attempts"
+  | "wrong_code"
+  | "already_has_passkey"
+  | "staff_always_on"
+  | "add_passkey_first"
+  | `passkey.${PasskeyErrorCode}`;
+
 export class SecondFactorError extends Error {
   /// False when the pending sign-in is still alive and the person may try
   /// again (a mistyped device code). Everything else ends the sign-in.
   readonly fatal: boolean;
-  constructor(message = "פג תוקף הכניסה. התחילו שוב מהסיסמה.", { fatal = true }: { fatal?: boolean } = {}) {
+  readonly code: SecondFactorErrorCode;
+  constructor(
+    message = "פג תוקף הכניסה. התחילו שוב מהסיסמה.",
+    { fatal = true, code = "expired" }: { fatal?: boolean; code?: SecondFactorErrorCode } = {},
+  ) {
     super(message);
     this.name = "SecondFactorError";
     this.fatal = fatal;
+    this.code = code;
   }
 }
 
@@ -137,7 +157,7 @@ export async function verifyLoginPasskey(raw: string, response: AuthenticationRe
     // password, whose lockout counts the attempts.
     await abandon(row.id);
     await recordAudit({ actorId: user.id, action: "login.passkey_failure", entityType: "User", entityId: user.id, after: { method: row.method } });
-    throw new SecondFactorError("ה-passkey לא אומת. התחילו שוב מהסיסמה.");
+    throw new SecondFactorError("ה-passkey לא אומת. התחילו שוב מהסיסמה.", { code: "passkey_not_verified" });
   }
   await prisma.pendingLogin.update({ where: { id: row.id }, data: { verifiedAt: new Date(), secondFactor: "passkey" } });
 }
@@ -153,7 +173,7 @@ export async function redeemDeviceLinkCode(raw: string, typed: unknown) {
   const code = normaliseDeviceLinkCode(typed);
   const link = await prisma.deviceLinkCode.findUnique({ where: { userId: user.id } });
   if (!link || link.expiresAt.getTime() < Date.now()) {
-    throw new SecondFactorError("אין קוד בתוקף. הפיקו קוד חדש במכשיר שבו אתם מחוברים.", { fatal: false });
+    throw new SecondFactorError("אין קוד בתוקף. הפיקו קוד חדש במכשיר שבו אתם מחוברים.", { fatal: false, code: "no_device_code" });
   }
   // The try is counted before the answer is looked at, so parallel guesses
   // cannot each see the same count.
@@ -171,9 +191,9 @@ export async function redeemDeviceLinkCode(raw: string, typed: unknown) {
     if (exhausted) {
       await prisma.deviceLinkCode.deleteMany({ where: { id: link.id } });
       await abandon(row.id);
-      throw new SecondFactorError("יותר מדי ניסיונות. הפיקו קוד חדש והתחילו שוב מהסיסמה.");
+      throw new SecondFactorError("יותר מדי ניסיונות. הפיקו קוד חדש והתחילו שוב מהסיסמה.", { code: "too_many_attempts" });
     }
-    throw new SecondFactorError("הקוד שגוי. נסו שוב.", { fatal: false });
+    throw new SecondFactorError("הקוד שגוי. נסו שוב.", { fatal: false, code: "wrong_code" });
   }
   // Single use: only the request that deletes it goes on.
   const used = await prisma.deviceLinkCode.deleteMany({ where: { id: link.id } });
@@ -191,7 +211,9 @@ async function assertMayEnroll(user: User, row: { deviceLinkedAt: Date | null })
   if (!secondFactorRequired(user)) throw new SecondFactorError();
   if (row.deviceLinkedAt) return;
   if ((await prisma.passkey.count({ where: { userId: user.id } })) > 0) {
-    throw new SecondFactorError("כבר יש passkey בחשבון. היכנסו איתו, או הוסיפו את המכשיר הזה עם קוד ממכשיר מחובר.");
+    throw new SecondFactorError("כבר יש passkey בחשבון. היכנסו איתו, או הוסיפו את המכשיר הזה עם קוד ממכשיר מחובר.", {
+      code: "already_has_passkey",
+    });
   }
 }
 
@@ -207,7 +229,7 @@ export async function finishLoginEnrollment(raw: string, response: RegistrationR
   try {
     await finishPasskeyRegistration(user, response, name, rp);
   } catch (err) {
-    if (err instanceof PasskeyError) throw new SecondFactorError(err.message);
+    if (err instanceof PasskeyError) throw new SecondFactorError(err.message, { code: `passkey.${err.code}` });
     throw err;
   }
   // The registration was made with the fingerprint or the device PIN,
@@ -282,11 +304,11 @@ export async function completePendingLogin(raw: string): Promise<AuthenticatedUs
 /// directions ask for the password, typed now: switching it off is exactly
 /// what someone holding a stolen session would want to do.
 export async function setOwnLoginPasskeyRequired(actor: User, enabled: boolean, password: string) {
-  if (actor.role !== "CLIENT_USER") throw new SecondFactorError("לצוות אנקורה האימות הדו-שלבי תמיד פעיל.");
+  if (actor.role !== "CLIENT_USER") throw new SecondFactorError("לצוות אנקורה האימות הדו-שלבי תמיד פעיל.", { code: "staff_always_on" });
   const { verifyOwnPassword } = await import("@/lib/app-auth/step-up");
   await verifyOwnPassword(actor, password);
   if (enabled && (await prisma.passkey.count({ where: { userId: actor.id } })) === 0) {
-    throw new SecondFactorError("קודם מוסיפים passkey, ואז מפעילים.");
+    throw new SecondFactorError("קודם מוסיפים passkey, ואז מפעילים.", { code: "add_passkey_first" });
   }
   await prisma.user.update({ where: { id: actor.id }, data: { loginPasskeyRequired: enabled } });
   await recordAudit({
