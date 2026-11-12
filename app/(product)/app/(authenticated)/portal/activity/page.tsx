@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalTimeline } from "@/lib/app-domain/client-portal";
@@ -29,16 +30,18 @@ export default async function PortalActivityPage() {
     throw err;
   }
 
+  const t = await getTranslations("portal.activity");
+
   return (
     <div className="space-y-4">
 
       <PromiseList
-        title="הפעילות שלך"
+        title={t("title")}
         promises={timeline.promises}
-        emptyText="עדיין אין פעילות להצגה."
+        emptyText={t("empty")}
         action={
           <Link href="/app/portal/hours" className="text-xs text-app-text-accent hover:underline">
-            שעות ודוחות
+            {t("hoursLink")}
           </Link>
         }
       />

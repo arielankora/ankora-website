@@ -48,15 +48,35 @@ export const SUPPLIER_EXPERIENCE_LABELS: Record<SupplierExperience, string> = {
 /// So: the word "החלטה" appears only when there is a decision, and when
 /// both exist the sentence counts them together without naming either.
 export function portalHeadline(decisions: number, waiting: number, inProgress: number): string {
-  if (decisions > 0 && waiting === 0) {
-    return decisions === 1 ? "החלטה אחת מחכה לך." : `${decisions} החלטות מחכות לך.`;
+  const { kind, count } = portalHeadlineKey(decisions, waiting, inProgress);
+  switch (kind) {
+    case "decisions":
+      return count === 1 ? "החלטה אחת מחכה לך." : `${count} החלטות מחכות לך.`;
+    case "needsYou":
+      return count === 1 ? "דבר אחד מחכה לך." : `${count} דברים מחכים לך.`;
+    case "allClear":
+      return "הכל מטופל. אין כרגע דבר שדורש פעולה מצדך.";
+    case "inProgress":
+      return count === 1 ? "הבטחה אחת בטיפול. אין דבר שמחכה לך." : `${count} הבטחות בטיפול. אין דבר שמחכה לך.`;
   }
+}
+
+/// ADR 0006: the same rule as portalHeadline, as a kind and a count, so
+/// the portal's home screen can word it in the reader's language
+/// (portal.home.headline in messages/*.json). portalHeadline words it in
+/// Hebrew from the same answer, so the two cannot drift apart.
+export type PortalHeadlineKind = "decisions" | "needsYou" | "allClear" | "inProgress";
+
+export function portalHeadlineKey(
+  decisions: number,
+  waiting: number,
+  inProgress: number,
+): { kind: PortalHeadlineKind; count: number } {
+  if (decisions > 0 && waiting === 0) return { kind: "decisions", count: decisions };
   const needsYou = decisions + waiting;
-  if (needsYou === 1) return "דבר אחד מחכה לך.";
-  if (needsYou > 1) return `${needsYou} דברים מחכים לך.`;
-  if (inProgress === 0) return "הכל מטופל. אין כרגע דבר שדורש פעולה מצדך.";
-  if (inProgress === 1) return "הבטחה אחת בטיפול. אין דבר שמחכה לך.";
-  return `${inProgress} הבטחות בטיפול. אין דבר שמחכה לך.`;
+  if (needsYou > 0) return { kind: "needsYou", count: needsYou };
+  if (inProgress === 0) return { kind: "allClear", count: 0 };
+  return { kind: "inProgress", count: inProgress };
 }
 
 /// Tasks phase 5. Who we are waiting on, as a person would say it.

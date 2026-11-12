@@ -6,10 +6,19 @@
 // hours, so it gave its place to "משימות". Its month picker, export and the
 // account manager's summary moved to the bottom of "שעות" (#monthly-report),
 // and the old addresses land there.
-export const HOURS_TABS = [
-  { key: "hours", label: "שעות", href: "/app/portal/hours" },
-  { key: "weekly", label: "לפי ימים", href: "/app/portal/hours?view=weekly" },
-  { key: "tasks", label: "משימות", href: "/app/portal/hours?view=tasks" },
-];
+//
+// ADR 0006: the labels are in the dictionary (portal.hours.tabs), so a
+// view words its tabs with hoursTabs(t).
+export const HOURS_TAB_KEYS = [
+  { key: "hours", href: "/app/portal/hours" },
+  { key: "weekly", href: "/app/portal/hours?view=weekly" },
+  { key: "tasks", href: "/app/portal/hours?view=tasks" },
+] as const;
+
+export type HoursTabKey = (typeof HOURS_TAB_KEYS)[number]["key"];
+
+export function hoursTabs(label: (key: HoursTabKey) => string) {
+  return HOURS_TAB_KEYS.map((tab) => ({ key: tab.key, href: tab.href, label: label(tab.key) }));
+}
 
 export const MONTHLY_REPORT_ANCHOR = "monthly-report";

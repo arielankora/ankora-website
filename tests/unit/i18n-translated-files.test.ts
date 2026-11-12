@@ -290,6 +290,31 @@ const TRANSLATED_FILES = [
   "app/(product)/app/(authenticated)/whatsapp-poc/setup/page.tsx",
   "app/(product)/app/(authenticated)/whatsapp-poc/setup/SetupForms.tsx",
   "app/(product)/app/(authenticated)/whatsapp-poc/setup/actions.ts",
+  // The client portal (12.11.2026). What people wrote for the client (notes,
+  // outcomes, requests, the client file's items, the monthly summary) is
+  // content and is never translated; the export and the emails stay Hebrew.
+  "app/(product)/app/(authenticated)/portal/PortalContextBar.tsx",
+  "app/(product)/app/(authenticated)/portal/PromiseList.tsx",
+  "app/(product)/app/(authenticated)/portal/RecipientsForm.tsx",
+  "app/(product)/app/(authenticated)/portal/actions.ts",
+  "app/(product)/app/(authenticated)/portal/activity/page.tsx",
+  "app/(product)/app/(authenticated)/portal/decisions/DecisionCard.tsx",
+  "app/(product)/app/(authenticated)/portal/decisions/actions.ts",
+  "app/(product)/app/(authenticated)/portal/decisions/page.tsx",
+  "app/(product)/app/(authenticated)/portal/file/PreferencesForm.tsx",
+  "app/(product)/app/(authenticated)/portal/file/actions.ts",
+  "app/(product)/app/(authenticated)/portal/file/page.tsx",
+  "app/(product)/app/(authenticated)/portal/history/page.tsx",
+  "app/(product)/app/(authenticated)/portal/hours/page.tsx",
+  "app/(product)/app/(authenticated)/portal/hours/tabs.ts",
+  "app/(product)/app/(authenticated)/portal/layout.tsx",
+  "app/(product)/app/(authenticated)/portal/monthly/MonthlyView.tsx",
+  "app/(product)/app/(authenticated)/portal/monthly/page.tsx",
+  "app/(product)/app/(authenticated)/portal/page.tsx",
+  "app/(product)/app/(authenticated)/portal/tasks/TasksView.tsx",
+  "app/(product)/app/(authenticated)/portal/weekly/WeeklyView.tsx",
+  "app/(product)/app/(authenticated)/portal/weekly/page.tsx",
+  "app/api/portal/documents/[documentId]/route.ts",
 ];
 
 describe("translated screens (ADR 0006)", () => {

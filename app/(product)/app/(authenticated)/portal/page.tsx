@@ -1,13 +1,13 @@
 import Link from "next/link";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalHome } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { whatsappHref } from "@/lib/whatsapp";
 import { PromiseList } from "./PromiseList";
-import { portalHeadline } from "@/lib/app-domain/portal-labels";
+import { portalHeadlineKey } from "@/lib/app-domain/portal-labels";
 import { bankFigures, packageFigures } from "@/lib/hours-format";
-import { forecastCell } from "@/lib/prepaid-format";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -40,6 +40,10 @@ export default async function PortalHomePage() {
   const nothingYet =
     openDecisions === 0 && waitingOnClient.length === 0 && inProgress.length === 0 && recentlyDone.length === 0;
   const waHref = whatsappHref(contact.whatsappNumber);
+  const t = await getTranslations("portal.home");
+  const format = await getFormatter();
+  const headline = portalHeadlineKey(openDecisions, waitingOnClient.length, inProgress.length);
+  const figure = (chunks: React.ReactNode) => <bdi dir="ltr">{chunks}</bdi>;
 
   return (
     <div className="space-y-4">
@@ -48,9 +52,9 @@ export default async function PortalHomePage() {
           there; otherwise the headline is the whole message. */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[20px] border border-app-border bg-white p-6 sm:p-7">
         <div>
-          <p className="text-[13.5px] text-app-text-secondary">שלום, {client.name}</p>
+          <p className="text-[13.5px] text-app-text-secondary">{t.rich("greeting", { name: client.name, who: (c) => <bdi>{c}</bdi> })}</p>
           <p className="mt-1.5 text-xl font-medium text-app-text-primary">
-            {portalHeadline(openDecisions, waitingOnClient.length, inProgress.length)}
+            {t(`headline.${headline.kind}`, { count: headline.count })}
           </p>
         </div>
         {openDecisions > 0 && (
@@ -59,7 +63,7 @@ export default async function PortalHomePage() {
             data-testid="portal-home-decisions"
             className="rounded-full bg-app-accent px-5 py-3 text-sm font-medium text-app-text-primary hover:opacity-90"
           >
-            {openDecisions === 1 ? "לצפייה בהחלטה" : `לצפייה ב-${openDecisions} החלטות`}
+            {t("viewDecisions", { count: openDecisions })}
           </Link>
         )}
       </div>
@@ -69,14 +73,14 @@ export default async function PortalHomePage() {
         // portal explains itself. Written as a promise with a date on it
         // rather than as a tour: "here is what will appear, and when".
         <div className="rounded-2xl border border-app-border bg-white p-6">
-          <p className="text-[13.5px] font-medium text-app-text-primary">כאן יופיע מה שאנחנו מטפלים בו עבורך</p>
+          <p className="text-[13.5px] font-medium text-app-text-primary">{t("empty.title")}</p>
           <ul className="mt-3 space-y-2 text-sm text-app-text-secondary">
-            <li>כל בקשה שנכנסת מופיעה כאן ברגע שהיא מתקבלת אצלנו.</li>
-            <li>כשמשהו מחכה לך, הוא יעלה לראש המסך.</li>
-            <li>מה שהושלם נשאר כאן, עם התאריך.</li>
+            <li>{t("empty.received")}</li>
+            <li>{t("empty.waiting")}</li>
+            <li>{t("empty.done")}</li>
           </ul>
           <p className="mt-4 text-[12.5px] text-app-text-tertiary">
-            הפריט הראשון שלך יופיע כאן תוך יום עבודה. בינתיים, כל בקשה נשלחת כרגיל בוואטסאפ למנהל התיק.
+            {t("empty.firstItem")}
           </p>
         </div>
       ) : (
@@ -91,21 +95,21 @@ export default async function PortalHomePage() {
               portal is not accurate. The wording here is the same stage
               label they read on every other screen. */}
           {waitingOnClient.length > 0 && (
-            <PromiseList title="מחכה לך" promises={waitingOnClient} tone="attention" showStage={false} />
+            <PromiseList title={t("waitingTitle")} promises={waitingOnClient} tone="attention" showStage={false} />
           )}
 
           <PromiseList
-            title="בטיפול עכשיו"
+            title={t("inProgressTitle")}
             promises={inProgress}
-            emptyText="אין כרגע הבטחות פתוחות."
+            emptyText={t("inProgressEmpty")}
           />
 
           <PromiseList
-            title="נסגר לאחרונה"
+            title={t("recentlyDoneTitle")}
             promises={recentlyDone}
             action={
               <Link href="/app/portal/activity" className="text-xs text-app-text-accent hover:underline">
-                כל הפעילות
+                {t("allActivity")}
               </Link>
             }
             showStage={false}
@@ -123,7 +127,7 @@ export default async function PortalHomePage() {
         {(contact.managerName || waHref) && (
           <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] border border-app-border bg-white px-[18px] py-3.5">
             <span className="text-[12.5px] text-app-text-secondary">
-              {contact.managerName ? `מנהל התיק שלך: ${contact.managerName}` : "מנהל התיק שלך ב-Ankora"}
+              {contact.managerName ? t.rich("managerNamed", { name: contact.managerName, who: (c) => <bdi>{c}</bdi> }) : t("managerUnnamed")}
             </span>
             {waHref ? (
               <a
@@ -132,10 +136,10 @@ export default async function PortalHomePage() {
                 rel="noopener noreferrer"
                 className="rounded-full border border-app-border-strong px-3.5 py-1.5 text-xs text-app-text-primary hover:border-app-accent"
               >
-                וואטסאפ
+                {t("whatsapp")}
               </a>
             ) : (
-              <span className="text-xs text-app-text-tertiary">וואטסאפ: זמין בקרוב</span>
+              <span className="text-xs text-app-text-tertiary">{t("whatsappSoon")}</span>
             )}
           </div>
         )}
@@ -147,22 +151,30 @@ export default async function PortalHomePage() {
                   figures the client sees on the hours screen one click away. */}
               {cycle.kind === "PREPAID" ? (
                 <>
-                  חבילת השעות: נוצלו{" "}
-                  <bdi dir="ltr">{packageFigures(cycle.purchasedMinutes, cycle.remainingMinutes).consumed}</bdi> מתוך{" "}
-                  <bdi dir="ltr">{packageFigures(cycle.purchasedMinutes, cycle.remainingMinutes).total}</bdi> שעות
-                  {cycle.forecast?.status === "projected" && ` · צפויה להספיק עד ${forecastCell(cycle.forecast, client.timezone)}`}
-                  {cycle.forecast?.status === "depleted" && " · החבילה נוצלה"}
+                  {t.rich("package", {
+                    consumed: packageFigures(cycle.purchasedMinutes, cycle.remainingMinutes).consumed,
+                    total: packageFigures(cycle.purchasedMinutes, cycle.remainingMinutes).total,
+                    n: figure,
+                  })}
+                  {cycle.forecast?.status === "projected" &&
+                    ` · ${t("packageLasts", {
+                      date: format.dateTime(cycle.forecast.depletionDate, { dateStyle: "medium", timeZone: client.timezone }),
+                    })}`}
+                  {cycle.forecast?.status === "depleted" && ` · ${t("packageUsedUp")}`}
                 </>
               ) : (
                 <>
-                  מחזור השעות הנוכחי: <bdi dir="ltr">{bankFigures(cycle.totalMinutes, cycle.usedMinutes).consumed}</bdi> מתוך{" "}
-                  <bdi dir="ltr">{bankFigures(cycle.totalMinutes, cycle.usedMinutes).total}</bdi> שעות
+                  {t.rich("cycle", {
+                    consumed: bankFigures(cycle.totalMinutes, cycle.usedMinutes).consumed,
+                    total: bankFigures(cycle.totalMinutes, cycle.usedMinutes).total,
+                    n: figure,
+                  })}
                 </>
               )}
-              {cycle.daysLeft !== null && ` · ${cycle.daysLeft} ימים לסיום`}
+              {cycle.daysLeft !== null && ` · ${t("daysLeft", { days: String(cycle.daysLeft) })}`}
             </span>
             <Link href="/app/portal/hours" className="text-xs text-app-text-accent hover:underline">
-              פירוט השעות
+              {t("hoursDetail")}
             </Link>
           </div>
         )}

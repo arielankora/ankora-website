@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { switchPortalClientAction, exitPortalPreviewAction } from "./actions";
 import type { PortalMembership } from "@/lib/app-domain/client-portal";
 
@@ -7,7 +8,7 @@ import type { PortalMembership } from "@/lib/app-domain/client-portal";
 // more than one client). A client with one membership sees neither, which
 // is the point - the portal must not grow chrome for the common case.
 
-export function PortalContextBar({
+export async function PortalContextBar({
   isStaffPreview,
   clientName,
   memberships,
@@ -18,18 +19,27 @@ export function PortalContextBar({
   memberships: PortalMembership[];
   currentClientId: string;
 }) {
+  const t = await getTranslations("portal.context");
+
   if (isStaffPreview) {
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-gold/40 bg-gold/10 px-4 py-3">
         <p className="text-[12.5px] text-app-text-primary">
-          תצוגת לקוח: <span className="font-medium">{clientName}</span>. זה בדיוק מה שהלקוח רואה, וכל פעולה חסומה.
+          {t.rich("preview", {
+            name: clientName,
+            b: (chunks) => (
+              <span dir="auto" className="font-medium">
+                {chunks}
+              </span>
+            ),
+          })}
         </p>
         <form action={exitPortalPreviewAction}>
           <button
             type="submit"
             className="rounded-full border border-gold/50 bg-white px-3.5 py-1.5 text-[12px] text-app-text-primary hover:border-gold"
           >
-            יציאה מהתצוגה
+            {t("exitPreview")}
           </button>
         </form>
       </div>
@@ -40,7 +50,7 @@ export function PortalContextBar({
 
   return (
     <div className="flex flex-wrap items-center gap-2.5 rounded-[14px] border border-app-border bg-white px-4 py-3">
-      <span className="text-[12.5px] text-app-text-secondary">התיק המוצג</span>
+      <span className="text-[12.5px] text-app-text-secondary">{t("shownFile")}</span>
       {memberships.map((m) => (
         <form key={m.clientId} action={switchPortalClientAction}>
           <input type="hidden" name="clientId" value={m.clientId} />
@@ -53,7 +63,7 @@ export function PortalContextBar({
                 : "border border-app-border text-app-text-primary hover:border-gold"
             }`}
           >
-            {m.clientName}
+            <bdi>{m.clientName}</bdi>
           </button>
         </form>
       ))}

@@ -1,4 +1,6 @@
+import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
+import { TIMEZONE } from "@/lib/timezone";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalHistory } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
@@ -9,22 +11,14 @@ import { bankFigures, packageFigures } from "@/lib/hours-format";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-const STATUS_LABEL: Record<string, { label: string; tone: "green" | "amber" | "gray" }> = {
-  OPEN: { label: "פתוח", tone: "green" },
-  CLOSED: { label: "סגור", tone: "gray" },
-  RECALCULATED: { label: "חושב מחדש", tone: "amber" },
-};
+// ADR 0006: the labels are in the dictionary (portal.history.status and
+// portal.recipients.reportTypes); these say only which exist.
+const STATUS_TONE = { OPEN: "green", CLOSED: "gray", RECALCULATED: "amber" } as const;
+type CycleStatus = keyof typeof STATUS_TONE;
 
-const REPORT_TYPE_LABEL: Record<string, string> = {
-  MONTHLY_DETAILED: "דוח חודשי מפורט",
-  WEEKLY_ACTIVITY: "פעילות שבועית",
-  HOURS_BY_CATEGORY: "שעות לפי קטגוריה",
-  HOUR_BANK_STATUS: "מצב בנק שעות",
-};
-
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
-}
+const REPORT_TYPES = ["MONTHLY_DETAILED", "WEEKLY_ACTIVITY", "HOURS_BY_CATEGORY", "HOUR_BANK_STATUS"] as const;
+type ReportType = (typeof REPORT_TYPES)[number];
+const isReportType = (value: string): value is ReportType => (REPORT_TYPES as readonly string[]).includes(value);
 
 
 // App redesign (handoff README, screen 16 "היסטוריה"): the prototype
@@ -62,37 +56,46 @@ export default async function PortalHistoryPage() {
     throw err;
   }
 
+  const t = await getTranslations("portal.history");
+  const tReports = await getTranslations("portal.recipients.reportTypes");
+  const format = await getFormatter();
+  // Cycles and report periods are Israeli days, written in Israel time; when
+  // a report was sent is an instant, written in the reader's own time zone.
+  const formatDate = (date: Date) => format.dateTime(date, { dateStyle: "medium", timeZone: TIMEZONE });
+  const formatInstant = (date: Date) => format.dateTime(date, { dateStyle: "medium" });
+  const reportLabel = (type: string) => (isReportType(type) ? tReports(type) : type);
+
   return (
     <>
       <div className="space-y-8">
 
         <div>
-          <h1 className="text-xl font-medium text-app-text-primary">היסטוריה</h1>
-          <p className="mt-1 text-sm text-app-text-secondary">מחזורים וחבילות שעות קודמים, ודוחות שנשלחו.</p>
+          <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">{t("subtitle")}</p>
         </div>
 
         <section className="space-y-3">
-          <h2 className="text-sm font-medium text-app-text-secondary">מחזורים וחבילות</h2>
+          <h2 className="text-sm font-medium text-app-text-secondary">{t("cyclesTitle")}</h2>
           <div className="overflow-x-auto rounded-2xl border border-app-border bg-white">
             <table className="w-full min-w-[560px] text-start text-sm">
               <thead>
                 <tr className="border-b border-app-border text-xs text-app-text-tertiary">
-                  <th className="px-5 py-3 font-medium">התחלה</th>
-                  <th className="px-5 py-3 font-medium">סיום</th>
-                  <th className="px-5 py-3 font-medium">סטטוס</th>
-                  <th className="px-5 py-3 font-medium">ניצול</th>
+                  <th className="px-5 py-3 font-medium">{t("columns.start")}</th>
+                  <th className="px-5 py-3 font-medium">{t("columns.end")}</th>
+                  <th className="px-5 py-3 font-medium">{t("columns.status")}</th>
+                  <th className="px-5 py-3 font-medium">{t("columns.usage")}</th>
                 </tr>
               </thead>
               <tbody>
                 {history.cycles.length === 0 && (
                   <tr>
                     <td colSpan={4} className="px-5 py-8 text-center text-app-text-tertiary">
-                      אין עדיין מחזורים או חבילות.
+                      {t("noCycles")}
                     </td>
                   </tr>
                 )}
                 {history.cycles.map((c, i) => {
-                  const status = STATUS_LABEL[c.status] ?? STATUS_LABEL.OPEN;
+                  const status: CycleStatus = c.status in STATUS_TONE ? (c.status as CycleStatus) : "OPEN";
                   // A package reads as its size and how much of it went,
                   // like the hours screen (12.10.2026).
                   const f =
@@ -102,12 +105,12 @@ export default async function PortalHistoryPage() {
                   return (
                     <tr key={i} className="border-b border-app-border last:border-0">
                       <td className="px-5 py-3 text-app-text-secondary">
-                        <span className="block text-[11px] text-app-text-tertiary">{c.kind === "PREPAID" ? "חבילה" : "מחזור"}</span>
+                        <span className="block text-[11px] text-app-text-tertiary">{c.kind === "PREPAID" ? t("kind.package") : t("kind.cycle")}</span>
                         {formatDate(c.cycleStart)}
                       </td>
                       <td className="px-5 py-3 text-app-text-secondary">{formatDate(c.cycleEnd)}</td>
                       <td className="px-5 py-3">
-                        <StatusBadge label={status.label} tone={status.tone} />
+                        <StatusBadge label={t(`status.${status}`)} tone={STATUS_TONE[status]} />
                       </td>
                       <td className="px-5 py-3 text-app-text-secondary">
                         <bdi dir="ltr">
@@ -124,14 +127,14 @@ export default async function PortalHistoryPage() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-sm font-medium text-app-text-secondary">דוחות שנשלחו</h2>
+          <h2 className="text-sm font-medium text-app-text-secondary">{t("reportsTitle")}</h2>
           <div className="overflow-x-auto rounded-2xl border border-app-border bg-white">
             <table className="w-full min-w-[560px] text-start text-sm">
               <thead>
                 <tr className="border-b border-app-border text-xs text-app-text-tertiary">
-                  <th className="px-5 py-3 font-medium">סוג דוח</th>
-                  <th className="px-5 py-3 font-medium">תקופה</th>
-                  <th className="px-5 py-3 font-medium">נשלח בתאריך</th>
+                  <th className="px-5 py-3 font-medium">{t("columns.reportType")}</th>
+                  <th className="px-5 py-3 font-medium">{t("columns.period")}</th>
+                  <th className="px-5 py-3 font-medium">{t("columns.sentOn")}</th>
                   <th className="px-5 py-3 font-medium"></th>
                 </tr>
               </thead>
@@ -139,24 +142,24 @@ export default async function PortalHistoryPage() {
                 {history.reportRuns.length === 0 && (
                   <tr>
                     <td colSpan={4} className="px-5 py-8 text-center text-app-text-tertiary">
-                      טרם נשלחו דוחות.
+                      {t("noReports")}
                     </td>
                   </tr>
                 )}
                 {history.reportRuns.map((r) => (
                   <tr key={r.id} className="border-b border-app-border last:border-0">
-                    <td className="px-5 py-3 text-app-text-primary">{REPORT_TYPE_LABEL[r.reportType] ?? r.reportType}</td>
+                    <td className="px-5 py-3 text-app-text-primary">{reportLabel(r.reportType)}</td>
                     <td className="px-5 py-3 text-app-text-secondary">
                       {formatDate(r.periodStart)} - {formatDate(r.periodEnd)}
                     </td>
-                    <td className="px-5 py-3 text-app-text-secondary">{formatDate(r.sentAt)}</td>
+                    <td className="px-5 py-3 text-app-text-secondary">{formatInstant(r.sentAt)}</td>
                     <td className="px-5 py-3 text-end">
                       {r.reportType === "MONTHLY_DETAILED" && (
                         <a
                           href={`/api/portal/export?monthOffset=${monthOffsetFor(r.periodStart)}&format=pdf`}
                           className="text-xs text-app-text-accent hover:underline"
                         >
-                          הורדה
+                          {t("download")}
                         </a>
                       )}
                     </td>
@@ -169,14 +172,14 @@ export default async function PortalHistoryPage() {
 
         {history.canManageRecipients && (
           <section className="space-y-3">
-            <h2 className="text-sm font-medium text-app-text-secondary">ניהול נמענים לדוחות מתוזמנים</h2>
+            <h2 className="text-sm font-medium text-app-text-secondary">{t("recipientsTitle")}</h2>
             <p className="text-sm text-app-text-secondary">
-              כמנהל לקוח, ניתן לערוך כאן את רשימת הנמענים לכל דוח מתוזמן. סוג הדוח, התדירות וההפעלה/השבתה נשארים בשליטת Ankora.
+              {t("recipientsIntro")}
             </p>
             <div className="space-y-3">
               {history.schedules.length === 0 && (
                 <p className="rounded-xl border border-app-border bg-white px-5 py-6 text-center text-sm text-app-text-tertiary">
-                  אין עדיין דוחות מתוזמנים עבור לקוח זה.
+                  {t("noSchedules")}
                 </p>
               )}
               {history.schedules.map((s) => (

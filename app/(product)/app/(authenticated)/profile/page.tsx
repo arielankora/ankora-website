@@ -91,10 +91,11 @@ export default async function ProfilePage() {
             <div className="mt-5 space-y-5 border-t border-app-border pt-5">
               <NameForm name={user.name} />
               <TimezoneForm timezone={user.timezone} />
-              {/* ADR 0006: staff only for now. The client portal is not
-                  translated yet, and a client who chose English would get a
-                  left-to-right page full of Hebrew. */}
-              {user.role !== "CLIENT_USER" && <LanguageForm locale={user.locale} />}
+              {/* ADR 0006: everyone, client users included, since the
+                  portal is translated (12.11.2026). The interface comes from
+                  the dictionary, not from AI, so a client marked "No AI" may
+                  choose English too. */}
+              <LanguageForm locale={user.locale} />
               {/* Staff only: it is what a colleague's "שיתוף" on a task
                   reaches. A client's number lives on the client. */}
               {user.role !== "CLIENT_USER" && <WhatsappForm whatsappNumber={user.whatsappNumber} />}

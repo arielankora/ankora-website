@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -16,10 +18,14 @@ import {
 
 type FormState = { error?: string; ok?: boolean };
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
+// ADR 0006: a refusal in the reader's language.
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("portal.errors");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  const text = await domainErrorText(err);
+  if (text) return text;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
 }
 
 function parseEmailList(value: FormDataEntryValue | null): string[] {
@@ -37,16 +43,17 @@ function parseEmailList(value: FormDataEntryValue | null): string[] {
 // adds no authorization logic of its own beyond calling it.
 export async function updatePortalRecipientsAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
+  const t = await getTranslations("portal.errors");
   const scheduleId = String(formData.get("scheduleId") || "");
-  if (!scheduleId) return { error: "חסר מזהה דוח מתוזמן." };
+  if (!scheduleId) return { error: t("scheduleMissing") };
 
   const recipients = parseEmailList(formData.get("recipients"));
-  if (recipients.length === 0) return { error: "יש להזין לפחות נמען אחד." };
+  if (recipients.length === 0) return { error: t("noRecipients") };
 
   try {
     await updatePortalScheduleRecipients(user, scheduleId, recipients);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/portal/history");

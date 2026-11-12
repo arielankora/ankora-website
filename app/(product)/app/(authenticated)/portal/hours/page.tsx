@@ -1,18 +1,20 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getFormatter, getTranslations } from "next-intl/server";
+import { TIMEZONE } from "@/lib/timezone";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalDashboard, getCategorySummary, getWeeklyActivity } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { ViewTabs } from "@/components/app/ViewTabs";
-import { HOURS_TABS, MONTHLY_REPORT_ANCHOR } from "./tabs";
+import { hoursTabs, MONTHLY_REPORT_ANCHOR } from "./tabs";
 import { MonthlyReportSection } from "../monthly/MonthlyView";
 import { WeeklyView } from "../weekly/WeeklyView";
 import { TasksView } from "../tasks/TasksView";
 import { carryQuery } from "@/components/app/ViewTabs";
 import { parsePeriodOffset, MAX_MONTH_OFFSET } from "@/lib/period-offset";
 import { bankFigures, formatDecimalHours, packageFigures } from "@/lib/hours-format";
-import { describeForecast } from "@/lib/prepaid-format";
+import type { PrepaidForecast } from "@/lib/app-domain/hour-banks";
 import { cycleElapsedShare } from "@/lib/app-domain/hour-banks";
 import { ProgressBar } from "@/components/app/ProgressBar";
 
@@ -22,9 +24,6 @@ export const metadata = { robots: { index: false, follow: false } };
 // client bought (lib/hours-format.ts). "3:04" beside "11:56" reads as two
 // decimals that do not add up; "3.07" beside "11.93" does. Every figure on
 // this screen goes through formatDecimalHours or bankFigures.
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
-}
 
 // 20.10.2026: four tones of the palette that differ in lightness, not three
 // golds a client cannot tell apart.
@@ -89,6 +88,29 @@ export default async function PortalHoursPage(props: {
     throw err;
   }
 
+  const t = await getTranslations("portal.hours");
+  const format = await getFormatter();
+  // ADR 0006: in the reader's language. A cycle starts and ends on Israeli
+  // days, so they are written in Israel time wherever the reader is.
+  const formatDate = (date: Date) => format.dateTime(date, { dateStyle: "medium", timeZone: TIMEZONE });
+  // describeForecast (lib/prepaid-format.ts) says the same in Hebrew for
+  // the reports and MCP; this is the screen's own wording.
+  const describeForecast = (f: PrepaidForecast | null, timeZone: string): string | null => {
+    if (!f) return null;
+    switch (f.status) {
+      case "depleted":
+        return t("forecast.depleted");
+      case "insufficient_data":
+        return t("forecast.insufficientData");
+      case "projected":
+        return t("forecast.projected", {
+          weekly: formatDecimalHours(f.weeklyMinutes),
+          date: format.dateTime(f.depletionDate, { dateStyle: "medium", timeZone }),
+        });
+    }
+  };
+  const ltr = (chunks: React.ReactNode) => <bdi dir="ltr">{chunks}</bdi>;
+
   const { client, snapshot, daysUntilCycleEnd, forecast } = dashboard;
   const totalCategoryMinutes = categorySummary.rows.reduce((s, r) => s + r.minutes, 0);
   // 12.10.2026: a prepaid package reads as its size, how much of it is
@@ -110,44 +132,44 @@ export default async function PortalHoursPage(props: {
       : null;
   const usedPct = snapshot?.utilization.utilizationPct ?? 0;
   const paceWord =
-    pacePct === null ? null : usedPct > pacePct + 5 ? "מעל הקצב" : usedPct < pacePct - 5 ? "מתחת לקצב" : "בקצב";
+    pacePct === null ? null : usedPct > pacePct + 5 ? t("pace.over") : usedPct < pacePct - 5 ? t("pace.under") : t("pace.on");
 
   return (
     <div className="space-y-4">
-        <ViewTabs label="שעות ודוחות" active="hours" tabs={HOURS_TABS} />
+        <ViewTabs label={t("tabsLabel")} active="hours" tabs={hoursTabs((key) => t(`tabs.${key}`))} />
 
       <div className="rounded-[20px] border border-gold/28 bg-app-surface-sunken p-6 sm:p-7">
-        <p className="text-base font-medium text-app-text-primary">{isPrepaid ? "חבילת השעות" : "מחזור השעות הנוכחי"}</p>
+        <p className="text-base font-medium text-app-text-primary">{isPrepaid ? t("packageTitle") : t("cycleTitle")}</p>
         {snapshot && isPrepaid ? (
           <div className="mt-1.5 space-y-1 text-[13.5px] text-app-text-secondary">
             <p>
-              חבילת שעות שנטענה ב-{formatDate(snapshot.bank.cycleStart)} · בתוקף עד {formatDate(snapshot.bank.cycleEnd)}
-              {daysUntilCycleEnd !== null && ` · ${daysUntilCycleEnd} ימים לסיום התוקף`}
+              {t("packageLoaded", { start: formatDate(snapshot.bank.cycleStart), end: formatDate(snapshot.bank.cycleEnd) })}
+              {daysUntilCycleEnd !== null && ` · ${t("packageDaysLeft", { days: String(daysUntilCycleEnd) })}`}
             </p>
             {forecastText && <p className="text-app-text-secondary">{forecastText}</p>}
           </div>
         ) : snapshot ? (
           <p className="mt-1.5 text-[13.5px] text-app-text-secondary">
-            מחזור נוכחי: {formatDate(snapshot.bank.cycleStart)} עד {formatDate(snapshot.bank.cycleEnd)}
-            {daysUntilCycleEnd !== null && ` · ${daysUntilCycleEnd} ימים לסיום`}
+            {t("currentCycle", { start: formatDate(snapshot.bank.cycleStart), end: formatDate(snapshot.bank.cycleEnd) })}
+            {daysUntilCycleEnd !== null && ` · ${t("cycleDaysLeft", { days: String(daysUntilCycleEnd) })}`}
           </p>
         ) : (
-          <p className="mt-1.5 text-[13.5px] text-app-text-secondary">טרם הוגדר מחזור בנק שעות. פנו למנהל התיק שלכם ב-Ankora.</p>
+          <p className="mt-1.5 text-[13.5px] text-app-text-secondary">{t("noBank")}</p>
         )}
 
         {snapshot && figures && (
           <>
             <div className="mt-[22px] grid grid-cols-3 gap-3.5">
               <div className="rounded-[14px] border border-app-border bg-white p-4">
-                <span className="text-xs text-app-text-secondary">{isPrepaid ? "גודל החבילה" : <>סה&quot;כ בבנק</>}</span>
+                <span className="text-xs text-app-text-secondary">{isPrepaid ? t("packageSize") : t("bankTotal")}</span>
                 <p className="mt-2 font-jbmono text-2xl text-app-text-primary">{figures.total}</p>
               </div>
               <div className="rounded-[14px] border border-app-border bg-white p-4">
-                <span className="text-xs text-app-text-secondary">נוצל</span>
+                <span className="text-xs text-app-text-secondary">{t("used")}</span>
                 <p className="mt-2 font-jbmono text-2xl text-app-text-primary">{figures.consumed}</p>
               </div>
               <div className="rounded-[14px] border border-app-border bg-white p-4">
-                <span className="text-xs text-app-text-secondary">נותר</span>
+                <span className="text-xs text-app-text-secondary">{t("remaining")}</span>
                 {/* <bdi dir="ltr"> keeps a negative balance's minus on the left
                     while the figure stays aligned under its label, like the
                     other three tiles. */}
@@ -158,32 +180,32 @@ export default async function PortalHoursPage(props: {
             </div>
             <ProgressBar className="mt-[18px]" percent={usedPct} dangerAt={100.01} markerAt={pacePct ?? undefined} />
             <p className="mt-2 text-[12.5px] text-app-text-secondary">
-              <span className="font-jbmono">{usedPct}%</span> נוצל
-              {paceWord && <> · {paceWord} · הקו מסמן איפה צפוי להיות היום</>}
+              {t.rich("usedPct", { pct: String(usedPct), num: (chunks) => <span className="font-jbmono">{chunks}</span> })}
+              {paceWord && <> · {paceWord} · {t("paceMarker")}</>}
             </p>
             {isPrepaid && carry !== 0 && (
               <p className="mt-3 text-[12px] text-app-text-secondary">
-                {carry < 0 ? "כולל קיזוז של " : "כולל יתרה של "}
-                <bdi dir="ltr">{formatDecimalHours(Math.abs(carry))}</bdi>
-                {carry < 0 ? " שעות שנוצלו מעבר לחבילה הקודמת." : " שעות שעברו מהחבילה הקודמת ומנוצלות ראשונות."}
+                {t.rich(carry < 0 ? "carryMinus" : "carryPlus", { hours: formatDecimalHours(Math.abs(carry)), h: ltr })}
               </p>
             )}
-            <p className="mt-3 text-[11.5px] text-app-text-tertiary">בשעות עשרוניות: 0.50 הן חצי שעה, 0.25 הן רבע שעה.</p>
+            <p className="mt-3 text-[11.5px] text-app-text-tertiary">{t("decimalNote")}</p>
           </>
         )}
       </div>
 
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
         <div className="rounded-2xl border border-app-border bg-white p-5">
-          <p className="mb-4 text-[13.5px] font-medium text-app-text-primary">פילוח לפי תחום · החודש</p>
+          <p className="mb-4 text-[13.5px] font-medium text-app-text-primary">{t("byCategory")}</p>
           {categorySummary.rows.length === 0 ? (
-            <p className="text-sm text-app-text-tertiary">אין עדיין נתונים לחודש הנוכחי.</p>
+            <p className="text-sm text-app-text-tertiary">{t("noCategoryData")}</p>
           ) : (
             <div className="flex flex-col gap-3.5">
               {categorySummary.rows.map((row, i) => (
                 <div key={row.category}>
                   <div className="flex justify-between text-sm">
-                    <span className="text-app-text-primary">{row.category}</span>
+                    <span dir="auto" className="text-app-text-primary">
+                      {row.category}
+                    </span>
                     <span className="font-jbmono text-app-text-secondary">
                       {formatDecimalHours(row.minutes)} · {row.pctOfTotal}%
                     </span>
@@ -202,13 +224,13 @@ export default async function PortalHoursPage(props: {
 
         <div className="overflow-hidden rounded-2xl border border-app-border bg-white">
           <div className="flex items-center justify-between border-b border-app-border px-[18px] py-3.5">
-            <span className="text-[13.5px] font-medium text-app-text-primary">מה נעשה השבוע</span>
+            <span className="text-[13.5px] font-medium text-app-text-primary">{t("thisWeek")}</span>
             <Link href="/app/portal/hours?view=weekly" className="text-xs text-app-text-accent hover:underline">
-              לפי ימים
+              {t("byDays")}
             </Link>
           </div>
           {weekly.topActivities.length === 0 ? (
-            <p className="px-[18px] py-8 text-center text-sm text-app-text-tertiary">אין עדיין פעילות השבוע.</p>
+            <p className="px-[18px] py-8 text-center text-sm text-app-text-tertiary">{t("noActivityThisWeek")}</p>
           ) : (
             weekly.topActivities.map((a, i) => (
               <div
@@ -217,7 +239,9 @@ export default async function PortalHoursPage(props: {
                   i < weekly.topActivities.length - 1 ? "border-b border-app-border" : ""
                 }`}
               >
-                <span className="text-app-text-primary">{a.activity}</span>
+                <span dir="auto" className="text-app-text-primary">
+                  {a.activity}
+                </span>
                 <span className="font-jbmono text-app-text-secondary">{formatDecimalHours(a.minutes)}</span>
               </div>
             ))

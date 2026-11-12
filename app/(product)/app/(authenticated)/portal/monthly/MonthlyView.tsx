@@ -1,14 +1,15 @@
 import type { User } from "@prisma/client";
+import { getFormatter, getTranslations } from "next-intl/server";
+import { TIMEZONE } from "@/lib/timezone";
 import { israelMonthReference } from "@/lib/period-offset";
-import { getMonthlyDetailed } from "@/lib/app-domain/client-portal";
+import { getMonthlyDetailed, type PortalAutoSend } from "@/lib/app-domain/client-portal";
 import { getApprovedSummaries } from "@/lib/app-domain/portal-summary";
 import { ExportMenu } from "@/components/app/ExportMenu";
 import { formatDecimalHours } from "@/lib/hours-format";
 import { MONTHLY_REPORT_ANCHOR } from "../hours/tabs";
 
-function formatMonthTitle(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "Asia/Jerusalem" }).format(date);
-}
+/// Sunday first, as ReportSchedule.dayOfWeek counts them.
+const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
 function monthKey(date: Date) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit" }).format(date);
@@ -37,15 +38,26 @@ export async function MonthlyReportSection({ user, monthOffset }: { user: User; 
   // An unapproved draft never reaches getApprovedSummaries.
   const shownMonth = monthKey(referenceDate);
   const summary = summaries.find((s) => monthKey(s.periodStart) === shownMonth);
+  const t = await getTranslations("portal.monthly");
+  const format = await getFormatter();
+  // ADR 0006: an Israeli month, named in the reader's language; and when
+  // the report goes out by itself, worded here from the schedule rather
+  // than taken as the Hebrew autoSendLabel.
+  const monthTitle = format.dateTime(referenceDate, { month: "long", year: "numeric", timeZone: TIMEZONE });
+  const autoSendText = (autoSend: PortalAutoSend | null): string | null => {
+    if (!autoSend) return null;
+    if (autoSend.frequency === "WEEKLY") return t("autoSendWeekly", { day: t(`weekdays.${WEEKDAY_KEYS[autoSend.dayOfWeek % 7]}`) });
+    return t("autoSendMonthly", { day: String(autoSend.dayOfMonth) });
+  };
   const hoursHref = (offset: number) => `/app/portal/hours?monthOffset=${offset}#${MONTHLY_REPORT_ANCHOR}`;
 
   return (
     <section id={MONTHLY_REPORT_ANCHOR} className="scroll-mt-6 rounded-2xl border border-app-border bg-white p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-[15px] font-medium text-app-text-primary">דוח {formatMonthTitle(referenceDate)}</h2>
+          <h2 className="text-[15px] font-medium text-app-text-primary">{t("title", { month: monthTitle })}</h2>
           <p className="mt-1.5 text-xs text-app-text-secondary">
-            {report.autoSendLabel ?? "פירוט מלא של החודש, להורדה."}
+            {autoSendText(report.autoSend) ?? t("fullDetail")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -53,14 +65,14 @@ export async function MonthlyReportSection({ user, monthOffset }: { user: User; 
             href={hoursHref(monthOffset - 1)}
             className="rounded-full border border-app-border-strong px-4 py-2 text-sm text-app-text-primary hover:border-app-accent"
           >
-            חודש קודם
+            {t("prevMonth")}
           </a>
           {monthOffset < 0 && (
             <a
               href={hoursHref(monthOffset + 1)}
               className="rounded-full border border-app-border-strong px-4 py-2 text-sm text-app-text-primary hover:border-app-accent"
             >
-              חודש הבא
+              {t("nextMonth")}
             </a>
           )}
           <ExportMenu baseHref={`/api/portal/export?monthOffset=${monthOffset}`} primary />
@@ -68,14 +80,18 @@ export async function MonthlyReportSection({ user, monthOffset }: { user: User; 
       </div>
 
       <p className="mt-4 text-sm text-app-text-secondary">
-        שעות החודש:{" "}
-        <span dir="ltr" className="font-jbmono text-app-text-primary">
-          {formatDecimalHours(report.totalMinutes)}
-        </span>
+        {t.rich("monthHours", {
+          hours: formatDecimalHours(report.totalMinutes),
+          h: (chunks) => (
+            <span dir="ltr" className="font-jbmono text-app-text-primary">
+              {chunks}
+            </span>
+          ),
+        })}
       </p>
 
       {summary && (
-        <p className="mt-4 rounded-xl border border-gold/28 bg-app-surface-sunken p-4 text-[13.5px] leading-relaxed text-app-text-primary">
+        <p dir="auto" className="mt-4 rounded-xl border border-gold/28 bg-app-surface-sunken p-4 text-[13.5px] leading-relaxed text-app-text-primary">
           {summary.draft}
         </p>
       )}

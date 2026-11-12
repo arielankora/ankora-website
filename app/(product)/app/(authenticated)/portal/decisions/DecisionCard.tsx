@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { respondToDecisionAction } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
 import { formatMinor } from "@/lib/money";
@@ -29,7 +30,9 @@ function SubmitOption({
   /// changing a decision they did not mean to reopen.
   locked: boolean;
 }) {
-  const price = formatMinor(option.amountMinor);
+  const t = useTranslations("portal.decisionCard");
+  const locale = useLocale();
+  const price = formatMinor(option.amountMinor, locale);
 
   return (
     <button
@@ -42,15 +45,19 @@ function SubmitOption({
       }`}
     >
       <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-app-text-primary">
-        {pending ? "נשלח..." : option.label}
+        {pending ? t("sending") : <bdi dir="auto">{option.label}</bdi>}
         {option.recommended && !pending && (
-          <span className="rounded-full bg-app-accent px-2 py-0.5 text-[11px] font-medium text-app-text-primary">ההמלצה שלנו</span>
+          <span className="rounded-full bg-app-accent px-2 py-0.5 text-[11px] font-medium text-app-text-primary">{t("recommended")}</span>
         )}
       </span>
       <span dir="ltr" className="min-w-[96px] text-page-end font-jbmono text-[13px] text-app-text-primary">
         {price ?? ""}
       </span>
-      {option.detail && <span className="col-span-2 block text-[12.5px] text-app-text-secondary">{option.detail}</span>}
+      {option.detail && (
+        <span dir="auto" className="col-span-2 block text-page-start text-[12.5px] text-app-text-secondary">
+          {option.detail}
+        </span>
+      )}
     </button>
   );
 }
@@ -112,7 +119,9 @@ export function DecisionCard({
     amountMinor: number | null;
     ceilingMinor: number | null;
     aboveCeiling: boolean;
-    dueAt: string | null;
+    /// "נשמח לתשובה עד ..." already worded by the page, which knows the
+    /// due date is an Israeli day (ADR 0006).
+    dueLabel: string | null;
     taskTitle: string | null;
     options: Option[];
   };
@@ -127,6 +136,8 @@ export function DecisionCard({
   /// are still refreshing. Held on the card rather than inside one option
   /// so that answering any option closes all of them.
   const [answered, setAnswered] = useState(false);
+  const t = useTranslations("portal.decisionCard");
+  const locale = useLocale();
 
   /// The answer leaves this page, and it leaves it the way a browser
   /// leaves a page.
@@ -174,23 +185,32 @@ export function DecisionCard({
   return (
     <div className="rounded-2xl border border-app-border bg-white p-5">
       <div className="flex flex-wrap items-center gap-2">
-        {decision.taskTitle && <p className="text-[11.5px] text-app-text-tertiary">{decision.taskTitle}</p>}
-        {decision.dueAt && (
+        {decision.taskTitle && (
+          <p dir="auto" className="text-[11.5px] text-app-text-tertiary">
+            {decision.taskTitle}
+          </p>
+        )}
+        {decision.dueLabel && (
           <span className="rounded-full bg-app-warning-soft px-2.5 py-0.5 text-[11.5px] font-medium text-app-warning">
-            נשמח לתשובה עד{" "}
-            {new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "long", timeZone: "Asia/Jerusalem" }).format(new Date(decision.dueAt))}
+            {decision.dueLabel}
           </span>
         )}
       </div>
-      <p className="mt-1 text-[15px] font-medium text-app-text-primary">{decision.question}</p>
-      {decision.background && <p className="mt-1.5 text-[13px] leading-relaxed text-app-text-secondary">{decision.background}</p>}
+      <p dir="auto" className="mt-1 text-page-start text-[15px] font-medium text-app-text-primary">
+        {decision.question}
+      </p>
+      {decision.background && (
+        <p dir="auto" className="mt-1.5 text-page-start text-[13px] leading-relaxed text-app-text-secondary">
+          {decision.background}
+        </p>
+      )}
 
       {decision.aboveCeiling && (
         // The service agreement asks for the client's approval in writing
         // above the ceiling they set. Saying so on the card is what turns
         // a required signature into an obvious one.
         <p className="mt-3 rounded-[10px] bg-app-info-soft px-3 py-2 text-[12.5px] text-app-info">
-          הסכום גבוה מהתקרה שסוכמה איתך ({formatMinor(decision.ceilingMinor)}), ולכן ההחלטה הזו שלך.
+          {t("aboveCeiling", { ceiling: formatMinor(decision.ceilingMinor, locale) ?? "" })}
         </p>
       )}
 
@@ -207,24 +227,24 @@ export function DecisionCard({
         ))}
       </div>
 
-      {answered && <p className="mt-2.5 text-[12px] text-app-text-secondary">התשובה נקלטה. תודה.</p>}
+      {answered && <p className="mt-2.5 text-[12px] text-app-text-secondary">{t("answered")}</p>}
 
       <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 text-[11.5px] text-app-text-tertiary">
-        <span>{decision.dueAt ? "" : "אין תאריך יעד להחלטה הזו"}</span>
+        <span>{decision.dueLabel ? "" : t("noDueDate")}</span>
         {/* Not a text box. Someone who wants to explain would rather talk,
             and the line they already use is one tap away. */}
         {whatsappHref ? (
           <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="text-app-text-accent hover:underline">
-            לדבר על זה
+            {t("talk")}
           </a>
         ) : (
-          <span className="text-app-text-tertiary">לדבר על זה: זמין בקרוב</span>
+          <span className="text-app-text-tertiary">{t("talkSoon")}</span>
         )}
       </div>
 
       {!canAnswer && (
         <p className="mt-2.5 text-[11.5px] text-app-text-tertiary">
-          רק מנהל הלקוח יכול לאשר. אפשר להעביר את זה אליו, או לדבר איתנו.
+          {t("adminOnly")}
         </p>
       )}
     </div>

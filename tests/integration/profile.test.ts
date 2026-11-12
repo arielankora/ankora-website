@@ -226,6 +226,16 @@ describe("updateOwnLocale()", () => {
     expect(event?.afterJson).toEqual({ locale: "en" });
   });
 
+  // 12.11.2026: the portal is translated, and a client user chooses their
+  // own language like anyone else (the picker is no longer staff only).
+  it("lets a client user choose English too", async () => {
+    const { user } = await createTestUser({ role: "CLIENT_USER" });
+
+    await expect(updateOwnLocale(user, "en")).resolves.toBe("en");
+
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).locale).toBe("en");
+  });
+
   it("refuses anything that is not one of the app's locales, and changes nothing", async () => {
     const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
 

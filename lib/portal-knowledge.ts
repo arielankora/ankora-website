@@ -35,7 +35,20 @@ export type PortalKnowledgeInput = {
   entities: (Knowledge & { name: string; legalName: string | null; country: string | null })[];
 };
 
-export type PortalKnowledgeItem = { text: string; detail?: string | null; tag?: string | null; askToConfirm?: boolean };
+export type PortalKnowledgeItem = {
+  text: string;
+  detail?: string | null;
+  tag?: string | null;
+  askToConfirm?: boolean;
+  /// ADR 0006: the same detail and tag for a screen that words them in the
+  /// reader's language. `detailText` is only what people wrote (never
+  /// translated), `date` the date the Hebrew `detail` writes as "הבא:" or
+  /// "מ-", and `tagCode` names the tag under portal.file.knowledge.tags.
+  /// `detail` and `tag` stay Hebrew for whoever reads them as they are.
+  detailText?: string | null;
+  date?: { kind: "next" | "from"; at: Date } | null;
+  tagCode?: string | null;
+};
 export type PortalKnowledgeGroup = { key: string; title: string; subtitle: string; items: PortalKnowledgeItem[] };
 
 /// Whether the client may see this row. Both gates: the box someone
@@ -73,12 +86,18 @@ export function portalKnowledge(input: PortalKnowledgeInput, now: Date = new Dat
       subtitle: "התהליכים שחוזרים אצלך, ואיפה כל אחד עומד.",
       items: input.processes
         .filter((p) => p.status !== "RETIRED" && shownToClient(p))
-        .map((p) => ({
-          text: p.title,
-          detail: [p.purpose, p.nextDate && p.nextDate.getTime() >= now.getTime() ? `הבא: ${dayLabel(p.nextDate)}` : null].filter(Boolean).join(" · ") || null,
-          tag: HANDOVER_FOR_CLIENT[p.transitionStatus] ?? null,
-          askToConfirm: unsure(p),
-        })),
+        .map((p) => {
+          const next = p.nextDate && p.nextDate.getTime() >= now.getTime() ? p.nextDate : null;
+          return {
+            text: p.title,
+            detail: [p.purpose, next ? `הבא: ${dayLabel(next)}` : null].filter(Boolean).join(" · ") || null,
+            tag: HANDOVER_FOR_CLIENT[p.transitionStatus] ?? null,
+            askToConfirm: unsure(p),
+            detailText: p.purpose || null,
+            date: next ? { kind: "next" as const, at: next } : null,
+            tagCode: HANDOVER_FOR_CLIENT[p.transitionStatus] ? `handover.${p.transitionStatus}` : null,
+          };
+        }),
     },
     {
       key: "rules",
@@ -86,24 +105,37 @@ export function portalKnowledge(input: PortalKnowledgeInput, now: Date = new Dat
       subtitle: "איך ביקשת שנעבוד. אנחנו בודקים כל נוהל מולם.",
       items: input.policies
         .filter((r) => r.status !== "RETIRED" && shownToClient(r))
-        .map((r) => ({
-          text: `${r.title}: ${r.statement}`,
-          detail: r.effectiveFrom && r.effectiveFrom.getTime() > now.getTime() ? `מ-${dayLabel(r.effectiveFrom)}` : null,
-          tag: r.status === "PROPOSED" ? "בהטמעה אצלנו" : null,
-          askToConfirm: unsure(r),
-        })),
+        .map((r) => {
+          const from = r.effectiveFrom && r.effectiveFrom.getTime() > now.getTime() ? r.effectiveFrom : null;
+          return {
+            text: `${r.title}: ${r.statement}`,
+            detail: from ? `מ-${dayLabel(from)}` : null,
+            tag: r.status === "PROPOSED" ? "בהטמעה אצלנו" : null,
+            askToConfirm: unsure(r),
+            detailText: null,
+            date: from ? { kind: "from" as const, at: from } : null,
+            tagCode: r.status === "PROPOSED" ? "policyProposed" : null,
+          };
+        }),
     },
     {
       key: "requests",
       title: "איך פונים אלינו",
       subtitle: "מה מגיע אלינו, ומה קורה איתו.",
-      items: input.requestTypes.filter(shownToClient).map((t) => ({ text: t.title, detail: t.handling, askToConfirm: unsure(t) })),
+      items: input.requestTypes.filter(shownToClient).map((t) => ({ text: t.title, detail: t.handling, askToConfirm: unsure(t), detailText: t.handling })),
     },
     {
       key: "systems",
       title: "מערכות",
       subtitle: "המערכות שאנחנו עובדים בהן עבורך.",
-      items: input.systems.filter(shownToClient).map((s) => ({ text: s.systemName, detail: s.purpose, tag: ACCESS_FOR_CLIENT[s.accessStatus] ?? null, askToConfirm: unsure(s) })),
+      items: input.systems.filter(shownToClient).map((s) => ({
+        text: s.systemName,
+        detail: s.purpose,
+        tag: ACCESS_FOR_CLIENT[s.accessStatus] ?? null,
+        askToConfirm: unsure(s),
+        detailText: s.purpose,
+        tagCode: ACCESS_FOR_CLIENT[s.accessStatus] ? `access.${s.accessStatus}` : null,
+      })),
     },
     {
       key: "facts",
@@ -111,22 +143,30 @@ export function portalKnowledge(input: PortalKnowledgeInput, now: Date = new Dat
       subtitle: "העדפות, דרישות ודברים שחשוב שנזכור.",
       items: input.facts
         .filter((f) => f.kind !== "QUESTION" && !f.closedAt && shownToClient(f))
-        .map((f) => ({ text: f.body, tag: FACT_KIND_LABELS[f.kind as FactKindLike] ?? null, askToConfirm: unsure(f) })),
+        .map((f) => ({
+          text: f.body,
+          tag: FACT_KIND_LABELS[f.kind as FactKindLike] ?? null,
+          askToConfirm: unsure(f),
+          tagCode: FACT_KIND_LABELS[f.kind as FactKindLike] ? `factKind.${f.kind}` : null,
+        })),
     },
     {
       key: "people",
       title: "אנשים וגורמים",
       subtitle: "מי מעורב, ובמה.",
       items: [
-        ...input.contacts.filter(shownToClient).map((c) => ({ text: c.name ?? c.role ?? "", detail: c.name ? c.role : null, askToConfirm: unsure(c) })),
-        ...input.organizations.filter(shownToClient).map((o) => ({ text: o.name, detail: o.role, askToConfirm: unsure(o) })),
+        ...input.contacts.filter(shownToClient).map((c) => ({ text: c.name ?? c.role ?? "", detail: c.name ? c.role : null, askToConfirm: unsure(c), detailText: c.name ? c.role : null })),
+        ...input.organizations.filter(shownToClient).map((o) => ({ text: o.name, detail: o.role, askToConfirm: unsure(o), detailText: o.role })),
       ].filter((i) => i.text),
     },
     {
       key: "entities",
       title: "ישויות",
       subtitle: "החברות שעבורן אנחנו עובדים.",
-      items: input.entities.filter(shownToClient).map((e) => ({ text: e.name, detail: [e.legalName, e.country].filter(Boolean).join(" · ") || null, askToConfirm: unsure(e) })),
+      items: input.entities.filter(shownToClient).map((e) => {
+        const detail = [e.legalName, e.country].filter(Boolean).join(" · ") || null;
+        return { text: e.name, detail, askToConfirm: unsure(e), detailText: detail };
+      }),
     },
   ];
   // An empty group is not shown: the screen is for what is there.
