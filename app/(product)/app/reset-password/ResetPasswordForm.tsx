@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
+import { useTranslations } from "next-intl";
 import { resetPasswordAction } from "./actions";
 
 // Kept in sync with lib/app-auth/password.ts's PASSWORD_MIN_LENGTH (10) -
@@ -13,13 +14,14 @@ const STRONG_LENGTH = 12;
 
 function SubmitButton() {
   const { pending } = useFormStatus();
+  const t = useTranslations("auth.reset");
   return (
     <button
       type="submit"
       disabled={pending}
       className="mt-5 min-h-[50px] w-full rounded-full bg-app-accent text-[15px] font-medium text-app-text-primary disabled:opacity-50"
     >
-      {pending ? "שומר…" : "שמירה וכניסה"}
+      {pending ? t("saving") : t("save")}
     </button>
   );
 }
@@ -39,18 +41,19 @@ function SubmitButton() {
 export function ResetPasswordForm({ token }: { token: string }) {
   const [state, formAction] = useFormState(resetPasswordAction, {});
   const [password, setPassword] = useState("");
+  const t = useTranslations("auth.reset");
 
   const score = password.length >= STRONG_LENGTH ? 3 : password.length >= MIN_LENGTH ? 2 : password.length > 0 ? 1 : 0;
   const barColor = score === 1 ? "bg-app-error" : score === 2 ? "bg-gold" : score === 3 ? "bg-app-success" : "bg-app-border";
   const label =
-    score === 0 ? "בחרו סיסמה" : score === 1 ? "חלשה — קצרה מדי" : score === 2 ? "בינונית" : "חזקה";
+    score === 0 ? t("strength.empty") : score === 1 ? t("strength.weak") : score === 2 ? t("strength.medium") : t("strength.strong");
 
   if (state?.done) {
     return (
       <div className="space-y-4">
-        <p className="text-[13px] text-app-text-secondary">הסיסמה נקבעה בהצלחה.</p>
+        <p className="text-[13px] text-app-text-secondary">{t("done")}</p>
         <Link href="/app/login" className="block text-center text-sm text-app-text-accent underline">
-          מעבר להתחברות
+          {t("goToSignIn")}
         </Link>
       </div>
     );
@@ -60,7 +63,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
     <form action={formAction}>
       <input type="hidden" name="token" value={token} />
       <label className="block">
-        <span className="mb-1.5 block text-xs text-app-text-secondary">סיסמה חדשה</span>
+        <span className="mb-1.5 block text-xs text-app-text-secondary">{t("newPassword")}</span>
         <input
           name="password"
           type="password"
@@ -69,7 +72,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
           minLength={MIN_LENGTH}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-page-start text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </label>
 
@@ -81,14 +84,14 @@ export function ResetPasswordForm({ token }: { token: string }) {
       <p className="mt-1.5 text-xs text-app-text-secondary">{label}</p>
 
       <label className="mt-3.5 block">
-        <span className="mb-1.5 block text-xs text-app-text-secondary">אימות סיסמה</span>
+        <span className="mb-1.5 block text-xs text-app-text-secondary">{t("confirm")}</span>
         <input
           name="confirm"
           type="password"
           dir="ltr"
           required
           minLength={MIN_LENGTH}
-          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-page-start text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </label>
 

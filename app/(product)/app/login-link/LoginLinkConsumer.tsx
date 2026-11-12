@@ -2,18 +2,20 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
+import { useTranslations } from "next-intl";
 import { consumeLoginLinkAction } from "./actions";
 import { SecondFactorStep } from "../login/SecondFactorStep";
 
 function Submit() {
   const { pending } = useFormStatus();
+  const t = useTranslations("auth.link");
   return (
     <button
       type="submit"
       disabled={pending}
       className="mt-5 min-h-[50px] w-full rounded-full bg-app-accent text-[15px] font-medium text-app-text-primary disabled:opacity-50"
     >
-      {pending ? "מתחבר…" : "כניסה לפורטל"}
+      {pending ? t("submitting") : t("submit")}
     </button>
   );
 }
@@ -28,6 +30,7 @@ function Submit() {
 // blocked.
 export function LoginLinkConsumer({ token }: { token: string }) {
   const [state, formAction] = useFormState(consumeLoginLinkAction, {});
+  const t = useTranslations("auth.link");
   const formRef = useRef<HTMLFormElement>(null);
   const submitted = useRef(false);
 
@@ -63,12 +66,12 @@ export function LoginLinkConsumer({ token }: { token: string }) {
             href="/app/login-link/request"
             className="mt-5 flex min-h-[50px] w-full items-center justify-center rounded-full bg-app-accent text-[15px] font-medium text-app-text-primary"
           >
-            שליחת קישור חדש
+            {t("sendNew")}
           </Link>
         </>
       ) : (
         <>
-          <p className="text-[13.5px] text-app-text-secondary">רגע אחד, מכניסים אותך לפורטל.</p>
+          <p className="text-[13.5px] text-app-text-secondary">{t("signingIn")}</p>
           <Submit />
         </>
       )}

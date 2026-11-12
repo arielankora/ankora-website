@@ -1,3 +1,4 @@
+import { authErrorText } from "@/lib/i18n/auth-errors";
 import { requireUserOrThrow, UnauthorizedError } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { stepUpWithPassword, StepUpFailedError, StepUpLockedError, PasskeyRequiredError } from "@/lib/app-auth/step-up";
@@ -39,9 +40,9 @@ export async function POST(req: Request) {
     const grant = await stepUpWithPassword(user, password);
     return json({ ok: true, expiresAt: grant.expiresAt.toISOString() }, 200);
   } catch (err) {
-    if (err instanceof PasskeyRequiredError) return json({ error: "passkey_required", message: err.message }, 403);
-    if (err instanceof StepUpLockedError) return json({ error: "locked", message: err.message }, 429);
-    if (err instanceof StepUpFailedError) return json({ error: "wrong_password", message: err.message }, 401);
+    if (err instanceof PasskeyRequiredError) return json({ error: "passkey_required", message: await authErrorText(err) }, 403);
+    if (err instanceof StepUpLockedError) return json({ error: "locked", message: await authErrorText(err) }, 429);
+    if (err instanceof StepUpFailedError) return json({ error: "wrong_password", message: await authErrorText(err) }, 401);
     throw err;
   }
 }

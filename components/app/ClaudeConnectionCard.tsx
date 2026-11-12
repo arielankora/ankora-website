@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useFormatter, useTranslations } from "next-intl";
 import { SITE_URL } from "@/lib/site";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { CopyValue } from "@/components/app/CopyValue";
@@ -33,25 +34,14 @@ export const MCP_CONNECTOR_URL = `${SITE_URL}/api/mcp`;
 /// would create a second copy to keep in sync.
 export const MCP_GUIDE_HREF = "/app/guide#mcp-claude";
 
-function formatDateTime(date: Date | null): string | null {
-  if (!date) return null;
-  return new Intl.DateTimeFormat("he-IL", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Jerusalem",
-  }).format(date);
-}
+type Format = ReturnType<typeof useFormatter>;
 
-function formatDate(date: Date | null): string | null {
-  if (!date) return null;
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
-}
-
-function toGrantRow(grant: ClaudeConnectionStatus["grants"][number]): GrantRow {
+// ADR 0006: dates in the reader's locale and time zone (i18n/request.ts).
+function toGrantRow(grant: ClaudeConnectionStatus["grants"][number], format: Format): GrantRow {
   return {
     id: grant.id,
     label: grant.label,
-    expiresLabel: formatDate(grant.expiresAt),
+    expiresLabel: grant.expiresAt ? format.dateTime(grant.expiresAt, { dateStyle: "medium" }) : null,
     isBridge: grant.kind === "PAT",
   };
 }
@@ -63,7 +53,9 @@ export function ClaudeConnectionCard({
   status: ClaudeConnectionStatus;
   orgSummary?: ClaudeOrgSummary | null;
 }) {
-  const lastUsedLabel = formatDateTime(status.lastUsedAt);
+  const t = useTranslations("claude");
+  const format = useFormatter();
+  const lastUsedLabel = status.lastUsedAt ? format.dateTime(status.lastUsedAt, { dateStyle: "medium", timeStyle: "short" }) : null;
 
   return (
     <div className="rounded-2xl border border-app-border bg-white p-6">
@@ -73,26 +65,24 @@ export function ClaudeConnectionCard({
           <p className="mt-0.5 text-xs text-app-text-tertiary">Model Context Protocol</p>
         </div>
         <StatusBadge
-          label={status.connected ? "מחובר" : "לא מחובר"}
+          label={status.connected ? t("connected") : t("notConnected")}
           tone={status.connected ? "green" : "gray"}
         />
       </div>
 
       <p className="mt-3 text-sm leading-relaxed text-app-text-secondary">
-        {status.connected
-          ? "Claude מחובר לחשבון שלכם ויכול להפעיל טיימר, לדווח זמן ולקרוא את הדיווחים שלכם - תמיד בהרשאות שלכם בלבד."
-          : "אפשר לחבר את Claude לחשבון שלכם ולנהל דיווחי זמן בשיחה - להפעיל טיימר, לסגור אותו ולדווח שעות, בלי לפתוח את המערכת."}
+        {status.connected ? t("connectedIntro") : t("notConnectedIntro")}
       </p>
 
       {status.connected ? (
         <dl className="mt-4 space-y-2 border-t border-app-border pt-4 text-sm">
           <div className="flex items-center justify-between gap-3">
-            <dt className="text-app-text-tertiary">חיבורים פעילים</dt>
+            <dt className="text-app-text-tertiary">{t("activeConnections")}</dt>
             <dd className="font-medium text-app-text-primary">{status.grants.length}</dd>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <dt className="text-app-text-tertiary">פעילות אחרונה</dt>
-            <dd className="font-medium text-app-text-primary">{lastUsedLabel ?? "טרם היה שימוש"}</dd>
+            <dt className="text-app-text-tertiary">{t("lastActivity")}</dt>
+            <dd className="font-medium text-app-text-primary">{lastUsedLabel ?? t("neverUsed")}</dd>
           </div>
           {/* Listed one by one because "two connections" with no way to
               tell them apart is not actionable - a person revoking an old
@@ -101,28 +91,28 @@ export function ClaudeConnectionCard({
               so the client half never needs its own opinion about
               timezones. */}
           <div className="pt-1">
-            <dt className="sr-only">רשימת החיבורים</dt>
+            <dt className="sr-only">{t("connectionList")}</dt>
             <dd>
-              <ClaudeGrantList grants={status.grants.map(toGrantRow)} />
+              <ClaudeGrantList grants={status.grants.map((g) => toGrantRow(g, format))} />
             </dd>
           </div>
         </dl>
       ) : (
         <div className="mt-4 space-y-2 border-t border-app-border pt-4">
-          <p className="text-xs font-medium text-app-text-tertiary">כתובת החיבור</p>
-          <CopyValue value={MCP_CONNECTOR_URL} label="העתקת כתובת החיבור" />
+          <p className="text-xs font-medium text-app-text-tertiary">{t("connectorUrl")}</p>
+          <CopyValue value={MCP_CONNECTOR_URL} label={t("copyConnectorUrl")} />
         </div>
       )}
 
       {orgSummary && (
         <p className="mt-4 rounded-lg bg-app-surface-sunken px-3 py-2 text-xs text-app-text-secondary">
-          {orgSummary.connectedUsers} מתוך {orgSummary.eligibleUsers} משתמשי Ankora חיברו את Claude לחשבון שלהם.
+          {t("orgSummary", { connected: orgSummary.connectedUsers, eligible: orgSummary.eligibleUsers })}
         </p>
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-4">
         <Link href={MCP_GUIDE_HREF} className="text-sm font-medium text-app-text-accent hover:underline">
-          איך מחברים את Claude →
+          {t("howTo")}
         </Link>
         {/* The card now owns disconnection (the "ניתוק" button on each
             row above), so this line no longer has to stand in for a
@@ -130,7 +120,7 @@ export function ClaudeConnectionCard({
             a grant, which people do still run into. */}
         {status.connected && (
           <span className="text-xs text-app-text-tertiary">
-            ניתוק כאן מבטל את ההרשאה מיידית. גם שינוי סיסמה עושה זאת.
+            {t("revokeNote")}
           </span>
         )}
       </div>

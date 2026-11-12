@@ -44,6 +44,12 @@ describe("app dictionaries (ADR 0006)", () => {
     expect(empty).toEqual([]);
   });
 
+  it("use the same tags in both languages", () => {
+    const tagsOf = (v: string) => [...v.matchAll(/<(\w+)>/g)].map((m) => m[1]).sort().join(",");
+    const mismatched = [...heLeaves].filter(([key, value]) => tagsOf(value) !== tagsOf(enLeaves.get(key) ?? "")).map(([key]) => key);
+    expect(mismatched).toEqual([]);
+  });
+
   it("use the same placeholders in both languages", () => {
     const mismatched = [...heLeaves]
       .filter(([key, value]) => JSON.stringify(argumentNames(value)) !== JSON.stringify(argumentNames(enLeaves.get(key) ?? "")))
@@ -65,7 +71,12 @@ describe("app dictionaries (ADR 0006)", () => {
       });
       for (const [key, value] of flat) {
         const args = Object.fromEntries(argumentNames(value).map((name) => [name, name === "count" || name === "hours" || name === "min" ? 3 : "x"]));
-        const out = (t as any)(key, args) as string;
+        // A message with tags (<name></name>) is rendered through t.rich,
+        // the way the screens render it, with each tag given a handler.
+        const tags = [...value.matchAll(/<(\w+)>/g)].map((m) => m[1]);
+        const out = tags.length
+          ? JSON.stringify((t as any).rich(key, { ...args, ...Object.fromEntries(tags.map((tag) => [tag, () => `[${tag}]`])) }))
+          : ((t as any)(key, args) as string);
         if (out.includes("{")) failures.push(`${locale}: ${key} left a placeholder: ${out}`);
       }
     }

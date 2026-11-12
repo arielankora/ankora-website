@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { getCurrentUser } from "@/lib/app-auth/session";
 import { CONFIDENTIALITY_SIGN_PATH, confidentialitySignatures, mustSignConfidentiality } from "@/lib/agreements";
 import { getClient } from "@/lib/mcp/oauth/store";
@@ -42,6 +43,7 @@ function Problem({ title, detail }: { title: string; detail: string }) {
 
 export default async function ConsentPage(props: { searchParams: Promise<Params> }) {
   const sp = await props.searchParams;
+  const t = await getTranslations("auth.consent");
 
   const clientId = sp.client_id ?? "";
   const redirectUri = sp.redirect_uri ?? "";
@@ -55,16 +57,16 @@ export default async function ConsentPage(props: { searchParams: Promise<Params>
   if (!client || !redirectUri || !codeChallenge || !codeChallengeMethod) {
     return (
       <Problem
-        title="Invalid connection request"
-        detail="This link is incomplete or has expired. Start the connection again from Claude."
+        title={t("invalidRequestTitle")}
+        detail={t("invalidRequestDetail")}
       />
     );
   }
   if (!findMatchingRedirectUri(redirectUri, client.redirectUris)) {
     return (
       <Problem
-        title="Invalid redirect address"
-        detail="The address this application asked to be returned to is not one it registered. Nothing was shared."
+        title={t("invalidRedirectTitle")}
+        detail={t("invalidRedirectDetail")}
       />
     );
   }
@@ -82,34 +84,38 @@ export default async function ConsentPage(props: { searchParams: Promise<Params>
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6" dir="rtl">
-      <h1 className="text-xl font-semibold text-app-text-primary">חיבור Claude לאנקורה</h1>
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
+      <h1 className="text-xl font-semibold text-app-text-primary">{t("title")}</h1>
       <p className="mt-2 text-sm leading-relaxed text-app-text-secondary">
-        אתה מחובר כ־<strong className="font-medium text-app-text-primary">{user.name}</strong> ({user.email}).
+        {t.rich("signedInAs", {
+          name: () => (
+            <strong dir="auto" className="font-medium text-app-text-primary">
+              {user.name}
+            </strong>
+          ),
+          email: user.email,
+        })}
       </p>
 
       <div className="mt-6 rounded-lg border border-app-border bg-app-surface-page p-4 text-sm leading-relaxed text-app-text-primary">
-        <p className="font-medium text-app-text-primary">מה Claude יוכל לעשות</p>
+        <p className="font-medium text-app-text-primary">{t("canDo")}</p>
         {user.role === "CLIENT_USER" ? (
           // A portal user connects the portal connector (/api/mcp/portal),
           // which reads what their portal shows and answers decisions -
           // nothing about timers or other clients applies to them.
           <ul className="mt-2 list-disc space-y-1 pe-5">
-            <li>לראות את סטטוס המשימות שאנקורה מטפלת בהן עבורכם, כפי שהן מופיעות בפורטל</li>
-            <li>לקרוא את הדוח השבועי, הדוח החודשי ובנק השעות</li>
-            <li>לראות החלטות שממתינות לכם, ולענות עליהן בשמכם אם אתם מנהלי החשבון</li>
+            <li>{t("portal.tasks")}</li>
+            <li>{t("portal.reports")}</li>
+            <li>{t("portal.decisions")}</li>
           </ul>
         ) : (
           <ul className="mt-2 list-disc space-y-1 pe-5">
-            <li>לראות את הלקוחות והקטגוריות שאתה רשאי לדווח עליהם</li>
-            <li>לקרוא את דיווחי הזמן שלך</li>
-            <li>להפעיל ולעצור טיימר, ולרשום זמן בשמך</li>
+            <li>{t("staff.clients")}</li>
+            <li>{t("staff.entries")}</li>
+            <li>{t("staff.timer")}</li>
           </ul>
         )}
-        <p className="mt-3 text-app-text-secondary">
-          Claude פועל בהרשאות שלך בלבד — בדיוק מה שאתה רואה במערכת, לא יותר. מחיקה אינה אפשרית דרך החיבור
-          הזה.
-        </p>
+        <p className="mt-3 text-app-text-secondary">{t("permissions")}</p>
       </div>
 
       <form method="POST" action="/api/mcp/oauth/consent" className="mt-6 flex gap-3">
@@ -126,7 +132,7 @@ export default async function ConsentPage(props: { searchParams: Promise<Params>
           value="approve"
           className="flex-1 rounded-md bg-app-surface-nav px-4 py-2.5 text-sm font-medium text-cream transition hover:opacity-90"
         >
-          אישור חיבור
+          {t("approve")}
         </button>
         <button
           type="submit"
@@ -134,7 +140,7 @@ export default async function ConsentPage(props: { searchParams: Promise<Params>
           value="deny"
           className="flex-1 rounded-md border border-app-border-strong px-4 py-2.5 text-sm font-medium text-app-text-primary transition hover:bg-app-surface-sunken"
         >
-          ביטול
+          {t("deny")}
         </button>
       </form>
     </main>

@@ -39,21 +39,27 @@ export async function requestPasswordReset(identifier: string): Promise<string |
   return raw;
 }
 
+/// ADR 0006: why a reset was refused, so the screen can say it in the
+/// reader's language. `error` stays the Hebrew sentence.
+export type PasswordResetErrorCode = "password_too_short" | "password_too_common" | "link_invalid" | "account_inactive";
+
 export async function consumePasswordResetToken(
   raw: string,
   newPassword: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true } | { ok: false; error: string; code: PasswordResetErrorCode }> {
   const policy = validatePasswordPolicy(newPassword);
-  if (!policy.valid) return { ok: false, error: policy.reason! };
+  if (!policy.valid) {
+    return { ok: false, error: policy.reason!, code: policy.code === "too_common" ? "password_too_common" : "password_too_short" };
+  }
 
   const tokenHash = hashToken(raw);
   const token = await prisma.passwordResetToken.findUnique({ where: { tokenHash }, include: { user: true } });
 
   if (!token || token.usedAt || token.expiresAt.getTime() < Date.now()) {
-    return { ok: false, error: "הקישור אינו תקין או שפג תוקפו." };
+    return { ok: false, error: "הקישור אינו תקין או שפג תוקפו.", code: "link_invalid" };
   }
   if (token.user.deletedAt || token.user.status === "ARCHIVED") {
-    return { ok: false, error: "החשבון אינו פעיל." };
+    return { ok: false, error: "החשבון אינו פעיל.", code: "account_inactive" };
   }
 
   const passwordHash = await hashPassword(newPassword);

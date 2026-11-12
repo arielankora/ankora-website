@@ -47,8 +47,15 @@ import {
 const CHALLENGE_TTL_MS = 5 * 60_000;
 const RP_NAME = "Ankora";
 
+/// ADR 0006: the code names the failure, so a screen in either language
+/// can say it; the Hebrew message is what existing callers show.
+export type PasskeyErrorCode = "request_expired" | "not_verified" | "not_found" | "none_set";
+
 export class PasskeyError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly code: PasskeyErrorCode = "not_verified",
+  ) {
     super(message);
     this.name = "PasskeyError";
   }
@@ -110,7 +117,7 @@ async function consumeChallenge(userId: string, purpose: ChallengePurpose): Prom
   const rows = await prisma.webAuthnChallenge.findMany({ where: { userId, purpose } });
   await prisma.webAuthnChallenge.deleteMany({ where: { userId, purpose } });
   const live = rows.find((r) => r.expiresAt.getTime() > Date.now());
-  if (!live) throw new PasskeyError("פג תוקף הבקשה. נסו שוב.");
+  if (!live) throw new PasskeyError("פג תוקף הבקשה. נסו שוב.", "request_expired");
   return live.challenge;
 }
 
@@ -165,9 +172,9 @@ export async function finishPasskeyRegistration(
       requireUserVerification: true,
     });
   } catch {
-    throw new PasskeyError("ה-passkey לא אומת. נסו שוב.");
+    throw new PasskeyError("ה-passkey לא אומת. נסו שוב.", "not_verified");
   }
-  if (!verification.verified) throw new PasskeyError("ה-passkey לא אומת. נסו שוב.");
+  if (!verification.verified) throw new PasskeyError("ה-passkey לא אומת. נסו שוב.", "not_verified");
 
   const info = verification.registrationInfo;
   const label = (name ?? "").trim().slice(0, 60) || "Passkey";
@@ -206,7 +213,7 @@ export async function finishPasskeyRegistration(
 
 export async function removeMyPasskey(actor: User, id: string) {
   const row = await prisma.passkey.findFirst({ where: { id, userId: actor.id }, select: { id: true, name: true } });
-  if (!row) throw new PasskeyError("ה-passkey לא נמצא.");
+  if (!row) throw new PasskeyError("ה-passkey לא נמצא.", "not_found");
   await prisma.passkey.delete({ where: { id } });
   // A client who asked for a passkey at every sign-in and just removed the
   // last one would otherwise be sent to enrol one at the next sign-in; the
@@ -231,7 +238,7 @@ export async function beginPasskeyStepUp(actor: User, rp: RelyingParty) {
     where: { userId: actor.id },
     select: { credentialId: true, transports: true },
   });
-  if (passkeys.length === 0) throw new PasskeyError("לא הוגדר passkey.");
+  if (passkeys.length === 0) throw new PasskeyError("לא הוגדר passkey.", "none_set");
   const options = await generateAuthenticationOptions({
     rpID: rp.rpID,
     allowCredentials: passkeys.map((p) => ({ id: p.credentialId, transports: p.transports as any })),
@@ -290,7 +297,7 @@ export async function beginPasskeyLogin(userId: string, rp: RelyingParty) {
     where: { userId },
     select: { credentialId: true, transports: true },
   });
-  if (passkeys.length === 0) throw new PasskeyError("לא הוגדר passkey.");
+  if (passkeys.length === 0) throw new PasskeyError("לא הוגדר passkey.", "none_set");
   const options = await generateAuthenticationOptions({
     rpID: rp.rpID,
     allowCredentials: passkeys.map((p) => ({ id: p.credentialId, transports: p.transports as any })),

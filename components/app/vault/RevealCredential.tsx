@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Copy, Check, Fingerprint, KeyRound, Lock } from "lucide-react";
-import { verifyWithPasskey } from "./webauthn-client";
+import { useTranslations } from "next-intl";
+import { verifyWithPasskey, webauthnFailureText } from "./webauthn-client";
 
 // The one place in the browser where a client's login appears
 // (claude/credentials-vault-spec-2026-10-06.md, "חוויית המסך").
@@ -50,6 +51,9 @@ async function postJson(url: string, body: unknown) {
 
 export function RevealCredential({ credentialId, taskId }: { credentialId: string; taskId?: string }) {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
+  // ADR 0006: only the passkey failures are worded by the dictionary so
+  // far; the rest of this screen is translated with the credentials area.
+  const tWebauthn = useTranslations("auth.webauthn");
   const [now, setNow] = useState(() => Date.now());
   const copied = useRef(false);
 
@@ -75,7 +79,7 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
     setPhase({ kind: "loading" });
     const r = await verifyWithPasskey();
     if (r.ok) return reveal();
-    setPhase({ kind: "step-up", methods, error: r.message });
+    setPhase({ kind: "step-up", methods, error: webauthnFailureText(r, tWebauthn) });
   }
 
   async function stepUp(e: FormEvent<HTMLFormElement>) {

@@ -1,3 +1,4 @@
+import { authErrorText } from "@/lib/i18n/auth-errors";
 import { beginPasskeyRegistration, relyingPartyFor } from "@/lib/app-auth/passkeys";
 import { StepUpFailedError, StepUpLockedError } from "@/lib/app-auth/step-up";
 import { json, openJsonRoute } from "@/lib/app-auth/json-route";
@@ -19,8 +20,8 @@ export async function POST(req: Request) {
     const options = await beginPasskeyRegistration(user, body.password, relyingPartyFor(req.headers));
     return json(options, 200);
   } catch (err) {
-    if (err instanceof StepUpLockedError) return json({ error: "locked", message: err.message }, 429);
-    if (err instanceof StepUpFailedError) return json({ error: "wrong_password", message: err.message }, 401);
+    if (err instanceof StepUpLockedError) return json({ error: "locked", message: await authErrorText(err) }, 429);
+    if (err instanceof StepUpFailedError) return json({ error: "wrong_password", message: await authErrorText(err) }, 401);
     throw err;
   }
 }

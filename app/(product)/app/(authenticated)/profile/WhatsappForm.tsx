@@ -35,7 +35,7 @@ export function WhatsappForm({ whatsappNumber }: { whatsappNumber: string | null
           maxLength={30}
           placeholder="050-000-0000"
           data-testid="profile-whatsapp"
-          className="w-full rounded-lg border border-app-border-strong bg-white px-3.5 py-2.5 text-end text-sm text-app-text-primary outline-none focus:border-gold"
+          className="w-full rounded-lg border border-app-border-strong bg-white px-3.5 py-2.5 text-page-start text-sm text-app-text-primary outline-none focus:border-gold"
         />
         <span className="mt-1.5 block text-[11.5px] text-app-text-tertiary">
           {t("whatsapp.hint")}

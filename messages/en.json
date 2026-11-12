@@ -98,6 +98,10 @@
       "title": "Page not found",
       "body": "This address does not exist, or you do not have permission to view it.",
       "home": "Back to home"
+    },
+    "copy": {
+      "copy": "Copy",
+      "copied": "Copied"
     }
   },
   "profile": {
@@ -162,6 +166,223 @@
       "whatsapp_characters": "A WhatsApp number can contain only digits, spaces, hyphens and +.",
       "whatsapp_invalid": "This WhatsApp number does not look valid.",
       "locale_invalid": "Please choose a language from the list."
+    },
+    "passkeys": {
+      "introStaff": "Two-step verification at every sign-in, and an identity check before viewing a client's access details. With your fingerprint or face, and the key stays on your device.",
+      "introClient": "An extra layer of protection for the portal: after your password or the email link, confirm with your fingerprint or face. The key stays on your device.",
+      "requiredNote": "To view access details in Systems and access, you need at least one passkey.",
+      "secondDeviceNote": "We recommend adding a second device, such as a phone, so losing one does not lock you out. Create a code here, and type it on the new device after your password.",
+      "added": "Added {date}",
+      "lastUsed": "last used {date}",
+      "neverUsed": "not used yet",
+      "backedUp": "backed up to the device account",
+      "remove": "Remove",
+      "addDevice": "Add a device",
+      "addDeviceHint": "To sign in from a phone or another computer. Confirm here with your fingerprint, and on the new device type the code after your password, by choosing \"This is a new device\".",
+      "codeValidUntil": "Valid until {time}, for one use.",
+      "waiting": "Waiting for the device...",
+      "createCode": "Create a code for a new device",
+      "unsupported": "This browser does not support passkeys.",
+      "deviceName": "Device name",
+      "yourPassword": "Your Ankora password",
+      "continueTouchId": "Continue to Touch ID",
+      "cancel": "Cancel",
+      "registerAnother": "Register another key in this browser or device",
+      "addPasskey": "Add a passkey",
+      "loginRequired": "Two-step verification at every sign-in: <state></state>",
+      "on": "On",
+      "off": "Off",
+      "turnOff": "Turn off",
+      "turnOn": "Turn on",
+      "turnOffTwoStep": "Turn off two-step verification",
+      "turnOnTwoStep": "Turn on two-step verification",
+      "staffAlwaysOn": "For the Ankora team, two-step verification is always on."
+    }
+  },
+  "auth": {
+    "secondFactor": {
+      "verifyCancelled": "Verification was cancelled. If this device has no passkey, choose \"This is a new device\" below.",
+      "verifyIncomplete": "The device did not complete the verification.",
+      "enrollCancelled": "Registration was cancelled. You can try again.",
+      "enrollIncomplete": "The device did not complete the registration.",
+      "titlePasskey": "Two-step verification",
+      "titleCode": "Add this device",
+      "titleEnroll": "Set up two-step verification",
+      "introPasskey": "Your password is correct. Now confirm on your device: fingerprint, face or device PIN.",
+      "introCode": "On a device where you are already signed in to Ankora, such as your computer, open My profile and choose \"Add a device\". After your fingerprint, a 6-digit code appears there. Type it here.",
+      "introLinked": "The code was accepted. Now register this device, and from next time sign in on it with your password and your face or fingerprint.",
+      "introEnroll": "This account requires verification on your device at every sign-in. Register the device once, and from now on sign in with your password and your fingerprint. It is a good idea to register a second device later, from your profile.",
+      "backToSignIn": "Back to sign in",
+      "waitingForDevice": "Waiting for the device…",
+      "verifyOnDevice": "Verify on this device",
+      "newDevice": "This is a new device without a passkey",
+      "codeLabel": "Code from the signed-in device",
+      "checking": "Checking…",
+      "continue": "Continue",
+      "backToVerify": "Back to device verification",
+      "deviceNameLabel": "Device name",
+      "deviceNamePhone": "For example: Dana's iPhone",
+      "deviceNameComputer": "For example: Dana's MacBook",
+      "enrollAndSignIn": "Register the device and sign in"
+    },
+    "shell": {
+      "tagline": "Operational intelligence that gives you time back.",
+      "restricted": "Ankora's internal operations system. Access is limited to authorized users."
+    },
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Sign in with your email address or your organization username.",
+      "passwordChanged": "Your password was changed. Please sign in again.",
+      "privacy": "Privacy policy",
+      "terms": "Terms of use",
+      "identifier": "Email or username",
+      "password": "Password",
+      "submit": "Sign in",
+      "submitting": "Signing in…",
+      "forgot": "Forgot password",
+      "emailLink": "Sign in with an email link",
+      "genericError": "The sign-in details are incorrect, or the account is temporarily locked."
+    },
+    "errors": {
+      "secondFactor": {
+        "expired": "The sign-in has expired. Start again from your password.",
+        "passkey_not_verified": "The passkey was not verified. Start again from your password.",
+        "no_device_code": "There is no valid code. Create a new code on a device where you are signed in.",
+        "too_many_attempts": "Too many attempts. Create a new code and start again from your password.",
+        "wrong_code": "The code is incorrect. Try again.",
+        "already_has_passkey": "This account already has a passkey. Sign in with it, or add this device with a code from a signed-in device.",
+        "staff_always_on": "For the Ankora team, two-step verification is always on.",
+        "add_passkey_first": "Add a passkey first, then turn this on."
+      },
+      "passkey": {
+        "request_expired": "The request expired. Try again.",
+        "not_verified": "The passkey was not verified. Try again.",
+        "not_found": "The passkey was not found.",
+        "none_set": "No passkey is set up."
+      },
+      "stepUp": {
+        "step_up_locked": "Too many verification attempts. You can try again in fifteen minutes.",
+        "step_up_failed": "The password is incorrect.",
+        "passkey_required": "Viewing access details requires a passkey (Touch ID). You can set one up in \"My profile\".",
+        "verify_failed": "Verification failed."
+      }
+    },
+    "forgot": {
+      "title": "Reset your password",
+      "subtitle": "We will send a reset link to your email address. The link is valid for one hour.",
+      "send": "Send link",
+      "sending": "Sending…",
+      "submitted": "If an active account matches the details you entered, a password reset link valid for one hour has been sent to it.",
+      "devLink": "No email provider is connected yet (Phase 4). Test link:",
+      "backToSignIn": "Back to sign in",
+      "email": "Email",
+      "privacyNote": "If the address exists in the system, an email will be sent. For security reasons we do not say whether it exists."
+    },
+    "reset": {
+      "title": "Choose a new password",
+      "subtitle": "At least {min} characters.",
+      "save": "Save and sign in",
+      "saving": "Saving…",
+      "strength": {
+        "empty": "Choose a password",
+        "weak": "Weak, too short",
+        "medium": "Medium",
+        "strong": "Strong"
+      },
+      "done": "Your password has been set.",
+      "goToSignIn": "Go to sign in",
+      "newPassword": "New password",
+      "confirm": "Confirm password",
+      "requestNew": "Request a new reset link",
+      "backToSignIn": "Back to sign in",
+      "errors": {
+        "mismatch": "The passwords do not match.",
+        "password_too_short": "The password must be at least {min} characters long.",
+        "password_too_common": "This password is too common. Please choose a stronger one.",
+        "link_invalid": "The link is invalid or has expired.",
+        "account_inactive": "The account is not active."
+      }
+    },
+    "link": {
+      "title": "Portal sign in",
+      "subtitle": "A one-time link, no password.",
+      "submit": "Enter the portal",
+      "submitting": "Signing in…",
+      "invalid": "The link is invalid or has expired.",
+      "sendNew": "Send a new link",
+      "signingIn": "One moment, signing you in to the portal.",
+      "withPassword": "Sign in with a password",
+      "requestTitle": "Sign in with a link",
+      "requestSubtitle": "We will send a one-time sign-in link to your email address. No password needed.",
+      "send": "Send sign-in link",
+      "sending": "Sending…",
+      "submitted": "If a portal account matches the address you entered, a sign-in link valid for 15 minutes has been sent to it.",
+      "devLink": "Development environment, test link:",
+      "email": "Email",
+      "privacyNote": "The link is sent only to an address registered as a portal user. For security reasons we do not say whether it exists."
+    },
+    "consent": {
+      "invalidRequestTitle": "Invalid connection request",
+      "invalidRequestDetail": "This link is incomplete or has expired. Start the connection again from Claude.",
+      "invalidRedirectTitle": "Invalid redirect address",
+      "invalidRedirectDetail": "The address this application asked to be returned to is not one it registered. Nothing was shared.",
+      "title": "Connect Claude to Ankora",
+      "signedInAs": "You are signed in as <name></name> ({email}).",
+      "canDo": "What Claude will be able to do",
+      "portal": {
+        "tasks": "See the status of the tasks Ankora handles for you, as they appear in the portal",
+        "reports": "Read the weekly report, the monthly report and the hour bank",
+        "decisions": "See decisions waiting for you, and answer them on your behalf if you are an account admin"
+      },
+      "staff": {
+        "clients": "See the clients and categories you may log time for",
+        "entries": "Read your time entries",
+        "timer": "Start and stop a timer, and log time on your behalf"
+      },
+      "permissions": "Claude acts with your permissions only: exactly what you see in the system, nothing more. Nothing can be deleted through this connection.",
+      "approve": "Approve connection",
+      "deny": "Cancel"
+    },
+    "webauthn": {
+      "verify_unavailable": "Verification cannot start right now.",
+      "verify_cancelled": "Verification was cancelled.",
+      "verify_incomplete": "The device did not complete the verification.",
+      "verify_failed": "Verification failed.",
+      "add_unavailable": "A passkey cannot be added right now.",
+      "add_already_registered": "This device is already registered. To add a phone or another computer, choose \"Create a code for a new device\".",
+      "add_cancelled": "Adding was cancelled.",
+      "add_incomplete": "The device did not complete adding the passkey.",
+      "add_not_saved": "The passkey was not saved."
+    }
+  },
+  "claude": {
+    "connected": "Connected",
+    "notConnected": "Not connected",
+    "connectedIntro": "Claude is connected to your account and can start a timer, log time and read your entries, always with your permissions only.",
+    "notConnectedIntro": "You can connect Claude to your account and manage time entries in a conversation: start a timer, stop it and log hours, without opening the system.",
+    "activeConnections": "Active connections",
+    "lastActivity": "Last activity",
+    "neverUsed": "Not used yet",
+    "connectionList": "Connections",
+    "connectorUrl": "Connector address",
+    "copyConnectorUrl": "Copy the connector address",
+    "orgSummary": "{connected} of {eligible} Ankora users have connected Claude to their account.",
+    "howTo": "How to connect Claude →",
+    "revokeNote": "Disconnecting here revokes access immediately. Changing your password does too.",
+    "revokeFailed": "Disconnecting failed",
+    "revoked": "Disconnected",
+    "revokedDetail": "Claude can no longer access your account through \"{label}\". To reconnect, approve again in Claude.",
+    "localBridge": "(local bridge)",
+    "validUntil": "valid until {date}",
+    "revoking": "Disconnecting…",
+    "confirmRevoke": "Confirm disconnect",
+    "cancel": "Cancel",
+    "revoke": "Disconnect",
+    "revokeErrors": {
+      "invalid_id": "Invalid connection id.",
+      "not_found": "The connection was not found.",
+      "already_revoked": "The connection was not found, or is already disconnected.",
+      "no_user": "No user was specified."
     }
   }
 }

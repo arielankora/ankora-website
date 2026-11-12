@@ -15,6 +15,9 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "."),
       "server-only": path.resolve(__dirname, "tests/__mocks__/server-only.ts"),
+      // ADR 0006: server actions and route handlers tested outside a Next
+      // request get the dictionary directly; see the file for why.
+      "next-intl/server": path.resolve(__dirname, "tests/__mocks__/next-intl-server.ts"),
     },
   },
   test: {

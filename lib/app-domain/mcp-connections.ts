@@ -232,7 +232,10 @@ export async function getClaudeOrgSummary(actor: User): Promise<ClaudeOrgSummary
 // which takes seconds and mints a fresh grant. So the safety lives in a
 // confirmation step before the act, not in a reversal after it.
 
-export type RevokeResult = { ok: true; revoked: number } | { ok: false; error: string };
+/// ADR 0006: `code` names the refusal for a screen in either language;
+/// `error` stays the Hebrew sentence.
+export type RevokeErrorCode = "invalid_id" | "not_found" | "already_revoked" | "no_user";
+export type RevokeResult = { ok: true; revoked: number } | { ok: false; error: string; code: RevokeErrorCode };
 
 /// How many live grants another user holds. Exists so the admin control
 /// is not blind: a "disconnect Claude" button that looks identical
@@ -266,7 +269,7 @@ function parseGrantId(grantId: string): { kind: ClaudeConnectionKind; id: string
 /// nothing about grants that are not theirs.
 export async function revokeMyClaudeGrant(actor: User, grantId: string): Promise<RevokeResult> {
   const parsed = parseGrantId(grantId);
-  if (!parsed) return { ok: false, error: "מזהה חיבור לא תקין." };
+  if (!parsed) return { ok: false, error: "מזהה חיבור לא תקין.", code: "invalid_id" };
 
   const now = new Date();
   let revoked = 0;
@@ -282,7 +285,7 @@ export async function revokeMyClaudeGrant(actor: User, grantId: string): Promise
       where: { id: parsed.id, userId: actor.id },
       select: { clientId: true },
     });
-    if (!row) return { ok: false, error: "החיבור לא נמצא." };
+    if (!row) return { ok: false, error: "החיבור לא נמצא.", code: "not_found" };
 
     const result = await prisma.oAuthToken.updateMany({
       where: { userId: actor.id, clientId: row.clientId, revokedAt: null },
@@ -297,7 +300,7 @@ export async function revokeMyClaudeGrant(actor: User, grantId: string): Promise
     revoked = result.count;
   }
 
-  if (revoked === 0) return { ok: false, error: "החיבור לא נמצא, או שכבר נותק." };
+  if (revoked === 0) return { ok: false, error: "החיבור לא נמצא, או שכבר נותק.", code: "already_revoked" };
 
   await recordAudit({
     actorId: actor.id,
@@ -325,7 +328,7 @@ export async function revokeMyClaudeGrant(actor: User, grantId: string): Promise
 /// this integration" rather than "this account may be compromised".
 export async function revokeClaudeGrantsForUser(actor: User, targetUserId: string): Promise<RevokeResult> {
   assertCan(actor.role, "user.manage");
-  if (!targetUserId) return { ok: false, error: "לא צוין משתמש." };
+  if (!targetUserId) return { ok: false, error: "לא צוין משתמש.", code: "no_user" };
 
   const now = new Date();
   const [oauth, pats] = await Promise.all([
