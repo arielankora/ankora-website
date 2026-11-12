@@ -1,4 +1,5 @@
 import "server-only";
+import { outgoingOf } from "@/lib/i18n/recipients";
 import { prisma } from "@/lib/prisma";
 import { TOP_LEVEL_ONLY } from "@/lib/app-domain/tasks";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -317,23 +318,26 @@ async function notifyManagerOfPreferenceChange(client: Client, actor: User) {
 
   const manager = await prisma.user.findFirst({
     where: { id: client.accountManagerId, deletedAt: null, status: "ACTIVE" },
-    select: { email: true },
+    select: { email: true, locale: true, timezone: true },
   });
   if (!manager) return;
 
-  const { html, text } = renderActionEmail({
-    title: `${client.name} עדכן העדפות שירות`,
-    body: [
-      `${actor.name} שינה את ההעדפות של ${client.name} בפורטל.`,
-      "שווה לקרוא לפני הפנייה הבאה: זה בדיוק המקום שבו לקוח אומר לנו מה חשוב לו ומה אסור שיקרה.",
-    ],
-    buttonLabel: "לכרטיס הלקוח",
-    url: `${appBaseUrl()}/app/clients/${client.id}`,
-  });
+  // In the account manager's language (ADR 0006, outgoing channels).
+  const out = outgoingOf(manager);
+  const t = out.t;
+  const { html, text } = renderActionEmail(
+    {
+      title: t("clientPreferences.title", { client: client.name }),
+      body: [t("clientPreferences.body1", { actor: actor.name, client: client.name }), t("clientPreferences.body2")],
+      buttonLabel: t("clientPreferences.button"),
+      url: `${appBaseUrl()}/app/clients/${client.id}`,
+    },
+    out
+  );
 
   await sendEmail({
     to: [manager.email],
-    subject: `${client.name}: העדפות שירות עודכנו`,
+    subject: t("clientPreferences.subject", { client: client.name }),
     html,
     text,
   }).catch(() => {

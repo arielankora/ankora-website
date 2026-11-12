@@ -1,6 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
+import { groupEmailsByLocale } from "@/lib/i18n/recipients";
+import type { OutgoingT } from "@/lib/i18n/outgoing";
 
 // Vault alerts (decision 8, 6.10.2026: "אריאל בלבד בשלב 1").
 //
@@ -16,26 +18,33 @@ import { sendEmail } from "@/lib/email";
 
 const DEFAULT_RECIPIENT = "ariel@ankora.co.il";
 
-export async function sendVaultAlert(subject: string, lines: string[]): Promise<void> {
+/// The words are built per recipient language (ADR 0006, outgoing
+/// channels): each address that belongs to an app user gets their
+/// language, any other address Hebrew, one email per language.
+export async function sendVaultAlert(words: (t: OutgoingT) => { subject: string; lines: string[] }): Promise<void> {
   const to = (process.env.VAULT_ALERT_EMAIL || DEFAULT_RECIPIENT)
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  const text = [...lines, "", "הפרטים המלאים ביומן הפעולות."].join("\n");
   try {
-    const fullSubject = `כספת הגישות: ${subject}`;
-    const result = await sendEmail({ to, subject: fullSubject, text });
-    await prisma.emailDelivery.create({
-      data: {
-        template: "vault_alert",
-        recipients: to,
-        subject: fullSubject,
-        body: text,
-        status: result.ok ? "SENT" : "FAILED",
-        providerMessageId: result.providerMessageId ?? null,
-        error: result.error ?? null,
-      },
-    });
+    for (const group of await groupEmailsByLocale(to)) {
+      const { t } = group.out;
+      const { subject, lines } = words(t);
+      const text = [...lines, "", t("vault.footer")].join("\n");
+      const fullSubject = t("vault.subject", { subject });
+      const result = await sendEmail({ to: group.to, subject: fullSubject, text });
+      await prisma.emailDelivery.create({
+        data: {
+          template: "vault_alert",
+          recipients: group.to,
+          subject: fullSubject,
+          body: text,
+          status: result.ok ? "SENT" : "FAILED",
+          providerMessageId: result.providerMessageId ?? null,
+          error: result.error ?? null,
+        },
+      });
+    }
   } catch {
     // An alert that fails to send must never turn a refusal into an
     // error page, and must never undo the audit row already written.

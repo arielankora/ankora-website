@@ -15,6 +15,7 @@
 //   the file than one never proposed.
 
 import { UNCERTAIN_REMINDER_DAYS } from "@/lib/client-facts";
+import type { OutgoingT } from "@/lib/i18n/outgoing";
 
 export type Attention = {
   pastValidity: number;
@@ -51,34 +52,19 @@ export function hasAttention(a: Attention): boolean {
 }
 
 /// One sentence, the counts that are not zero, in order of urgency.
-export function attentionSentence(a: Attention): string {
+///
+/// Written to a person (the weekly notification, the morning digest), so
+/// in that person's language (ADR 0006, outgoing channels): the caller
+/// passes the recipient's words from lib/i18n/outgoing.ts. A type-only
+/// import, so this module stays free of the dictionaries.
+export function attentionSentence(a: Attention, t: OutgoingT): string {
   const parts: string[] = [];
-  if (a.pastValidity) parts.push(a.pastValidity === 1 ? "פריט זמני אחד עבר את התוקף שלו. עדיין נכון?" : `${a.pastValidity} פריטים זמניים עברו את התוקף שלהם. עדיין נכונים?`);
-  if (a.openQuestions) parts.push(a.openQuestions === 1 ? "שאלה פתוחה אחת עדיין בלי תשובה." : `${a.openQuestions} שאלות פתוחות עדיין בלי תשובה.`);
-  if (a.staleUncertain) {
-    parts.push(
-      a.staleUncertain === 1
-        ? `פריט אחד לא ודאי כבר יותר מ-${UNCERTAIN_REMINDER_DAYS} יום.`
-        : `${a.staleUncertain} פריטים לא ודאיים כבר יותר מ-${UNCERTAIN_REMINDER_DAYS} יום.`
-    );
-  }
-  if (a.staleProposedRules) {
-    parts.push(
-      a.staleProposedRules === 1
-        ? `כלל מוצע אחד מחכה לאישור מנהל כבר יותר מ-${RULE_WAIT_DAYS} ימים, ועד אז הוא לא מחייב.`
-        : `${a.staleProposedRules} כללים מוצעים מחכים לאישור מנהל כבר יותר מ-${RULE_WAIT_DAYS} ימים, ועד אז הם לא מחייבים.`
-    );
-  }
-  if (a.staleProposals) {
-    parts.push(
-      a.staleProposals === 1
-        ? `הצעה אחת מחכה במסך הבדיקה כבר יותר מ-${PROPOSAL_WAIT_DAYS} ימים, ועד שתאושר היא לא בתיק.`
-        : `${a.staleProposals} הצעות מחכות במסך הבדיקה כבר יותר מ-${PROPOSAL_WAIT_DAYS} ימים, ועד שיאושרו הן לא בתיק.`
-    );
-  }
-  if (a.rulesDueReview) {
-    parts.push(a.rulesDueReview === 1 ? "הגיע מועד הסקירה של כלל אחד." : `הגיע מועד הסקירה של ${a.rulesDueReview} כללים.`);
-  }
+  if (a.pastValidity) parts.push(t("attention.pastValidity", { count: a.pastValidity }));
+  if (a.openQuestions) parts.push(t("attention.openQuestions", { count: a.openQuestions }));
+  if (a.staleUncertain) parts.push(t("attention.staleUncertain", { count: a.staleUncertain, days: String(UNCERTAIN_REMINDER_DAYS) }));
+  if (a.staleProposedRules) parts.push(t("attention.staleProposedRules", { count: a.staleProposedRules, days: String(RULE_WAIT_DAYS) }));
+  if (a.staleProposals) parts.push(t("attention.staleProposals", { count: a.staleProposals, days: String(PROPOSAL_WAIT_DAYS) }));
+  if (a.rulesDueReview) parts.push(t("attention.rulesDueReview", { count: a.rulesDueReview }));
   return parts.join(" ");
 }
 

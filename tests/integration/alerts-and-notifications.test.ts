@@ -297,7 +297,7 @@ describe("email retries resend the message that failed, never a stand-in", () =>
 
   it("resends a failed vault alert as the vault alert it was", async () => {
     vi.mocked(sendEmail).mockResolvedValue({ ok: false, error: "provider down" });
-    await sendVaultAlert("נעילת אימות", ["משתמש: test", "ניסיונות: 5"]);
+    await sendVaultAlert(() => ({ subject: "נעילת אימות", lines: ["משתמש: test", "ניסיונות: 5"] }));
     const [original] = vi.mocked(sendEmail).mock.calls.map(([i]) => i);
 
     vi.mocked(sendEmail).mockReset();

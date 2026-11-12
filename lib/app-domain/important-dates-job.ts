@@ -1,5 +1,7 @@
 import "server-only";
-import { autoTaskTitle, reminderTitle } from "@/lib/date-receipt";
+import { autoTaskTitle } from "@/lib/date-receipt";
+import { groupEmailsByLocale, outgoingForUser } from "@/lib/i18n/recipients";
+import type { OutgoingT } from "@/lib/i18n/outgoing";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { sendEmail } from "@/lib/email";
@@ -14,6 +16,8 @@ import {
   buildEmailReminderSubject,
   buildEmailReminderBody,
   buildEscalationMessage,
+  buildEscalationSubject,
+  localizedReminderTitle,
 } from "@/lib/app-domain/important-dates-reminders";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { openProcessRun } from "@/lib/app-domain/process-runs";
@@ -376,23 +380,28 @@ export async function sendPendingReminders(now = new Date()): Promise<{ sent: nu
       continue;
     }
     const daysBefore = Math.round((date.nextOccurrenceAt!.getTime() - occ.occurrenceDate.getTime()) / 86_400_000) + (occ.reminderRule?.daysBefore ?? 0);
-    const messageInput = {
+    // Worded per recipient (ADR 0006, outgoing channels): the bell row in
+    // its person's language, the email once per language among its
+    // addresses. An address that is not an app user's keeps Hebrew.
+    const messageInput = (t: OutgoingT) => ({
       clientName: date.client.name,
       // Spec 3.10: a date that expects something says so first.
-      dateTitle: reminderTitle(date),
+      dateTitle: localizedReminderTitle(date, t),
       occurrenceDate: localDateKey(occ.occurrenceDate, TIMEZONE).split("-").reverse().join("/"),
       daysBefore: occ.reminderRule?.daysBefore ?? 0,
-    };
+    });
     void daysBefore;
 
     try {
       if (occ.channel === "IN_APP") {
+        const recipientId = occ.recipientUserId ?? date.responsibleUserId;
+        const { t } = await outgoingForUser(recipientId);
         await prisma.notification.create({
           data: {
-            userId: occ.recipientUserId ?? date.responsibleUserId,
+            userId: recipientId,
             type: "important_date.reminder",
-            title: reminderTitle(date),
-            body: buildInAppReminderMessage(messageInput),
+            title: localizedReminderTitle(date, t),
+            body: buildInAppReminderMessage(messageInput(t), t),
             entityType: "ImportantDate",
             entityId: date.id,
           },
@@ -403,11 +412,17 @@ export async function sendPendingReminders(now = new Date()): Promise<{ sent: nu
         const recipients = Array.from(
           new Set([occ.recipientEmail, date.responsibleUser.email, ...date.extraEmailRecipients, ...(occ.reminderRule?.extraAnkoraRecipients ?? [])].filter((e): e is string => Boolean(e)))
         );
-        const result = await sendEmail({
-          to: recipients,
-          subject: buildEmailReminderSubject(messageInput),
-          text: buildEmailReminderBody(messageInput),
-        });
+        // One send per language. The occurrence is SENT when every send
+        // went out; the first failure is the one recorded.
+        let result: { ok: boolean; error?: string; providerMessageId?: string } = { ok: true };
+        for (const group of await groupEmailsByLocale(recipients)) {
+          const r = await sendEmail({
+            to: group.to,
+            subject: buildEmailReminderSubject(messageInput(group.out.t), group.out.t),
+            text: buildEmailReminderBody(messageInput(group.out.t), group.out.t),
+          });
+          if (result.ok) result = r;
+        }
         await prisma.reminderOccurrence.update({
           where: { id: occ.id },
           data: {
@@ -493,12 +508,17 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
         select: { id: true },
       });
       if (alreadyAsked) continue;
+      // In the responsible person's language (ADR 0006, outgoing channels).
+      const { t } = await outgoingForUser(date.responsibleUserId);
       await prisma.notification.create({
         data: {
           userId: date.responsibleUserId,
           type: "important_date.condition_check",
           title: date.title,
-          body: `מועד מותנה ב-${localDateKey(date.nextOccurrenceAt, TIMEZONE).split("-").reverse().join("/")}. האם התנאי מתקיים: ${date.conditionText}? אם כן, צריך לפתוח משימה.`,
+          body: t("importantDates.conditionCheck", {
+            date: localDateKey(date.nextOccurrenceAt, TIMEZONE).split("-").reverse().join("/"),
+            condition: date.conditionText,
+          }),
           entityType: "ImportantDate",
           entityId: date.id,
         },
@@ -621,11 +641,17 @@ export async function escalateUnhandledReminders(now = new Date()): Promise<{ es
       originalResponsibleName: date.responsibleUser.name ?? date.responsibleUser.email,
     };
 
-    const result = await sendEmail({
-      to: adminEmails,
-      subject: `הסלמה: ${date.title} - ${date.client.name}`,
-      text: buildEscalationMessage(messageInput),
-    });
+    // Each admin in their own language (ADR 0006, outgoing channels): one
+    // send per language, recorded as one escalation.
+    let result: { ok: boolean; error?: string } = { ok: true };
+    for (const group of await groupEmailsByLocale(adminEmails)) {
+      const r = await sendEmail({
+        to: group.to,
+        subject: buildEscalationSubject(messageInput, group.out.t),
+        text: buildEscalationMessage(messageInput, group.out.t),
+      });
+      if (result.ok) result = r;
+    }
 
     await prisma.reminderOccurrence.create({
       data: {

@@ -1,4 +1,5 @@
 import "server-only";
+import { outgoingForUser } from "@/lib/i18n/recipients";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError, assertCan, can, canManageClients } from "@/lib/app-auth/permissions";
 import { DomainError } from "@/lib/domain-error";
@@ -2095,12 +2096,14 @@ export async function setStepDone(actor: User, stepId: string, done: boolean): P
     throw new DomainError("tasks.stepAlreadyPendingNoSupervisor", message);
   }
   await updateTask(actor, stepId, { status: "PENDING_APPROVAL" });
+  // In the approver's language (ADR 0006, outgoing channels).
+  const { t } = await outgoingForUser(step.supervisorId);
   await prisma.notification.create({
     data: {
       userId: step.supervisorId,
       type: STEP_APPROVAL_REQUESTED,
-      title: `מחכה לאישור שלך: ${step.title}`.slice(0, 200),
-      body: `${actor.name} סיים/ה את השלב ושלח/ה אותו לאישור שלך. אחרי האישור אפשר לסגור את המשימה.`,
+      title: t("stepApproval.title", { step: step.title }).slice(0, 200),
+      body: t("stepApproval.body", { actor: actor.name }),
       entityType: "Task",
       entityId: step.parentId ?? step.id,
     },

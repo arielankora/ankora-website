@@ -17,7 +17,8 @@ import { STALE_BUSINESS_DAYS } from "@/lib/client-control";
 import { formatClockMinutes } from "@/lib/hours-format";
 import { sentForApprovalAt } from "@/lib/app-domain/task-approval-times";
 import { countApprovals } from "@/lib/app-domain/approvals";
-import { approvalsLine } from "@/lib/approvals";
+import { HEBREW, type Outgoing } from "@/lib/i18n/outgoing";
+import { outgoingOf } from "@/lib/i18n/recipients";
 
 // The morning digest.
 //
@@ -49,6 +50,11 @@ import { approvalsLine } from "@/lib/approvals";
 //
 // Internal, to the team. The rule Ariel set on 25.9 is about clients,
 // and nothing here reaches one.
+//
+// ADR 0006, outgoing channels: each person's digest is in their own
+// language. Every function here that writes words takes the recipient's
+// `Outgoing` (lib/i18n/outgoing.ts) as its last parameter, Hebrew when
+// not given, which is what every digest was before.
 
 /// After this many days, a wait is worth a line of its own.
 ///
@@ -223,31 +229,37 @@ export function isDigestEmpty(d: Digest): boolean {
 /// only part read at all. Until 20.10.2026 it counted ("משימה אחת עליך,
 /// אחת באיחור"), which says how much and not what. Now it names the
 /// first thing in the ranked list, with its reason, and counts the rest.
-export function digestSubject(d: Digest, now: Date = new Date()): string {
-  const items = rankDigest(d, now);
+export function digestSubject(d: Digest, now: Date = new Date(), out: Outgoing = HEBREW): string {
+  const { t } = out;
+  const items = rankDigest(d, now, out);
   if (items.length === 0) {
-    if (d.staleWaits === 1) return "משימה אחת ממתינה יותר משבוע";
-    if (d.staleWaits > 1) return `${d.staleWaits} משימות ממתינות יותר משבוע`;
+    if (d.staleWaits > 0) return t("digest.subject.staleWaits", { count: d.staleWaits });
     // Only the blocks under the list: name the first of them.
     const c = d.clients?.[0];
     if (c) return clip(`${c.clientName}: ${c.text.replace(/\.$/, "")}`, SUBJECT_TITLE_CHARS + 20);
     const h = d.housekeeping?.[0];
     if (h) return h.text.replace(/\.$/, "");
-    const waiting = approvalsLine(d.approvals ?? 0);
+    const waiting = approvalsSentence(d.approvals ?? 0, out);
     if (waiting) return waiting.replace(/\.$/, "");
-    return "הבוקר שלך";
+    return t("digest.subject.morning");
   }
   const [first] = items;
   const head = `${first.short}: ${clip(first.task.title, SUBJECT_TITLE_CHARS)}`;
   const rest = items.length - 1 + Math.max(0, d.staleWaits - (d.waiting?.length ?? 0));
   if (rest <= 0) return head;
-  return rest === 1 ? `${head}, ועוד אחת` : `${head}, ועוד ${rest}`;
+  return t("digest.subject.more", { head, count: rest });
 }
 
 /// A title longer than this is cut in the subject line. Phones show
 /// about forty characters of a subject; the reason comes first so it is
 /// never the part that is cut.
 export const SUBJECT_TITLE_CHARS = 48;
+
+/// "N things wait for your approval", or nothing. lib/approvals.ts's
+/// approvalsLine in the reader's language.
+function approvalsSentence(count: number, out: Outgoing): string | null {
+  return count > 0 ? out.t("digest.approvals", { count }) : null;
+}
 
 function clip(text: string, max: number): string {
   const flat = text.replace(/\s+/g, " ").trim();
@@ -334,7 +346,8 @@ export function groupChanges(
 /// What others changed on this person's open tasks since `since`.
 async function changesOnMyTasks(
   userId: string,
-  since: Date
+  since: Date,
+  out: Outgoing
 ): Promise<Map<string, { changes: DigestChange[]; more: number }>> {
   const myTasks = await prisma.task.findMany({
     where: { assignedToId: userId, deletedAt: null, status: { in: OPEN_STATUSES } },
@@ -406,13 +419,16 @@ async function changesOnMyTasks(
       return {
         taskId: e.entityId as string,
         at: e.createdAt,
-        actorName: actorName.get(e.actorId as string) ?? "מישהו",
-        text: describeChange({
-          action: e.action,
-          before: e.beforeJson,
-          after: e.afterJson,
-          commentBody: typeof commentId === "string" ? (commentBody.get(commentId) ?? null) : null,
-        }),
+        actorName: actorName.get(e.actorId as string) ?? out.t("digest.someone"),
+        text: describeChange(
+          {
+            action: e.action,
+            before: e.beforeJson,
+            after: e.afterJson,
+            commentBody: typeof commentId === "string" ? (commentBody.get(commentId) ?? null) : null,
+          },
+          out
+        ),
       };
     }),
     ...files.map((e) => {
@@ -420,13 +436,16 @@ async function changesOnMyTasks(
       return {
         taskId: after?.taskId as string,
         at: e.createdAt,
-        actorName: actorName.get(e.actorId as string) ?? "מישהו",
-        text: describeChange({
-          action: "client_document.add",
-          before: null,
-          after,
-          fileTitle: typeof after?.title === "string" ? after.title : null,
-        }),
+        actorName: actorName.get(e.actorId as string) ?? out.t("digest.someone"),
+        text: describeChange(
+          {
+            action: "client_document.add",
+            before: null,
+            after,
+            fileTitle: typeof after?.title === "string" ? after.title : null,
+          },
+          out
+        ),
       };
     }),
   ];
@@ -463,7 +482,8 @@ async function excerptsFor(taskIds: string[]): Promise<Map<string, string>> {
 /// a broken date table is a reason for a shorter email, not for none.
 async function beyondTasks(
   userId: string,
-  now: Date
+  now: Date,
+  out: Outgoing
 ): Promise<Pick<Digest, "exceptions" | "routines" | "dates" | "reviews" | "clients" | "housekeeping" | "approvals">> {
   const actor = await prisma.user.findUnique({ where: { id: userId } });
   if (!actor) return {};
@@ -496,7 +516,7 @@ async function beyondTasks(
           })
         )
     ),
-    safe("dates", () => datesAhead(userId, now, clientName)),
+    safe("dates", () => datesAhead(userId, now, clientName, out)),
     safe("reviews", async () => {
       if (clientIds.length === 0) return [];
       const rows = await prisma.process.findMany({
@@ -518,13 +538,13 @@ async function beyondTasks(
           dueDate: null,
           href: `/app/clients/${p.clientId}?tab=file#processes`,
           meta: `${clientName.get(p.clientId) ?? ""} · ${
-            p.reviewReason === "RULES" ? "לא עומד עוד בכללי הלקוח" : "הגיע מועד הסקירה התקופתית"
+            p.reviewReason === "RULES" ? out.t("digest.review.rules") : out.t("digest.review.periodic")
           }`,
         })
       );
     }),
-    safe("clients", () => myClientLines(userId, clientName, now)),
-    safe("housekeeping", () => myHousekeeping(userId, now)),
+    safe("clients", () => myClientLines(userId, clientName, now, out)),
+    safe("housekeeping", () => myHousekeeping(userId, now, out)),
   ]);
   let approvals = 0;
   try {
@@ -542,7 +562,8 @@ async function beyondTasks(
 ///   3. The client file's open questions, expired and uncertain items,
 ///      the same split as the weekly notification.
 ///   4. Extraction that stopped (clients they manage).
-async function myClientLines(userId: string, accessible: Map<string, string>, now: Date): Promise<DigestClientLine[]> {
+async function myClientLines(userId: string, accessible: Map<string, string>, now: Date, out: Outgoing): Promise<DigestClientLine[]> {
+  const { t } = out;
   const managed = await prisma.client.findMany({
     where: { accountManagerId: userId, status: "ACTIVE", deletedAt: null },
     select: { id: true, name: true, isInternal: true },
@@ -559,12 +580,19 @@ async function myClientLines(userId: string, accessible: Map<string, string>, no
     const pct = Math.round(b.utilization.utilizationPct);
     const text =
       b.bank.kind === "PREPAID"
-        ? `ניצלו ${pct}% מהחבילה, ${
-            b.utilization.remainingMinutes > 0 ? `נשארו ${formatClockMinutes(b.utilization.remainingMinutes)} שעות` : "ואין יתרה"
-          }.`
+        ? t("digest.clients.prepaid", {
+            pct: String(pct),
+            rest:
+              b.utilization.remainingMinutes > 0
+                ? t("digest.clients.prepaidLeft", { hours: formatClockMinutes(b.utilization.remainingMinutes) })
+                : t("digest.clients.prepaidNone"),
+          })
         : (() => {
             const left = Math.max(0, daysBetween(now, b.bank.cycleEnd));
-            return `ניצלו ${pct}% מבנק השעות, ${left === 0 ? "המחזור נגמר היום" : `${days(left)} לסוף המחזור`}.`;
+            return t("digest.clients.bank", {
+              pct: String(pct),
+              rest: left === 0 ? t("digest.clients.cycleEndsToday") : t("digest.clients.cycleLeft", { days: days(left, out) }),
+            });
           })();
     lines.push({ clientName: c.name, text, href: `/app/clients/${c.id}`, tone: pct >= 100 ? "red" : "amber" });
   }
@@ -578,7 +606,7 @@ async function myClientLines(userId: string, accessible: Map<string, string>, no
   for (const [clientId, n] of pendingBy) {
     lines.push({
       clientName: name.get(clientId) ?? "",
-      text: n === 1 ? "הצעה אחת לתיק מחכה לבדיקה." : `${n} הצעות לתיק מחכות לבדיקה.`,
+      text: t("digest.clients.proposals", { count: n }),
       href: `/app/approvals?tab=knowledge&clientId=${clientId}`,
       tone: "blue",
     });
@@ -591,7 +619,7 @@ async function myClientLines(userId: string, accessible: Map<string, string>, no
     // week-old ones: one line about them, not two.
     const rest = { ...a, staleProposals: 0 };
     if (!hasAttention(rest)) continue;
-    lines.push({ clientName: name.get(clientId) ?? "", text: attentionSentence(rest), href: `/app/clients/${clientId}/client-file`, tone: "gray" });
+    lines.push({ clientName: name.get(clientId) ?? "", text: attentionSentence(rest, t), href: `/app/clients/${clientId}/client-file`, tone: "gray" });
   }
 
   for (const c of managed) {
@@ -600,7 +628,7 @@ async function myClientLines(userId: string, accessible: Map<string, string>, no
     if (since === null || since <= STALE_BUSINESS_DAYS) continue;
     lines.push({
       clientName: c.name,
-      text: `לא הגיע חילוץ כבר ${since} ימי עבודה.`,
+      text: t("digest.clients.extraction", { days: String(since) }),
       href: `/app/approvals?tab=knowledge&clientId=${c.id}`,
       tone: "gray",
     });
@@ -610,7 +638,8 @@ async function myClientLines(userId: string, accessible: Map<string, string>, no
 
 /// "סדר בית": a timer left running from before today, and a working day
 /// with no hours from somebody who usually reports them.
-async function myHousekeeping(userId: string, now: Date): Promise<DigestNote[]> {
+async function myHousekeeping(userId: string, now: Date, out: Outgoing): Promise<DigestNote[]> {
+  const { t } = out;
   const dayStart = startOfLocalDay(now);
   const notes: DigestNote[] = [];
 
@@ -619,12 +648,12 @@ async function myHousekeeping(userId: string, now: Date): Promise<DigestNote[]> 
     orderBy: { startAt: "asc" },
     select: { startAt: true, client: { select: { name: true } } },
   });
-  for (const t of running) {
-    const ago = daysBetween(t.startAt, now);
-    const when = ago === 1 ? "מאתמול" : `כבר ${days(ago)}, מ-${formatDue(t.startAt)}`;
+  for (const e of running) {
+    const ago = daysBetween(e.startAt, now);
+    const when = ago === 1 ? t("digest.house.sinceYesterday") : t("digest.house.sinceDays", { days: days(ago, out), date: formatDue(e.startAt, out) });
     notes.push({
-      text: `טיימר רץ ${when} ${formatTime(t.startAt)} על ${t.client.name}.`,
-      linkText: "לעצור ולתקן",
+      text: t("digest.house.timer", { when, time: formatTime(e.startAt, out), client: e.client.name }),
+      linkText: t("digest.house.timerLink"),
       href: "/app/timer",
     });
   }
@@ -640,8 +669,8 @@ async function myHousekeeping(userId: string, now: Date): Promise<DigestNote[]> 
     prisma.timeEntry.count({ where: { userId, deletedAt: null, startAt: { gte: lookback, lt: prevStart } } }),
   ]);
   if (thatDay === 0 && before > 0) {
-    const weekday = new Intl.DateTimeFormat("he-IL", { weekday: "long", timeZone: TIMEZONE }).format(prev);
-    notes.push({ text: `לא דווחו שעות ב${weekday}, ${formatDue(prev)}.`, linkText: "לדווח", href: "/app/my-time" });
+    const weekday = new Intl.DateTimeFormat(out.tag, { weekday: "long", timeZone: out.timeZone }).format(prev);
+    notes.push({ text: t("digest.house.noHours", { weekday, date: formatDue(prev, out) }), linkText: t("digest.house.noHoursLink"), href: "/app/my-time" });
   }
   return notes;
 }
@@ -690,7 +719,7 @@ async function exceptionsToDecide(
 /// stays quiet until its snooze ends. A sensitive date is named only as
 /// "מועד רגיש": the email leaves the app, and the date screen is where
 /// its details are shown to who may see them.
-async function datesAhead(userId: string, now: Date, clientName: Map<string, string>): Promise<DigestTask[]> {
+async function datesAhead(userId: string, now: Date, clientName: Map<string, string>, out: Outgoing): Promise<DigestTask[]> {
   const horizon = new Date(startOfLocalDay(now).getTime() + (DATE_HORIZON_DAYS + 1) * 24 * 3600_000);
   const rows = await prisma.importantDate.findMany({
     where: {
@@ -715,17 +744,18 @@ async function datesAhead(userId: string, now: Date, clientName: Map<string, str
     .filter((r) => !withTask.has(r.id) && clientName.has(r.clientId))
     .map((r) => ({
       id: `date:${r.id}`,
-      title: r.sensitivity === "SENSITIVE" ? "מועד רגיש" : r.title,
+      title: r.sensitivity === "SENSITIVE" ? out.t("digest.sensitiveDate") : r.title,
       clientName: clientName.get(r.clientId) ?? "",
       dueDate: r.nextOccurrenceAt,
       href: `/app/important-dates/${r.id}`,
-      meta: `${clientName.get(r.clientId) ?? ""} · ${formatDue(r.nextOccurrenceAt)}`,
+      meta: `${clientName.get(r.clientId) ?? ""} · ${formatDue(r.nextOccurrenceAt, out)}`,
     }));
 }
 
 export async function buildDigest(
   user: { id: string; dailyDigestAt: Date | null },
-  now: Date = new Date()
+  now: Date = new Date(),
+  out: Outgoing = HEBREW
 ): Promise<Digest> {
   const dayStart = startOfLocalDay(now);
   const dayEnd = new Date(dayStart.getTime() + 24 * 3600_000);
@@ -810,10 +840,10 @@ export async function buildDigest(
   const freshOnly = fresh.filter((t) => !overdueIds.has(t.id) && !todayIds.has(t.id));
 
   const [changes, excerpts, approvalSince, more] = await Promise.all([
-    changesOnMyTasks(user.id, since),
+    changesOnMyTasks(user.id, since, out),
     excerptsFor(freshOnly.map((t) => t.id)),
     sentForApprovalAt(awaiting.map((t) => t.id)),
-    beyondTasks(user.id, now),
+    beyondTasks(user.id, now, out),
   ]);
 
   const withChanges = (t: DigestTask): DigestTask => {
@@ -848,7 +878,7 @@ export async function buildDigest(
         const c = withChanges(t);
         // The comment shown as the excerpt is not also a change line.
         // Hadas's note on the RIMED task would otherwise appear twice.
-        const changes = c.changes?.filter((ch) => !excerpt || ch.text !== `תגובה: «${excerpt}»`);
+        const changes = c.changes?.filter((ch) => !excerpt || ch.text !== out.t("changes.comment", { quote: excerpt }));
         return { ...c, changes, excerpt };
       }),
     updated,
@@ -858,7 +888,7 @@ export async function buildDigest(
       since: approvalSince.get(t.id) ?? t.updatedAt,
       // A step is sent for approval from its parent's screen, and the
       // parent is what the approver recognises.
-      meta: t.parent ? `${t.client.name} · שלב במשימה: ${t.parent.title}` : undefined,
+      meta: t.parent ? `${t.client.name} · ${out.t("digest.stepOf", { parent: t.parent.title })}` : undefined,
     })),
     staleWaits,
     waiting: waiting.map((t) => ({ ...toDigestTask(t), blockedOn: t.blockedOn, since: t.blockedSince })),
@@ -866,9 +896,9 @@ export async function buildDigest(
   };
 }
 
-function formatDue(date: Date | null): string {
+function formatDue(date: Date | null, out: Outgoing): string {
   if (!date) return "";
-  return new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: TIMEZONE }).format(date);
+  return new Intl.DateTimeFormat(out.tag, { day: "numeric", month: "numeric", timeZone: out.timeZone }).format(date);
 }
 
 /// Whole Israel calendar days from `from` to `to`. Pure.
@@ -881,8 +911,8 @@ export function daysBetween(from: Date, to: Date): number {
   return Math.round((b - a) / (24 * 3600_000));
 }
 
-function days(n: number): string {
-  return n === 1 ? "יום אחד" : n === 2 ? "יומיים" : `${n} ימים`;
+function days(n: number, out: Outgoing): string {
+  return out.t("digest.days", { count: n });
 }
 
 export type DigestTone = "red" | "amber" | "blue" | "gray";
@@ -903,13 +933,6 @@ export type DigestItem = {
   hint?: string;
 };
 
-const WAIT_LABEL: Record<TaskBlocker, string> = {
-  CLIENT: "ממתינה ללקוח",
-  SUPPLIER: "ממתינה לספק",
-  INTERNAL: "ממתינה לגורם פנימי",
-  OTHER: "ממתינה",
-};
-
 /// The whole email in one decision: what comes first. Pure.
 ///
 /// The order, and why:
@@ -926,7 +949,10 @@ const WAIT_LABEL: Record<TaskBlocker, string> = {
 ///   8. Long waits on somebody outside, by name: a reminder to send.
 ///   9. Updated by somebody else, with nothing else making it urgent.
 /// Inside a rank, the order the query returned is kept.
-export function rankDigest(d: Digest, now: Date = new Date()): DigestItem[] {
+export function rankDigest(d: Digest, now: Date = new Date(), out: Outgoing = HEBREW): DigestItem[] {
+  const { t: w } = out;
+  const n$ = (n: number) => days(n, out);
+  const urgently = (text: string) => `${w("digest.rank.urgent")} · ${text}`;
   const items: DigestItem[] = [];
   const seen = new Set<string>();
   const push = (item: DigestItem) => {
@@ -938,24 +964,24 @@ export function rankDigest(d: Digest, now: Date = new Date()): DigestItem[] {
 
   for (const t of d.awaitingMySignature) {
     const waited = t.since ? daysBetween(t.since, now) : 0;
-    const who = t.assigneeName ? ` · עוצר את ${t.assigneeName}` : "";
+    const who = t.assigneeName ? ` · ${w("digest.rank.blocking", { name: t.assigneeName })}` : "";
     push({
       task: t,
-      reason: `מחכה לאישור שלך${waited > 0 ? ` ${days(waited)}` : ""}${who}`,
-      short: "מחכה לאישור שלך",
+      reason: `${w("digest.rank.approval")}${waited > 0 ? ` ${n$(waited)}` : ""}${who}`,
+      short: w("digest.rank.approval"),
       tone: "red",
-      action: "לאשר",
+      action: w("digest.rank.approve"),
     });
   }
   for (const t of d.exceptions ?? []) {
     const waited = t.since ? daysBetween(t.since, now) : 0;
-    const who = t.assigneeName ? ` · ביקש/ה ${t.assigneeName}` : "";
+    const who = t.assigneeName ? ` · ${w("digest.rank.askedBy", { name: t.assigneeName })}` : "";
     push({
       task: t,
-      reason: `בקשת חריגה מחכה להחלטה שלך${waited > 0 ? ` ${days(waited)}` : ""}${who}`,
-      short: "בקשת חריגה מחכה לך",
+      reason: `${w("digest.rank.exception")}${waited > 0 ? ` ${n$(waited)}` : ""}${who}`,
+      short: w("digest.rank.exceptionShort"),
       tone: "red",
-      action: "להחליט",
+      action: w("digest.rank.decide"),
     });
   }
 
@@ -964,53 +990,54 @@ export function rankDigest(d: Digest, now: Date = new Date()): DigestItem[] {
     const urgent = t.priority === "URGENT";
     return {
       task: t,
-      reason: `${urgent ? "דחופה · " : ""}באיחור ${days(n)}`,
-      short: `באיחור ${days(n)}`,
+      reason: urgent ? urgently(w("digest.rank.late", { days: n$(n) })) : w("digest.rank.late", { days: n$(n) }),
+      short: w("digest.rank.late", { days: n$(n) }),
       tone: "red",
-      action: "לפתוח",
-      hint: n >= DECIDE_AFTER_DAYS ? "לבצע, לדחות את התאריך, או לסגור?" : undefined,
+      action: w("digest.rank.open"),
+      hint: n >= DECIDE_AFTER_DAYS ? w("digest.rank.decideHint") : undefined,
     };
   };
   const routineItem = (t: DigestTask): DigestItem => {
     const n = lateness(t);
     return n > 0
-      ? { task: t, reason: `בדיקה שגרתית באיחור ${days(n)}`, short: "בדיקה שגרתית באיחור", tone: "red", action: "לבדוק" }
-      : { task: t, reason: "בדיקה שגרתית להיום", short: "בדיקה שגרתית להיום", tone: "amber", action: "לבדוק" };
+      ? { task: t, reason: w("digest.rank.routineLate", { days: n$(n) }), short: w("digest.rank.routineLateShort"), tone: "red", action: w("digest.rank.check") }
+      : { task: t, reason: w("digest.rank.routineToday"), short: w("digest.rank.routineToday"), tone: "amber", action: w("digest.rank.check") };
   };
   const dateItem = (t: DigestTask): DigestItem => {
     const n = lateness(t);
-    if (n > 0) return { task: t, reason: `מועד שעבר לפני ${days(n)} ולא טופל`, short: "מועד שעבר", tone: "red", action: "לטפל" };
-    if (n === 0) return { task: t, reason: "מועד היום", short: "מועד היום", tone: "amber", action: "לטפל" };
+    if (n > 0) return { task: t, reason: w("digest.rank.datePast", { days: n$(n) }), short: w("digest.rank.datePastShort"), tone: "red", action: w("digest.rank.handle") };
+    if (n === 0) return { task: t, reason: w("digest.rank.dateToday"), short: w("digest.rank.dateToday"), tone: "amber", action: w("digest.rank.handle") };
     const ahead = -n;
+    const when = ahead === 1 ? w("digest.rank.dateTomorrow") : w("digest.rank.dateAhead", { days: n$(ahead) });
     return {
       task: t,
-      reason: ahead === 1 ? "מועד מחר" : `מועד בעוד ${days(ahead)}`,
-      short: ahead === 1 ? "מועד מחר" : `מועד בעוד ${days(ahead)}`,
+      reason: when,
+      short: when,
       tone: ahead <= DATE_SOON_DAYS ? "amber" : "blue",
-      action: "לטפל",
-      hint: "אין עדיין משימה פתוחה למועד הזה.",
+      action: w("digest.rank.handle"),
+      hint: w("digest.rank.dateNoTask"),
     };
   };
   const todayItem = (t: DigestTask): DigestItem => ({
     task: t,
-    reason: t.priority === "URGENT" ? "דחופה · להיום" : "להיום",
-    short: t.priority === "URGENT" ? "דחופה להיום" : "להיום",
+    reason: t.priority === "URGENT" ? urgently(w("digest.rank.today")) : w("digest.rank.today"),
+    short: t.priority === "URGENT" ? w("digest.rank.todayUrgentShort") : w("digest.rank.today"),
     tone: t.priority === "URGENT" ? "red" : "amber",
-    action: "לפתוח",
+    action: w("digest.rank.open"),
   });
   const freshItem = (t: DigestTask): DigestItem => ({
     task: t,
-    reason: t.priority === "URGENT" ? "דחופה · חדשה אצלך" : "חדשה אצלך",
-    short: t.priority === "URGENT" ? "דחופה חדשה" : "חדשה אצלך",
+    reason: t.priority === "URGENT" ? urgently(w("digest.rank.fresh")) : w("digest.rank.fresh"),
+    short: t.priority === "URGENT" ? w("digest.rank.freshUrgentShort") : w("digest.rank.fresh"),
     tone: t.priority === "URGENT" ? "red" : "blue",
-    action: "לפתוח",
+    action: w("digest.rank.open"),
   });
   const updatedItem = (t: DigestTask): DigestItem => ({
     task: t,
-    reason: t.priority === "URGENT" ? "דחופה · עודכנה" : "עודכנה",
-    short: t.priority === "URGENT" ? "דחופה עודכנה" : "עודכנה",
+    reason: t.priority === "URGENT" ? urgently(w("digest.rank.updated")) : w("digest.rank.updated"),
+    short: t.priority === "URGENT" ? w("digest.rank.updatedUrgentShort") : w("digest.rank.updated"),
     tone: t.priority === "URGENT" ? "red" : "gray",
-    action: "לפתוח",
+    action: w("digest.rank.open"),
   });
 
   const urgent = (t: DigestTask) => t.priority === "URGENT";
@@ -1039,13 +1066,13 @@ export function rankDigest(d: Digest, now: Date = new Date()): DigestItem[] {
   for (const t of dates) push(dateItem(t));
 
   for (const t of d.reviews ?? []) {
-    push({ task: t, reason: "נוהל לבדיקה", short: "נוהל לבדיקה", tone: "blue", action: "לבדוק" });
+    push({ task: t, reason: w("digest.rank.review"), short: w("digest.rank.review"), tone: "blue", action: w("digest.rank.check") });
   }
 
   for (const t of d.waiting ?? []) {
-    const label = WAIT_LABEL[t.blockedOn ?? "OTHER"];
+    const label = w(`digest.wait.${(t.blockedOn ?? "OTHER") as TaskBlocker}`);
     const waited = t.since ? daysBetween(t.since, now) : STALE_WAIT_DAYS;
-    push({ task: t, reason: `${label} ${days(waited)}`, short: label, tone: "gray", action: "להזכיר" });
+    push({ task: t, reason: `${label} ${n$(waited)}`, short: label, tone: "gray", action: w("digest.rank.remind") });
   }
 
   for (const t of d.updated) push(updatedItem(t));
@@ -1055,38 +1082,37 @@ export function rankDigest(d: Digest, now: Date = new Date()): DigestItem[] {
 /// The sentence under the greeting. Says how much, and whether anybody
 /// is stopped on this person, which is the one fact that changes the
 /// order somebody opens things in. Pure.
-export function digestLead(d: Digest, items: DigestItem[]): string {
+export function digestLead(d: Digest, items: DigestItem[], out: Outgoing = HEBREW): string {
+  const { t } = out;
   const hiddenWaits = Math.max(0, d.staleWaits - (d.waiting?.length ?? 0));
-  const needs = items.filter((i) => i.short !== "עודכנה").length + hiddenWaits;
+  const needs = items.filter((i) => i.short !== t("digest.rank.updated")).length + hiddenWaits;
   const blocking = d.awaitingMySignature.length + (d.exceptions ?? []).filter((e) => e.assigneeName).length;
   const parts: string[] = [];
   if (needs === 0 && items.length === 0) {
-    parts.push("אין משימות שדורשות אותך היום.");
+    parts.push(t("digest.lead.none"));
   } else if (needs === 0) {
-    parts.push(items.length === 1 ? "משימה אחת שלך עודכנה." : `${items.length} משימות שלך עודכנו.`);
+    parts.push(t("digest.lead.updated", { count: items.length }));
   } else {
-    parts.push(needs === 1 ? "דבר אחד דורש אותך היום." : `${needs} דברים דורשים אותך היום.`);
+    parts.push(t("digest.lead.needs", { count: needs }));
   }
   if (blocking > 0 && needs > 1) {
-    parts.push(blocking === 1 ? "אחד מהם עוצר מישהו אחר." : `${blocking} מהם עוצרים אחרים.`);
+    parts.push(t("digest.lead.blocking", { count: blocking }));
   }
   return parts.join(" ");
 }
 
-function formatTime(date: Date): string {
-  return new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TIMEZONE }).format(
-    date
-  );
+function formatTime(date: Date, out: Outgoing): string {
+  return new Intl.DateTimeFormat(out.tag, { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: out.timeZone }).format(date);
 }
 
 /// The small lines under a task: what was written on new work, and what
 /// others changed. Pure.
-export function taskNotes(t: DigestTask): string[] {
+export function taskNotes(t: DigestTask, out: Outgoing = HEBREW): string[] {
   const notes: string[] = [];
   if (t.excerpt) notes.push(`«${t.excerpt}»`);
-  for (const c of t.changes ?? []) notes.push(`${c.actorName}, ${formatTime(c.at)}: ${c.text}`);
+  for (const c of t.changes ?? []) notes.push(`${c.actorName}, ${formatTime(c.at, out)}: ${c.text}`);
   if (t.moreChanges && t.moreChanges > 0) {
-    notes.push(t.moreChanges === 1 ? "ועוד עדכון אחד" : `ועוד ${t.moreChanges} עדכונים`);
+    notes.push(out.t("digest.moreChanges", { count: t.moreChanges }));
   }
   return notes;
 }
@@ -1117,26 +1143,27 @@ export function safeText(value: string): string {
     .replace(/@/g, "@&#8203;");
 }
 
-export function renderDigestEmail(d: Digest, name: string, now: Date = new Date()): { html: string; text: string } {
+export function renderDigestEmail(d: Digest, name: string, now: Date = new Date(), out: Outgoing = HEBREW): { html: string; text: string } {
+  const { t: w, dir, start, end } = out;
   const base = appBaseUrl();
-  const all = rankDigest(d, now);
+  const all = rankDigest(d, now, out);
   const items = all.slice(0, RANKED_LINES);
   const hiddenWaits = Math.max(0, d.staleWaits - (d.waiting?.length ?? 0));
   const more = all.length - items.length;
-  const lead = digestLead(d, all);
+  const lead = digestLead(d, all, out);
   const dayHref = `${base}/app/calendar?view=day`;
 
   const approvalsHref = `${base}/app/approvals`;
-  const waiting = approvalsLine(d.approvals ?? 0);
-  const textLines: string[] = [`בוקר טוב ${name},`, "", lead, `היום שלך: ${dayHref}`, ...(waiting ? [`${waiting} ${approvalsHref}`] : []), ""];
+  const waiting = approvalsSentence(d.approvals ?? 0, out);
+  const textLines: string[] = [w("digest.email.greetingText", { name }), "", lead, w("digest.email.dayText", { url: dayHref }), ...(waiting ? [`${waiting} ${approvalsHref}`] : []), ""];
   const rows: string[] = [];
 
   items.forEach((item, i) => {
     const t = item.task;
     const href = `${base}${t.href ?? `/app/tasks/${t.id}`}`;
-    const due = formatDue(t.dueDate);
-    const meta = t.meta ?? [t.clientName, due ? `יעד ${due}` : ""].filter(Boolean).join(" · ");
-    const notes = taskNotes(t);
+    const due = formatDue(t.dueDate, out);
+    const meta = t.meta ?? [t.clientName, due ? w("digest.email.due", { date: due }) : ""].filter(Boolean).join(" · ");
+    const notes = taskNotes(t, out);
 
     textLines.push(`${i + 1}. ${item.reason}`);
     textLines.push(`   ${t.title} · ${meta}`);
@@ -1157,10 +1184,10 @@ export function renderDigestEmail(d: Digest, name: string, now: Date = new Date(
       : "";
 
     rows.push(`<tr>
-  <td valign="top" style="padding:14px 0 14px 10px;border-top:1px solid ${RULE};width:24px;">
+  <td valign="top" style="padding:${dir === "rtl" ? "14px 0 14px 10px" : "14px 10px 14px 0"};border-top:1px solid ${RULE};width:24px;">
     <div style="width:22px;height:22px;line-height:22px;border-radius:11px;background:${INK};color:#FFFFFF;font-size:12px;font-weight:700;text-align:center;">${i + 1}</div>
   </td>
-  <td valign="top" style="padding:14px 0;border-top:1px solid ${RULE};" dir="rtl" align="right">
+  <td valign="top" style="padding:14px 0;border-top:1px solid ${RULE};" dir="${dir}" align="${start}">
     <div style="font-size:12px;font-weight:700;color:${TONE_COLOR[item.tone]};">${escapeHtml(item.reason)}</div>
     <a href="${href}" style="display:block;margin-top:2px;font-size:15px;font-weight:600;line-height:1.45;color:${INK};text-decoration:none;">${safeText(
       t.title
@@ -1168,7 +1195,7 @@ export function renderDigestEmail(d: Digest, name: string, now: Date = new Date(
     <div style="margin-top:2px;font-size:12.5px;color:${MUTED};">${safeText(meta)}</div>
     ${hintHtml}${notesHtml}
   </td>
-  <td valign="top" style="padding:14px 10px 14px 0;border-top:1px solid ${RULE};width:1%;white-space:nowrap;" align="left">
+  <td valign="top" style="padding:${dir === "rtl" ? "14px 10px 14px 0" : "14px 0 14px 10px"};border-top:1px solid ${RULE};width:1%;white-space:nowrap;" align="${end}">
     <a href="${href}" style="display:inline-block;padding:6px 12px;border:1px solid #C7CED8;border-radius:7px;font-size:13px;font-weight:600;color:${INK};text-decoration:none;">${escapeHtml(
       item.action
     )}</a>
@@ -1177,34 +1204,29 @@ export function renderDigestEmail(d: Digest, name: string, now: Date = new Date(
   });
 
   const tailParts: string[] = [];
-  if (more > 0) tailParts.push(more === 1 ? "ועוד משימה אחת ברשימה." : `ועוד ${more} משימות ברשימה.`);
+  if (more > 0) tailParts.push(w("digest.email.moreTasks", { count: more }));
   if (hiddenWaits > 0) {
-    const also = items.length > 0 ? "ועוד " : "";
-    tailParts.push(
-      hiddenWaits === 1
-        ? `${also}משימה אחת ממתינה למישהו יותר משבוע. אולי הגיע הזמן להזכיר.`
-        : `${also}${hiddenWaits} משימות ממתינות למישהו יותר משבוע. אולי הגיע הזמן להזכיר.`
-    );
+    tailParts.push(w(items.length > 0 ? "digest.email.alsoWaits" : "digest.email.waits", { count: hiddenWaits }));
   }
   const tasksHref = `${base}/app/tasks`;
   if (tailParts.length > 0) textLines.push(tailParts.join(" "), "");
-  textLines.push(`כל המשימות: ${tasksHref}`);
+  textLines.push(w("digest.email.allTasksText", { url: tasksHref }));
 
   const tail = tailParts.length
-    ? `<p style="margin:4px 0 0;padding-top:14px;border-top:1px solid ${RULE};font-size:13px;line-height:1.7;color:${MUTED};" dir="rtl" align="right">${escapeHtml(
+    ? `<p style="margin:4px 0 0;padding-top:14px;border-top:1px solid ${RULE};font-size:13px;line-height:1.7;color:${MUTED};" dir="${dir}" align="${start}">${escapeHtml(
         tailParts.join(" ")
-      )} <a href="${tasksHref}" style="color:${INK};font-weight:600;">לכל המשימות</a></p>`
+      )} <a href="${tasksHref}" style="color:${INK};font-weight:600;">${escapeHtml(w("digest.email.allTasksLink"))}</a></p>`
     : "";
 
   const block = (heading: string, lines: { html: string; text: string }[]) => {
     if (lines.length === 0) return "";
     textLines.push("", `${heading}:`, ...lines.map((l) => `  ${l.text}`));
-    return `<div style="margin-top:22px;font-size:12px;font-weight:600;letter-spacing:.06em;color:#8A94A3;" dir="rtl" align="right">${escapeHtml(
+    return `<div style="margin-top:22px;font-size:12px;font-weight:600;letter-spacing:.06em;color:#8A94A3;" dir="${dir}" align="${start}">${escapeHtml(
       heading
     )}</div>${lines
       .map(
         (l) =>
-          `<div style="padding:10px 0;border-top:1px solid ${RULE};font-size:13.5px;line-height:1.7;color:#3B4A5E;" dir="rtl" align="right">${l.html}</div>`
+          `<div style="padding:10px 0;border-top:1px solid ${RULE};font-size:13.5px;line-height:1.7;color:#3B4A5E;" dir="${dir}" align="${start}">${l.html}</div>`
       )
       .join("")}`;
   };
@@ -1213,53 +1235,53 @@ export function renderDigestEmail(d: Digest, name: string, now: Date = new Date(
   const clientLines = shownClients.map((c) => ({
     html: `<a href="${base}${c.href}" style="color:${INK};font-weight:600;text-decoration:none;border-bottom:1px solid #C7CED8;">${safeText(
       c.clientName
-    )}</a>&#8207; <span style="color:${c.tone === "red" ? TONE_COLOR.red : c.tone === "amber" ? TONE_COLOR.amber : "#3B4A5E"};">${escapeHtml(c.text)}</span>`,
+    )}</a>${dir === "rtl" ? "&#8207;" : "&#8206;"} <span style="color:${c.tone === "red" ? TONE_COLOR.red : c.tone === "amber" ? TONE_COLOR.amber : "#3B4A5E"};">${escapeHtml(c.text)}</span>`,
     text: `${c.clientName}: ${c.text} ${base}${c.href}`,
   }));
   if (allClients.length > shownClients.length) {
     const n = allClients.length - shownClients.length;
     clientLines.push({
-      html: `${n === 1 ? "ועוד עניין אחד" : `ועוד ${n} עניינים`}. <a href="${base}/app/clients" style="color:${INK};font-weight:600;">ללקוחות</a>`,
-      text: `${n === 1 ? "ועוד עניין אחד" : `ועוד ${n} עניינים`}: ${base}/app/clients`,
+      html: `${escapeHtml(w("digest.email.moreClients", { count: n }))}. <a href="${base}/app/clients" style="color:${INK};font-weight:600;">${escapeHtml(w("digest.email.clientsLink"))}</a>`,
+      text: `${w("digest.email.moreClients", { count: n })}: ${base}/app/clients`,
     });
   }
   const houseLines = (d.housekeeping ?? []).map((h) => ({
     html: `${escapeHtml(h.text)} <a href="${base}${h.href}" style="color:${INK};font-weight:600;">${escapeHtml(h.linkText)}</a>`,
     text: `${h.text} ${h.linkText}: ${base}${h.href}`,
   }));
-  const blocks = block("הלקוחות שלך", clientLines) + block("סדר בית", houseLines);
+  const blocks = block(w("digest.email.clientsHeading"), clientLines) + block(w("digest.email.houseHeading"), houseLines);
 
   const html = `<!doctype html>
-<html dir="rtl" lang="he">
+<html dir="${dir}" lang="${out.locale}">
   <body style="margin:0;padding:0;background:#EEF0F3;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF0F3;padding:24px 12px;">
       <tr>
         <td align="center">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border:1px solid #D9DEE5;border-radius:14px;font-family:Arial,Helvetica,sans-serif;">
             <tr>
-              <td style="padding:22px 24px 8px;" dir="rtl" align="right">
+              <td style="padding:22px 24px 8px;" dir="${dir}" align="${start}">
                 <div style="font-size:11px;font-weight:600;letter-spacing:.22em;color:#8A94A3;">ANKORA</div>
-                <p style="margin:10px 0 4px;font-size:20px;font-weight:600;color:${INK};">בוקר טוב ${escapeHtml(name)}</p>
+                <p style="margin:10px 0 4px;font-size:20px;font-weight:600;color:${INK};">${escapeHtml(w("digest.email.greeting", { name }))}</p>
                 <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#3B4A5E;">${escapeHtml(lead)}</p>
-                <a href="${dayHref}" style="display:inline-block;background:${INK};color:#FFFFFF;text-decoration:none;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:600;">פתח את היום שלי</a>
+                <a href="${dayHref}" style="display:inline-block;background:${INK};color:#FFFFFF;text-decoration:none;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:600;">${escapeHtml(w("digest.email.openDay"))}</a>
                 ${
                   waiting
-                    ? `<p style="margin:12px 0 0;font-size:13.5px;line-height:1.6;color:#3B4A5E;">${escapeHtml(waiting)} <a href="${approvalsHref}" style="color:${INK};font-weight:600;">למסך האישורים</a></p>`
+                    ? `<p style="margin:12px 0 0;font-size:13.5px;line-height:1.6;color:#3B4A5E;">${escapeHtml(waiting)} <a href="${approvalsHref}" style="color:${INK};font-weight:600;">${escapeHtml(w("digest.email.approvalsLink"))}</a></p>`
                     : ""
                 }
               </td>
             </tr>
             <tr>
-              <td style="padding:14px 24px 4px;" dir="rtl" align="right">
-                ${rows.length ? `<div style="font-size:12px;font-weight:600;letter-spacing:.06em;color:#8A94A3;margin-bottom:4px;">לפי סדר חשיבות</div>` : ""}
-                ${rows.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" dir="rtl">${rows.join("")}</table>` : ""}
+              <td style="padding:14px 24px 4px;" dir="${dir}" align="${start}">
+                ${rows.length ? `<div style="font-size:12px;font-weight:600;letter-spacing:.06em;color:#8A94A3;margin-bottom:4px;">${escapeHtml(w("digest.email.ranked"))}</div>` : ""}
+                ${rows.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" dir="${dir}">${rows.join("")}</table>` : ""}
                 ${tail}
                 ${blocks}
               </td>
             </tr>
             <tr>
-              <td style="padding:14px 24px 20px;font-size:12px;color:#8A94A3;" dir="rtl" align="right">
-                <a href="${base}/app/profile" style="color:${MUTED};">הגדרות המייל</a>
+              <td style="padding:14px 24px 20px;font-size:12px;color:#8A94A3;" dir="${dir}" align="${start}">
+                <a href="${base}/app/profile" style="color:${MUTED};">${escapeHtml(w("digest.email.settings"))}</a>
               </td>
             </tr>
           </table>
@@ -1295,7 +1317,7 @@ export async function sendDailyTaskDigest(now: Date = new Date()): Promise<{ sen
       dailyDigestByEmail: true,
       role: { in: ["SUPER_ADMIN", "ANKORA_ADMIN", "ANKORA_EMPLOYEE"] },
     },
-    select: { id: true, name: true, email: true, dailyDigestAt: true },
+    select: { id: true, name: true, email: true, dailyDigestAt: true, locale: true, timezone: true },
   });
 
   let sent = 0;
@@ -1303,7 +1325,9 @@ export async function sendDailyTaskDigest(now: Date = new Date()): Promise<{ sen
 
   for (const person of people) {
     try {
-      const digest = await buildDigest(person, now);
+      // In the person's own language (ADR 0006, outgoing channels).
+      const out = outgoingOf(person);
+      const digest = await buildDigest(person, now, out);
       if (isDigestEmpty(digest)) {
         skipped++;
         // The stamp moves anyway. Without this, a quiet Tuesday makes
@@ -1313,10 +1337,10 @@ export async function sendDailyTaskDigest(now: Date = new Date()): Promise<{ sen
         continue;
       }
 
-      const { html, text } = renderDigestEmail(digest, person.name, now);
+      const { html, text } = renderDigestEmail(digest, person.name, now, out);
       const result = await sendEmail({
         to: [person.email],
-        subject: digestSubject(digest, now),
+        subject: digestSubject(digest, now, out),
         text,
         html,
       });

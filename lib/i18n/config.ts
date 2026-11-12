@@ -28,6 +28,19 @@ export const APP_LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 /// Every person's time zone until they choose one (User.timezone's default).
 export const DEFAULT_TIME_ZONE = "Asia/Jerusalem";
 
+/// A time zone Intl accepts, or the default. User.timezone is free text
+/// (TimezoneForm.tsx says why), and one bad value must not take every
+/// formatted date on every screen down with it.
+export function safeTimeZone(value: string | null | undefined): string {
+  if (!value) return DEFAULT_TIME_ZONE;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value });
+    return value;
+  } catch {
+    return DEFAULT_TIME_ZONE;
+  }
+}
+
 export function isAppLocale(value: unknown): value is AppLocale {
   return typeof value === "string" && (APP_LOCALES as readonly string[]).includes(value);
 }

@@ -1,4 +1,6 @@
 import "server-only";
+import { groupEmailsByLocale } from "@/lib/i18n/recipients";
+import type { OutgoingT } from "@/lib/i18n/outgoing";
 import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -362,19 +364,6 @@ export function decideAlertAction(
   return openUnresolvedEvent ? "resolve" : "none";
 }
 
-function formatThresholdLabel(type: AlertThresholdType): string {
-  switch (type) {
-    case "UTILIZATION_PCT":
-      return "ניצול (%)";
-    case "REMAINING_MINUTES":
-      return "דקות שנותרו";
-    case "CONSUMED_MINUTES":
-      return "דקות שנוצלו";
-    case "OVERAGE":
-      return "חריגה (דקות)";
-  }
-}
-
 /// The rule's own Ankora list plus, when the rule asks for it, the
 /// client's account manager. Deduplicated, so a manager who is also on
 /// the list is mailed once.
@@ -515,22 +504,31 @@ async function evaluateSingleRule(
     throw err;
   }
 
-  const label = formatThresholdLabel(rule.type);
-  const subjectAnkora = `[Ankora] התראת בנק שעות - ${clientName}`;
+  // The Ankora copy goes to people on the team, each in their own
+  // language (ADR 0006, outgoing channels): one email per language among
+  // the recipients. The client copy below stays Hebrew (part B).
   const isPrepaid = bank.kind === "PREPAID";
-  const textAnkora = [
-    `לקוח: ${clientName}`,
-    `סוג התראה: ${label}`,
-    `סף: ${rule.thresholdValue}`,
-    `ערך נוכחי: ${Math.round(currentValue)}`,
-    isPrepaid
-      ? `חבילה: נוצלו ${utilization.utilizationPct}% מ-${((bank.purchasedMinutes ?? 0) / 60).toFixed(2)} השעות שנטענו. ${
-          utilization.remainingMinutes < 0
-            ? `חריגה: ${(-utilization.remainingMinutes / 60).toFixed(2)} שעות, תקוזז מהטעינה הבאה.`
-            : `נותרו ${(utilization.remainingMinutes / 60).toFixed(2)} שעות.`
-        }`
-      : `ניצול: ${utilization.utilizationPct}% (${utilization.consumedMinutes}/${utilization.totalMinutes} דקות)`,
-  ].join("\n");
+  const ankoraText = (t: OutgoingT) =>
+    [
+      t("alerts.client", { client: clientName }),
+      t("alerts.kind", { kind: t(`alerts.thresholds.${rule.type}`) }),
+      t("alerts.threshold", { value: String(rule.thresholdValue) }),
+      t("alerts.current", { value: String(Math.round(currentValue)) }),
+      isPrepaid
+        ? t("alerts.prepaid", {
+            pct: String(utilization.utilizationPct),
+            hours: ((bank.purchasedMinutes ?? 0) / 60).toFixed(2),
+            rest:
+              utilization.remainingMinutes < 0
+                ? t("alerts.prepaidOver", { hours: (-utilization.remainingMinutes / 60).toFixed(2) })
+                : t("alerts.prepaidLeft", { hours: (utilization.remainingMinutes / 60).toFixed(2) }),
+          })
+        : t("alerts.utilization", {
+            pct: String(utilization.utilizationPct),
+            consumed: String(utilization.consumedMinutes),
+            total: String(utilization.totalMinutes),
+          }),
+    ].join("\n");
 
   const skipClientCopy = isPrepaid && hasFullRule && !isFullPackageRule(rule) && utilization.remainingMinutes <= 0;
   const subjectClient = isPrepaid ? `עדכון חבילת שעות - ${clientName}` : `עדכון ניצול שעות - ${clientName}`;
@@ -552,13 +550,12 @@ async function evaluateSingleRule(
     `צוות Ankora`,
   ].join("\n");
 
+  const ankoraGroups = await groupEmailsByLocale(
+    ankoraRecipients(rule.recipientsAnkora, rule.notifyAccountManager ? accountManagerEmail : null)
+  );
   await Promise.all([
-    deliverAlertEmail(
-      event.id,
-      "ankora_internal",
-      ankoraRecipients(rule.recipientsAnkora, rule.notifyAccountManager ? accountManagerEmail : null),
-      subjectAnkora,
-      textAnkora
+    ...ankoraGroups.map((g) =>
+      deliverAlertEmail(event.id, "ankora_internal", g.to, g.out.t("alerts.subject", { client: clientName }), ankoraText(g.out.t))
     ),
     deliverAlertEmail(
       event.id,

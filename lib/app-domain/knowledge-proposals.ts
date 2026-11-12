@@ -501,9 +501,11 @@ export async function proposeKnowledge(
     const client = await prisma.client.findUniqueOrThrow({ where: { id: input.clientId }, select: { name: true } });
     await notifyRuleApprovers(input.clientId, actor.id, {
       type: SENSITIVE_PROPOSED,
-      title: `${client.name}: מידע רגיש ממתין לאישור שלך`,
-      body: `${sensitive === 1 ? "פריט רגיש אחד" : `${sensitive} פריטים רגישים`} מ-${registered.code} ${source.title}. רק מי שמאשר מידע רגיש אצל הלקוח רואה אותם.`.slice(0, 500),
       entityType: "Knowledge",
+      words: (t) => ({
+        title: t("sensitiveProposed.title", { client: client.name }),
+        body: t("sensitiveProposed.body", { count: sensitive, source: `${registered.code} ${source.title}` }).slice(0, 500),
+      }),
     });
   }
   await recordAudit({

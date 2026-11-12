@@ -2,6 +2,8 @@ import "server-only";
 import { DomainError } from "@/lib/domain-error";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { outgoingForUser } from "@/lib/i18n/recipients";
+import type { OutgoingT } from "@/lib/i18n/outgoing";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { readSteps } from "@/lib/process-rules";
@@ -35,9 +37,17 @@ export const REVIEW_DUE = "process.review_due";
 
 const OPEN_RUN = { notIn: ["DONE", "ARCHIVED"] as ("DONE" | "ARCHIVED")[] };
 
-async function notifyOwner(p: { clientId: string; ownerId: string | null; backupOwnerId: string | null }, type: string, title: string, body: string) {
+/// Worded in the owner's language (ADR 0006, outgoing channels). What the
+/// caller passes in as text already written (the cause, the failing
+/// checks) stays as it was written.
+async function notifyOwner(
+  p: { clientId: string; ownerId: string | null; backupOwnerId: string | null },
+  type: string,
+  words: (t: OutgoingT) => { title: string; body: string }
+) {
   const userId = p.ownerId ?? p.backupOwnerId;
   if (!userId) return false;
+  const { title, body } = words((await outgoingForUser(userId)).t);
   await prisma.notification.create({ data: { userId, type, title: title.slice(0, 200), body: body.slice(0, 2000), entityType: "ClientProcesses", entityId: p.clientId } });
   return true;
 }
@@ -71,7 +81,10 @@ export async function rescanClientProcesses(clientId: string, cause: string, now
           })),
         });
       }
-      await notifyOwner(p, RULES_CHANGED, `דורש סקירה: ${p.code} ${p.title}`, `${cause}. הנוהל שבתוקף כבר לא עומד בכללי הלקוח.\n${lines}`);
+      await notifyOwner(p, RULES_CHANGED, (t) => ({
+        title: t("processReview.rulesTitle", { code: p.code, title: p.title }),
+        body: `${t("processReview.rulesBody", { cause })}\n${lines}`,
+      }));
       await recordAudit({ actorId: null, action: "process.needs_review", entityType: "Process", entityId: p.id, clientId, after: { reason: "RULES", cause, checks: failing.map((c) => c.code), runsCommented: runs.length } });
       flagged++;
     } else if (!failing.length && reason === "RULES") {
@@ -120,7 +133,10 @@ export async function reviewProcessesDaily(now = new Date()): Promise<{ flagged:
   for (const p of periodic) {
     if (!isReviewDue(p, now)) continue;
     await prisma.process.update({ where: { id: p.id }, data: { needsReview: true, reviewReason: "PERIODIC" } });
-    await notifyOwner(p, REVIEW_DUE, `הגיע מועד הסקירה: ${p.code} ${p.title}`, `סקירה כל ${p.reviewEveryDays} ימים. עוברים על הנוהל מול מה שקורה בפועל, ומסמנים "נסקר", או כותבים גרסה חדשה.`);
+    await notifyOwner(p, REVIEW_DUE, (t) => ({
+      title: t("processReview.dueTitle", { code: p.code, title: p.title }),
+      body: t("processReview.dueBody", { days: String(p.reviewEveryDays) }),
+    }));
     await recordAudit({ actorId: null, action: "process.needs_review", entityType: "Process", entityId: p.id, clientId: p.clientId, after: { reason: "PERIODIC" } });
     due++;
   }

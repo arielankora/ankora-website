@@ -226,3 +226,39 @@ language (item 4 above).
 Until the screens a person uses are translated, choosing English shows
 those screens in Hebrew laid out left to right. That is expected in this
 phase and is the reason the screens come next.
+
+## Outgoing channels, part A (12.11.2026)
+
+What the app sends to a person who has an account, staff or a client
+user, is written in that person's language (`User.locale`), whoever
+caused it and whatever request (or cron) it runs in.
+
+* `lib/i18n/outgoing.ts`: `translatorFor(locale, timeZone)` returns the
+  `outgoing` namespace (`t`), a formatter, and the direction and sides an
+  email layout needs. It reads the dictionaries directly with next-intl's
+  `createTranslator`, because `getTranslations` reads the current
+  request, which is the sender's. `HEBREW` is the default every builder
+  falls back to.
+* `lib/i18n/recipients.ts`: `outgoingForUser(s)` and `outgoingOf(row)`
+  read the person's row; `groupEmailsByLocale` splits a typed-in address
+  list (an alert rule's Ankora list, a reminder's extra addresses, the
+  vault alert's) by the language of the app user behind each address, one
+  send per language. An address that is no app user's keeps Hebrew.
+* Bell rows are worded when they are created, in the recipient's language;
+  the schema is unchanged, so a row keeps the language it was written in
+  if the person changes theirs later.
+* Emails: the action layout (`renderActionEmail`), the morning digest and
+  the weekly metrics email take the recipient's `Outgoing` and turn the
+  layout with it (`dir`, `lang`, `align`).
+* An invite goes out in the language set for the new account
+  (`inviteUser`'s `locale`, read from the form's `locale` field when it
+  sends one), Hebrew otherwise.
+
+Still Hebrew, for part B or by decision: anything to people who are not
+app users (client contacts, the client copy of an hour bank alert,
+scheduled reports, messages staff write to clients, WhatsApp, procedure
+steps sent through the person's Gmail), PDFs and exports, the nightly
+backup email, prompts to Claude and MCP answers. Text people wrote, and
+lines lib/ builds as a record (a process review's cause, a failing
+check's message, the reason stored on an auto-apply pause), are put into
+the message as they are.

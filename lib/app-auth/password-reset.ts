@@ -1,4 +1,5 @@
 import "server-only";
+import { outgoingOf } from "@/lib/i18n/recipients";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, validatePasswordPolicy } from "@/lib/app-auth/password";
@@ -41,17 +42,20 @@ export async function requestPasswordReset(identifier: string): Promise<string |
   // inbox, in production, for every staff member who forgot a password
   // and for every invitee who tried this door. sendEmail never throws, so
   // a mail-provider outage still leaves the same neutral screen.
-  const { html, text } = renderActionEmail({
-    title: "בחירת סיסמה חדשה למערכת Ankora",
-    body: [
-      `שלום ${user.name},`,
-      "התקבלה בקשה לבחור סיסמה חדשה לחשבון שלך. הקישור תקף לשעה ולשימוש אחד בלבד.",
-    ],
-    buttonLabel: "בחירת סיסמה",
-    url: `${appBaseUrl()}/app/reset-password?token=${raw}`,
-    footnote: "אם לא ביקשת את הקישור, אפשר להתעלם מההודעה. הסיסמה הנוכחית לא השתנתה.",
-  });
-  const mail = await sendEmail({ to: [user.email], subject: "בחירת סיסמה חדשה למערכת Ankora", text, html });
+  // In the person's own language (ADR 0006, outgoing channels).
+  const out = outgoingOf(user);
+  const t = out.t;
+  const { html, text } = renderActionEmail(
+    {
+      title: t("passwordReset.title"),
+      body: [t("greeting", { name: user.name }), t("passwordReset.body")],
+      buttonLabel: t("passwordReset.button"),
+      url: `${appBaseUrl()}/app/reset-password?token=${raw}`,
+      footnote: t("passwordReset.footnote"),
+    },
+    out
+  );
+  const mail = await sendEmail({ to: [user.email], subject: t("passwordReset.title"), text, html });
 
   await recordAudit({
     actorId: user.id,

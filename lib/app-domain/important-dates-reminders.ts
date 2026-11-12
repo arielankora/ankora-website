@@ -44,6 +44,8 @@
 // simply not gate it, rather than duplicate its exports into a second,
 // client-safe copy.
 
+import type { OutgoingT } from "@/lib/i18n/outgoing";
+
 export type ImportantDateCategoryLike =
   | "PEOPLE_FAMILY"
   | "DOCUMENTS_AUTHORITIES"
@@ -153,30 +155,59 @@ export interface ReminderMessageInput {
   daysBefore: number;
 }
 
+// ADR 0006, outgoing channels: every text below goes to a person, and is
+// written in that person's language. The caller passes the recipient's
+// words (lib/i18n/outgoing.ts); the import is type-only, so the date form
+// that reads this module's labels does not carry the dictionaries.
+
+function whenText(daysBefore: number, t: OutgoingT): string {
+  return daysBefore === 0
+    ? t("importantDates.today")
+    : daysBefore === 1
+      ? t("importantDates.tomorrow")
+      : t("importantDates.inDays", { days: String(daysBefore) });
+}
+
 /// Plain-text in-app notification body (Notification.type will be a new
 /// "important_date.reminder" string - free-string precedent, same as
 /// every other Notification.type value - no schema change needed).
-export function buildInAppReminderMessage(input: ReminderMessageInput): string {
-  const when = input.daysBefore === 0 ? "היום" : input.daysBefore === 1 ? "מחר" : `בעוד ${input.daysBefore} ימים`;
-  return `${input.dateTitle} (${input.clientName}) - ${when}, בתאריך ${input.occurrenceDate}.`;
+export function buildInAppReminderMessage(input: ReminderMessageInput, t: OutgoingT): string {
+  return t("importantDates.inApp", { title: input.dateTitle, client: input.clientName, when: whenText(input.daysBefore, t), date: input.occurrenceDate });
 }
 
-export function buildEmailReminderSubject(input: ReminderMessageInput): string {
-  return `תזכורת: ${input.dateTitle} - ${input.clientName}`;
+export function buildEmailReminderSubject(input: ReminderMessageInput, t: OutgoingT): string {
+  return t("importantDates.emailSubject", { title: input.dateTitle, client: input.clientName });
 }
 
-export function buildEmailReminderBody(input: ReminderMessageInput): string {
-  const when = input.daysBefore === 0 ? "היום" : input.daysBefore === 1 ? "מחר" : `בעוד ${input.daysBefore} ימים`;
+export function buildEmailReminderBody(input: ReminderMessageInput, t: OutgoingT): string {
+  const when = whenText(input.daysBefore, t);
   return [
-    `שלום,`,
+    t("importantDates.emailHello"),
     ``,
-    `מועד חשוב מתקרב עבור ${input.clientName}:`,
-    `${input.dateTitle} - ${when} (${input.occurrenceDate}).`,
+    t("importantDates.emailLead", { client: input.clientName }),
+    t("importantDates.emailLine", { title: input.dateTitle, when, date: input.occurrenceDate }),
     ``,
-    `הודעה זו נשלחה אוטומטית ממערכת ניהול הזמן של Ankora.`,
+    t("importantDates.emailFooter"),
   ].join("\n");
 }
 
-export function buildEscalationMessage(input: ReminderMessageInput & { originalResponsibleName: string }): string {
-  return `${input.dateTitle} (${input.clientName}) לא טופל על ידי ${input.originalResponsibleName} - המועד חל ב-${input.occurrenceDate}.`;
+export function buildEscalationMessage(input: ReminderMessageInput & { originalResponsibleName: string }, t: OutgoingT): string {
+  return t("importantDates.escalation", {
+    title: input.dateTitle,
+    client: input.clientName,
+    person: input.originalResponsibleName,
+    date: input.occurrenceDate,
+  });
+}
+
+export function buildEscalationSubject(input: { dateTitle: string; clientName: string }, t: OutgoingT): string {
+  return t("importantDates.escalationSubject", { title: input.dateTitle, client: input.clientName });
+}
+
+/// reminderTitle (lib/date-receipt.ts) in the reader's language: a date
+/// that expects something to arrive says so first.
+export function localizedReminderTitle(d: { title: string; expectsReceipt?: boolean | null; expectedFrom?: string | null }, t: OutgoingT): string {
+  if (!d.expectsReceipt) return d.title;
+  const from = d.expectedFrom?.trim();
+  return from ? t("importantDates.receiptTitleFrom", { title: d.title, from }) : t("importantDates.receiptTitle", { title: d.title });
 }

@@ -2763,7 +2763,8 @@
       "clearAll": "Clear all",
       "noClients": "There are no clients yet.",
       "invitedEmailSent": "{name} was invited and the email was sent. This one-time link is a backup in case the email doesn't arrive:",
-      "invitedEmailFailed": "{name} was invited, but the email could not be sent. Pass on this one-time link yourself:"
+      "invitedEmailFailed": "{name} was invited, but the email could not be sent. Pass on this one-time link yourself:",
+      "language": "Language"
     },
     "detail": {
       "back": "Users",
@@ -7022,6 +7023,377 @@
     },
     "documentRoute": {
       "unavailable": "This document isn't available right now. You can ask us for it on WhatsApp."
+    }
+  },
+  "outgoing": {
+    "greeting": "Hi {name},",
+    "layout": {
+      "buttonFallback": "If the button does not work, copy this address into your browser:",
+      "footer": "Ankora · Operational intelligence that gives you time back"
+    },
+    "deletionDeclaration": {
+      "title": "Deletion declaration at the end of your work with Ankora",
+      "body1": "When someone finishes working with Ankora, we ask them to confirm that they returned equipment and deleted client information, as set out in the confidentiality undertaking.",
+      "body2": "The link opens the declaration to read and confirm. The declaration itself is in Hebrew. The link is personal, valid for seven days and works once.",
+      "button": "Read and confirm the declaration",
+      "footnote": "If you have a question about the declaration, write to ops@ankora.co.il before you confirm."
+    },
+    "loginLink": {
+      "title": "Your sign-in link to the Ankora portal",
+      "body": "This link signs you in to the portal without a password. It is valid for 15 minutes and works once.",
+      "button": "Sign in to the portal",
+      "footnote": "If you did not ask for this link, you can ignore this email. Nothing in your account has changed."
+    },
+    "passwordReset": {
+      "title": "Choose a new password for Ankora",
+      "body": "We received a request to choose a new password for your account. The link is valid for one hour and works once.",
+      "button": "Choose a password",
+      "footnote": "If you did not ask for this link, you can ignore this email. Your current password has not changed."
+    },
+    "deviceAdded": {
+      "subject": "A device was added to your Ankora account",
+      "title": "A device was added to your account",
+      "unnamed": "New device",
+      "body1": "The device \"{label}\" can now sign in to your Ankora account. It was approved from a device that was already signed in.",
+      "body2": "If you did not add it, open your profile, remove the device and change your password, or write to us at security@ankora.co.il.",
+      "button": "My devices"
+    },
+    "invite": {
+      "staff": {
+        "title": "Your invitation to Ankora",
+        "body": "An account was created for you in Ankora's operations app. The link is valid for 48 hours, and you choose a password the first time you sign in.",
+        "button": "Choose a password"
+      },
+      "client": {
+        "title": "Your access to the Ankora portal",
+        "body1": "We opened portal access for you. The portal shows what is in progress, what is done and what is waiting for your decision.",
+        "body2": "The link is valid for 48 hours. You choose a password the first time you sign in, and later you can also sign in with an emailed link, without a password.",
+        "button": "Open the portal"
+      },
+      "footnote": "If this invitation reached you by mistake, you can ignore this email."
+    },
+    "clientPreferences": {
+      "title": "{client} updated their service preferences",
+      "body1": "{actor} changed the preferences of {client} in the portal.",
+      "body2": "Worth reading before you next reach out: this is exactly where a client tells us what matters to them and what must not happen.",
+      "button": "Open the client",
+      "subject": "{client}: service preferences updated"
+    },
+    "longTimer": {
+      "title": "Timer running for a long time",
+      "body": "The timer for {client} has been running for {hours} hours straight. Check whether it should be stopped."
+    },
+    "taskNotice": {
+      "assigned": "New task for you",
+      "assignedUrgent": "Urgent task for you",
+      "supervising": "You were named supervisor of a task",
+      "body": "{task} · {client}"
+    },
+    "urgent": {
+      "landed": {
+        "subject": "Urgent task for you: {task} · {client}",
+        "title": "Urgent task for you",
+        "from": "From {actor}"
+      },
+      "comment": {
+        "subject": "Update on an urgent task: {task} · {client}",
+        "title": "Update on your urgent task",
+        "wrote": "{actor} wrote a comment"
+      },
+      "taskLine": "{task} · {client}",
+      "button": "Open the task",
+      "bellTitle": "Update on an urgent task",
+      "bellBody": "{task} · {client} · {actor}"
+    },
+    "stepApproval": {
+      "title": "Waiting for your approval: {step}",
+      "body": "{actor} finished the step and sent it for your approval. Once you approve it, the task can be closed."
+    },
+    "exceptions": {
+      "requested": {
+        "title": "{client}: request for an exception to the rule \"{policy}\"",
+        "body": "{actor} asks: {what}"
+      },
+      "approved": "Exception approved for the rule \"{policy}\"",
+      "rejected": "Exception rejected for the rule \"{policy}\""
+    },
+    "sensitiveProposed": {
+      "title": "{client}: sensitive information is waiting for your approval",
+      "body": "{count, plural, =1 {One sensitive item} other {# sensitive items}} from {source}. Only people who approve sensitive information for this client can see them."
+    },
+    "extractionStale": {
+      "title": "No extraction has reached {client} for {days} working days",
+      "body": "The last proposal for this client file arrived more than three working days ago. Check that the daily extraction is running, and that the client meetings are matched to the client by their domains."
+    },
+    "processCheck": {
+      "title": "Time for the check: {code} {title}",
+      "body": "{check}. {last}.",
+      "defaultCheck": "Routine check",
+      "lastChecked": "Last checked on {date}",
+      "neverChecked": "Not checked yet"
+    },
+    "lesson": {
+      "title": "A note on the procedure: {code} {title}",
+      "body": "{actor} closed \"{task}\" and wrote: {text}"
+    },
+    "runOpened": {
+      "title": "A run was opened: {code} {title}",
+      "body": "{steps} steps, from procedure version {version}. The first is on {date}."
+    },
+    "processReview": {
+      "rulesTitle": "Needs review: {code} {title}",
+      "rulesBody": "{cause}. The procedure in force no longer meets the client's rules.",
+      "dueTitle": "Review due: {code} {title}",
+      "dueBody": "Reviewed every {days} days. Go over the procedure against what actually happens, then mark it \"reviewed\" or write a new version."
+    },
+    "autoApply": {
+      "clientTitle": "Auto-apply paused for {client}",
+      "clientBody": "{errors} of this client's items that entered the file automatically were undone or corrected within {days} days. From now on, the client's proposals wait for a person to approve them. To turn auto-apply back on, use the \"Extracted knowledge\" tab on the approvals screen.",
+      "kindTitle": "Auto-apply paused: {kind}",
+      "kindBody": "{errors} of the last {counted} items of the kind {kind} that entered client files automatically were undone or corrected. From now on, proposals of this kind wait for a person to approve them. To turn auto-apply back on, use the \"Extracted knowledge\" tab on the approvals screen."
+    },
+    "labels": {
+      "targets": {
+        "FACT": "Fact",
+        "CONTACT": "Contact",
+        "ORGANIZATION": "Vendor or service provider",
+        "SYSTEM": "System",
+        "REQUEST_TYPE": "Request type",
+        "POLICY": "Client rule",
+        "ENTITY": "Legal entity",
+        "NARRATIVE": "Overview, background or our role",
+        "PROCESS": "Process",
+        "DOMAIN": "Domain",
+        "TASK": "Task",
+        "DATE": "Date"
+      },
+      "factKinds": {
+        "SCOPE_IN": "In scope",
+        "SCOPE_OUT": "Out of scope",
+        "PREFERENCE": "Preference",
+        "REQUIREMENT": "Standing requirement",
+        "LOCATION": "Location",
+        "FINANCE": "Finance",
+        "TEMPORARY": "Temporary information",
+        "ONE_OFF_DECISION": "One-off decision",
+        "QUESTION": "Open question",
+        "NOTE": "Note"
+      },
+      "status": {
+        "OPEN": "Open",
+        "IN_PROGRESS": "In progress",
+        "PENDING_APPROVAL": "Waiting for approval",
+        "DONE": "Done",
+        "ARCHIVED": "Archived"
+      },
+      "priority": {
+        "LOW": "Low",
+        "NORMAL": "Normal",
+        "HIGH": "High",
+        "URGENT": "Urgent"
+      },
+      "blocker": {
+        "CLIENT": "Waiting on the client",
+        "SUPPLIER": "Waiting on a vendor",
+        "INTERNAL": "Waiting on someone internal",
+        "OTHER": "Waiting"
+      }
+    },
+    "attention": {
+      "title": "{client} file: what needs attention",
+      "pastValidity": "{count, plural, =1 {One temporary item is past its validity. Still true?} other {# temporary items are past their validity. Still true?}}",
+      "openQuestions": "{count, plural, =1 {One open question still has no answer.} other {# open questions still have no answer.}}",
+      "staleUncertain": "{count, plural, =1 {One item has been uncertain for more than {days} days.} other {# items have been uncertain for more than {days} days.}}",
+      "staleProposedRules": "{count, plural, =1 {One proposed rule has waited for a manager's approval for more than {days} days, and until then it is not binding.} other {# proposed rules have waited for a manager's approval for more than {days} days, and until then they are not binding.}}",
+      "staleProposals": "{count, plural, =1 {One proposal has waited on the review screen for more than {days} days, and until it is approved it is not in the file.} other {# proposals have waited on the review screen for more than {days} days, and until they are approved they are not in the file.}}",
+      "rulesDueReview": "{count, plural, =1 {One rule is due for review.} other {# rules are due for review.}}"
+    },
+    "importantDates": {
+      "today": "today",
+      "tomorrow": "tomorrow",
+      "inDays": "in {days} days",
+      "inApp": "{title} ({client}): {when}, on {date}.",
+      "emailSubject": "Reminder: {title}, {client}",
+      "emailHello": "Hello,",
+      "emailLead": "An important date is coming up for {client}:",
+      "emailLine": "{title}: {when} ({date}).",
+      "emailFooter": "This message was sent automatically by Ankora's time management system.",
+      "escalation": "{title} ({client}) was not handled by {person}. The date falls on {date}.",
+      "escalationSubject": "Escalation: {title}, {client}",
+      "receiptTitle": "Awaiting receipt: {title}",
+      "receiptTitleFrom": "Awaiting receipt: {title} (from {from})",
+      "conditionCheck": "A conditional date on {date}. Does the condition hold: {condition}? If so, open a task."
+    },
+    "alerts": {
+      "subject": "[Ankora] Hour bank alert: {client}",
+      "client": "Client: {client}",
+      "kind": "Alert type: {kind}",
+      "threshold": "Threshold: {value}",
+      "current": "Current value: {value}",
+      "prepaid": "Package: {pct}% of the {hours} hours loaded has been used. {rest}",
+      "prepaidOver": "Overage: {hours} hours, to be deducted from the next top-up.",
+      "prepaidLeft": "{hours} hours left.",
+      "utilization": "Utilization: {pct}% ({consumed}/{total} minutes)",
+      "thresholds": {
+        "UTILIZATION_PCT": "Utilization (%)",
+        "REMAINING_MINUTES": "Minutes remaining",
+        "CONSUMED_MINUTES": "Minutes used",
+        "OVERAGE": "Overage (minutes)"
+      }
+    },
+    "vault": {
+      "subject": "Credentials vault: {subject}",
+      "footer": "The full details are in the audit log.",
+      "rateLimit": {
+        "subject": "Reveal limit reached",
+        "line1": "{name} ({email}) reached {limit} credential reveals in the last hour.",
+        "line2": "Further reveals are blocked until the hour turns."
+      },
+      "many": {
+        "subject": "Many reveals in a short time",
+        "line": "{name} ({email}) viewed {count} different credentials in the last hour."
+      },
+      "lockout": {
+        "subject": "Verification lockout",
+        "line1": "{name} ({email}) failed identity verification {limit} times before revealing a credential.",
+        "line2": "Reveals are locked for this user for {minutes} minutes."
+      },
+      "rewrap": {
+        "moved": "Moved to the new key: {count}",
+        "current": "Already on the new key: {count}",
+        "failed": "Failed the check and left untouched: {count}",
+        "foreign": "Rows on a key this environment does not hold: {count}",
+        "doneSubject": "Key rotation complete",
+        "notDoneSubject": "Key rotation not complete",
+        "doneNext": "You can move the new value to VAULT_KEK, delete VAULT_KEK_NEXT and redeploy.",
+        "notDoneNext": "Do not delete the old key until these numbers reach zero."
+      }
+    },
+    "brainMetrics": {
+      "subjectAllOk": "File metrics, week of {week}: all on target",
+      "subjectOff": "File metrics, week of {week}: {count, plural, =1 {one measure} other {# measures}} not on target yet",
+      "lead": "File metrics for the week of {week}, across all clients:",
+      "line": "- {label}: {display} (target: {target}). {state}.",
+      "byClientText": "Not on target yet, by client:",
+      "byClient": "Not on target yet, by client",
+      "target": "Target: {target}",
+      "heading": "File metrics, week of {week}",
+      "intro": "Hi {name}, this is how the file worked this week, across all clients.",
+      "link": "Open the metrics"
+    },
+    "changes": {
+      "noDate": "none",
+      "backFromApproval": "Sent back from approval",
+      "reopened": "Reopened",
+      "status": "Status: {from} → {to}",
+      "priority": "Priority: {from} → {to}",
+      "dueDate": "Due date: {from} → {to}",
+      "comment": "Comment: «{quote}»",
+      "fileNamed": "Attached a file: {title}",
+      "file": "Attached a file",
+      "approved": "The task was approved",
+      "blocked": "Marked as waiting",
+      "unblocked": "No longer waiting",
+      "descriptionUpdated": "Description updated",
+      "descriptionRemoved": "Description removed"
+    },
+    "digest": {
+      "someone": "Someone",
+      "days": "{count, plural, =1 {one day} other {# days}}",
+      "subject": {
+        "staleWaits": "{count, plural, =1 {One task has been waiting for more than a week} other {# tasks have been waiting for more than a week}}",
+        "morning": "Your morning",
+        "more": "{count, plural, =1 {{head}, and one more} other {{head}, and # more}}"
+      },
+      "approvals": "{count, plural, =1 {One thing is waiting for your approval.} other {# things are waiting for your approval.}}",
+      "review": {
+        "rules": "No longer meets the client's rules",
+        "periodic": "Periodic review is due"
+      },
+      "clients": {
+        "prepaid": "{pct}% of the package used, {rest}.",
+        "prepaidLeft": "{hours} hours left",
+        "prepaidNone": "nothing left",
+        "bank": "{pct}% of the hour bank used, {rest}.",
+        "cycleEndsToday": "the cycle ends today",
+        "cycleLeft": "{days} until the cycle ends",
+        "proposals": "{count, plural, =1 {One proposal for the file is waiting for review.} other {# proposals for the file are waiting for review.}}",
+        "extraction": "No extraction has arrived for {days} working days."
+      },
+      "house": {
+        "sinceYesterday": "since yesterday",
+        "sinceDays": "for {days}, since {date}",
+        "timer": "A timer has been running {when} {time} on {client}.",
+        "timerLink": "Stop and fix",
+        "noHours": "No hours were reported on {weekday}, {date}.",
+        "noHoursLink": "Report"
+      },
+      "sensitiveDate": "Sensitive date",
+      "stepOf": "Step in the task: {parent}",
+      "rank": {
+        "urgent": "Urgent",
+        "approval": "Waiting for your approval",
+        "blocking": "holding up {name}",
+        "approve": "Approve",
+        "exception": "An exception request is waiting for your decision",
+        "exceptionShort": "An exception request is waiting for you",
+        "askedBy": "requested by {name}",
+        "decide": "Decide",
+        "late": "{days} late",
+        "open": "Open",
+        "decideHint": "Do it, move the date, or close it?",
+        "routineLate": "Routine check {days} late",
+        "routineLateShort": "Routine check late",
+        "routineToday": "Routine check due today",
+        "check": "Check",
+        "datePast": "A date that passed {days} ago and was not handled",
+        "datePastShort": "Date passed",
+        "dateToday": "Date today",
+        "dateTomorrow": "Date tomorrow",
+        "dateAhead": "Date in {days}",
+        "handle": "Handle",
+        "dateNoTask": "There is no open task for this date yet.",
+        "today": "Due today",
+        "todayUrgentShort": "Urgent, due today",
+        "fresh": "New for you",
+        "freshUrgentShort": "New urgent task",
+        "updated": "Updated",
+        "updatedUrgentShort": "Urgent task updated",
+        "review": "Procedure to review",
+        "remind": "Remind"
+      },
+      "wait": {
+        "CLIENT": "Waiting on the client",
+        "SUPPLIER": "Waiting on a supplier",
+        "INTERNAL": "Waiting on someone internal",
+        "OTHER": "Waiting"
+      },
+      "lead": {
+        "none": "Nothing needs you today.",
+        "updated": "{count, plural, =1 {One of your tasks was updated.} other {# of your tasks were updated.}}",
+        "needs": "{count, plural, =1 {One thing needs you today.} other {# things need you today.}}",
+        "blocking": "{count, plural, =1 {One of them is holding someone else up.} other {# of them are holding others up.}}"
+      },
+      "moreChanges": "{count, plural, =1 {and one more update} other {and # more updates}}",
+      "email": {
+        "greetingText": "Good morning {name},",
+        "greeting": "Good morning {name}",
+        "dayText": "Your day: {url}",
+        "due": "due {date}",
+        "moreTasks": "{count, plural, =1 {One more task on the list.} other {# more tasks on the list.}}",
+        "waits": "{count, plural, =1 {One task has been waiting on someone for more than a week. Maybe it is time for a reminder.} other {# tasks have been waiting on someone for more than a week. Maybe it is time for a reminder.}}",
+        "alsoWaits": "{count, plural, =1 {One more task has been waiting on someone for more than a week. Maybe it is time for a reminder.} other {# more tasks have been waiting on someone for more than a week. Maybe it is time for a reminder.}}",
+        "allTasksText": "All tasks: {url}",
+        "allTasksLink": "All tasks",
+        "moreClients": "{count, plural, =1 {One more matter} other {# more matters}}",
+        "clientsLink": "Clients",
+        "clientsHeading": "Your clients",
+        "houseHeading": "Housekeeping",
+        "openDay": "Open my day",
+        "approvalsLink": "Go to approvals",
+        "ranked": "In order of importance",
+        "settings": "Email settings"
+      }
     }
   }
 }

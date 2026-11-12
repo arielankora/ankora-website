@@ -13,6 +13,10 @@ export interface Recipient {
   /// Null for everyone until WhatsApp is connected. See the note on the
   /// WhatsApp channel in channels.ts.
   phone: string | null;
+  /// ADR 0006: the language the message and its layout are in. The caller
+  /// writes the message in it; a channel lays it out in it. Hebrew when
+  /// not given.
+  locale?: "he" | "en" | null;
 }
 
 /// One message, written once, in a shape every channel can render.

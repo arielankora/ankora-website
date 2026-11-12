@@ -1,4 +1,5 @@
 import "server-only";
+import { outgoingForUser } from "@/lib/i18n/recipients";
 import { DomainError } from "@/lib/domain-error";
 import { rescanAfterRuleChange } from "@/lib/app-domain/process-review";
 import { ruleChangeCause } from "@/lib/process-review";
@@ -57,9 +58,11 @@ export async function requestException(actor: User, input: ExceptionInput, now =
   const client = await prisma.client.findUniqueOrThrow({ where: { id: policy.clientId }, select: { name: true } });
   await notifyRuleApprovers(policy.clientId, actor.id, {
     type: EXCEPTION_REQUESTED,
-    title: `${client.name}: בקשה לחריגה מהכלל "${policy.title}"`.slice(0, 200),
-    body: `${actor.name} מבקש/ת: ${row.what}`.slice(0, 500),
     entityType: "ClientRules",
+    words: (t) => ({
+      title: t("exceptions.requested.title", { client: client.name, policy: policy.title }).slice(0, 200),
+      body: t("exceptions.requested.body", { actor: actor.name, what: row.what }).slice(0, 500),
+    }),
   });
   return row;
 }
@@ -85,11 +88,13 @@ async function decide(actor: User, id: string, approve: boolean, note: string | 
     after: updated,
   });
   if (before.requestedById !== actor.id) {
+    // In the requester's language (ADR 0006, outgoing channels).
+    const { t } = await outgoingForUser(before.requestedById);
     await prisma.notification.create({
       data: {
         userId: before.requestedById,
         type: EXCEPTION_DECIDED,
-        title: `${approve ? "אושרה" : "נדחתה"} חריגה מהכלל "${before.policy.title}"`.slice(0, 200),
+        title: t(approve ? "exceptions.approved" : "exceptions.rejected", { policy: before.policy.title }).slice(0, 200),
         body: (why ? `${before.what}. ${why}` : before.what).slice(0, 500),
         entityType: "ClientRules",
         entityId: before.clientId,

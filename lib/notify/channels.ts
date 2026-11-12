@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { renderActionEmail } from "@/lib/email-templates";
+import { translatorFor } from "@/lib/i18n/outgoing";
 import {
   type ChannelId,
   type DeliveryPolicy,
@@ -52,7 +53,9 @@ const emailChannel: DeliveryChannel = {
   async send(r, m) {
     const body = [...m.lines];
     if (m.detail) body.push(`«${m.detail}»`);
-    const { html, text } = renderActionEmail({ title: m.title, body, buttonLabel: m.buttonLabel, url: m.url });
+    // The layout in the recipient's language, like the words the caller
+    // already wrote for them (ADR 0006, outgoing channels).
+    const { html, text } = renderActionEmail({ title: m.title, body, buttonLabel: m.buttonLabel, url: m.url }, translatorFor(r.locale));
     const result = await sendEmail({ to: [r.email as string], subject: m.subject, text, html });
 
     // Logged like every other alert, so a failure is visible and the

@@ -1,4 +1,6 @@
 import "server-only";
+import { outgoingForUsers } from "@/lib/i18n/recipients";
+import { HEBREW, type OutgoingT } from "@/lib/i18n/outgoing";
 import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/domain-error";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
@@ -98,12 +100,21 @@ export async function setUserCanApproveExceptions(actor: User, userId: string, v
 }
 
 /// One in-app notice to each approver of a client, except the person who
-/// caused it. Returns how many were written.
-export async function notifyRuleApprovers(clientId: string, exceptUserId: string, notice: { type: string; title: string; body: string; entityType: string }) {
+/// caused it. Returns how many were written. The notice is worded per
+/// approver, in their own language (ADR 0006, outgoing channels).
+export async function notifyRuleApprovers(
+  clientId: string,
+  exceptUserId: string,
+  notice: { type: string; entityType: string; words: (t: OutgoingT) => { title: string; body: string } }
+) {
   const approvers = (await ruleApproversFor(clientId)).filter((u) => u.id !== exceptUserId);
   if (approvers.length === 0) return 0;
+  const words = await outgoingForUsers(approvers.map((u) => u.id));
   await prisma.notification.createMany({
-    data: approvers.map((u) => ({ userId: u.id, type: notice.type, title: notice.title, body: notice.body, entityType: notice.entityType, entityId: clientId })),
+    data: approvers.map((u) => {
+      const { title, body } = notice.words((words.get(u.id) ?? HEBREW).t);
+      return { userId: u.id, type: notice.type, title, body, entityType: notice.entityType, entityId: clientId };
+    }),
   });
   return approvers.length;
 }

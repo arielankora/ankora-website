@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { isAppLocale } from "@/lib/i18n/config";
 import { headers } from "next/headers";
 import { getTranslations } from "next-intl/server";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
@@ -69,6 +70,10 @@ export async function inviteUserAction(_prev: InviteState | undefined, formData:
   const clientIds = formData.getAll("clientIds").map(String).filter(Boolean);
   const clientUserRole = (String(formData.get("clientUserRole") || "") as ClientUserRole) || undefined;
   const personalEmail = String(formData.get("personalEmail") || "");
+  // ADR 0006: the new person's language, when the form sends one. The
+  // invite email goes out in it; without it, Hebrew.
+  const localeField = formData.get("locale");
+  const locale = isAppLocale(localeField) ? localeField : undefined;
 
   try {
     const { user, setPasswordToken, emailSent } = await inviteUser(actor, {
@@ -78,6 +83,7 @@ export async function inviteUserAction(_prev: InviteState | undefined, formData:
       clientIds,
       clientUserRole,
       personalEmail,
+      locale,
     });
     revalidatePath("/app/users");
 

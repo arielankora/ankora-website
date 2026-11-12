@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/app-auth/session";
-import { APP_LOCALE_COOKIE, DEFAULT_APP_LOCALE, DEFAULT_TIME_ZONE, isAppLocale, type AppLocale } from "./config";
+import { APP_LOCALE_COOKIE, DEFAULT_APP_LOCALE, isAppLocale, safeTimeZone, type AppLocale } from "./config";
 
 // Which language and time zone this request is rendered in (ADR 0006).
 //
@@ -17,18 +17,9 @@ export function pickLocale(userLocale: AppLocale | null | undefined, cookieValue
   return DEFAULT_APP_LOCALE;
 }
 
-/// A time zone Intl accepts, or the default. User.timezone is free text
-/// (TimezoneForm.tsx says why), and one bad value must not take every
-/// formatted date on every screen down with it.
-export function safeTimeZone(value: string | null | undefined): string {
-  if (!value) return DEFAULT_TIME_ZONE;
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: value });
-    return value;
-  } catch {
-    return DEFAULT_TIME_ZONE;
-  }
-}
+/// A time zone Intl accepts, or the default. Lives in config.ts (the
+/// outgoing translator needs it outside a request); re-exported here.
+export { safeTimeZone };
 
 export const resolveRequestLocale = cache(async (): Promise<{ locale: AppLocale; timeZone: string }> => {
   // getCurrentUser() is already cached for the request, so the layout,
