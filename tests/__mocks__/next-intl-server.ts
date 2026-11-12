@@ -8,7 +8,7 @@ import he from "../../messages/he.json";
 // in Jerusalem time. The strings asserted in those tests are therefore the
 // exact Hebrew the app shows, read from the same dictionary.
 
-const config = { locale: "he" as const, messages: he, timeZone: "Asia/Jerusalem" };
+const config = { locale: "he-IL" as const, messages: he, timeZone: "Asia/Jerusalem" };
 
 export async function getTranslations(namespace?: string) {
   return createTranslator({ ...config, namespace: namespace as never });

@@ -39,7 +39,9 @@ export function directionOf(locale: AppLocale): "rtl" | "ltr" {
 /// The tag Intl formats dates and numbers with. English is en-IL and not
 /// en-US: the work is in Israel, so a date reads day first, a time is 24
 /// hours, and money is in shekels, the way the Hebrew screens show them.
-export function intlTag(locale: AppLocale): "he-IL" | "en-IL" {
+export type IntlTag = "he-IL" | "en-IL";
+
+export function intlTag(locale: AppLocale): IntlTag {
   return locale === "he" ? "he-IL" : "en-IL";
 }
 
