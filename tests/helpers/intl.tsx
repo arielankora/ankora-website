@@ -8,7 +8,7 @@ import en from "../../messages/en.json";
 export function intlWrapper(locale: "he" | "en" = "he") {
   return function IntlWrapper({ children }: { children: ReactNode }) {
     return (
-      <NextIntlClientProvider locale={locale} messages={locale === "he" ? he : en} timeZone="Asia/Jerusalem">
+      <NextIntlClientProvider locale={locale === "he" ? "he-IL" : "en-IL"} messages={locale === "he" ? he : en} timeZone="Asia/Jerusalem">
         {children}
       </NextIntlClientProvider>
     );

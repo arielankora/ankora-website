@@ -15,7 +15,7 @@ import he from "@/messages/he.json";
 export function HebrewOnly({ children }: { children: ReactNode }) {
   return (
     <div lang="he" dir="rtl">
-      <NextIntlClientProvider locale="he" messages={he}>
+      <NextIntlClientProvider locale="he-IL" messages={he}>
         {children}
       </NextIntlClientProvider>
     </div>

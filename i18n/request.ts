@@ -1,6 +1,6 @@
 import { getRequestConfig } from "next-intl/server";
 import { resolveRequestLocale } from "@/lib/i18n/resolve";
-import type { AppLocale } from "@/lib/i18n/config";
+import { intlTag, type AppLocale } from "@/lib/i18n/config";
 import he from "@/messages/he.json";
 import en from "@/messages/en.json";
 
@@ -16,5 +16,8 @@ const MESSAGES: Record<AppLocale, typeof he> = { he, en };
 
 export default getRequestConfig(async () => {
   const { locale, timeZone } = await resolveRequestLocale();
-  return { locale, timeZone, messages: MESSAGES[locale] };
+  // The Intl tag, so dates and numbers follow ADR 0006 decision 3 (en-IL,
+  // not US English). The page's language and direction are decided from
+  // the person's setting in app/(product)/layout.tsx.
+  return { locale: intlTag(locale), timeZone, messages: MESSAGES[locale] };
 });

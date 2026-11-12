@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getLocale, getTranslations } from "next-intl/server";
+import { getTranslations } from "next-intl/server";
+import { resolveRequestLocale } from "@/lib/i18n/resolve";
 import { AuthShell } from "@/components/app/AuthShell";
 import { LoginForm } from "./LoginForm";
 
@@ -18,7 +19,7 @@ export default async function LoginPage(props: {
   const searchParams = await props.searchParams;
   const t = await getTranslations("auth.login");
   // The legal pages live on the marketing site, in both languages.
-  const legal = await getLocale();
+  const legal = (await resolveRequestLocale()).locale;
   return (
     <AuthShell>
       <p className="text-[22px] font-medium text-app-text-primary">{t("title")}</p>

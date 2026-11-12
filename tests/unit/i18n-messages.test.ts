@@ -60,8 +60,8 @@ describe("app dictionaries (ADR 0006)", () => {
   it("format every message in both languages", () => {
     const failures: string[] = [];
     for (const [locale, messages, flat] of [
-      ["he", he, heLeaves],
-      ["en", en, enLeaves],
+      ["he-IL", he, heLeaves],
+      ["en-IL", en, enLeaves],
     ] as const) {
       const t = createTranslator({
         locale,
