@@ -8,6 +8,7 @@
 // Pure rules, no database: shared by the domain function, the form and the
 // tests.
 import type { SubprocessorNotice } from "@prisma/client";
+import { DomainError } from "@/lib/domain-error";
 
 export const SUBPROCESSOR_NOTICE_VALUES: readonly SubprocessorNotice[] = ["UNCHECKED", "COMMITTED", "NOT_COMMITTED"];
 
@@ -57,7 +58,7 @@ export function normalizeSubprocessorNotice(input: SubprocessorNoticeInput): Sub
     return { subprocessorNotice: "UNCHECKED", subprocessorNoticeSource: null, subprocessorNoticeDocumentId: null };
   }
   const source = input.source?.trim() || null;
-  if (!source) throw new Error(SUBPROCESSOR_NOTICE_SOURCE_REQUIRED);
+  if (!source) throw new DomainError("clients.subprocessorSourceRequired", SUBPROCESSOR_NOTICE_SOURCE_REQUIRED);
   return {
     subprocessorNotice: input.notice,
     subprocessorNoticeSource: source,

@@ -2,15 +2,16 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import type { KnowledgeAudience, ProcedureClassification, ProcessStatus, ProcessTransition, ProcessTrigger, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { approvesProceduresOf, NOT_APPROVER, procedureApprovalBlocker } from "@/lib/procedure-approval";
+import { DomainError } from "@/lib/domain-error";
+import { approvesProceduresOf, NOT_APPROVER, procedureApprovalBlocker, SEPARATION_REQUIRED } from "@/lib/procedure-approval";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
 import { findSecrets } from "@/lib/secret-scan";
 import { isExceptionInForce, ruleBindsNow, type PolicyKindLike } from "@/lib/client-policies";
 import { hasParams, invoiceGaps, paramsInForce, requestTypeConflicts, ruleChecks, type RuleForCheck, type RuleSeverity } from "@/lib/policy-params";
-import { checkEveryError } from "@/lib/process-checks";
-import { reviewEveryError } from "@/lib/process-review";
+import { CHECK_MAX_DAYS, checkEveryError } from "@/lib/process-checks";
+import { MAX_REVIEW_EVERY_DAYS, reviewEveryError } from "@/lib/process-review";
 import {
   MAX_PROCESS_STEPS,
   blockingChecks,
@@ -96,32 +97,42 @@ export interface ProcessInput extends KnowledgeInput {
   notApplicableFields?: string[];
 }
 
-export class ProcessVersionConflictError extends Error {
+export class ProcessVersionConflictError extends DomainError {
   constructor(public latest: number) {
-    super(`מישהו שמר גרסה חדשה של הנוהל (גרסה ${latest}) בזמן שערכת. רעננו, ובדקו מה השתנה לפני ששומרים.`);
+    super("processes.versionConflict", `מישהו שמר גרסה חדשה של הנוהל (גרסה ${latest}) בזמן שערכת. רעננו, ובדקו מה השתנה לפני ששומרים.`, { latest: String(latest) });
   }
 }
+
+/// The refusal assertIdsBelong gives when a chosen id is not the client's.
+/// Each Hebrew message is the one it has always given.
+const NOT_IN_FILE = {
+  contact: () => new DomainError("processes.contactNotInFile", "איש קשר שנבחר לא נמצא בתיק של הלקוח."),
+  system: () => new DomainError("processes.systemNotInFile", "מערכת שנבחר לא נמצא בתיק של הלקוח."),
+  rule: () => new DomainError("processes.ruleNotInFile", "כלל שנבחר לא נמצא בתיק של הלקוח."),
+  approver: () => new DomainError("processes.approverNotInFile", "המאשר שנבחר לא נמצא בתיק של הלקוח."),
+  executor: () => new DomainError("processes.executorNotInFile", "המבצע שנבחר לא נמצא בתיק של הלקוח."),
+} as const;
 
 const clean = (v: string | null | undefined) => v?.trim() || null;
 
 async function assertIdsBelong(clientId: string, input: Partial<ProcessInput>) {
-  const check = async (ids: string[] | undefined, count: (ids: string[]) => Promise<number>, what: string) => {
+  const check = async (ids: string[] | undefined, count: (ids: string[]) => Promise<number>, kind: keyof typeof NOT_IN_FILE) => {
     const unique = [...new Set((ids ?? []).filter(Boolean))];
-    if (unique.length && (await count(unique)) !== unique.length) throw new Error(`${what} שנבחר לא נמצא בתיק של הלקוח.`);
+    if (unique.length && (await count(unique)) !== unique.length) throw NOT_IN_FILE[kind]();
     return ids === undefined ? undefined : unique;
   };
-  const contacts = await check(input.externalPartyContactIds, (ids) => prisma.clientContact.count({ where: { id: { in: ids }, clientId, deletedAt: null } }), "איש קשר");
-  const systems = await check(input.requiredSystemIds, (ids) => prisma.systemAccess.count({ where: { id: { in: ids }, clientId, deletedAt: null } }), "מערכת");
-  const policies = await check(input.approvalPolicyIds, (ids) => prisma.clientPolicy.count({ where: { id: { in: ids }, clientId, deletedAt: null } }), "כלל");
-  if (input.approverContactId) await check([input.approverContactId], (ids) => prisma.clientContact.count({ where: { id: { in: ids }, clientId, deletedAt: null } }), "המאשר");
-  if (input.executorContactId) await check([input.executorContactId], (ids) => prisma.clientContact.count({ where: { id: { in: ids }, clientId, deletedAt: null } }), "המבצע");
+  const contacts = await check(input.externalPartyContactIds, (ids) => prisma.clientContact.count({ where: { id: { in: ids }, clientId, deletedAt: null } }), "contact");
+  const systems = await check(input.requiredSystemIds, (ids) => prisma.systemAccess.count({ where: { id: { in: ids }, clientId, deletedAt: null } }), "system");
+  const policies = await check(input.approvalPolicyIds, (ids) => prisma.clientPolicy.count({ where: { id: { in: ids }, clientId, deletedAt: null } }), "rule");
+  if (input.approverContactId) await check([input.approverContactId], (ids) => prisma.clientContact.count({ where: { id: { in: ids }, clientId, deletedAt: null } }), "approver");
+  if (input.executorContactId) await check([input.executorContactId], (ids) => prisma.clientContact.count({ where: { id: { in: ids }, clientId, deletedAt: null } }), "executor");
   if (input.executorUserId) {
     const ok = await prisma.user.count({ where: { id: input.executorUserId, deletedAt: null, role: { not: "CLIENT_USER" } } });
-    if (!ok) throw new Error("המבצע באנקורה צריך להיות איש צוות.");
+    if (!ok) throw new DomainError("processes.executorNotStaff", "המבצע באנקורה צריך להיות איש צוות.");
   }
   for (const id of [input.ownerId, input.backupOwnerId].filter((x): x is string => !!x)) {
     const ok = await prisma.user.count({ where: { id, deletedAt: null, role: { not: "CLIENT_USER" } } });
-    if (!ok) throw new Error("אחראי או מחליף צריכים להיות אנשי צוות של אנקורה.");
+    if (!ok) throw new DomainError("processes.ownerNotStaff", "אחראי או מחליף צריכים להיות אנשי צוות של אנקורה.");
   }
   // The approver signs a step on this client's task: someone on the
   // client, or a manager, who reaches every client.
@@ -129,7 +140,7 @@ async function assertIdsBelong(clientId: string, input: Partial<ProcessInput>) {
     const ok = await prisma.user.count({
       where: { id: input.approverUserId, deletedAt: null, status: "ACTIVE", role: { not: "CLIENT_USER" }, OR: [{ role: { in: (["SUPER_ADMIN", "ANKORA_ADMIN", "ANKORA_EMPLOYEE"] as const).filter((r) => canManageClients(r)) } }, { clientAccess: { some: { clientId } } }] },
     });
-    if (!ok) throw new Error("המאשר באנקורה צריך להיות איש צוות פעיל שמשויך ללקוח, או מנהל.");
+    if (!ok) throw new DomainError("processes.approverNotAllowed", "המאשר באנקורה צריך להיות איש צוות פעיל שמשויך ללקוח, או מנהל.");
   }
   if (input.entityId !== undefined) await assertEntityBelongs(clientId, input.entityId);
   return { contacts, systems, policies };
@@ -150,10 +161,10 @@ function permissionsFor(input: Partial<ProcessInput>, systems: string[] | undefi
 
 function fields(input: Partial<ProcessInput>, ids: { contacts?: string[]; systems?: string[]; policies?: string[] }) {
   const reviewError = reviewEveryError(input.reviewEveryDays);
-  if (reviewError) throw new Error(reviewError);
-  if (input.businessCalendar && !isBusinessCalendarKey(input.businessCalendar)) throw new Error("לוח ימי העבודה לא מוכר.");
+  if (reviewError) throw new DomainError("processes.reviewRange", reviewError, { max: MAX_REVIEW_EVERY_DAYS });
+  if (input.businessCalendar && !isBusinessCalendarKey(input.businessCalendar)) throw new DomainError("processes.calendarUnknown", "לוח ימי העבודה לא מוכר.");
   if (input.slaBusinessDays !== undefined && input.slaBusinessDays !== null && (!Number.isInteger(input.slaBusinessDays) || input.slaBusinessDays < 0 || input.slaBusinessDays > 60)) {
-    throw new Error("ה-SLA בימי עסקים הוא מספר שלם בין 0 ל-60.");
+    throw new DomainError("processes.slaRange", "ה-SLA בימי עסקים הוא מספר שלם בין 0 ל-60.");
   }
   return {
     title: input.title !== undefined ? input.title.trim() : undefined,
@@ -196,20 +207,20 @@ function fields(input: Partial<ProcessInput>, ids: { contacts?: string[]; system
 /// and a check on top of them would be a second clock nobody reads.
 function assertCheck(triggerKinds: ProcessTrigger[], checkEveryDays: number | null | undefined) {
   const error = checkEveryError(checkEveryDays);
-  if (error) throw new Error(error);
-  if (checkEveryDays && !triggerKinds.includes("CONTINUOUS")) throw new Error("בדיקה תקופתית היא לתהליך שוטף.");
+  if (error) throw new DomainError("processes.checkRange", error, { max: CHECK_MAX_DAYS });
+  if (checkEveryDays && !triggerKinds.includes("CONTINUOUS")) throw new DomainError("processes.checkNotContinuous", "בדיקה תקופתית היא לתהליך שוטף.");
 }
 
 function assertNoSecrets(input: Partial<ProcessInput>) {
   const text = [input.title, input.purpose, input.triggerText, input.slaText, input.externalPartyText, input.approverText, input.approvalText, input.exceptionPlaybook, input.executorText, input.checkText, input.scope, input.definitions, input.relatedDocs]
     .filter(Boolean)
     .join("\n");
-  if (findSecrets(text).length) throw new Error("יש כאן סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בתיק.");
+  if (findSecrets(text).length) throw new DomainError("processes.secrets", "יש כאן סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בתיק.");
 }
 
 async function findProcess(actor: User, id: string) {
   const row = await prisma.process.findUnique({ where: { id } });
-  if (!row || row.deletedAt) throw new Error("התהליך לא נמצא.");
+  if (!row || row.deletedAt) throw new DomainError("processes.notFound", "התהליך לא נמצא.");
   await assertClientAccess(actor, row.clientId);
   return row;
 }
@@ -217,7 +228,7 @@ async function findProcess(actor: User, id: string) {
 export async function addProcess(actor: User, input: ProcessInput) {
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
-  if (!input.title?.trim()) throw new Error("צריך שם לתהליך.");
+  if (!input.title?.trim()) throw new DomainError("processes.titleRequired", "צריך שם לתהליך.");
   assertNoSecrets(input);
   assertCheck(input.triggerKinds ?? [], input.checkEveryDays);
   assertResolvable(input.knowledgeStatus, input.toResolve);
@@ -252,7 +263,7 @@ export async function addProcess(actor: User, input: ProcessInput) {
 export async function updateProcess(actor: User, id: string, input: Partial<Omit<ProcessInput, "clientId">>) {
   assertCan(actor.role, "time_entry.create_self");
   const before = await findProcess(actor, id);
-  if (input.title !== undefined && !input.title.trim()) throw new Error("צריך שם לתהליך.");
+  if (input.title !== undefined && !input.title.trim()) throw new DomainError("processes.titleRequired", "צריך שם לתהליך.");
   assertNoSecrets(input);
   assertCheck(input.triggerKinds ?? before.triggerKinds, input.checkEveryDays !== undefined ? input.checkEveryDays : before.checkEveryDays);
   assertResolvable(input.knowledgeStatus ?? before.knowledgeStatus, input.toResolve !== undefined ? input.toResolve : before.toResolve);
@@ -268,11 +279,11 @@ export async function updateProcess(actor: User, id: string, input: Partial<Omit
 /// Pause, resume or retire. A manager's call: a paused process opens no
 /// runs.
 export async function setProcessStatus(actor: User, id: string, status: Exclude<ProcessStatus, "DRAFT">) {
-  if (!canManageClients(actor.role)) throw new Error("רק מנהל משהה, מחדש או מבטל תהליך.");
+  if (!canManageClients(actor.role)) throw new DomainError("processes.statusManagerOnly", "רק מנהל משהה, מחדש או מבטל תהליך.");
   const before = await findProcess(actor, id);
   if (status === "ACTIVE") {
     const approved = await prisma.processVersion.count({ where: { processId: id, status: "APPROVED" } });
-    if (!approved) throw new Error("לתהליך עוד אין נוהל מאושר.");
+    if (!approved) throw new DomainError("processes.noApprovedProcedure", "לתהליך עוד אין נוהל מאושר.");
   }
   const updated = await prisma.process.update({ where: { id }, data: { status } });
   await recordAudit({ actorId: actor.id, action: "process.status", entityType: "Process", entityId: id, clientId: before.clientId, before: { status: before.status }, after: { status } });
@@ -284,7 +295,7 @@ export async function setProcessStatus(actor: User, id: string, status: Exclude<
 export async function removeProcess(actor: User, id: string) {
   assertCan(actor.role, "time_entry.create_self");
   const row = await findProcess(actor, id);
-  if (row.status !== "DRAFT") throw new Error("תהליך שהיה לו נוהל מאושר לא נמחק. מבטלים אותו, והוא נשאר בהיסטוריה.");
+  if (row.status !== "DRAFT") throw new DomainError("processes.removeApproved", "תהליך שהיה לו נוהל מאושר לא נמחק. מבטלים אותו, והוא נשאר בהיסטוריה.");
   await prisma.importantDate.updateMany({ where: { processId: id }, data: { processId: null } });
   const removed = await prisma.process.update({ where: { id }, data: { deletedAt: new Date() } });
   await recordAudit({ actorId: actor.id, action: "process.remove", entityType: "Process", entityId: id, clientId: row.clientId, before: row });
@@ -298,7 +309,7 @@ export async function linkProcessDates(actor: User, processId: string, dateIds: 
   const process = await findProcess(actor, processId);
   const unique = [...new Set(dateIds.filter(Boolean))];
   const found = await prisma.importantDate.count({ where: { id: { in: unique }, clientId: process.clientId, deletedAt: null } });
-  if (found !== unique.length) throw new Error("מועד שנבחר לא נמצא אצל הלקוח.");
+  if (found !== unique.length) throw new DomainError("processes.dateNotFound", "מועד שנבחר לא נמצא אצל הלקוח.");
   await prisma.$transaction([
     prisma.importantDate.updateMany({ where: { processId, id: { notIn: unique } }, data: { processId: null } }),
     prisma.importantDate.updateMany({ where: { id: { in: unique } }, data: { processId } }),
@@ -424,17 +435,17 @@ export async function saveProcessVersion(actor: User, processId: string, input: 
   let flow: ProcessFlow | null = null;
   if (input.flow !== undefined && input.flow !== null) {
     flow = readFlow(input.flow);
-    if (!flow) throw new Error("הזרימה לא נקראה. רעננו ונסו שוב.");
+    if (!flow) throw new DomainError("processes.flowUnread", "הזרימה לא נקראה. רעננו ונסו שוב.");
     const issues = flowIssues(flow);
     if (issues.length) throw new Error(issues.map((i) => i.message).join(" "));
   }
   const steps = flow ? flowSteps(flow) : readSteps(input.steps);
-  if (steps.length === 0) throw new Error("נוהל צריך לפחות שלב אחד.");
-  if (steps.length > MAX_PROCESS_STEPS) throw new Error(`עד ${MAX_PROCESS_STEPS} שלבים. נוהל ארוך מזה הוא כמה תהליכים.`);
+  if (steps.length === 0) throw new DomainError("processes.noSteps", "נוהל צריך לפחות שלב אחד.");
+  if (steps.length > MAX_PROCESS_STEPS) throw new DomainError("processes.tooManySteps", `עד ${MAX_PROCESS_STEPS} שלבים. נוהל ארוך מזה הוא כמה תהליכים.`, { max: MAX_PROCESS_STEPS });
   const systemIds = [...new Set(steps.flatMap((s) => s.systemIds))];
   if (systemIds.length) {
     const found = await prisma.systemAccess.count({ where: { id: { in: systemIds }, clientId: process.clientId, deletedAt: null } });
-    if (found !== systemIds.length) throw new Error("מערכת שנבחרה בשלב לא נמצאת במפת המערכות של הלקוח.");
+    if (found !== systemIds.length) throw new DomainError("processes.stepSystemNotFound", "מערכת שנבחרה בשלב לא נמצאת במפת המערכות של הלקוח.");
   }
   const version = { steps, highlights: clean(input.highlights), outputs: clean(input.outputs) };
   // A secret blocks the save itself, not only the approval (R4): a draft
@@ -448,7 +459,7 @@ export async function saveProcessVersion(actor: User, processId: string, input: 
   // 5.11.2026: a procedure built as a flow is edited as a flow. Saving it
   // as a list (the list editor, a proposal from Claude) would drop its
   // conditions and branches without a word, so it is refused instead.
-  if (!flow && latest && readFlow(latest.flow)) throw new Error(FLOW_ONLY_MESSAGE);
+  if (!flow && latest && readFlow(latest.flow)) throw new DomainError("processes.flowOnly", FLOW_ONLY_MESSAGE);
   try {
     const row = await prisma.processVersion.create({
       data: {
@@ -526,7 +537,17 @@ export async function flowForEditor(actor: User, processId: string): Promise<Flo
 /// then. Never called for what Claude proposes: that stays a draft.
 export type SaveAndActivateResult =
   | { live: true; version: number }
-  | { live: false; version: number; reason: string; secondEye: string[] };
+  | {
+      live: false;
+      version: number;
+      reason: string;
+      secondEye: string[];
+      /// ADR 0006: why, for a screen in the reader's language
+      /// (clients.processes.flow.reasons.<key>), or the refusal that held
+      /// the approval back. `reason` stays the Hebrew.
+      reasonKey?: "waitingSecondEye" | "notApprover" | "separation" | "notActivated";
+      reasonError?: unknown;
+    };
 
 export async function saveAndActivateProcessVersion(actor: User, processId: string, input: VersionInput): Promise<SaveAndActivateResult> {
   const row = await saveProcessVersion(actor, processId, input);
@@ -534,22 +555,22 @@ export async function saveAndActivateProcessVersion(actor: User, processId: stri
   const flow = readFlow(row.flow);
   const waiting = flow ? secondEyeNodes(flow).map((n) => n.title) : [];
   if (waiting.length) {
-    return { live: false, version: row.version, secondEye: waiting, reason: `ממתין לעין שנייה: ${waiting.map((t) => `"${t}"`).join(", ")}. עד האישור, הגרסה הקודמת ממשיכה לרוץ.` };
+    return { live: false, version: row.version, secondEye: waiting, reason: `ממתין לעין שנייה: ${waiting.map((t) => `"${t}"`).join(", ")}. עד האישור, הגרסה הקודמת ממשיכה לרוץ.`, reasonKey: "waitingSecondEye" };
   }
   const client = await prisma.client.findUnique({ where: { id: process.clientId }, select: { accountManagerId: true, procedureApprovalSeparation: true } });
   const approver = { userId: actor.id, isManager: canManageClients(actor.role), accountManagerId: client?.accountManagerId ?? null };
   if (!approvesProceduresOf(approver)) {
-    return { live: false, version: row.version, secondEye: [], reason: "נשמר כטיוטה: רק מנהל או מנהל התיק של הלקוח מפעילים נוהל." };
+    return { live: false, version: row.version, secondEye: [], reason: "נשמר כטיוטה: רק מנהל או מנהל התיק של הלקוח מפעילים נוהל.", reasonKey: "notApprover" };
   }
   if (procedureApprovalBlocker({ ...approver, separation: client?.procedureApprovalSeparation ?? false, authorId: row.createdById })) {
-    return { live: false, version: row.version, secondEye: [], reason: "נשמר כטיוטה: אצל הלקוח הזה מי שכתב את הנוהל לא מאשר אותו, ולכן הוא ממתין לעין שנייה." };
+    return { live: false, version: row.version, secondEye: [], reason: "נשמר כטיוטה: אצל הלקוח הזה מי שכתב את הנוהל לא מאשר אותו, ולכן הוא ממתין לעין שנייה.", reasonKey: "separation" };
   }
   try {
     await approveProcessVersion(actor, processId, row.version);
   } catch (err) {
     // Saved, not live: the client's rules hold it (an approval threshold
     // with no approval step, say). The editor shows why.
-    return { live: false, version: row.version, secondEye: [], reason: err instanceof Error ? err.message : "הנוהל נשמר כטיוטה ולא הופעל." };
+    return { live: false, version: row.version, secondEye: [], reason: err instanceof Error ? err.message : "הנוהל נשמר כטיוטה ולא הופעל.", ...(err instanceof Error ? { reasonError: err } : { reasonKey: "notActivated" as const }) };
   }
   return { live: true, version: row.version };
 }
@@ -568,15 +589,20 @@ export async function approveProcessVersion(actor: User, processId: string, vers
   // client's separation on, not whoever wrote the version.
   const client = await prisma.client.findUnique({ where: { id: process.clientId }, select: { accountManagerId: true, procedureApprovalSeparation: true } });
   const approver = { userId: actor.id, isManager: canManageClients(actor.role), accountManagerId: client?.accountManagerId ?? null };
-  if (!approvesProceduresOf(approver)) throw new Error(NOT_APPROVER);
+  if (!approvesProceduresOf(approver)) throw new DomainError("processes.notApprover", NOT_APPROVER);
   const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" } });
-  if (!latest || latest.version !== version) throw new Error("זו לא הגרסה האחרונה של הנוהל. רעננו ונסו שוב.");
-  if (latest.status !== "DRAFT") throw new Error("הגרסה הזו כבר מאושרת.");
+  if (!latest || latest.version !== version) throw new DomainError("processes.notLatestVersion", "זו לא הגרסה האחרונה של הנוהל. רעננו ונסו שוב.");
+  if (latest.status !== "DRAFT") throw new DomainError("processes.alreadyApproved", "הגרסה הזו כבר מאושרת.");
   const blocker = procedureApprovalBlocker({ ...approver, separation: client?.procedureApprovalSeparation ?? false, authorId: latest.createdById });
+  if (blocker === NOT_APPROVER) throw new DomainError("processes.notApprover", NOT_APPROVER);
+  if (blocker === SEPARATION_REQUIRED) throw new DomainError("processes.separationRequired", SEPARATION_REQUIRED);
   if (blocker) throw new Error(blocker);
   const checks = await checkProcessVersion(process, latest);
   const blocking = holdsApproval(checks);
-  if (blocking.length) throw new Error(`הנוהל לא עובר את הבדיקות: ${blocking.map((b) => b.message).join(" ")}`);
+  if (blocking.length) {
+    const failing = blocking.map((b) => b.message).join(" ");
+    throw new DomainError("processes.failsChecks", `הנוהל לא עובר את הבדיקות: ${failing}`, { checks: failing });
+  }
   const now = new Date();
   // 23.10.2026: the document as approved, names and all, so version N
   // reads the same next year (lib/app-domain/procedure-documents.ts).
@@ -659,8 +685,8 @@ async function partiesOf(clientId: string): Promise<(Named & { kind: "contact" |
 /// is never shown as a gap.
 export async function setProcessFieldNotApplicable(actor: User, id: string, field: string, notApplicable: boolean) {
   const before = await findProcess(actor, id);
-  if (!canManageClients(actor.role) && before.ownerId !== actor.id) throw new Error("רק מנהל או הבעלים של התהליך מסמנים שדה כלא רלוונטי.");
-  if (!(NOT_APPLICABLE_FIELDS as readonly string[]).includes(field)) throw new Error("את השדה הזה אי אפשר לסמן כלא רלוונטי.");
+  if (!canManageClients(actor.role) && before.ownerId !== actor.id) throw new DomainError("processes.notApplicableNotAllowed", "רק מנהל או הבעלים של התהליך מסמנים שדה כלא רלוונטי.");
+  if (!(NOT_APPLICABLE_FIELDS as readonly string[]).includes(field)) throw new DomainError("processes.notApplicableField", "את השדה הזה אי אפשר לסמן כלא רלוונטי.");
   const now = readNotApplicable(before.notApplicableFields);
   const next = notApplicable ? [...new Set([...now, field as NotApplicableField])] : now.filter((f) => f !== field);
   const updated = await prisma.process.update({ where: { id }, data: { notApplicableFields: next } });

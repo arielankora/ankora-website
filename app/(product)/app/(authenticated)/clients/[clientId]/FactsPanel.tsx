@@ -1,19 +1,13 @@
 "use client";
 import { useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import Link from "next/link";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { StatusBadge } from "@/components/app/StatusBadge";
-import { KNOWLEDGE_STATUS_LABELS, KNOWLEDGE_AUDIENCE_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
-import {
-  FACT_KIND_LABELS,
-  FACT_SECTIONS,
-  FACT_TOPIC_LABELS,
-  isPastValidity,
-  type FactKindLike,
-  type FactTopicLike,
-} from "@/lib/client-facts";
+import type { KnowledgeStatusLike } from "@/lib/knowledge";
+import { FACT_SECTIONS, FACT_TOPIC_LABELS, isPastValidity, QUESTION_DEFAULT_TO_RESOLVE, type FactKindLike, type FactTopicLike } from "@/lib/client-facts";
 import {
   addClientFactAction,
   supersedeClientFactAction,
@@ -73,10 +67,11 @@ export type PanelFact = {
 
 type Option = { value: string; label: string };
 
-function dateLabel(iso: string | null): string | null {
-  if (!iso) return null;
-  const [y, m, d] = iso.slice(0, 10).split("-");
-  return `${Number(d)}.${Number(m)}.${y}`;
+/// A date-only value (its day in UTC), as the reader writes dates.
+function useDateLabel() {
+  const format = useFormatter();
+  return (iso: string | null): string | null =>
+    iso ? format.dateTime(new Date(`${iso.slice(0, 10)}T00:00:00Z`), { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }) : null;
 }
 
 function FactForm({
@@ -99,6 +94,8 @@ function FactForm({
   const [kind, setKind] = useState<FactKindLike>(existing?.kind ?? initialKind ?? "PREFERENCE");
   const [status, setStatus] = useState<KnowledgeStatusLike>(existing && existing.status !== "SUPERSEDED" ? existing.status : "CONFIRMED");
   const question = kind === "QUESTION";
+  const t = useTranslations("clients.facts");
+  const tk = useTranslations("clients.knowledge");
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
@@ -108,38 +105,38 @@ function FactForm({
         <>
           <input type="hidden" name="kind" value={kind} />
           <p className="text-xs text-app-text-secondary">
-            הגרסה הנוכחית תישמר בהיסטוריה, מסומנת &quot;הוחלף&quot;, והחדשה תופיע במקומה.
+            {t("form.supersedeHint", { status: tk("status.SUPERSEDED") })}
           </p>
         </>
       ) : (
-        <Field label="סוג">
+        <Field label={t("form.kind")}>
           <select name="kind" value={kind} onChange={(e) => setKind(e.target.value as FactKindLike)} className={INPUT}>
             {FACT_SECTIONS.map((s) => (
               <option key={s.kind} value={s.kind}>
-                {FACT_KIND_LABELS[s.kind]}
+                {t(`kinds.${s.kind}`)}
               </option>
             ))}
           </select>
         </Field>
       )}
-      <Field label={question ? "השאלה *" : "מה *"}>
+      <Field label={question ? t("form.question") : t("form.body")}>
         <textarea name="body" required rows={3} defaultValue={existing?.body ?? ""} className={INPUT} />
       </Field>
 
       {(kind === "PREFERENCE" || kind === "REQUIREMENT") && (
         <div className="grid grid-cols-2 gap-3">
-          <Field label="נושא">
+          <Field label={t("form.topic")}>
             <select name="topic" defaultValue={existing?.topic ?? "COMMUNICATION"} className={INPUT}>
-              {(Object.keys(FACT_TOPIC_LABELS) as FactTopicLike[]).map((t) => (
-                <option key={t} value={t}>
-                  {FACT_TOPIC_LABELS[t]}
+              {(Object.keys(FACT_TOPIC_LABELS) as FactTopicLike[]).map((topic) => (
+                <option key={topic} value={topic}>
+                  {t(`topics.${topic}`)}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="של מי">
+          <Field label={t("form.subject")}>
             <select name="subject" defaultValue={existing?.subjectKey ?? ""} className={INPUT}>
-              <option value="">הלקוח</option>
+              <option value="">{t("form.subjectClient")}</option>
               {subjects.map((s) => (
                 <option key={s.value} value={s.value}>
                   {s.label}
@@ -150,34 +147,34 @@ function FactForm({
         </div>
       )}
       {kind === "SCOPE_OUT" && (
-        <Field label="למי מפנים">
+        <Field label={t("form.referTo")}>
           <input name="referTo" defaultValue={existing?.referTo ?? ""} placeholder="Nextage" className={INPUT} />
         </Field>
       )}
       {kind === "TEMPORARY" && (
         <div className="grid grid-cols-2 gap-3">
-          <Field label="בתוקף עד">
+          <Field label={t("form.validUntil")}>
             <input name="validUntil" type="date" dir="ltr" defaultValue={existing?.validUntil?.slice(0, 10) ?? ""} className={INPUT} />
           </Field>
-          <Field label="או עד אירוע">
-            <input name="validUntilEvent" defaultValue={existing?.validUntilEvent ?? ""} placeholder="עד הצירוף לארגון" className={INPUT} />
+          <Field label={t("form.validUntilEvent")}>
+            <input name="validUntilEvent" defaultValue={existing?.validUntilEvent ?? ""} placeholder={t("form.validUntilEventPlaceholder")} className={INPUT} />
           </Field>
         </div>
       )}
       {kind === "ONE_OFF_DECISION" && (
         <div className="grid grid-cols-2 gap-3">
-          <Field label="תאריך ההחלטה *">
+          <Field label={t("form.decidedAt")}>
             <input name="decidedAt" type="date" dir="ltr" required defaultValue={existing?.decidedAt?.slice(0, 10) ?? ""} className={INPUT} />
           </Field>
-          <Field label="מי החליט">
+          <Field label={t("form.decidedBy")}>
             <input name="decidedBy" defaultValue={existing?.decidedBy ?? ""} className={INPUT} />
           </Field>
         </div>
       )}
       {(question || kind === "TEMPORARY") && (
-        <Field label={question ? "מי אחראי לברר" : "מי אחראי לבדוק שעדיין נכון"}>
+        <Field label={question ? t("form.assigneeQuestion") : t("form.assigneeTemporary")}>
           <select name="assigneeId" defaultValue={existing?.assigneeId ?? ""} className={INPUT}>
-            <option value="">לא נקבע</option>
+            <option value="">{t("form.noAssignee")}</option>
             {staff.map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
@@ -189,11 +186,11 @@ function FactForm({
 
       {!question && (
         <div className="grid grid-cols-2 gap-3">
-          <Field label="סטטוס">
+          <Field label={tk("statusLabel")}>
             <select name="knowledgeStatus" value={status} onChange={(e) => setStatus(e.target.value as KnowledgeStatusLike)} className={INPUT}>
-              <option value="CONFIRMED">{KNOWLEDGE_STATUS_LABELS.CONFIRMED}</option>
-              <option value="UNCERTAIN">{KNOWLEDGE_STATUS_LABELS.UNCERTAIN}</option>
-              <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
+              <option value="CONFIRMED">{tk("status.CONFIRMED")}</option>
+              <option value="UNCERTAIN">{tk("status.UNCERTAIN")}</option>
+              <option value="MISSING">{tk("status.MISSING")}</option>
             </select>
           </Field>
           <AudienceField existing={existing} />
@@ -202,22 +199,22 @@ function FactForm({
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={question ? "MISSING" : status} />
       <ItemExtras existing={existing} />
       {(question || status !== "CONFIRMED") && (
-        <Field label={question ? "מה יסגור אותה" : "מה יסגור את זה *"}>
+        <Field label={question ? t("form.toResolveQuestion") : tk("toResolve")}>
           <input name="toResolve" required={!question} defaultValue={existing?.toResolve ?? ""} className={INPUT} />
         </Field>
       )}
       {(question || status !== "CONFIRMED") && (
         <label className="flex items-center gap-2 text-sm text-app-text-primary">
           <input type="checkbox" name="lowImportance" defaultChecked={existing?.lowImportance} className="h-4 w-4 accent-gold" />
-          לא קריטי
+          {t("lowImportance")}
         </label>
       )}
-      <Field label="למי אסור לספר">
+      <Field label={tk("doNotDisclose")}>
         <input name="doNotDisclose" defaultValue={existing?.doNotDisclose ?? ""} className={INPUT} />
       </Field>
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : existing ? "שמירת הגרסה החדשה" : "הוספה לתיק"}
+        {pending ? t("saving") : existing ? t("form.saveVersion") : t("addToFile")}
       </button>
     </form>
   );
@@ -226,16 +223,17 @@ function FactForm({
 function ConfirmForm({ clientId, fact, sourceOptions }: { clientId: string; fact: PanelFact; sourceOptions: SourceOption[] }) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(confirmClientFactAction, close);
+  const t = useTranslations("clients.facts");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="id" value={fact.id} />
-      <p className="text-sm text-app-text-primary">{fact.body}</p>
+      <p className="text-sm text-app-text-primary" dir="auto">{fact.body}</p>
       <SourcesField options={sourceOptions} defaultValue={fact.sources.join(", ")} status="CONFIRMED" />
-      <p className="-mt-2 text-[11px] text-app-text-tertiary">צריך מקור מהלקוח או מספק שלו. מסמך של אנקורה לבד לא מאשר.</p>
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">{t("confirm.hint")}</p>
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : "אישור"}
+        {pending ? t("saving") : t("confirm.submit")}
       </button>
     </form>
   );
@@ -244,18 +242,19 @@ function ConfirmForm({ clientId, fact, sourceOptions }: { clientId: string; fact
 function AnswerForm({ clientId, fact, sourceOptions }: { clientId: string; fact: PanelFact; sourceOptions: SourceOption[] }) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(answerClientQuestionAction, close);
+  const t = useTranslations("clients.facts");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="id" value={fact.id} />
-      <p className="text-sm text-app-text-primary">{fact.body}</p>
-      <Field label="התשובה *">
+      <p className="text-sm text-app-text-primary" dir="auto">{fact.body}</p>
+      <Field label={t("answer.label")}>
         <textarea name="answer" required rows={3} className={INPUT} />
       </Field>
       <SourcesField options={sourceOptions} status="CONFIRMED" />
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : "שמירת התשובה"}
+        {pending ? t("saving") : t("answer.submit")}
       </button>
     </form>
   );
@@ -277,6 +276,8 @@ function FactRow({
   now: number;
 }) {
   const { showToast } = useToast();
+  const t = useTranslations("clients.facts");
+  const dateLabel = useDateLabel();
   const closed = !!fact.closedAt;
   const answered = !!fact.answeredAt;
   const pastValidity = isPastValidity(
@@ -286,91 +287,91 @@ function FactRow({
 
   async function act(fn: () => Promise<{ error?: string }>, done: string) {
     const r = await fn();
-    if (r.error) showToast({ tone: "error", title: "הפעולה נכשלה", description: r.error });
+    if (r.error) showToast({ tone: "error", title: t("toast.failed"), description: r.error });
     else showToast({ tone: "info", title: done, description: fact.body.slice(0, 80) });
   }
 
   const meta = [
-    fact.topic ? FACT_TOPIC_LABELS[fact.topic] : null,
+    fact.topic ? t(`topics.${fact.topic}`) : null,
     fact.subject,
-    fact.referTo ? `מפנים ל: ${fact.referTo}` : null,
-    fact.kind === "TEMPORARY" ? `בתוקף עד ${dateLabel(fact.validUntil) ?? fact.validUntilEvent}` : null,
+    fact.referTo ? t("row.referTo", { name: fact.referTo }) : null,
+    fact.kind === "TEMPORARY" ? t("row.validUntil", { until: dateLabel(fact.validUntil) ?? fact.validUntilEvent ?? "" }) : null,
     fact.kind === "ONE_OFF_DECISION" ? [dateLabel(fact.decidedAt), fact.decidedBy].filter(Boolean).join(", ") : null,
-    (fact.kind === "QUESTION" || fact.kind === "TEMPORARY") && fact.assigneeName ? `אחראי: ${fact.assigneeName}` : null,
-    fact.lowImportance ? "לא קריטי" : null,
+    (fact.kind === "QUESTION" || fact.kind === "TEMPORARY") && fact.assigneeName ? t("row.assignee", { name: fact.assigneeName }) : null,
+    fact.lowImportance ? t("lowImportance") : null,
   ].filter(Boolean);
 
   return (
     <li id={`item-${fact.id}`} className={`py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft ${closed ? "opacity-60" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-[1_1_18rem]">
-          <p className="text-sm text-app-text-primary">{fact.body}</p>
+          <p className="text-sm text-app-text-primary" dir="auto">{fact.body}</p>
           {meta.length > 0 && <p className="mt-0.5 text-xs text-app-text-secondary">{meta.join(" · ")}</p>}
           {answered && (
             <p className="mt-1 text-xs text-app-text-primary">
-              תשובה ({dateLabel(fact.answeredAt)}): {fact.answer}
+              {t("row.answer", { date: dateLabel(fact.answeredAt) ?? "" })} <span dir="auto">{fact.answer}</span>
             </p>
           )}
-          {closed && <p className="mt-1 text-xs text-app-text-tertiary">נסגר ב-{dateLabel(fact.closedAt)}</p>}
+          {closed && <p className="mt-1 text-xs text-app-text-tertiary">{t("row.closedOn", { date: dateLabel(fact.closedAt) ?? "" })}</p>}
           {fact.alternatives.map((a, i) => (
             <p key={i} className="mt-1 text-xs text-app-warning">
-              גרסה אחרת: {a.value}
+              {t("row.alternative")} <span dir="auto">{a.value}</span>
               {a.sources.length > 0 && <span dir="ltr"> [{a.sources.join(", ")}]</span>}
             </p>
           ))}
           {pastValidity && (
             <div className="mt-1.5">
-              <StatusBadge label="עבר התוקף. עדיין נכון?" tone="amber" />
+              <StatusBadge label={t("row.pastValidity")} tone="amber" />
             </div>
           )}
           {fact.taskId && (
             <p className="mt-1 text-xs">
               <Link href={`/app/tasks/${fact.taskId}`} className="text-app-text-accent hover:underline">
-                למשימה
+                {t("row.toTask")}
               </Link>
             </p>
           )}
-          {fact.doNotDisclose && <p className="mt-1 text-xs text-app-error">לא לספר: {fact.doNotDisclose}</p>}
+          {fact.doNotDisclose && <p className="mt-1 text-xs text-app-error">{t("row.doNotTell", { text: fact.doNotDisclose })}</p>}
           {fact.kind !== "QUESTION" && <StatusLine status={fact.status} toResolve={fact.toResolve} />}
           <ItemTags item={fact} />
-          {fact.kind === "QUESTION" && !answered && fact.toResolve && fact.toResolve !== "תשובה לשאלה." && (
-            <p className="mt-1 text-xs text-app-text-secondary">{fact.toResolve}</p>
+          {fact.kind === "QUESTION" && !answered && fact.toResolve && fact.toResolve !== QUESTION_DEFAULT_TO_RESOLVE && (
+            <p className="mt-1 text-xs text-app-text-secondary" dir="auto">{fact.toResolve}</p>
           )}
           <SourceCodes sources={fact.sources} options={sourceOptions} />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3 text-xs">
           {fact.kind === "QUESTION" && !answered && (
-            <Drawer triggerLabel="תשובה" title="תשובה לשאלה" variant="link">
+            <Drawer triggerLabel={t("row.answerAction")} title={t("answer.title")} variant="link">
               <AnswerForm clientId={clientId} fact={fact} sourceOptions={sourceOptions} />
             </Drawer>
           )}
           {fact.kind === "QUESTION" && !answered && !fact.taskId && (
-            <button type="button" onClick={() => act(() => questionToTaskAction(fact.id, clientId), "נפתחה משימה")} className="text-app-text-accent hover:underline">
-              למשימה
+            <button type="button" onClick={() => act(() => questionToTaskAction(fact.id, clientId), t("toast.taskOpened"))} className="text-app-text-accent hover:underline">
+              {t("row.toTask")}
             </button>
           )}
           {fact.kind !== "QUESTION" && (fact.status === "UNCERTAIN" || fact.status === "MISSING") && (
-            <Drawer triggerLabel="אישור" title="אישור פריט" variant="link">
+            <Drawer triggerLabel={t("confirm.submit")} title={t("confirm.title")} variant="link">
               <ConfirmForm clientId={clientId} fact={fact} sourceOptions={sourceOptions} />
             </Drawer>
           )}
           {fact.kind === "TEMPORARY" && !closed && !fact.taskId && (
-            <button type="button" onClick={() => act(() => questionToTaskAction(fact.id, clientId), "נפתחה משימה")} className="text-app-text-accent hover:underline">
-              למשימה
+            <button type="button" onClick={() => act(() => questionToTaskAction(fact.id, clientId), t("toast.taskOpened"))} className="text-app-text-accent hover:underline">
+              {t("row.toTask")}
             </button>
           )}
           {fact.kind === "TEMPORARY" && !closed && (
-            <button type="button" onClick={() => act(() => closeTemporaryFactAction(fact.id, clientId), "נסגר")} className="text-app-text-secondary hover:text-app-text-primary">
-              כבר לא נכון
+            <button type="button" onClick={() => act(() => closeTemporaryFactAction(fact.id, clientId), t("toast.closed"))} className="text-app-text-secondary hover:text-app-text-primary">
+              {t("row.noLongerTrue")}
             </button>
           )}
           {!answered && !closed && (
-            <Drawer triggerLabel="החלפה" title={`גרסה חדשה: ${FACT_KIND_LABELS[fact.kind]}`} variant="link">
+            <Drawer triggerLabel={t("row.supersede")} title={t("row.supersedeTitle", { kind: t(`kinds.${fact.kind}`) })} variant="link">
               <FactForm clientId={clientId} sourceOptions={sourceOptions} subjects={subjects} staff={staff} existing={fact} />
             </Drawer>
           )}
-          <button type="button" onClick={() => act(() => removeClientFactAction(fact.id, clientId), "הוסר מהתיק")} className="text-app-text-tertiary hover:text-app-error">
-            הסרה
+          <button type="button" onClick={() => act(() => removeClientFactAction(fact.id, clientId), t("toast.removed"))} className="text-app-text-tertiary hover:text-app-error">
+            {t("row.remove")}
           </button>
         </div>
       </div>
@@ -399,28 +400,30 @@ export function FactsPanel({
 }) {
   const sections = FACT_SECTIONS.map((s) => ({ ...s, items: facts.filter((f) => f.kind === s.kind) })).filter((s) => s.items.length > 0);
   const openQuestions = facts.filter((f) => f.kind === "QUESTION" && !f.answeredAt).length;
+  const t = useTranslations("clients.facts");
+  const dateLabel = useDateLabel();
 
   return (
     <div className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <h2 className="text-sm font-medium text-app-text-primary">
-          תיק הלקוח: עובדות ({facts.length})
-          {openQuestions > 0 && <span className="ms-2 text-xs font-normal text-app-warning">{openQuestions} שאלות פתוחות</span>}
+          {t("heading", { count: facts.length })}
+          {openQuestions > 0 && <span className="ms-2 text-xs font-normal text-app-warning">{t("openQuestions", { count: openQuestions })}</span>}
         </h2>
-        <Drawer triggerLabel="+ פריט" title="פריט חדש בתיק" variant="link">
+        <Drawer triggerLabel={t("add")} title={t("addTitle")} variant="link">
           <FactForm clientId={clientId} sourceOptions={sourceOptions} subjects={subjects} staff={staff} />
         </Drawer>
       </div>
       {sections.length === 0 ? (
         <p className="mt-2 text-sm text-app-text-tertiary">
-          אין עדיין עובדות בתיק: תחומי אחריות, העדפות, דרישות, מידע זמני, החלטות ושאלות פתוחות נכנסים לכאן.
+          {t("empty")}
         </p>
       ) : (
         sections.map((s) => (
           <section key={s.kind} className="mt-5">
             <h3 className="text-xs font-medium text-app-text-secondary">
               {s.section && <span className="me-1.5 font-mono text-app-text-accent">{s.section}</span>}
-              {s.title} ({s.items.length})
+              {t(`sections.${s.kind}`)} ({s.items.length})
             </h3>
             <ul className="mt-1 divide-y divide-app-border">
               {s.items.map((f) => (
@@ -432,13 +435,13 @@ export function FactsPanel({
       )}
       {history.length > 0 && (
         <details className="mt-5">
-          <summary className="cursor-pointer text-xs text-app-text-tertiary">היסטוריה: גרסאות שהוחלפו ({history.length})</summary>
+          <summary className="cursor-pointer text-xs text-app-text-tertiary">{t("history", { count: history.length })}</summary>
           <ul className="mt-2 space-y-1.5">
             {history.map((f) => (
               <li key={f.id} className="text-xs text-app-text-tertiary">
-                <span className="me-1.5">{FACT_KIND_LABELS[f.kind]}:</span>
-                <span className="line-through">{f.body}</span>
-                {f.supersededAt && <span className="ms-1.5">(הוחלף ב-{dateLabel(f.supersededAt)})</span>}
+                <span className="me-1.5">{t(`kinds.${f.kind}`)}:</span>
+                <span className="line-through" dir="auto">{f.body}</span>
+                {f.supersededAt && <span className="ms-1.5">{t("supersededOn", { date: dateLabel(f.supersededAt) ?? "" })}</span>}
               </li>
             ))}
           </ul>

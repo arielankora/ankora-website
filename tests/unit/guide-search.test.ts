@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GUIDE_GROUPS } from "@/app/(product)/app/(authenticated)/guide/content";
+import { GUIDE_GROUPS as GUIDE_EN } from "@/app/(product)/app/(authenticated)/guide/content.en";
 import { filterGuide, highlightParts, queryWords } from "@/app/(product)/app/(authenticated)/guide/search";
 
 // Ariel, 26.9.2026: search in the user guide. Tested against the real
@@ -47,5 +48,36 @@ describe("the guide search", () => {
 
   it("does not choke on characters that mean something in a regex", () => {
     expect(() => highlightParts("מחיר (כולל מע\"מ)", queryWords("(כולל"))).not.toThrow();
+  });
+});
+
+// ADR 0006: the same search runs over the English guide (content.en.ts)
+// for readers whose language is English.
+describe("the guide search, in English", () => {
+  it("finds a section by a word in its body, in any case", () => {
+    expect(titles(filterGuide(GUIDE_EN, "supervisor"))).toContain("Tasks");
+    expect(titles(filterGuide(GUIDE_EN, "Supervisor"))).toEqual(titles(filterGuide(GUIDE_EN, "supervisor")));
+  });
+
+  it("needs every word, so more words narrow the result", () => {
+    const one = titles(filterGuide(GUIDE_EN, "hour"));
+    const two = titles(filterGuide(GUIDE_EN, "hour export"));
+    expect(two.length).toBeGreaterThan(0);
+    expect(two.length).toBeLessThan(one.length);
+    expect(two.every((t) => one.includes(t))).toBe(true);
+  });
+
+  it("marks matches whatever their case, keeping the text as written", () => {
+    const parts = highlightParts("Hour banks and hour packages", queryWords("HOUR"));
+    expect(parts).toEqual([
+      { text: "Hour", match: true },
+      { text: " banks and ", match: false },
+      { text: "hour", match: true },
+      { text: " packages", match: false },
+    ]);
+  });
+
+  it("drops groups with nothing left in them", () => {
+    expect(filterGuide(GUIDE_EN, "no-such-word-anywhere")).toEqual([]);
   });
 });

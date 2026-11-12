@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { MoreHorizontal } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { withFrom } from "@/lib/list-back";
 import { clientNameMatches } from "@/lib/client-search";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -53,12 +54,13 @@ export type ClientsSummary = {
   endingNames: string;
 };
 
-const CHIP: Record<"attention" | "ok" | "none" | "paused" | "archived", { label: string; className: string }> = {
-  attention: { label: "דורש תשומת לב", className: "bg-app-error-soft text-app-error" },
-  ok: { label: "בקצב", className: "bg-app-success-soft text-app-success" },
-  none: { label: "בלי בנק שעות", className: "bg-app-neutral-soft text-app-text-secondary" },
-  paused: { label: "מושהה", className: "bg-app-warning-soft text-app-warning" },
-  archived: { label: "בארכיון", className: "bg-app-neutral-soft text-app-text-secondary" },
+type ChipKey = "attention" | "ok" | "none" | "paused" | "archived";
+const CHIP: Record<ChipKey, { key: ChipKey; className: string }> = {
+  attention: { key: "attention", className: "bg-app-error-soft text-app-error" },
+  ok: { key: "ok", className: "bg-app-success-soft text-app-success" },
+  none: { key: "none", className: "bg-app-neutral-soft text-app-text-secondary" },
+  paused: { key: "paused", className: "bg-app-warning-soft text-app-warning" },
+  archived: { key: "archived", className: "bg-app-neutral-soft text-app-text-secondary" },
 };
 
 const REASON_TONE = {
@@ -74,10 +76,6 @@ function chipOf(c: ClientCard) {
   if (c.status === "ARCHIVED") return CHIP.archived;
   if (!c.assessment) return CHIP.none;
   return c.assessment.attention ? CHIP.attention : CHIP.ok;
-}
-
-function plural(n: number, one: string, many: string) {
-  return n === 1 ? one : `${n} ${many}`;
 }
 
 // App redesign (handoff README, screen 5): live search (filters
@@ -118,6 +116,8 @@ export function ClientsGrid({
   rulesLine: string;
 }) {
   const { showToast } = useToast();
+  const t = useTranslations("clients.list.grid");
+  const tClose = useTranslations("shell");
   const [query, setQuery] = useState(initialQuery);
   const [items, setItems] = useState(cards);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -142,13 +142,13 @@ export function ClientsGrid({
     setMenuFor(null);
     const result = await archiveClientAction(client.id);
     if (!result.ok) {
-      showToast({ tone: "error", title: "הפעולה נכשלה", description: result.error });
+      showToast({ tone: "error", title: t("actionFailed"), description: result.error });
       return;
     }
     setItems((prev) => prev.filter((c) => c.id !== client.id));
     showToast({
       tone: "warning",
-      title: "הלקוח הועבר לארכיון",
+      title: t("archivedToast"),
       description: client.name,
       undo: async () => {
         const restored = await restoreClientAction(client.id);
@@ -164,24 +164,24 @@ export function ClientsGrid({
       {summary.withBank > 0 && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="clients-summary">
           <div className="rounded-2xl border border-app-border bg-white px-5 py-4">
-            <p className="text-xs text-app-text-secondary">יתרה כוללת בבנקים</p>
+            <p className="text-xs text-app-text-secondary">{t("summary.remaining")}</p>
             <p dir="ltr" className="mt-1.5 text-end font-jbmono text-2xl font-medium text-app-text-primary">{summary.remaining}</p>
-            <p className="mt-1 text-xs text-app-text-secondary">שעות, ב-{plural(summary.withBank, "לקוח אחד", "לקוחות")} עם בנק</p>
+            <p className="mt-1 text-xs text-app-text-secondary">{t("summary.remainingHint", { count: summary.withBank })}</p>
           </div>
           <div className="rounded-2xl border border-app-border bg-white px-5 py-4">
-            <p className="text-xs text-app-text-secondary">נוצל במחזורים הנוכחיים</p>
+            <p className="text-xs text-app-text-secondary">{t("summary.used")}</p>
             <p dir="ltr" className="mt-1.5 text-end font-jbmono text-2xl font-medium text-app-text-primary">{summary.used}</p>
-            <p className="mt-1 text-xs text-app-text-secondary">שעות, מתחילת כל מחזור עד היום</p>
+            <p className="mt-1 text-xs text-app-text-secondary">{t("summary.usedHint")}</p>
           </div>
           <div className="rounded-2xl border border-app-border bg-white px-5 py-4">
-            <p className="text-xs text-app-text-secondary">חרגו במחזור הקודם</p>
+            <p className="text-xs text-app-text-secondary">{t("summary.overran")}</p>
             <p className={`mt-1.5 font-jbmono text-2xl font-medium ${summary.overranCount ? "text-app-error" : "text-app-text-primary"}`}>{summary.overranCount}</p>
-            <p className="mt-1 text-xs text-app-text-secondary">{summary.overranNames || "אף לקוח"}</p>
+            <p className="mt-1 text-xs text-app-text-secondary">{summary.overranNames || t("summary.noClient")}</p>
           </div>
           <div className="rounded-2xl border border-app-border bg-white px-5 py-4">
-            <p className="text-xs text-app-text-secondary">חבילות שעומדות להיגמר</p>
+            <p className="text-xs text-app-text-secondary">{t("summary.ending")}</p>
             <p className={`mt-1.5 font-jbmono text-2xl font-medium ${summary.endingCount ? "text-app-warning" : "text-app-text-primary"}`}>{summary.endingCount}</p>
-            <p className="mt-1 text-xs text-app-text-secondary">{summary.endingNames || "אף חבילה"}</p>
+            <p className="mt-1 text-xs text-app-text-secondary">{summary.endingNames || t("summary.noPackage")}</p>
           </div>
         </div>
       )}
@@ -193,22 +193,22 @@ export function ClientsGrid({
             setQuery(e.target.value);
             mirrorQuery(e.target.value.trim());
           }}
-          placeholder="חיפוש לקוח"
-          aria-label="חיפוש לקוח"
+          placeholder={t("search")}
+          aria-label={t("search")}
           className="w-full max-w-xs rounded-full border border-app-border-strong bg-white px-4 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold sm:w-auto"
         />
       </div>
       <div className="space-y-1 text-xs text-app-text-secondary">
         <p className="flex items-center gap-1.5">
           <span aria-hidden="true" className="inline-block h-3.5 w-0.5 bg-app-text-primary" />
-          הקו על הפס: כמה היה צפוי להיות מנוצל עד היום.
+          {t("expectedLine")}
         </p>
         <p>{rulesLine}</p>
       </div>
 
       {filtered.length === 0 ? (
         <p className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-secondary">
-          {items.length === 0 ? "אין עדיין לקוחות. הוסיפו לקוח ראשון למעלה." : "לא נמצאו לקוחות התואמים את החיפוש."}
+          {items.length === 0 ? t("empty") : t("noMatch")}
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3">
@@ -220,8 +220,8 @@ export function ClientsGrid({
             const open = menuFor === client.id;
             const href = withFrom(`/app/clients/${client.id}`, fromParam);
             const meta = [
-              client.employeeCount === 0 ? "אין עדיין אנשי צוות מוקצים" : plural(client.employeeCount, "איש צוות מוקצה", "אנשי צוות מוקצים"),
-              plural(client.openTasks, "משימה פתוחה אחת", "משימות פתוחות"),
+              t("meta.employees", { count: client.employeeCount }),
+              t("meta.openTasks", { count: client.openTasks }),
             ];
             return (
               <article key={client.id} className="flex flex-col gap-3.5 rounded-2xl border border-app-border bg-white p-5" data-testid="client-card">
@@ -229,14 +229,15 @@ export function ClientsGrid({
                   <div className="min-w-0">
                     <Link
                       href={href}
-                      title="פתיחת תיק הלקוח"
+                      title={t("openFile")}
+                      dir="auto"
                       className="text-[15px] font-medium text-app-text-primary underline decoration-app-border-strong underline-offset-4 hover:text-app-text-accent"
                     >
                       {client.name}
                     </Link>
-                    <p className="mt-1 text-xs text-app-text-secondary">{bank ? bank.kindLabel : "אין בנק שעות פעיל"}</p>
+                    <p className="mt-1 text-xs text-app-text-secondary">{bank ? bank.kindLabel : t("noActiveBank")}</p>
                   </div>
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${chip.className}`}>{chip.label}</span>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${chip.className}`}>{t(`chips.${chip.key}`)}</span>
                 </div>
 
                 {client.assessment && client.assessment.reasons.length > 0 && (
@@ -250,21 +251,25 @@ export function ClientsGrid({
                     <div className="flex items-end justify-between gap-4">
                       <div className="space-y-1">
                         <p className="text-xs text-app-text-secondary">
-                          נוצל מתוך סך הכול (<span dir="ltr">{bank.pct}%</span>)
+                          {t.rich("usedOfTotal", { pct: String(bank.pct), ltr: (chunks) => <span dir="ltr">{chunks}</span> })}
                         </p>
                         <p data-testid="client-hours">
                           <span dir="ltr" className={`font-jbmono text-[22px] font-medium ${over ? "text-app-error" : "text-app-text-primary"}`}>
                             {bank.used}
                           </span>{" "}
                           <span className="text-[13px] text-app-text-secondary">
-                            מתוך <span dir="ltr" className="font-jbmono">{bank.total}</span> שעות
+                            {t.rich("ofHours", { total: bank.total, num: (chunks) => <span dir="ltr" className="font-jbmono">{chunks}</span> })}
                           </span>
                         </p>
                         <p className="text-xs text-app-text-secondary">
-                          {bank.overdrawn ? "חריגה של " : "נותרו "}
-                          <span dir="ltr" className={`font-jbmono ${bank.overdrawn ? "text-app-error" : "text-app-text-primary"}`}>
-                            {bank.overdrawn ? bank.remaining.replace("-", "") : bank.remaining}
-                          </span>
+                          {t.rich(bank.overdrawn ? "overdrawnBy" : "remaining", {
+                            value: bank.overdrawn ? bank.remaining.replace("-", "") : bank.remaining,
+                            num: (chunks) => (
+                              <span dir="ltr" className={`font-jbmono ${bank.overdrawn ? "text-app-error" : "text-app-text-primary"}`}>
+                                {chunks}
+                              </span>
+                            ),
+                          })}
                         </p>
                       </div>
                       {client.history.length > 1 && (
@@ -288,7 +293,7 @@ export function ClientsGrid({
                               </div>
                             ))}
                           </div>
-                          <figcaption className="text-[11px] text-app-text-secondary">קו מקווקו: גודל המחזור</figcaption>
+                          <figcaption className="text-[11px] text-app-text-secondary">{t("dashedLine")}</figcaption>
                         </figure>
                       )}
                     </div>
@@ -314,7 +319,7 @@ export function ClientsGrid({
                     <>
                       {", "}
                       <Link href={`/app/approvals?clientId=${client.id}`} className="font-medium text-app-warning hover:underline">
-                        {client.approvals === 1 ? "דבר אחד ממתין לאישורך" : `${client.approvals} ממתינים לאישורך`}
+                        {t("approvalsWaiting", { count: client.approvals })}
                       </Link>
                     </>
                   )}
@@ -324,12 +329,12 @@ export function ClientsGrid({
                   <div className="flex flex-wrap items-center gap-2">
                     {canManageBanks && (
                       <Link href={`/app/hour-banks?clientId=${client.id}`} className={PILL}>
-                        {bank ? "בנק שעות" : "פתיחת בנק שעות"}
+                        {bank ? t("hourBank") : t("openHourBank")}
                       </Link>
                     )}
                     {canViewReports && (
                       <Link href={`/app/reports?tab=summary&clientId=${client.id}`} className={PILL}>
-                        דוח פעילות
+                        {t("activityReport")}
                       </Link>
                     )}
                     {/* Portal phase 0: an Ankora manager can open this
@@ -340,7 +345,7 @@ export function ClientsGrid({
                     <form action={startPortalPreviewAction}>
                       <input type="hidden" name="clientId" value={client.id} />
                       <button type="submit" className={PILL}>
-                        תצוגת לקוח
+                        {t("clientView")}
                       </button>
                     </form>
                     <div className="relative ms-auto">
@@ -349,17 +354,17 @@ export function ClientsGrid({
                         onClick={() => setMenuFor(open ? null : client.id)}
                         aria-haspopup="menu"
                         aria-expanded={open}
-                        aria-label={`פעולות נוספות ל${client.name}`}
+                        aria-label={t("moreActions", { name: client.name })}
                         className={`flex h-11 w-11 items-center justify-center rounded-full border text-app-text-primary ${open ? "border-app-border-strong bg-app-surface-page" : "border-transparent hover:border-app-border"}`}
                       >
                         <MoreHorizontal size={18} strokeWidth={1.75} />
                       </button>
                       {open && (
                         <>
-                          <button type="button" aria-label="סגירה" onClick={() => setMenuFor(null)} className="fixed inset-0 z-10 cursor-default" />
+                          <button type="button" aria-label={tClose("close")} onClick={() => setMenuFor(null)} className="fixed inset-0 z-10 cursor-default" />
                           <div role="menu" className="absolute bottom-full end-0 z-20 mb-1.5 w-44 overflow-hidden rounded-lg border border-app-border bg-white py-1 shadow-lg">
                             <Link href={href} role="menuitem" onClick={() => setMenuFor(null)} className="block px-4 py-2.5 text-sm text-app-text-primary hover:bg-app-surface-page">
-                              תיק הלקוח
+                              {t("clientFile")}
                             </Link>
                             {client.status !== "ARCHIVED" && (
                               <button
@@ -368,7 +373,7 @@ export function ClientsGrid({
                                 onClick={() => handleArchive(client)}
                                 className="block w-full px-4 py-2.5 text-start text-sm text-app-error hover:bg-app-surface-page"
                               >
-                                העברה לארכיון
+                                {t("archive")}
                               </button>
                             )}
                           </div>

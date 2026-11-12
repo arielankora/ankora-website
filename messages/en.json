@@ -1311,6 +1311,259 @@
         "notActive": "This block isn't active.",
         "forbidden": "You don't have permission."
       }
+    },
+    "processes": {
+      "contactNotInFile": "A chosen contact is not in the client's file.",
+      "systemNotInFile": "A chosen system is not in the client's file.",
+      "ruleNotInFile": "A chosen rule is not in the client's file.",
+      "approverNotInFile": "The chosen approver is not in the client's file.",
+      "executorNotInFile": "The chosen executor is not in the client's file.",
+      "executorNotStaff": "The executor at Ankora must be a staff member.",
+      "ownerNotStaff": "An owner or a backup must be Ankora staff.",
+      "approverNotAllowed": "The approver at Ankora must be an active staff member assigned to the client, or a manager.",
+      "calendarUnknown": "Unknown business calendar.",
+      "slaRange": "The SLA in business days is a whole number from 0 to 60.",
+      "reviewRange": "A review is every whole number of days, up to {max}.",
+      "checkRange": "A check is every 1 to {max} days.",
+      "checkNotContinuous": "A periodic check is for an ongoing process.",
+      "secrets": "There is a password, a key or a card number here. Secrets are kept in the vault, not in the file.",
+      "notFound": "Process not found.",
+      "titleRequired": "The process needs a name.",
+      "statusManagerOnly": "Only a manager pauses, resumes or retires a process.",
+      "noApprovedProcedure": "The process has no approved procedure yet.",
+      "removeApproved": "A process that had an approved procedure is not deleted. Retire it, and it stays in the history.",
+      "dateNotFound": "A chosen date is not at this client.",
+      "flowUnread": "The flow could not be read. Refresh and try again.",
+      "noSteps": "A procedure needs at least one step.",
+      "tooManySteps": "Up to {max} steps. A procedure longer than that is several processes.",
+      "stepSystemNotFound": "A system chosen in a step is not in the client's system map.",
+      "versionConflict": "Someone saved a new version of the procedure (version {latest}) while you were editing. Refresh, and check what changed before saving.",
+      "flowOnly": "This procedure was built as a flow with conditions. Edit it in the \"Flow editor\", so that no branch gets lost.",
+      "notApprover": "Only a manager or the client's account manager approves a procedure.",
+      "separationRequired": "This client requires separation: whoever wrote the procedure version does not approve it. Someone else approves.",
+      "notLatestVersion": "This is not the latest version of the procedure. Refresh and try again.",
+      "alreadyApproved": "This version is already approved.",
+      "failsChecks": "The procedure fails the checks: {checks}",
+      "notApplicableNotAllowed": "Only a manager or the process owner marks a field not relevant.",
+      "notApplicableField": "This field cannot be marked not relevant."
+    },
+    "processRuns": {
+      "sameDay": "There is already an open run of {code} for this day: \"{title}\" ({id}). Work on it, or close it and then open a new one.",
+      "notFound": "Process not found.",
+      "paused": "The process is paused. A manager resumes it before a run is opened.",
+      "noApprovedProcedure": "The process has no approved procedure yet.",
+      "continuous": "An ongoing process is not opened as a run. It runs all the time, and is checked in the periodic review.",
+      "dateRequired": "The run needs a date.",
+      "cannotOpen": "A run cannot be opened for this process."
+    },
+    "processChecks": {
+      "notFound": "Process not found.",
+      "notRoutine": "A check is recorded for an ongoing process that is neither paused nor retired.",
+      "outcome": "What did the check find?",
+      "issueNote": "When an issue is found, write what was found.",
+      "noteTooLong": "Up to {max} characters.",
+      "secrets": "There is a password, a key or a card number here. Secrets are kept in the vault, not in the file."
+    },
+    "processNextSteps": {
+      "notFound": "Process not found.",
+      "closeManagerOnly": "Only a manager closes a task because a process covers it.",
+      "rulesManagerOnly": "Only a manager approves rules."
+    },
+    "processOverlap": {
+      "managerOnly": "Only a manager closes a task because a process covers it.",
+      "taskNotFound": "Task not found.",
+      "processNotFound": "Process not found.",
+      "differentClients": "The task and the process belong to different clients.",
+      "notActive": "Only a process with an approved procedure covers tasks.",
+      "isRun": "This is a run of a process, not a separate task.",
+      "notOpen": "The task is no longer open.",
+      "sourceTask": "The process was proposed from this task, so it does not duplicate it."
+    },
+    "processReview": {
+      "managerOnly": "Only a manager marks a procedure reviewed.",
+      "notFound": "Process not found.",
+      "noApproved": "The process has no approved procedure to review yet.",
+      "failsRules": "The procedure in force does not meet the client's rules. Write a new version, or ask for an exception to the rule."
+    },
+    "procedureDocuments": {
+      "notFound": "Process not found.",
+      "noProcedure": "This process has no procedure yet.",
+      "versionNotFound": "Version not found.",
+      "noApprovedTranslation": "This version has no approved English translation yet.",
+      "translationInvalid": "The saved translation is not valid. It needs translating again.",
+      "noApprovedVersion": "Only an approved procedure is translated. This process has no approved version yet.",
+      "onlyApproved": "Only the approved version is translated.",
+      "translationTooShort": "The translation needs at least a title and a list of steps.",
+      "translationSecrets": "The translation contains a password, a key or a card number.",
+      "managerOnly": "Only a manager approves a translation.",
+      "nothingToApprove": "There is no translation to approve.",
+      "incomplete": "The translation is incomplete: {gaps}",
+      "clientNotFound": "Client not found."
+    },
+    "strangerTests": {
+      "processNotFound": "Process not found.",
+      "questionNotFound": "Question not found.",
+      "questionClosed": "The question is already closed.",
+      "answerRequired": "An answer is needed, or mark the question not relevant.",
+      "answerTooLong": "The answer is too long.",
+      "kindNotAllowed": "This kind of answer does not fit the file.",
+      "ruleNotFound": "The rule is not in the client's file.",
+      "ruleRetired": "The rule was retired. Write a new rule.",
+      "ruleChangeNotAllowed": "Only a manager or the client's account manager changes a client's rule. Record the answer without changing the rule, and they will decide."
+    },
+    "clients": {
+      "contractNotFound": "The selected contract is not in this client's file.",
+      "managerNotActive": "The selected account manager is not an active Ankora user.",
+      "subprocessorSourceRequired": "To mark a commitment as present or absent, write the source: the contract and the clause."
+    },
+    "clientEntities": {
+      "notFoundForClient": "This entity was not found for the client.",
+      "missingNeedsWhy": "For a missing field, write what will close it.",
+      "selfParent": "An entity cannot be its own parent.",
+      "cycle": "That would create a loop between entities.",
+      "nameRequired": "The entity needs a name.",
+      "notFound": "Entity not found.",
+      "invalidCountry": "The country code is not valid.",
+      "invalidCurrency": "The currency code is not valid.",
+      "inUse": "{name} is linked to {count} items in the file. Reassign them first."
+    },
+    "systemMap": {
+      "invalidUrl": "The system's address is not valid.",
+      "lastFourOnly": "Only the card's last four digits.",
+      "passwordInMap": "Passwords belong in the vault, not in the systems map.",
+      "vaultEntryNotFound": "That vault entry was not found for this client.",
+      "invalidCost": "The cost is not valid.",
+      "nameRequired": "The system needs a name.",
+      "notFound": "System not found.",
+      "duplicate": "{name} is already in the systems map."
+    },
+    "connections": {
+      "managersOnly": "Only a manager or the client's account manager can connect the client's systems.",
+      "invalidEmail": "The email address is not valid.",
+      "appPasswordTooShort": "The app password is too short.",
+      "consentRequired": "Write who at the client gave the access, and when.",
+      "notFound": "Connection not found.",
+      "sendFailed": "Sending failed. The permission may have been revoked in Google.",
+      "noMailAccess": "No access to the mailbox. The permission may have been revoked in Google.",
+      "invalidFolderId": "The folder ID is not valid.",
+      "noDriveAccess": "No access to the Drive folder."
+    },
+    "requestTypes": {
+      "processNotFound": "The selected process was not found for this client.",
+      "contactNotFound": "A selected contact is not in the client's file.",
+      "titleRequired": "The request type needs a name.",
+      "handlingRequired": "Write how to answer and where to pass it on.",
+      "notFound": "Request type not found."
+    },
+    "decisions": {
+      "questionRequired": "Write the question the client needs to decide.",
+      "minOptions": "Enter at least two options.",
+      "oneRecommendation": "Only one option can be marked as recommended.",
+      "taskNotForClient": "The linked task does not belong to this client.",
+      "notFound": "Decision not found.",
+      "cannotCancelAnswered": "A decision that has been answered cannot be cancelled.",
+      "alreadyClosed": "This decision is already closed.",
+      "optionNotInDecision": "The selected option does not belong to this decision.",
+      "maxOptions": "A decision can have at most {max} options."
+    },
+    "clientDocuments": {
+      "titleRequired": "Enter a name for the document.",
+      "emptyFile": "The file is empty.",
+      "tooLarge": "The file is larger than 4MB. Compress it or scan it again at a lower quality.",
+      "taskNotFound": "The task was not found for this client.",
+      "notFound": "Document not found.",
+      "driveNotConfigured": "Document storage is not connected yet. You can attach files here once the folder is set up.",
+      "uploadFailed": "The upload failed: {error}",
+      "uploadFailedUnknown": "The upload failed for an unknown reason."
+    },
+    "clientPolicies": {
+      "managerOnly": "Only a manager can approve or retire a client rule.",
+      "params": "{interim, select, yes {In the interim rule: } other {}}{problem, select, threshold {A threshold needs an amount and a currency.} tags {Choose which actions the rule applies to.} mustInclude {Write what must appear in the steps.} timing {Timing needs a number of business days and the actions it applies to.} communication {Add the allowed channels, or where invoices go.} other {A separation is between at least two entities.}}",
+      "entityNotInFile": "An entity chosen in the rule is not in this client's file.",
+      "notFound": "Rule not found.",
+      "shape": "{problem, select, title {The rule needs a name.} statement {Write the rule itself.} other {A proposed rule of this kind needs an interim rule: what to do until it is approved (\"every expense goes to Oren\").}}",
+      "retiredNotEditable": "A retired rule cannot be edited. Write a new rule.",
+      "approverOnly": "Only a manager or the client's account manager can approve a client rule.",
+      "onlyProposed": "Only a proposed rule can be approved.",
+      "notConfirmed": "The rule itself is not certain yet. Check with the client what they said first, then approve it.",
+      "alreadyRetired": "This rule is already retired.",
+      "retireReasonRequired": "Write in one line why the rule is retired.",
+      "approvedNotRemovable": "An approved rule cannot be deleted. Retire it instead, and it stays in the history."
+    },
+    "policyExceptions": {
+      "notFound": "Request not found.",
+      "policyNotFound": "Rule not found.",
+      "policyRetired": "This rule is retired, so there is no exception to it.",
+      "shape": "{problem, select, what {Write what is done differently.} reason {Write why.} noEnd {An exception needs an end date.} past {The end date has already passed.} other {An exception lasts up to {max} days. For longer, change the rule itself.}}",
+      "secrets": "The request contains a password, a key or a card number. Secrets are kept in the vault.",
+      "alreadyDecided": "This request has already been decided.",
+      "rejectReasonRequired": "Write in one line why the request is rejected.",
+      "onlyUndecided": "Only a request that has not been decided can be withdrawn.",
+      "requesterOnly": "Only the person who asked can withdraw the request."
+    },
+    "clientFacts": {
+      "contactNotInFile": "This contact is not in the client's file.",
+      "organizationNotInFile": "This organization is not in the client's file.",
+      "assigneeNotStaff": "The person responsible is not on the team.",
+      "shape": "{problem, select, body {Write the fact itself.} temporaryValidity {Temporary information needs an end: a date, or an event (\"until they join the organization\").} other {A one-off decision needs a date.}}",
+      "notFound": "Item not found.",
+      "alreadySuperseded": "This item has already been replaced. Work on its new version.",
+      "sameKindOnly": "A replacement keeps the same kind of item. A different kind is a new item.",
+      "questionNotConfirmed": "A question is closed by an answer, not by confirming it.",
+      "alternativeRequired": "Write what was said differently.",
+      "onlyQuestionAnswered": "Only an open question can be answered.",
+      "alreadyAnswered": "This question has already been answered.",
+      "answerRequired": "Write the answer.",
+      "notTaskable": "Only an open question or temporary information can become a task from here.",
+      "temporaryClosed": "This temporary information is already closed.",
+      "taskExists": "{temporary, select, yes {There is already a task for this information.} other {There is already a task for this question.}}",
+      "onlyTemporaryClosed": "Only temporary information can be closed.",
+      "alreadyClosed": "Already closed."
+    },
+    "clientSources": {
+      "unknownCodes": "{count, plural, one {Source {codes} is not in the client's register.} other {Sources {codes} are not in the client's register.}}",
+      "sourceRequired": "A source is needed: how do we know this? If nobody knows yet, mark it \"Missing\".",
+      "documentNotInFile": "A document named as a source is not in the client's file.",
+      "taskNotInClient": "A task named as a source was not found for this client.",
+      "titleRequired": "The source needs a name.",
+      "notFound": "Source not found.",
+      "weightInUse": "{code} is already cited by {count, plural, one {# item} other {# items}} in the file, so its weight cannot change.",
+      "inUse": "{code} is cited by {count, plural, one {# item} other {# items}} in the file. Change their source first.",
+      "invalidDomain": "Invalid domain.",
+      "publicDomain": "{domain} is a public email service and does not identify a client.",
+      "domainOfOtherClient": "{domain} is already registered as another client's domain.",
+      "domainListed": "{domain} is already on the list.",
+      "domainNotFound": "Domain not found.",
+      "driveFolderUnrecognized": "The Drive folder was not recognized. Paste a link to the folder or its ID.",
+      "conversationsDocUnrecognized": "The running document was not recognized. Paste a link to the document or its ID."
+    },
+    "clientNarratives": {
+      "tooLong": "The text is too long.",
+      "conflict": "Version {current} was saved in the meantime. Reopen and edit the current version."
+    },
+    "clientContacts": {
+      "organizationNameRequired": "Enter an organization name or a domain.",
+      "invalidMonthlyCost": "Invalid monthly cost.",
+      "organizationInFile": "{name} is already in the client's file.",
+      "organizationNotFound": "Organization not found in the file.",
+      "domainTaken": "This domain already belongs to {name}.",
+      "notFound": "Not found.",
+      "userNotStaff": "The chosen user is not on Ankora's staff.",
+      "nameOrRoleRequired": "Enter a name or a role.",
+      "contactInFile": "{hasName, select, yes {{name} is} other {This contact is}} already in the client's file.",
+      "contactNotFound": "Contact not found.",
+      "emailTaken": "This email address already belongs to another contact.",
+      "emailOrPhoneRequired": "Enter an email address or a phone number."
+    },
+    "clientQuestions": {
+      "noneSelected": "No questions selected.",
+      "notInFile": "A selected question is not in the client's file.",
+      "emptyMessage": "The message is empty.",
+      "alreadyClosed": "This question is already closed.",
+      "itemNotInFile": "The item is not in the client's file.",
+      "dismissReasonRequired": "Write in one line why this is not relevant.",
+      "taskExists": "There is already a task for this question.",
+      "snooze": "{problem, select, date {Choose a date.} past {The date must be in the future.} other {You can snooze up to a year ahead.}}"
     }
   },
   "home": {
@@ -1900,6 +2153,2099 @@
         "unknownDecision": "Unknown decision.",
         "nothingToMark": "No conversations to mark.",
         "keptAll": "{count, plural, one {# conversation} other {# conversations}} marked as reviewed, and still stored."
+      }
+    }
+  },
+  "guide": {
+    "page": {
+      "title": "User guide",
+      "subtitle": "A full explanation of everything the system can do: what each screen does, who can open it, and how to work with it.",
+      "introTitle": "How to use this guide",
+      "introBody": "The contents below are grouped by topic, and every section has a badge showing exactly which roles can see it, so the guide always reflects what you yourself can do in the system, not a general list of features. You can also jump straight to a section from the contents, or search for a word in the search box, instead of scrolling through the whole guide."
+    },
+    "search": {
+      "label": "Search the guide",
+      "placeholder": "Search the guide, for example: supervisor, hour bank, export",
+      "clear": "Clear search",
+      "noResults": "No sections found. Try another word, or fewer words.",
+      "foundOne": "1 section found",
+      "foundMany": "{count} sections found"
+    },
+    "toc": {
+      "label": "Contents",
+      "title": "Contents"
+    },
+    "section": {
+      "allUsers": "All users",
+      "howTo": "How to do it"
+    }
+  },
+  "clients": {
+    "processes": {
+      "labels": {
+        "triggers": {
+          "SCHEDULED": "By date",
+          "EVENT": "When something happens",
+          "ON_DEMAND": "On request",
+          "CONTINUOUS": "Ongoing"
+        },
+        "transitions": {
+          "WITH_CLIENT": "With the client",
+          "IN_HANDOVER": "In handover",
+          "WITH_ANKORA": "With us",
+          "NOT_PLANNED": "Not moving to us"
+        },
+        "stepModes": {
+          "MANUAL": "Manual",
+          "ASSISTED": "Claude prepares, a person checks",
+          "AUTOMATED": "Automated"
+        },
+        "actionTags": {
+          "PAYMENT": "Payment",
+          "PURCHASE": "Purchase",
+          "INVOICE": "Invoice",
+          "SUPPLIER_NEW": "New supplier",
+          "CONTRACT": "Contract",
+          "PRICE_CHANGE": "Price change",
+          "REFUND": "Credit or refund",
+          "CLIENT_MESSAGE": "Message to the client",
+          "CREDENTIAL_ACCESS": "Password access",
+          "DATA_EXPORT": "Data export",
+          "HR": "HR",
+          "LEGAL": "Legal",
+          "BANK_SIGNATURE": "Bank signature"
+        },
+        "channels": {
+          "EMAIL": "Email",
+          "WHATSAPP": "WhatsApp",
+          "SLACK": "Slack",
+          "PHONE": "Phone",
+          "PORTAL": "the portal",
+          "OTHER": "Other"
+        },
+        "fields": {
+          "owner": "Owner",
+          "trigger": "Trigger",
+          "sla": "SLA",
+          "systems": "Systems",
+          "permissions": "Permissions",
+          "approvals": "Approval thresholds and approver",
+          "external": "External party",
+          "exceptions": "Exceptions playbook",
+          "next": "Next date"
+        },
+        "reviewReasons": {
+          "RULES": "The procedure in force does not meet the client's rules",
+          "PERIODIC": "The periodic review is due"
+        },
+        "checkStates": {
+          "OVERDUE": "Overdue",
+          "DUE": "Today",
+          "LATER": "Later"
+        },
+        "checkOutcomes": {
+          "OK": "OK",
+          "ISSUE": "Issue found"
+        },
+        "strangerSeverity": {
+          "BLOCKER": "Blocker",
+          "SLOWS": "Slows down",
+          "IMPROVES": "Improvement"
+        },
+        "strangerAskWho": {
+          "ANKORA": "Ask us",
+          "CLIENT": "Ask the client"
+        },
+        "lessonStatus": {
+          "NOTHING": "The procedure was right",
+          "OPEN": "Waiting for the next version",
+          "APPLIED": "Went into the procedure",
+          "DISMISSED": "Left out of the procedure"
+        },
+        "knowledgeStatus": {
+          "CONFIRMED": "Confirmed",
+          "UNCERTAIN": "Uncertain",
+          "MISSING": "Missing"
+        },
+        "businessCalendars": {
+          "IL": "Israel (Sunday to Thursday)",
+          "US": "US (Monday to Friday)"
+        },
+        "classifications": {
+          "CONFIDENTIAL": "Confidential",
+          "INTERNAL": "Internal",
+          "PUBLIC": "Public"
+        },
+        "weekdays": {
+          "d0": "Sunday",
+          "d1": "Monday",
+          "d2": "Tuesday",
+          "d3": "Wednesday",
+          "d4": "Thursday",
+          "d5": "Friday",
+          "d6": "Saturday"
+        },
+        "secrets": {
+          "PASSWORD": "a password",
+          "PRIVATE_KEY": "a private key",
+          "API_KEY": "an API key",
+          "TOKEN": "a token",
+          "CARD": "a card number"
+        },
+        "branchSources": {
+          "MANUAL": "A person answers in the task",
+          "EMAIL_REPLY": "A reply arrived by email",
+          "DRIVE_FILE": "A file appeared in Drive",
+          "CLAUDE": "Claude checks"
+        },
+        "sendModes": {
+          "DRAFT": "Draft, a person sends it",
+          "AUTO": "Sent automatically"
+        },
+        "nodeKinds": {
+          "ACTION": "Action",
+          "WAIT": "Wait",
+          "CONDITION": "Condition",
+          "END": "End",
+          "MAIL": "Send email"
+        }
+      },
+      "readiness": {
+        "runs": "Runs",
+        "blockers": {
+          "retired": "Will not run: the process was retired",
+          "paused": "Will not run: the process is paused",
+          "noOwner": "Will not run: no owner",
+          "noTrigger": "Will not run: nothing says what starts it",
+          "noProcedure": "Will not run: no approved procedure",
+          "scheduledNoDate": "Will not run: a date-based process with no date",
+          "continuousNoCheck": "Will not run: an ongoing process with no check frequency"
+        }
+      },
+      "documentation": {
+        "full": "Fully documented",
+        "partial": "Documented {score} of {of}"
+      },
+      "nextSteps": {
+        "fix": {
+          "complete": "Complete",
+          "writeProcedure": "Write the procedure",
+          "toProcess": "Open the process",
+          "link": "Link",
+          "addDate": "Add a date",
+          "fix": "Fix",
+          "approveProcedure": "Approve the procedure",
+          "toProcedure": "Open the procedure",
+          "markReviewed": "Mark reviewed",
+          "close": "Close",
+          "closeBoth": "Close both",
+          "closeAll": "Close all",
+          "toLessons": "Open the remarks",
+          "update": "Update",
+          "notApplicable": "Not relevant",
+          "toSystems": "Open the systems"
+        },
+        "notReady": {
+          "recommendOwner": "decide who owns it",
+          "recommendTrigger": "write what starts the process",
+          "recommendProcedure": "write the procedure and send it for approval",
+          "recommendRenew": "decide whether to resume it",
+          "why": "Until then the process opens no runs on its own."
+        },
+        "noNextDate": {
+          "title": "A date-based process with no dates",
+          "recommendLink": "link the date \"{title}\"",
+          "recommendAdd": "add the process's dates",
+          "whyCandidate": "The date is already in the file, and its name describes the process's work. Once linked, it opens the run.",
+          "whyNone": "Without a linked date, no run opens on its own."
+        },
+        "draft": {
+          "blockedTitle": "Procedure draft, version {version}, fails the checks",
+          "blockedRecommend": "fix the draft, then approve it",
+          "blockedWhy": "A procedure that breaks the client's rules is not approved.",
+          "waitingTitle": "Procedure draft, version {version}, waiting for approval",
+          "recommendApprove": "read and approve",
+          "recommendAsk": "ask a manager or the account manager to approve",
+          "whyActive": "Until it is approved, runs follow the previous version.",
+          "whyInactive": "Without an approved procedure the process opens no runs."
+        },
+        "review": {
+          "recommendPeriodic": "read the procedure and mark it reviewed",
+          "recommendRules": "write a new version, or ask for an exception to the rule",
+          "whyPeriodic": "This keeps the procedure right over time.",
+          "whyRules": "The procedure in force does not meet the client's rule today."
+        },
+        "covered": {
+          "title": "{count, plural, one {One old task duplicates} other {# old tasks duplicate}} the process: {titles}",
+          "recommend": "{count, plural, one {close it} =2 {close both} other {close them all}}",
+          "why": "Every run of the process opens its own task, so the old one is the same work twice."
+        },
+        "lessons": {
+          "title": "{count, plural, one {One remark from runs, for the next version} other {# remarks from runs, for the next version}}",
+          "recommend": "decide on each remark: into the procedure, or not",
+          "why": "Whoever ran the process found something worth changing."
+        },
+        "uncertain": {
+          "title": "The process itself is not certain yet",
+          "recommend": "ask the client",
+          "whyNone": "Nothing says what would settle it."
+        },
+        "mention": {
+          "systemTitle": "{name} is named in the process but not linked",
+          "systemRecommend": "link the system",
+          "systemWhy": "This way the process knows which system it needs access to.",
+          "contactTitle": "{name} is named in the process but not linked as an external party",
+          "contactRecommend": "link as an external party",
+          "contactWhy": "This makes clear who outside takes part in the process."
+        },
+        "docField": {
+          "title": "Documentation: {field} missing"
+        },
+        "missing": {
+          "title": "Missing: {fields}",
+          "recommend": "complete it in the process",
+          "why": "This way anyone who picks up the process can do it without asking."
+        },
+        "noAccess": {
+          "title": "We have no access to: {systems}",
+          "recommend": "ask the client for access",
+          "why": "Without access, the process depends on someone else."
+        }
+      },
+      "checks": {
+        "humanOnlyAutomated": "Step {step}: {tags} is never done automatically. By the procedures book, that is a person's decision.",
+        "humanOnlyAssisted": "Step {step}: when Claude prepares {tags}, a person approves before it is done. Tick \"Needs approval\".",
+        "clientMessageAutomated": "Step {step}: a message to the client is checked by a person before it goes out, so it is not sent automatically.",
+        "automatedNoVerification": "Step {step} is automated: write how a person makes sure it happened.",
+        "moneyNoApproval": "The procedure has a payment or a purchase, and the client's approval rules ({thresholds}) have no approval step in it.",
+        "secrets": "The procedure contains {secrets}. Secrets are kept in the vault, not in the procedure.",
+        "exceptionApproved": "(The rule has an approved exception.)",
+        "exceptionNeeded": "It can be approved only with an approved exception to the rule."
+      },
+      "panel": {
+        "title": "Processes ({count})",
+        "proceduresLink": "Procedures as documents",
+        "connectionsLink": "Connections",
+        "add": "+ Process",
+        "drawerTitle": "Process",
+        "allRunning": "All running",
+        "someRunning": "{running} of {total} running",
+        "summaryRest": "{withUs} with us · {handover} in handover · documentation {doc}%",
+        "empty": "No processes yet. What recurs at the client, who owns it, what starts it, and how it is done.",
+        "actionFailed": "The action failed",
+        "done": "Done",
+        "markedNotApplicable": "Marked not relevant",
+        "markRemoved": "Mark removed",
+        "paused": "Process paused",
+        "resumed": "Process resumed",
+        "removed": "Process removed",
+        "editTitle": "Edit: {code} {title}",
+        "procedureTitle": "Procedure: {code} {title}",
+        "datesTitle": "Dates: {code} {title}",
+        "runTitle": "Run: {code} {title}",
+        "checkTitle": "Check: {code} {title}",
+        "needsReview": "Needs review",
+        "owner": "Owner: {name}",
+        "backup": "Backup: {name}",
+        "next": "Next: {date}",
+        "lastRun": "Last run: {date}",
+        "nextStepLabel": "Next step:",
+        "recommendedLine": "Recommended: {recommend}.",
+        "recommendedShort": "Recommended: {recommend}",
+        "allClear": "All good: nothing to close on this process right now.",
+        "notApplicable": "Not relevant:",
+        "undoMark": "(undo)",
+        "details": "Details",
+        "executorToday": "Done today by: {name}",
+        "systems": "Systems: {list}",
+        "reviewEvery": "(every {days} days)",
+        "nextReview": "Next review: {date}",
+        "startRun": "Start a run",
+        "recordCheck": "Record a check",
+        "edit": "Edit",
+        "editDraft": "Edit the draft",
+        "newVersion": "New procedure version",
+        "writeProcedure": "Write the procedure",
+        "isFlow": "This procedure was built as a flow with conditions, so it is edited in the <link>flow editor</link>, so that no branch gets lost.",
+        "flowEditor": "Flow editor",
+        "dates": "Dates",
+        "document": "Procedure document",
+        "more": "More ▾",
+        "pause": "Pause",
+        "resume": "Resume",
+        "remove": "Remove",
+        "versionLine": "Procedure, version {version}",
+        "approvedBy": ", approved by {name}",
+        "approvedOn": "on {date}",
+        "atApprovalClean": "At approval: met all of the client's rules.",
+        "atApprovalExceptions": "At approval: {count, plural, one {one approved exception} other {# approved exceptions}}.",
+        "highlights": "Key points: {text}",
+        "currentFails": "The procedure in force does not meet the client's rules today. Write a new version, or ask for an exception.",
+        "noProcedure": "No procedure yet.",
+        "runs": "Runs:",
+        "runDone": "(done)",
+        "checkLine": "Check {every}",
+        "checkEvery": "{days, select, 1 {every day} 7 {once a week} 14 {every two weeks} 30 {once a month} 31 {once a month} other {every {days} days}}",
+        "checkNext": "next on {date}",
+        "checkOverdue": "Overdue, since {date}",
+        "taskLink": "The task",
+        "draftLine": "Draft, version {version}"
+      },
+      "lessons": {
+        "open": "{count, plural, one {One remark from runs, for the next version} other {# remarks from runs, for the next version}}",
+        "version": "version {version}",
+        "toRun": "to the run",
+        "decide": "Decide",
+        "drawerTitle": "Remark on the procedure",
+        "handled": "{count, plural, one {One handled remark} other {# handled remarks}}",
+        "what": "What happened with it",
+        "oneLine": "In one sentence *",
+        "oneLinePlaceholder": "Version 4, step 2"
+      },
+      "common": {
+        "saving": "Saving...",
+        "save": "Save",
+        "none": "None",
+        "nothingInFile": "Nothing in the file yet."
+      },
+      "form": {
+        "showMore": "Show more",
+        "showMoreFilled": "Show more ({filled, plural, one {one field filled} other {# filled}})",
+        "showLess": "Show less",
+        "permissionPlaceholder": "Which permission is needed",
+        "permissionAria": "Permission in {name}",
+        "groupWhat": "What and when",
+        "name": "Process name *",
+        "namePlaceholder": "Supplier payments, LTD",
+        "purpose": "Why it exists",
+        "triggers": "What starts it",
+        "triggerText": "The trigger in words",
+        "triggerPlaceholder": "Twice a month, on the 10th and the 25th",
+        "groupWho": "Who",
+        "backup": "Backup (optional)",
+        "executorText": "Done by, in words",
+        "executorTextPlaceholder": "Guy",
+        "approver": "Who approves a step that needs approval",
+        "approverAnkoraAria": "Approver at Ankora",
+        "noneAtAnkora": "No one at Ankora",
+        "approverOption": "{name} (approves in the app)",
+        "approverClientAria": "Approver at the client",
+        "noneAtClient": "No one at the client",
+        "approverHelp": "An approver at Ankora signs in the app: the step waits for them, and the run does not close before they do. An approver at the client is named, and their approval is collected outside.",
+        "approverTextPlaceholder": "Or in words: authorized bank signatory",
+        "owner": "Owner",
+        "notSet": "Not set",
+        "executorAnkora": "Who does it today at Ankora",
+        "executorAnkoraAria": "Done by at Ankora",
+        "executorClient": "Who does it today at the client",
+        "executorClientAria": "Done by at the client",
+        "groupTiming": "Timing and control",
+        "calendar": "Business calendar",
+        "calendarByEntity": "By the entity's country",
+        "calendarHelp": "Runs and the dates that start the process are counted by it.",
+        "reviewEvery": "Review the procedure every (days)",
+        "checkEvery": "Check every (days)",
+        "checkText": "What is checked (ongoing process)",
+        "checkTextPlaceholder": "That no invoices are stuck",
+        "sla": "SLA",
+        "slaPlaceholder": "The material is with Ayala two business days before",
+        "businessDays": "Business days",
+        "groupSystems": "Systems and parties",
+        "external": "External party",
+        "externalPlaceholder": "Nextage, or \"none\"",
+        "thresholds": "Approval thresholds",
+        "thresholdsPlaceholder": "New supplier: accountant approval, or \"none\"",
+        "systems": "Systems",
+        "groupState": "Status",
+        "handover": "Where in the handover",
+        "knowledge": "What is known about the process",
+        "toResolve": "What would settle it *",
+        "groupExceptions": "Exceptions and the procedure document",
+        "exceptionPlaybook": "Exceptions playbook",
+        "exceptionPlaceholder": "What to do when something is off",
+        "docHelp": "What a SOC 2 procedure needs beyond the fields above. It goes into the document exported to the client or an auditor, and is locked with every approved version.",
+        "scope": "Scope",
+        "scopePlaceholder": "Who and what the procedure covers, and what it does not",
+        "definitions": "Definitions (term: explanation, one line per term)",
+        "definitionsPlaceholder": "Offboarding: an employee leaving",
+        "controls": "Controls (comma separated)",
+        "classification": "Classification",
+        "relatedDocs": "Related documents",
+        "relatedDocsPlaceholder": "Access control policy, employee onboarding procedure",
+        "addToFile": "Add to the file"
+      },
+      "editor": {
+        "savedAs": "Saved as version {version}, a draft. A manager approves it, and the checks run before approval.",
+        "blocking": "What blocks approval ({count})",
+        "step": "Step {n}",
+        "moveUp": "Move step {n} up",
+        "moveDown": "Move step {n} down",
+        "removeStep": "Remove step",
+        "whatAria": "Step {n}: what is done",
+        "whatPlaceholder": "What is done",
+        "howAria": "Step {n}: how",
+        "daysAria": "Step {n}: business days from the date",
+        "daysPlaceholder": "Days, -2",
+        "outputPlaceholder": "What exists at the end of the step",
+        "amountAria": "Step {n}: maximum amount",
+        "amountPlaceholder": "Maximum amount, if known",
+        "currencyAria": "Step {n}: currency",
+        "currency": "Currency",
+        "channelAria": "Step {n}: channel",
+        "channelPlaceholder": "Which channel the message goes out on",
+        "verificationAria": "Verification of step {n}",
+        "verificationPlaceholder": "How a person makes sure it happened *",
+        "requiresApproval": "Needs approval before it is done",
+        "addStep": "+ Step",
+        "highlights": "Key points",
+        "highlightsPlaceholder": "Recording and payment are two separate channels",
+        "outputs": "What must exist for the run to count as done",
+        "changeNote": "What changed and why",
+        "saveDraft": "Save draft"
+      },
+      "steps": {
+        "days": "{days} business days",
+        "removedSystem": "Removed system",
+        "upTo": "up to {amount}",
+        "via": "via {channel}",
+        "needsApproval": "Needs approval",
+        "verification": "Verification: {text}"
+      },
+      "dates": {
+        "orLink": "Or link a date already in the file",
+        "linkHelp": "The client's dates that start the process. A run opens from them once the procedure is approved.",
+        "saveLinks": "Save the links",
+        "newTitle": "A new date for the process",
+        "newHelp": "The date is created in the file under the process's name, linked to it, and opens a run every time it comes.",
+        "howOften": "How often",
+        "BUSINESS_DAILY": "Every business day (Sunday to Thursday, no holidays)",
+        "WEEKLY": "Once a week",
+        "MONTHLY": "Once a month",
+        "ONCE": "Once",
+        "weekday": "Which day",
+        "dayOfMonth": "Day of the month",
+        "date": "Date",
+        "creating": "Creating...",
+        "create": "Create the date and link it"
+      },
+      "run": {
+        "opens": "A task opens with the {count} steps of procedure version {version}, each on its business day.",
+        "oneRun": "One run, for one day. For the process to run regularly, give it a date.",
+        "day": "For which day *",
+        "opening": "Opening...",
+        "open": "Start the run"
+      },
+      "stranger": {
+        "notRun": "Stranger test: not run yet",
+        "passed": "Stranger test: passed · {date}",
+        "open": "Stranger test: {parts} · {date}",
+        "blockers": "{count, plural, one {one blocker} other {# blockers}}",
+        "questions": "{count, plural, one {one open question} other {# open questions}}",
+        "step": "step {step}",
+        "less": "Less",
+        "more": "{count} more",
+        "copied": "Copied. Paste it into Claude",
+        "copyNew": "New stranger test: copy the prompt for Claude",
+        "copyFirst": "Stranger test: copy the prompt for Claude"
+      },
+      "visual": {
+        "viewAria": "Process view",
+        "visual": "Diagram",
+        "text": "Text",
+        "steps": "{count, plural, one {one step} other {# steps}}",
+        "slaEnd": "End of the set time",
+        "late": "After the set time",
+        "dayZeroDate": "The date",
+        "dayZeroStart": "Start",
+        "bandAria": "The process's business days",
+        "noDay": "No day in the procedure",
+        "needsApproval": "Needs approval",
+        "day": "Day {day}",
+        "daysBefore": "{days} days before"
+      },
+      "checkForm": {
+        "legend": "What was found",
+        "ok": "Checked, all fine",
+        "issue": "Found an issue",
+        "whatFound": "What was found *",
+        "note": "Note",
+        "issuePlaceholder": "Two Notion invoices did not reach billing",
+        "issueTask": "A task with what was found will open for you, for today.",
+        "record": "Record the check"
+      },
+      "flow": {
+        "defaultBranch": "Yes",
+        "afterDays": "After {days} business days",
+        "elseAfter": "\"Otherwise\" after {days} days",
+        "owner": "Owner: {name}",
+        "secondEye": "Second review",
+        "otherwise": "Otherwise",
+        "otherwiseEdge": "Otherwise, {days} days",
+        "otherwiseTree": "Otherwise, after {days} days",
+        "saveFailed": "Saving failed.",
+        "live": "The procedure is live, at version {version}. Runs that already started continue on the previous version.",
+        "waiting": "Saved as version {version}, not live yet. {reason}",
+        "notChosen": "Not chosen",
+        "start": "Start: {text}",
+        "noTrigger": "No trigger set",
+        "connections": "Client connections ({count})",
+        "fromList": "The procedure was saved as a list until now, and was turned into a flow. Nothing is saved until you press \"Save and activate\".",
+        "issuesCount": "{count, plural, one {# blocking issue} other {# blocking issues}}",
+        "allPassed": "All checks passed",
+        "saveActivate": "Save and activate",
+        "addAfter": "Add after the selected node",
+        "addNode": "Add a node",
+        "startHere": "Start here",
+        "delete": "Delete",
+        "whatDone": "What is done",
+        "question": "The question",
+        "waitDays": "Business days to wait before the node",
+        "how": "How",
+        "ownerIfNot": "Owner, if not the process's executor",
+        "ownerPlaceholder": "For example: the client",
+        "continuesTo": "Continues to",
+        "helpDesktop": "Drag a node to move it, and pull a line from its bottom dot to another node to connect them.",
+        "helpMobile": "Tap a node to edit it. On a computer there is a canvas you can drag on.",
+        "sentFrom": "Sent from the account manager's mailbox.",
+        "to": "To",
+        "noContact": "No contact chosen",
+        "wording": "Wording",
+        "params": "Parameters: {params}",
+        "howSent": "How it is sent",
+        "autoWarning": "Automatic sending gets a second review once, and needs fixed wording. Until it is approved, the previous version keeps running.",
+        "branchOrder": "Branches are checked in order. The first that holds wins.",
+        "branch": "Branch {n}",
+        "remove": "Remove",
+        "branchNameAria": "Branch {n}: name",
+        "branchPlaceholder": "For example: a file arrived",
+        "sourceAria": "Branch {n}: where the answer comes from",
+        "replyAria": "Branch {n}: reply to which email",
+        "replyTo": "Reply to which email",
+        "connectionAria": "Branch {n}: connection",
+        "clientConnection": "Client connection",
+        "folderAria": "Branch {n}: Drive folder ID",
+        "folderPlaceholder": "Drive folder ID",
+        "manageConnections": "Manage the client's connections",
+        "addBranch": "+ Another branch",
+        "after": "After",
+        "elseDays": "business days with no answer",
+        "goto": "Continues to: {target}",
+        "emptyTree": "No nodes yet. Add a first node from the list.",
+        "unnamedNode": "Unnamed node",
+        "reasons": {
+          "waitingSecondEye": "Waiting for a second review: {titles}. Until it is approved, the previous version keeps running.",
+          "notApprover": "Saved as a draft: only a manager or the client's account manager puts a procedure live.",
+          "separation": "Saved as a draft: at this client, whoever wrote the procedure does not approve it, so it waits for a second review.",
+          "notActivated": "The procedure was saved as a draft and not put live."
+        },
+        "issues": {
+          "duplicateId": "Two nodes have the same ID ({id}).",
+          "noStart": "The procedure has no start node.",
+          "missingTarget": "{node} continues to a node that does not exist.",
+          "autoNoBody": "{node} is sent automatically, so it needs fixed wording a person wrote here.",
+          "unknownParams": "The wording of {node} has a parameter that does not exist: {unknown}. Available: {allowed}.",
+          "deadEnd": "{node} does not continue anywhere. Every path ends in an \"End\" node.",
+          "noQuestion": "Condition {node} has no question.",
+          "noBranches": "Condition {node} has no branches.",
+          "noElseDays": "Condition {node} does not say after how many days it moves to \"Otherwise\".",
+          "elseDeadEnd": "The \"Otherwise\" of {node} does not continue anywhere.",
+          "branchDeadEnd": "Branch {n} of {node} does not continue anywhere.",
+          "branchNoMailConnection": "Branch {n} of {node} checks email, and no connection is chosen.",
+          "branchNoDriveConnection": "Branch {n} of {node} checks Drive, and no connection is chosen.",
+          "branchNoFolder": "Branch {n} of {node}: no folder is chosen.",
+          "branchReplyNotMail": "Branch {n} of {node} waits for a reply to a node that sends no email.",
+          "loop": "The procedure has a loop: a node that goes back to one already passed. Branches can merge, but not go back.",
+          "unreachable": "{node} cannot be reached from the start.",
+          "tooLong": "One path has more than {max} actions. A procedure longer than that is several processes."
+        },
+        "backToClient": "Back to the client file"
+      },
+      "document": {
+        "version": "Version:",
+        "inForce": "in force",
+        "draft": "draft",
+        "language": "Language:",
+        "hebrew": "Hebrew",
+        "english": "English",
+        "noApprovedTranslation": "No approved translation yet",
+        "exportAfterApproval": "English export once the translation is approved",
+        "downloadPdf": "Download as PDF",
+        "downloadWord": "Download as Word",
+        "gaps": "<b>Missing from the document: </b>{gaps}. An empty section does not appear in exported files. <link>Complete it in the process</link>",
+        "noTranslation": "No English version yet. Claude translates, and a manager approves before it can be exported.",
+        "translate": "Translate to English with Claude",
+        "draftState": "Translation draft",
+        "byName": "by {name}",
+        "awaitingApproval": ". Waiting for a manager to approve.",
+        "readTranslation": "Read the translation",
+        "incomplete": "The translation is incomplete: {gaps}. Complete it before approving.",
+        "retranslate": "Translate again with Claude",
+        "approvedState": "Approved translation",
+        "approvedBy": "by {name}"
+      },
+      "translation": {
+        "copied": "Prompt copied. Paste it into a new chat in Ankora's organization account in Claude.",
+        "openClaude": "Open Claude",
+        "promptAria": "The prompt to copy",
+        "approveFailed": "Approval failed",
+        "approved": "Translation approved",
+        "approving": "Approving...",
+        "approve": "Approve the translation"
+      },
+      "errors": {
+        "forbidden": "You do not have permission for this action: the client is not assigned to you.",
+        "generic": "Something went wrong. Try again.",
+        "sourceUnclear": "Unclear source: {sources}. Write a code and a minute, for example S1 08:13.",
+        "slaInteger": "The SLA in business days is a whole number.",
+        "checkInteger": "The check is every whole number of days.",
+        "reviewInteger": "The review is every whole number of days.",
+        "lessonChoice": "Choose whether it went into the procedure or not.",
+        "stepsUnread": "The steps could not be read. Refresh and try again.",
+        "runDate": "The run needs a date.",
+        "checkOutcome": "What did the check find?"
+      }
+    },
+    "procedures": {
+      "title": "Procedures: {name}",
+      "intro": "Each procedure as a document, with its version, owner, effective date and approval history. The document is built from the process, and locked for every approved version. Every download is logged.",
+      "packTitle": "All procedures in one file",
+      "packHelp": "{count} procedures in force, a cover page with contents, and each procedure from a new page. Ready to send to an auditor.",
+      "hebrew": "Hebrew:",
+      "english": "English ({english} of {total}):",
+      "noApproved": "No approved translation yet",
+      "empty": "None of the client's processes has a procedure yet.",
+      "colId": "ID",
+      "colProcedure": "Procedure",
+      "colVersion": "Version in force",
+      "colFrom": "In force from",
+      "colEnglish": "English",
+      "draftWaiting": "Draft {version} waiting",
+      "none": "None",
+      "approved": "Approved",
+      "pending": "Waiting for approval"
+    },
+    "handover": {
+      "title": "Handover readiness: {name}",
+      "pctAria": "{pct}% ready",
+      "process": "Process",
+      "checks": {
+        "runs": "Runs",
+        "access": "Access to all systems",
+        "withUs": "With us",
+        "complete": "Fully documented"
+      },
+      "executorToday": "Done today by: {name}",
+      "has": "Yes",
+      "missingAria": "Missing",
+      "noAccessTitle": "Systems a process needs that we have no access to",
+      "needs": "Needs: {permission}",
+      "notPlanned": "Not planned to move to us: {list}.",
+      "accessStatus": {
+        "HAS_ACCESS": "Has access",
+        "PENDING": "Waiting for access",
+        "NO_ACCESS": "No access",
+        "NOT_NEEDED": "Not needed"
+      },
+      "missing": {
+        "blockers": {
+          "retired": "Will not run: the process was retired.",
+          "paused": "Will not run: the process is paused.",
+          "noOwner": "Will not run: no owner.",
+          "noTrigger": "Will not run: nothing says what starts it.",
+          "noProcedure": "Will not run: no approved procedure.",
+          "scheduledNoDate": "Will not run: a date-based process with no date.",
+          "continuousNoCheck": "Will not run: an ongoing process with no check frequency."
+        },
+        "noAccess": "We have no access to: {systems}.",
+        "notWithUs": "Not with us yet.",
+        "notWithUsExecutor": "Not with us yet: today {executor} does it."
+      },
+      "line": {
+        "none": "No processes are planned to move to us yet.",
+        "oneReady": "The process is ready: it can move to us.",
+        "allReady": "All {total} processes are ready.",
+        "some": "{ready} of {total} processes ready{systems, plural, =0 {} one {, and one system without access} other {, and # systems without access}}."
+      }
+    },
+    "list": {
+      "title": "Clients",
+      "subtitle": "Manage Ankora's clients, their status and hour bank use.",
+      "newClient": "New client",
+      "archived": {
+        "summary": "Archived ({count})",
+        "exportTitle": "Conversations and recordings are deleted on {date}",
+        "export": "Export conversations and recordings (until {date})"
+      },
+      "bank": {
+        "prepaid": "Prepaid package, valid until {date}",
+        "ended": "Cycle ended on {date}",
+        "renews": "Cycle, renews on {date}"
+      },
+      "history": {
+        "current": "Current",
+        "title": "{month}: {used} of {total}"
+      },
+      "rules": "Marked \"Needs attention\" when the bank has run out, when the previous cycle overran, when less than {pct}% of the bank is left, when the pace is fast after {paceDays} days into the cycle, or when a package is expected to run out within {endingDays} days.",
+      "reasons": {
+        "bankEmpty": "The bank has run out.",
+        "bankOverdrawn": "The bank has run out, over by {hours} hours.",
+        "previousOverrun": "The previous cycle overran by {hours} hours ({used} of {total}).",
+        "lowRemaining": "{hours} hours left, {pct}% of the bank.",
+        "lowRemainingRenews": "{hours} hours left, {pct}% of the bank, with {days, plural, =1 {one day} other {# days}} until it renews.",
+        "pace": "Using hours {ratio} times faster than expected.",
+        "packageEnding": "At the pace of the last 4 weeks, the package will run out around {date}.",
+        "rolloverIn": "Includes {hours} hours carried over from the previous cycle.",
+        "rolloverDebt": "Includes a debt of {hours} hours from the previous package."
+      },
+      "grid": {
+        "actionFailed": "The action failed",
+        "archivedToast": "Client moved to the archive",
+        "summary": {
+          "remaining": "Total left in banks",
+          "remainingHint": "hours, across {count, plural, =1 {one client} other {# clients}} with a bank",
+          "used": "Used in current cycles",
+          "usedHint": "hours, from the start of each cycle to today",
+          "overran": "Overran last cycle",
+          "noClient": "No clients",
+          "ending": "Packages about to run out",
+          "noPackage": "No packages"
+        },
+        "search": "Search clients",
+        "expectedLine": "The line on the bar: how much was expected to be used by today.",
+        "empty": "No clients yet. Add the first one above.",
+        "noMatch": "No clients match your search.",
+        "meta": {
+          "employees": "{count, plural, =0 {No team members assigned yet} =1 {One team member assigned} other {# team members assigned}}",
+          "openTasks": "{count, plural, =1 {One open task} other {# open tasks}}"
+        },
+        "openFile": "Open the client file",
+        "noActiveBank": "No active hour bank",
+        "chips": {
+          "attention": "Needs attention",
+          "ok": "On track",
+          "none": "No hour bank",
+          "paused": "Paused",
+          "archived": "Archived"
+        },
+        "usedOfTotal": "Used of total (<ltr>{pct}%</ltr>)",
+        "ofHours": "of <num>{total}</num> hours",
+        "overdrawnBy": "Over by <num>{value}</num>",
+        "remaining": "<num>{value}</num> left",
+        "dashedLine": "Dashed line: cycle size",
+        "approvalsWaiting": "{count, plural, =1 {One item waiting for your approval} other {# waiting for your approval}}",
+        "hourBank": "Hour bank",
+        "openHourBank": "Open an hour bank",
+        "activityReport": "Activity report",
+        "clientView": "Client view",
+        "moreActions": "More actions for {name}",
+        "clientFile": "Client file",
+        "archive": "Move to archive"
+      },
+      "restore": {
+        "restore": "Make active again",
+        "pending": "Restoring..."
+      },
+      "back": "Clients",
+      "backSearch": "Clients · \"{q}\""
+    },
+    "create": {
+      "submit": "Add client",
+      "submitting": "Creating...",
+      "name": "Client name *",
+      "legalName": "Legal name",
+      "primaryContact": "Contact person",
+      "timezone": "Time zone"
+    },
+    "subprocessors": {
+      "emptyGroup": "No clients in this group.",
+      "paused": " (paused)",
+      "checkedAt": ", checked {date}",
+      "title": "Who to notify about a new sub-processor (P8 step 8)",
+      "intro": "Based on the \"Proactive notice of a new sub-processor\" field on each client's card. Only an explicit commitment in the contract counts.",
+      "committed": {
+        "title": "Get an email",
+        "hint": "The contract requires a proactive notice."
+      },
+      "unchecked": {
+        "title": "Not checked: email to be safe",
+        "hint": "The contract has not been checked yet. Send an email, and mark the card once it is checked."
+      },
+      "notCommitted": {
+        "title": "A website update is enough",
+        "hint": "No commitment in the contract."
+      },
+      "notice": {
+        "UNCHECKED": "Not checked",
+        "COMMITTED": "Committed: gets an email",
+        "NOT_COMMITTED": "Not committed: a website update is enough"
+      }
+    },
+    "holidays": {
+      "count": "({count} dates)",
+      "subscribed": "Subscribed",
+      "notSubscribed": "Not subscribed",
+      "subscribe": "Subscribe",
+      "unsubscribe": "Unsubscribe"
+    },
+    "page": {
+      "errors": {
+        "forbidden": "You don't have permission to do this.",
+        "forbiddenNotAssigned": "You can't do this: the client is not assigned to you.",
+        "generic": "Something went wrong. Please try again.",
+        "nameRequired": "Enter a client name.",
+        "clientNotFound": "Client not found.",
+        "fileRequired": "Choose a file.",
+        "summaryNotFound": "Summary not found.",
+        "badSources": "Source not understood: {refs}. Write a code and a minute, for example S1 08:13.",
+        "unknownTextKind": "Unknown text type.",
+        "noPortalUser": "This client has no portal user to email.",
+        "emailNotSent": "The email was not sent. You can copy it and send it yourself."
+      },
+      "inactive": {
+        "paused": "Paused",
+        "archived": "Archived",
+        "pausedBody": "This client is paused, so its tasks, file and documents are not shown here, and it does not appear in work lists. Nothing was deleted: everything comes back when the client is active again.",
+        "archivedBody": "This client is archived. Nothing was deleted: tasks, the file and hours come back when the client is active again."
+      },
+      "header": {
+        "approvals": "{count, plural, =1 {One item waiting for your approval} other {# waiting for your approval}}",
+        "proposals": "{count, plural, =1 {One proposal for the file} other {# proposals for the file}}",
+        "questions": "{count, plural, =1 {One question to check with the client} other {# questions to check with the client}}",
+        "readFile": "Read the client file",
+        "handover": "Handover readiness"
+      },
+      "contactFallback": "Contact",
+      "removedEntity": "Removed entity",
+      "tabs": {
+        "label": "Client tabs",
+        "work": "Ongoing work",
+        "file": "Client file"
+      },
+      "pending": {
+        "title": "Waiting for approval",
+        "link": "In the extraction knowledge tab, with filters"
+      },
+      "narrativeMeta": "Version {version}, {date}",
+      "narrativeMetaBy": "Version {version}, {date}, {name}",
+      "categories": {
+        "title": "Categories ({count})",
+        "empty": "No categories specific to this client yet.",
+        "inactive": "(inactive)"
+      },
+      "dates": {
+        "title": "Important dates ({count})",
+        "all": "All of the client's dates",
+        "empty": "No important dates for this client yet.",
+        "status": {
+          "ACTIVE": "Active",
+          "NEEDS_ATTENTION": "Needs attention",
+          "IN_PROGRESS": "In progress",
+          "HANDLED_CURRENT": "Handled (current cycle)",
+          "PAUSED": "Paused",
+          "ARCHIVED": "Archived"
+        }
+      },
+      "holidays": {
+        "title": "Holiday calendars",
+        "defaults": "Default reminders: 30 and 7 days before",
+        "intro": "Subscribing the client to a holiday calendar creates an important date for each holiday in it, updated every year."
+      },
+      "staff": {
+        "title": "Assigned users ({count})",
+        "empty": "No team members assigned to this client yet.",
+        "hint": "Team members are assigned to clients on the <link>Users</link> page."
+      },
+      "edit": {
+        "save": "Save changes",
+        "saving": "Saving...",
+        "saved": "Saved.",
+        "name": "Client name",
+        "legalName": "Legal name",
+        "primaryContact": "Contact person",
+        "timezone": "Time zone",
+        "status": "Status",
+        "statuses": {
+          "ACTIVE": "Active",
+          "PAUSED": "Paused",
+          "ARCHIVED": "Archived"
+        },
+        "kind": "Client type",
+        "kinds": {
+          "BUSINESS": "Business",
+          "PRIVATE": "Private"
+        },
+        "industry": "Industry",
+        "industryPlaceholder": "Company, AI startup",
+        "internal": "Internal client",
+        "internalHint": "Ankora's own work. Hours are recorded and appear in reports, but not in the hours chart on the home screen.",
+        "aiExcluded": "No AI",
+        "aiExcludedHint": "The client asked that nothing of theirs go through AI systems: tasks, documents and the client file. A person handles everything.",
+        "separation": "Separation in approving procedures",
+        "separationHint": "Whoever wrote a version of a procedure does not approve it. For a client whose auditor asks for separation. Off: the account manager or a manager approves any procedure.",
+        "notice": {
+          "title": "Proactive notice of a new sub-processor",
+          "hint": "Only an explicit commitment in the client's contract counts. Clause 6 of the data processing addendum on the website does not count on its own. Not checked: the client gets an email to be safe.",
+          "state": "State",
+          "source": "Source: contract and clause",
+          "sourcePlaceholder": "Service agreement 3.2026, clause 9",
+          "sourceHint": "Required when marking committed or not committed.",
+          "document": "Contract in the file",
+          "noDocument": "None selected",
+          "optional": "Optional.",
+          "updated": "Updated on {date}.",
+          "updatedBy": "Updated on {date} by {name}."
+        },
+        "portal": {
+          "title": "Client portal",
+          "manager": "Account manager",
+          "noManager": "Not set",
+          "managerHint": "Shown in the portal as the person responsible for the account.",
+          "whatsapp": "Dedicated WhatsApp",
+          "whatsappHint": "The line the client already messages. Empty: the portal shows the channel is not connected yet.",
+          "ceiling": "Approval ceiling (₪)",
+          "ceilingNow": "Currently: {amount}. Above this amount the client's approval is needed.",
+          "ceilingEmpty": "Empty: any decision with an amount is shown as needing approval."
+        },
+        "preferences": {
+          "title": "Service preferences",
+          "hint": "Shown to the client on the \"My file\" screen, where they can edit it themselves.",
+          "contact": "How to talk to them",
+          "matters": "What matters to them",
+          "never": "What must never happen"
+        }
+      },
+      "knowledgeStatus": {
+        "CONFIRMED": "Confirmed",
+        "UNCERTAIN": "Uncertain",
+        "MISSING": "Missing",
+        "SUPERSEDED": "Superseded"
+      }
+    },
+    "decisions": {
+      "create": "Create the decision",
+      "creating": "Creating...",
+      "optionRequired": "Option {n} (required)",
+      "option": "Option {n}",
+      "recommended": "Recommended",
+      "cancelFailed": "Cancelling failed",
+      "cancelled": "Decision cancelled",
+      "title": "Decisions ({count} open)",
+      "close": "Close",
+      "new": "+ New decision",
+      "ceiling": "The client's approval ceiling: {amount}. Above it, a decision is shown as needing their approval.",
+      "noCeiling": "No approval ceiling is set for this client, so any decision with an amount is shown as needing approval.",
+      "question": "What needs deciding *",
+      "questionPlaceholder": "When should the technician visit?",
+      "background": "Short background",
+      "backgroundPlaceholder": "Up to three sentences. What led to this point.",
+      "amount": "Total amount (₪)",
+      "amountPlaceholder": "Empty if the decision is not about money",
+      "dueAt": "Answer requested by",
+      "created": "The decision is waiting for the client in the portal. They don't know about it yet.",
+      "notify": "Tell the client",
+      "empty": "No decisions opened for this client yet.",
+      "chosen": "Chosen: {option}",
+      "statusCancelled": "Cancelled",
+      "waiting": "Waiting for the client",
+      "cancel": "Cancel"
+    },
+    "file": {
+      "documentKinds": {
+        "POLICY": "Policy",
+        "PROCEDURE": "Procedure",
+        "CERTIFICATE": "Certificate",
+        "CONTRACT": "Contract",
+        "INVOICE": "Invoice",
+        "OTHER": "Document"
+      },
+      "documents": {
+        "title": "Documents",
+        "intro": "The client downloads them from their file. Only we upload.",
+        "kindOf": "Document type: {title}",
+        "visible": "Client sees it",
+        "hidden": "Hidden",
+        "aiExcludedByTask": "No AI (from the task)",
+        "managerOnly": "Only a manager can remove this",
+        "aiExcluded": "No AI",
+        "aiAllowed": "AI allowed",
+        "remove": "Remove",
+        "storageNotReady": "Document storage is still being built. The form below is ready; what remains is to open the shared folder and share it. Until then, send documents on WhatsApp as usual.",
+        "name": "Document name",
+        "namePlaceholder": "Car insurance policy 2026",
+        "kind": "Type",
+        "file": "File (up to 4MB)",
+        "clientVisible": "The client sees this in their file",
+        "added": "Document added to the file.",
+        "uploading": "Uploading...",
+        "upload": "Attach document"
+      },
+      "summary": {
+        "title": "Monthly summary",
+        "intro": "Built from the records. Reaches the client only after someone approves it.",
+        "generating": "Generating...",
+        "generate": "Generate a draft for this month",
+        "approvedBy": "Approved by {name}",
+        "accountManager": "the account manager",
+        "discarded": "Discarded",
+        "draft": "Draft",
+        "discardedLong": "Discarded, will not reach the client",
+        "draftFrom": "Draft, built from {count} records",
+        "approved": "Approved. The client will see it in the monthly report.",
+        "discard": "Discard the draft",
+        "notify": "Tell the client",
+        "approving": "Approving...",
+        "reapprove": "Save and approve again",
+        "approve": "Approve and publish in the portal"
+      },
+      "parts": {
+        "label": "Parts of the file",
+        "all": "All",
+        "pending": "Waiting for approval",
+        "overview": "Overview and entities",
+        "people": "People and vendors",
+        "facts": "Facts and questions",
+        "processes": "Processes and procedures",
+        "rules": "Rules",
+        "requests": "Request types",
+        "systems": "Systems and access",
+        "sources": "Sources"
+      },
+      "read": {
+        "title": "Client file: {name}",
+        "downloadPdf": "Download as PDF",
+        "downloadMarkdown": "Download as Markdown",
+        "howToRead": "Each line is marked by what is known about it. No mark: confirmed, the client or their vendor said or showed it explicitly. \"Uncertain\" and \"Missing\" appear next to the item, with what will close it. Sources are in brackets, for example [S1 08:13], and explained in the legend at the end.",
+        "aiExcluded": "No AI: the client asked that nothing of theirs go through AI, so there is no extraction with Claude.",
+        "doNotDisclose": "Do not tell: {value}",
+        "legend": "Source legend",
+        "legendEmpty": "No sources in the register yet.",
+        "sections": {
+          "identity": {
+            "title": "Client identity"
+          },
+          "overview": {
+            "title": "Overview, background and our role",
+            "empty": "Nothing written yet about what is in scope and what is not."
+          },
+          "people": {
+            "title": "People and relationships",
+            "empty": "No contacts in the file yet."
+          },
+          "preferences": {
+            "title": "Preferences",
+            "empty": "No preferences yet."
+          },
+          "requirements": {
+            "title": "Recurring requirements",
+            "empty": "No recurring requirements yet."
+          },
+          "rules": {
+            "title": "Rules and restrictions",
+            "empty": "The client has not set any rules yet."
+          },
+          "systems": {
+            "title": "Systems and access",
+            "empty": "No systems in the map yet."
+          },
+          "vendors": {
+            "title": "Vendors and service providers",
+            "empty": "No regular vendors or service providers yet."
+          },
+          "locations": {
+            "title": "Knowledge sources and locations",
+            "empty": "Nothing written yet about where the knowledge is."
+          },
+          "processes": {
+            "title": "Processes",
+            "empty": "No processes written yet."
+          },
+          "requestTypes": {
+            "title": "Request types and how to answer",
+            "empty": "Nothing written yet about what comes in, from whom, and how to answer."
+          },
+          "finance": {
+            "title": "Finance and approval rules",
+            "empty": "No financial facts or approval rules yet."
+          },
+          "communication": {
+            "title": "Communication",
+            "empty": "Nothing written yet about which channels to use for whom."
+          },
+          "dates": {
+            "title": "Dates and recurring events",
+            "empty": "No dates."
+          },
+          "temporary": {
+            "title": "Current or temporary information",
+            "empty": "No temporary information."
+          },
+          "oneOff": {
+            "title": "One-off decisions",
+            "empty": "No one-off decisions."
+          },
+          "questions": {
+            "title": "Open questions",
+            "empty": "No open questions."
+          },
+          "workRules": {
+            "title": "Specific working rules",
+            "empty": "No working rules or data-handling rules."
+          },
+          "notes": {
+            "title": "Notes",
+            "empty": "No notes."
+          },
+          "pending": {
+            "title": "Waiting for approval and conflicts",
+            "empty": "No items waiting for approval."
+          },
+          "changes": {
+            "title": "Change log",
+            "empty": "No changes."
+          }
+        }
+      }
+    },
+    "control": {
+      "label": "Control",
+      "toApprovalsAndQuestions": "To approvals and questions for the client",
+      "toFile": "To the client file",
+      "toApprovals": "To approvals",
+      "more": "and {count} more",
+      "access": {
+        "NO_ACCESS": "No access",
+        "PENDING": "Access pending"
+      },
+      "parts": {
+        "noProcesses": "No processes yet",
+        "processes": "{count, plural, =1 {One process} other {# processes}}",
+        "processesWithAnkora": "{count, plural, =1 {One process} other {# processes}}, {withAnkora} with us",
+        "processesInHandover": "{count, plural, =1 {One process} other {# processes}}, {inHandover} in handover",
+        "processesBoth": "{count, plural, =1 {One process} other {# processes}}, {withAnkora} with us and {inHandover} in handover",
+        "notRunning": "{count, plural, =1 {One process will not run} other {# processes will not run}}",
+        "documentation": "Documentation {pct}%",
+        "needsReview": "{count, plural, =1 {One process needs review} other {# processes need review}}",
+        "exceptionsInForce": "{count, plural, =1 {One exception} other {# exceptions}} in force",
+        "exceptionsRequested": "{count, plural, =1 {One exception request waiting} other {# exception requests waiting}}",
+        "uncertain": "{count, plural, =1 {One uncertain item} other {# uncertain items}}",
+        "openQuestions": "{count, plural, =1 {One open question} other {# open questions}}",
+        "clientVisible": "{count, plural, =1 {One item visible to the client} other {# items visible to the client}}",
+        "noOwner": "{count, plural, =1 {One item} other {# items}} without an owner",
+        "systemsWithoutAccess": "{count, plural, =1 {One system} other {# systems}} without access",
+        "noBatch": "No batch from the extraction yet",
+        "lastBatch": "Last batch {days, plural, =0 {arrived today} =1 {arrived one business day ago} other {arrived # business days ago}}"
+      }
+    },
+    "tasks": {
+      "title": "Tasks ({count} open)",
+      "allTasks": "All of the client's tasks",
+      "newTrigger": "Task",
+      "newTitle": "New task: {name}",
+      "closedRecently": "{count} closed in the last 30 days",
+      "untasked": "{hours} hours this month logged without a task",
+      "empty": "No open tasks for this client.",
+      "noAssignee": "No assignee",
+      "due": "Due {date}",
+      "hours": "{hours} hours",
+      "status": {
+        "OPEN": "Open",
+        "IN_PROGRESS": "In progress",
+        "PENDING_APPROVAL": "Pending approval",
+        "DONE": "Done",
+        "ARCHIVED": "Archived"
+      },
+      "showing": "Showing {shown} of {total}.",
+      "fullList": "Full list"
+    },
+    "entities": {
+      "fields": {
+        "legalName": "Legal name",
+        "registrationNumber": "Registration number",
+        "country": "Country",
+        "currency": "Currency",
+        "billingAddress": "Billing address"
+      },
+      "missing": "Missing",
+      "shortName": "Short name *",
+      "parent": "Parent entity",
+      "noParent": "None",
+      "missingToResolve": "What will close the missing fields *",
+      "missingToResolvePlaceholder": "Ask the CEO for the certificate of incorporation",
+      "status": "Entity status",
+      "toResolve": "What will close this *",
+      "saving": "Saving...",
+      "save": "Save",
+      "add": "Add to the file",
+      "removeFailed": "Removing failed",
+      "removed": "Removed from the file",
+      "title": "Legal entities ({count})",
+      "addTrigger": "+ Entity",
+      "drawerTitle": "Legal entity",
+      "empty": "No entities yet. For a client with more than one entity, people and systems are linked to the right one.",
+      "childOf": "Subsidiary of {name}",
+      "missingList": "Missing: {fields}",
+      "edit": "Edit",
+      "editTitle": "Edit: {name}",
+      "remove": "Remove"
+    },
+    "requestTypes": {
+      "title": "Request type *",
+      "titlePlaceholder": "Inc invoice",
+      "fromWho": "From",
+      "fromWhoPlaceholder": "Vendor",
+      "arrivesVia": "Arrives via",
+      "handling": "How to answer and where to pass it on *",
+      "handlingPlaceholder": "To Shani and Janan, not to Ayala",
+      "routeTo": "Route to",
+      "process": "Triggers a process",
+      "noProcess": "Does not trigger a process",
+      "status": "Status",
+      "toResolve": "What will close this *",
+      "saving": "Saving...",
+      "save": "Save",
+      "add": "Add to the file",
+      "removeFailed": "Removing failed",
+      "removed": "Removed from the file",
+      "panelTitle": "Request types and how to answer ({count})",
+      "addTrigger": "+ Request type",
+      "drawerTitle": "Request type",
+      "empty": "No request types yet. What comes in, from whom, and how to answer: what a new operations manager needs on day one.",
+      "from": "From: {value}",
+      "via": "Via: {value}",
+      "routedTo": "Routed to: {names}",
+      "triggers": "Triggers: {name}",
+      "edit": "Edit",
+      "editTitle": "Edit: {name}",
+      "remove": "Remove"
+    },
+    "systems": {
+      "system": "System *",
+      "purpose": "What it's used for",
+      "purposePlaceholder": "Inc's bank",
+      "url": "Address",
+      "accountUsed": "The account we work with",
+      "noPasswords": "No passwords. Passwords go in the vault.",
+      "accessStatus": "Access status",
+      "ourPermission": "Our permission",
+      "blocker": "What's blocking",
+      "blockerPlaceholder": "MFA on the CEO's phone",
+      "clientAdmin": "Who manages it at the client",
+      "clientAdminPlaceholder": "The CEO opens users by hand",
+      "vaultEntry": "Vault entry",
+      "none": "None",
+      "cost": "Cost",
+      "currency": "Currency",
+      "cycle": "Cycle",
+      "cycles": {
+        "MONTHLY": "Monthly",
+        "ANNUAL": "Annual",
+        "OTHER": "Other"
+      },
+      "cardLast4": "Card's last 4 digits",
+      "invoiceTo": "Where the invoice goes",
+      "notes": "Notes",
+      "status": "Status",
+      "toResolve": "What will close this *",
+      "doNotDisclose": "Who must not be told",
+      "saving": "Saving...",
+      "save": "Save",
+      "add": "Add to the map",
+      "removeFailed": "Removing failed",
+      "removed": "Removed from the map",
+      "title": "Systems map ({count})",
+      "gaps": "{count} without access yet",
+      "addTrigger": "+ System",
+      "drawerTitle": "System in the map",
+      "empty": "No systems in the map yet. A system we have no access to belongs here too.",
+      "access": {
+        "HAS_ACCESS": "Has access",
+        "PENDING": "Waiting for access",
+        "NO_ACCESS": "No access",
+        "NOT_NEEDED": "Not needed"
+      },
+      "permissions": {
+        "NONE": "None",
+        "VIEWER": "Viewer",
+        "USER": "User",
+        "BILLING": "Billing",
+        "ADMIN": "Admin",
+        "OWNER": "Owner"
+      },
+      "per": {
+        "MONTHLY": "a month",
+        "ANNUAL": "a year"
+      },
+      "permissionLine": "Permission: {permission}",
+      "accountLine": "Account: <ltr>{account}</ltr>",
+      "blockerLine": "Blocked by: {value}",
+      "clientAdminLine": "Managed at the client by: {value}",
+      "invoiceLine": "Invoice to <ltr>{to}</ltr>",
+      "inVault": "In the vault: {name}",
+      "doNotDiscloseLine": "Do not tell: {value}",
+      "edit": "Edit",
+      "editTitle": "Edit system",
+      "remove": "Remove",
+      "invalidCost": "The cost is not valid."
+    },
+    "connections": {
+      "back": "Back to the client file",
+      "notices": {
+        "connected": "Connection added.",
+        "notConfigured": "Connecting to Google is not set up in this environment yet (OAuth client details are missing).",
+        "denied": "The connection was cancelled on Google's screen.",
+        "noToken": "Google did not return a lasting permission. Remove the app in the Google account settings and try again.",
+        "failed": "The connection failed. Please try again."
+      },
+      "result": {
+        "generic": "Something went wrong. Please try again.",
+        "saved": "Connection saved. The password is in the vault.",
+        "disconnected": "Disconnected, and the permission was revoked.",
+        "appPasswordNotTestable": "An app password connection is checked on the first run that reads mail. Testing from here is not built yet.",
+        "testSent": "A test email was sent to {account}.",
+        "mailConnected": "Mail: connected ({threads} threads, no content read)",
+        "driveFiles": "Drive: {count} files in the folder",
+        "mailOnly": "{mail}.",
+        "mailAndDrive": "{mail}. {drive}."
+      },
+      "kinds": {
+        "GOOGLE_OAUTH": "Client's Google",
+        "MAIL_APP_PASSWORD": "Client's mail",
+        "MANAGER_SEND": "Sending from the account manager's mailbox"
+      },
+      "scopes": {
+        "appPassword": "App password",
+        "mailOnly": "Mail only",
+        "viaGoogle": "Via Google",
+        "sendOnly": "Send only",
+        "mailReplies": "Mail: only whether a reply arrived",
+        "driveRead": "Drive: sees files in the folder",
+        "driveWrite": "Drive: writes files the procedure creates"
+      },
+      "confirmLabel": "Confirm disconnect",
+      "confirmYes": "Yes, disconnect",
+      "cancel": "Cancel",
+      "eyebrow": "{name} · Client file",
+      "title": "Connections",
+      "intro": "The client's systems that its procedures read from or write to. Every use is logged.",
+      "connected": "Connected",
+      "noConsent": "Consent not recorded",
+      "connectedBy": "Connected by: {name}",
+      "usedBy": "Used in {count} procedures",
+      "notUsed": "Not used in a procedure yet",
+      "folderId": "Drive folder ID, for testing (optional)",
+      "test": "Test connection",
+      "disconnect": "Disconnect",
+      "confirmInUse": "This connection is used in {count} procedures, and they will stop at the step that uses it. Disconnect?",
+      "confirmGoogle": "Disconnect and revoke the permission in Google?",
+      "new": {
+        "title": "New connection",
+        "how": "How the client connects:",
+        "google": "Connect through Google (recommended)",
+        "googleHint": "The client approves on Google's screen. Mail and Drive.",
+        "googleNotReady": "Connecting through Google is not set up in this environment yet.",
+        "appPassword": "Username and app password",
+        "appPasswordHint": "Mail only. Stored in the vault. A Google app password needs two-step verification on the account.",
+        "email": "Email address",
+        "password": "App password",
+        "consent": "Who at the client gave the access, and when",
+        "save": "Save the connection"
+      },
+      "send": {
+        "title": "Sending",
+        "intro": "Emails this client's procedures send go out from the account manager's mailbox.",
+        "mine": "Your mailbox is connected: {account}",
+        "confirm": "Disconnect your mailbox from sending and revoke the permission in Google?",
+        "connect": "Connect my mailbox for sending",
+        "notConnected": "Your mailbox is not connected."
+      },
+      "aiExcluded": "This client is marked \"No AI\": simple checks (a reply arrived, a file exists) still run, but Claude does not read through the connections."
+    },
+    "knowledge": {
+      "status": {
+        "CONFIRMED": "Confirmed",
+        "UNCERTAIN": "Uncertain",
+        "MISSING": "Missing",
+        "SUPERSEDED": "Replaced"
+      },
+      "statusLabel": "Status",
+      "toResolve": "What would close this *",
+      "doNotDisclose": "Who must not be told",
+      "audience": {
+        "ALL_STAFF": "Everyone working on the client",
+        "ACCOUNT_TEAM": "Account manager and chosen people",
+        "RESTRICTED": "Only chosen people",
+        "label": "Who can see it",
+        "restrictedPeople": "Only these people can see it",
+        "teamPeople": "The account manager, and also"
+      },
+      "missingFields": {
+        "CONTACT": {
+          "emails": "Email",
+          "phones": "Phone",
+          "role": "Role",
+          "clientSideAddress": "Address at the client"
+        },
+        "SYSTEM": {
+          "url": "URL",
+          "accountUsed": "Our account",
+          "clientAdmin": "Admin at the client",
+          "billing": "Billing"
+        }
+      },
+      "missing": {
+        "title": "Missing fields",
+        "toResolve": "What would fill the missing fields *",
+        "line": "Missing: {fields}",
+        "lineWhy": "Missing: {fields} · {why}"
+      },
+      "sources": {
+        "label": "Sources",
+        "labelRequired": "Sources *",
+        "secondaryOnly": "{count, plural, =1 {The source is an Ankora document} other {All the sources are Ankora documents}}, so the item will be saved as \"{status}\". If there is a source from the client or a vendor (a meeting, an email, a message), add it.",
+        "manualConfirm": "Manual confirmation: there is no source from the client, and I confirm this is correct. It will be saved as \"{status}\".",
+        "emptyRegister": "No sources in the register yet. Add them under \"Source register\" on the client screen.",
+        "optionAnkora": "{code} {title} (Ankora document)"
+      },
+      "entity": {
+        "label": "Entity",
+        "none": "No entity"
+      },
+      "extras": {
+        "externalRefs": "External references (RAID-002, ClickUp:86c1x)",
+        "doNotDisclose": "Do not tell (whom, and until when)",
+        "doNotDisclosePlaceholder": "The client's staff, until the CEO announces it",
+        "owner": "Owner at Ankora",
+        "noOwner": "No owner",
+        "clientVisible": "Visible to the client"
+      },
+      "tags": {
+        "verified": "Verified: {date}",
+        "doNotTell": "Do not tell: {text}",
+        "owner": "Owner: {name}"
+      },
+      "errors": {
+        "forbidden": "You do not have permission for this: the client is not assigned to you.",
+        "generic": "Something went wrong. Try again.",
+        "badSource": "Unreadable source: {entries}. Write a code and a minute, for example S1 08:13.",
+        "invalidDate": "Invalid date.",
+        "invalidEmail": "Invalid email address: {entries}",
+        "invalidPhone": "Invalid phone number: {entries}",
+        "invalidMonthlyCost": "Invalid monthly cost.",
+        "clientNotFound": "Client not found.",
+        "policyKindRequired": "Choose the kind of rule.",
+        "paramsUnreadable": "What the rule checks could not be read. Refresh and try again.",
+        "exceptionEndRequired": "An exception needs an end date.",
+        "sourceKindRequired": "Choose the kind of source.",
+        "domainKindRequired": "Choose whose domain it is.",
+        "factKindRequired": "Choose a kind.",
+        "chooseDate": "Choose a date."
+      },
+      "duplicates": {
+        "heading": "Possible duplicates ({count})",
+        "intro": "The same item may have been added twice under a slightly different name. Complete one of them and remove the other.",
+        "kinds": {
+          "CONTACT": "Contacts",
+          "ORGANIZATION": "Organizations",
+          "SYSTEM": "Systems",
+          "ENTITY": "Entities",
+          "DATE": "Dates"
+        },
+        "pair": "<a></a> and <b></b>",
+        "sameName": "Same name"
+      }
+    },
+    "policies": {
+      "saving": "Saving...",
+      "sending": "Sending...",
+      "save": "Save",
+      "addToFile": "Add to file",
+      "heading": "Client rules ({count})",
+      "add": "+ Rule",
+      "addTitle": "Client rule",
+      "empty": "No rules yet. What is allowed and not allowed at the client, who approves, what is not told to whom, and what never goes into the file.",
+      "retired": "Retired rules ({count})",
+      "kinds": {
+        "DATA_HANDLING": "Data handling",
+        "DISCLOSURE": "Disclosure",
+        "COMMUNICATION": "Communication",
+        "SEPARATION": "Separation",
+        "APPROVAL_REQUIRED": "Approval required",
+        "THRESHOLD": "Threshold",
+        "REQUIRED_STEP": "Required step",
+        "TIMING": "Timing",
+        "FORBIDDEN": "Forbidden",
+        "INFO": "Working rule"
+      },
+      "kindHints": {
+        "DATA_HANDLING": "What goes into the file and how. Sent with every extraction, manual and daily.",
+        "DISCLOSURE": "Who must not be told what. Shown at the top of the client screen and of the file.",
+        "COMMUNICATION": "Which channel is used for what, and where invoices go. With channels, checked against procedure steps (needs an exception). With addresses, checked against the systems map.",
+        "SEPARATION": "What stays separate between entities. Checked against procedure steps (needs an exception) and request types.",
+        "APPROVAL_REQUIRED": "What needs approval. With actions, a procedure without an approval step is not approved.",
+        "THRESHOLD": "An amount above which approval is needed. With an amount, a step above it without approval blocks the procedure.",
+        "REQUIRED_STEP": "A step that must exist. With wording, checked against procedure steps (needs an exception).",
+        "TIMING": "How long before. With business days, checked against procedure steps (needs an exception).",
+        "FORBIDDEN": "What is forbidden for everyone, not only for AI. With actions, such a step in a procedure needs an exception.",
+        "INFO": "Everything else: read by people and by Claude."
+      },
+      "statuses": {
+        "PROPOSED": "Proposed",
+        "ACTIVE": "Active",
+        "RETIRED": "Retired"
+      },
+      "form": {
+        "activeWarning": "This rule is active. Changing its name, kind, wording or what is checked sends it back to \"Proposed\", and a manager has to approve it again.",
+        "kind": "Kind of rule *",
+        "title": "Rule name *",
+        "titlePlaceholder": "Management meetings",
+        "statement": "The rule *",
+        "statementPlaceholder": "Write down topics only, no quotes and no details",
+        "interim": "Until approved",
+        "interimRequired": "Until approved *",
+        "interimPlaceholder": "Every expense goes to Oren",
+        "interimHint": "The careful rule that applies until a manager approves. Without an interim rule, the rule applies as written.",
+        "rationale": "Why",
+        "effectiveFrom": "Takes effect on",
+        "reviewBy": "Review by",
+        "datesHint": "Empty: applies now, with no review date. Changing the start date of an active rule sends it back for a manager's approval.",
+        "knowledgeStatus": "How sure we are of the rule"
+      },
+      "exception": {
+        "rule": "The rule:",
+        "what": "What is done differently *",
+        "whatPlaceholder": "Send Ayala the October Inc invoices",
+        "reason": "Why *",
+        "reasonPlaceholder": "Shani is on leave, and the payment is due on the 25th",
+        "until": "Until (inclusive) *",
+        "maxDays": "Up to {max} days. For longer, change the rule itself.",
+        "submit": "Send request",
+        "rejectReason": "Why not, in one line *",
+        "rejectSubmit": "Reject request",
+        "badgeUntil": "Exception until {date}",
+        "badgeRequest": "Exception request",
+        "until2": "until {date}",
+        "requestedBy": "requested by {name}",
+        "decidedBy": "approved by {name}",
+        "approve": "Approve exception",
+        "reject": "Reject exception",
+        "rejectTitle": "Reject exception request",
+        "withdraw": "Withdraw request"
+      },
+      "approvers": {
+        "hint": "Only when the client decided who approves. With no choice, anyone with the \"Approve exceptions and sensitive information\" permission on their user page approves.",
+        "line": "Exceptions and sensitive information are approved by: {names}",
+        "none": "Exceptions and sensitive information are approved by: nobody yet. Grant the permission on the user page.",
+        "setByClient": "(as the client decided)",
+        "change": "Change",
+        "title": "Who approves for the client"
+      },
+      "retire": {
+        "reason": "Why it is retired, in one line *",
+        "reasonPlaceholder": "Oren lifted the restriction in the 20.10 meeting",
+        "submit": "Retire rule"
+      },
+      "history": {
+        "summary": "Earlier versions ({count})",
+        "version": "Version {version}",
+        "versionTitled": "Version {version}: {title}",
+        "interim": "Until approved:",
+        "checked": "Checked:",
+        "approvedBy": "Approved by {name}",
+        "approvedByOn": "Approved by {name}, {date}",
+        "notApproved": "Not approved",
+        "replacedOn": "Replaced on {date}"
+      },
+      "row": {
+        "interim": "Until approved:",
+        "proposed": "Proposed rule:",
+        "why": "Why:",
+        "checked": "Checked against procedures:",
+        "textOnly": "Text only: the server does not check this rule.",
+        "approveBlocked": "Before approving: check with the client that this is what they said, and in the edit form mark it \"{status}\" with the source that confirms it. Then the rule can be approved.",
+        "approve": "Approve rule",
+        "edit": "Edit",
+        "editTitle": "Edit: {title}",
+        "requestException": "Request exception",
+        "requestExceptionTitle": "Request exception: {title}",
+        "retire": "Retire",
+        "retireTitle": "Retire: {title}",
+        "remove": "Remove"
+      },
+      "toast": {
+        "approveFailed": "Approval failed",
+        "ruleActive": "Rule is active",
+        "exceptionApproved": "Exception approved",
+        "withdrawFailed": "Withdrawal failed",
+        "withdrawn": "Request withdrawn",
+        "removeFailed": "Removal failed",
+        "removed": "Removed from the file"
+      },
+      "dates": {
+        "startsOn": "Takes effect on {date}",
+        "inForceFrom": "In force since {date}",
+        "reviewOverdue": "Review overdue ({date})",
+        "reviewBy": "Review by {date}"
+      },
+      "checked": {
+        "entityOnly": "({entity} only)",
+        "removedEntity": "Removed entity",
+        "threshold": "{tags} above {amount} needs an approval step",
+        "thresholdDefaultTags": "Payment, purchase, refund",
+        "approval": "{tags} needs an approval step before it is done",
+        "forbidden": "A step of {tags} is forbidden",
+        "requiredStep": "One of the steps includes \"{text}\"",
+        "requiredStepWith": "In a procedure with {tags}, one of the steps includes \"{text}\"",
+        "timing": "{tags}: at least {days} business days before the date",
+        "channels": "{tags} only by: {channels}",
+        "invoices": "System invoices go only to: {to}",
+        "separation": "Separation between {entities}: a money step belongs to one entity, with no outside party of another entity",
+        "separationJoin": " and "
+      },
+      "disclosure": {
+        "lead": "Before talking to anyone at the client:",
+        "proposed": "(proposed)",
+        "more": "{count, plural, =1 {One more rule} other {# more rules}}"
+      },
+      "params": {
+        "check": "Check the rule against procedures",
+        "textOnlyHint": "Without this, the rule is read by people and by Claude, and the server does not check it.",
+        "amountAbove": "Above an amount of *",
+        "currency": "Currency *",
+        "choose": "Choose",
+        "interimThreshold": "Until approved, the threshold is",
+        "interimThresholdPlaceholder": "0: every amount needs approval",
+        "mustInclude": "What must appear in one of the steps *",
+        "mustIncludePlaceholder": "Class and department",
+        "leadDays": "At least how many business days before the date *",
+        "channels": "Allowed channels",
+        "invoiceTo": "System invoices go only to",
+        "separatedEntities": "Which entities stay separate *",
+        "needTwoEntities": "The file needs at least two legal entities.",
+        "entityOnly": "Only for procedures of an entity",
+        "allEntities": "All entities",
+        "tagLabel": {
+          "whichActions": "Which actions",
+          "needsApproval": "What needs approval",
+          "forbidden": "What is forbidden",
+          "onlyWith": "Only in a procedure that has",
+          "actions": "Actions"
+        },
+        "actionTags": {
+          "PAYMENT": "Payment",
+          "PURCHASE": "Purchase",
+          "INVOICE": "Invoice",
+          "SUPPLIER_NEW": "New vendor",
+          "CONTRACT": "Contract",
+          "PRICE_CHANGE": "Price change",
+          "REFUND": "Credit or refund",
+          "CLIENT_MESSAGE": "Message to the client",
+          "CREDENTIAL_ACCESS": "Password access",
+          "DATA_EXPORT": "Data export",
+          "HR": "HR",
+          "LEGAL": "Legal",
+          "BANK_SIGNATURE": "Bank signature"
+        },
+        "channelLabels": {
+          "EMAIL": "Email",
+          "WHATSAPP": "WhatsApp",
+          "SLACK": "Slack",
+          "PHONE": "Phone",
+          "PORTAL": "The portal",
+          "OTHER": "Other"
+        }
+      }
+    },
+    "facts": {
+      "saving": "Saving...",
+      "addToFile": "Add to file",
+      "heading": "Client file: facts ({count})",
+      "openQuestions": "{count, plural, one {# open question} other {# open questions}}",
+      "add": "+ Item",
+      "addTitle": "New item in the file",
+      "empty": "No facts in the file yet: scope, preferences, requirements, temporary information, decisions and open questions go here.",
+      "history": "History: replaced versions ({count})",
+      "supersededOn": "(replaced on {date})",
+      "lowImportance": "Not critical",
+      "kinds": {
+        "SCOPE_IN": "In scope",
+        "SCOPE_OUT": "Out of scope",
+        "PREFERENCE": "Preference",
+        "REQUIREMENT": "Recurring requirement",
+        "LOCATION": "Location",
+        "FINANCE": "Finance",
+        "TEMPORARY": "Temporary information",
+        "ONE_OFF_DECISION": "One-off decision",
+        "QUESTION": "Open question",
+        "NOTE": "Note"
+      },
+      "sections": {
+        "SCOPE_IN": "In our scope",
+        "SCOPE_OUT": "Out of scope, and who to refer to",
+        "PREFERENCE": "Preferences",
+        "REQUIREMENT": "Recurring requirements",
+        "LOCATION": "Knowledge sources and locations",
+        "FINANCE": "Finance",
+        "TEMPORARY": "Current or temporary information",
+        "ONE_OFF_DECISION": "One-off decisions",
+        "QUESTION": "Open questions",
+        "NOTE": "Notes"
+      },
+      "topics": {
+        "COMMUNICATION": "Communication",
+        "REPORTING": "Reporting",
+        "DOCUMENTS": "Documents",
+        "AUTOMATION": "Automation",
+        "ADMINS": "Admins",
+        "PAYMENTS": "Payments",
+        "SUPPLIERS": "Vendors",
+        "OTHER": "Other"
+      },
+      "form": {
+        "supersedeHint": "The current version will be kept in the history, marked \"{status}\", and the new one will take its place.",
+        "kind": "Kind",
+        "question": "The question *",
+        "body": "What *",
+        "topic": "Topic",
+        "subject": "Whose",
+        "subjectClient": "The client",
+        "referTo": "Refer to",
+        "validUntil": "Valid until",
+        "validUntilEvent": "Or until an event",
+        "validUntilEventPlaceholder": "Until they join the organization",
+        "decidedAt": "Decision date *",
+        "decidedBy": "Decided by",
+        "assigneeQuestion": "Who finds out",
+        "assigneeTemporary": "Who checks it is still true",
+        "noAssignee": "Not set",
+        "toResolveQuestion": "What would close it",
+        "saveVersion": "Save new version"
+      },
+      "confirm": {
+        "hint": "A source from the client or one of their vendors is needed. An Ankora document alone does not confirm.",
+        "submit": "Confirm",
+        "title": "Confirm item"
+      },
+      "answer": {
+        "label": "The answer *",
+        "submit": "Save answer",
+        "title": "Answer the question"
+      },
+      "row": {
+        "referTo": "Refer to: {name}",
+        "validUntil": "Valid until {until}",
+        "assignee": "Responsible: {name}",
+        "answer": "Answer ({date}):",
+        "closedOn": "Closed on {date}",
+        "alternative": "Another version:",
+        "pastValidity": "Past its end date. Still true?",
+        "toTask": "To task",
+        "doNotTell": "Do not tell: {text}",
+        "answerAction": "Answer",
+        "noLongerTrue": "No longer true",
+        "supersede": "Replace",
+        "supersedeTitle": "New version: {kind}",
+        "remove": "Remove"
+      },
+      "toast": {
+        "failed": "Action failed",
+        "taskOpened": "Task opened",
+        "closed": "Closed",
+        "removed": "Removed from the file"
+      }
+    },
+    "sources": {
+      "saving": "Saving...",
+      "save": "Save",
+      "remove": "Remove",
+      "heading": "Source register ({count})",
+      "add": "+ Source",
+      "addTitle": "New source in the register",
+      "intro": "Every item in the file says how we know it, using the codes here.",
+      "empty": "No sources yet. Add the first meeting or document, then cite it next to each item.",
+      "clientConversation": "Summary of a conversation with the client",
+      "lowered": "{count, plural, =1 {One item is uncertain} other {# items are uncertain}} only because this is an Ankora document.",
+      "badges": {
+        "secondary": "Secondary",
+        "topicsOnly": "Topics only"
+      },
+      "kinds": {
+        "TRANSCRIPT": "Recording",
+        "CLIENT_DOCUMENT": "Client document",
+        "TASK": "Task",
+        "PERSON": "Told in person",
+        "ANKORA_DOCUMENT": "Ankora document",
+        "EMAIL": "Email"
+      },
+      "form": {
+        "kind": "Kind",
+        "date": "Date",
+        "title": "Name *",
+        "titlePlaceholder": "Intro meeting with Nextage",
+        "participants": "Participants",
+        "participantsPlaceholder": "Oren, Shani, Hadas",
+        "externalId": {
+          "fireflies": "Fireflies ID",
+          "document": "Document ID in the file",
+          "task": "Task ID"
+        },
+        "externalIdPlaceholder": "Several are fine, separated by commas",
+        "weight": "Weight",
+        "primary": "Primary: the client or one of their vendors",
+        "primaryConversation": "Primary: summary of a conversation with the client, what the client said in Ankora's writing",
+        "secondary": "Secondary: a document Ankora wrote",
+        "secondaryHint": "An item whose sources are all secondary is saved as \"Uncertain\" until the client confirms.",
+        "conversationHint": "For a document Ankora wrote from a conversation with the client, such as an intro meeting summary. What comes from it is not marked \"Uncertain\" just because Ankora wrote it.",
+        "topicsOnly": "Topics only: no quotes and no details",
+        "notes": "Notes",
+        "submit": "Add to register"
+      },
+      "domains": {
+        "heading": "Domains ({count})",
+        "add": "+ Domain",
+        "addTitle": "Domain in the file",
+        "intro": "This is how an email or a recording is matched to the right client.",
+        "empty": "No domains yet.",
+        "domain": "Domain *",
+        "whose": "Whose",
+        "client": "The client's",
+        "partnerOption": "A partner's or a service provider's",
+        "partner": "Partner",
+        "partnerOf": "Partner: {name}",
+        "organization": "Organization",
+        "partnerHint": "A partner can work with several clients, so their domain alone does not match an email to a client.",
+        "submit": "Add"
+      },
+      "anchors": {
+        "heading": "Where else to look",
+        "edit": "Edit",
+        "title": "Source anchors",
+        "intro": "Together with the domains, this is how \"Advance with Claude\" finds the client's emails, files and recordings.",
+        "keywords": "Keywords:",
+        "driveFolder": "Conversations folder:",
+        "conversationsDoc": "Running document:",
+        "none": "None",
+        "openInDrive": "Open in Drive",
+        "keywordsLabel": "Keywords in a meeting or email title",
+        "keywordsPlaceholder": "nux, nux.ai",
+        "driveFolderLabel": "Conversations folder in Drive (link or ID)",
+        "conversationsDocLabel": "Running conversations document (link or ID)",
+        "hint": "These tell Claude where to look, not what it may read. What each person can read depends on their own connections."
+      },
+      "confirm": {
+        "done": "Confirmed with the client",
+        "doneDescription": "{count, plural, one {# item} other {# items}} from {code}",
+        "title": "Confirm with the client: {code}",
+        "lead": "{count, plural, =1 {One item is} other {# items are}} marked \"Uncertain\" only because their source, {code}, is an Ankora document.",
+        "effect": "On confirming, they are marked confirmed, and {code} is marked \"{label}\", so what comes from it later is not marked again. An item uncertain for another reason does not change.",
+        "note": "How it was confirmed with the client, in one line *",
+        "notePlaceholder": "Nadav went over the list on WhatsApp on 21.10 and confirmed"
+      },
+      "toast": {
+        "removeFailed": "Removal failed",
+        "removedFromRegister": "Removed from the register",
+        "removed": "Removed"
+      }
+    },
+    "people": {
+      "saving": "Saving...",
+      "save": "Save",
+      "addToFile": "Add to file",
+      "edit": "Edit",
+      "remove": "Remove",
+      "doNotTell": "Do not tell: {text}",
+      "relationships": {
+        "CLIENT_STAFF": "Client staff",
+        "PROVIDER": "Service provider",
+        "ADVISOR": "Advisor",
+        "INVESTOR": "Investor",
+        "SUPPLIER": "Vendor",
+        "ANKORA": "Ankora"
+      },
+      "contact": {
+        "name": "Name",
+        "role": "Role",
+        "nameOrRole": "A name or a role, at least one of them.",
+        "relationship": "Relationship to the client",
+        "organization": "Organization",
+        "emails": "Emails",
+        "phones": "Phones",
+        "sharedDetails": "Email and phone belong to the person, and update in every file they appear in.",
+        "channelOrder": "Channels in order of preference",
+        "channelOrderPlaceholder": "WhatsApp, Slack, email",
+        "context": "What to know to work with them",
+        "user": "Their user in the app",
+        "noUser": "Not linked",
+        "clientSideAddress": "Their address at the client",
+        "isPrimary": "Primary contact",
+        "isDecisionMaker": "Decision maker",
+        "sensitive": "Sensitive (not sent to Claude)",
+        "toResolvePlaceholder": "Ask Guy for the email"
+      },
+      "contacts": {
+        "heading": "People and relationships ({count})",
+        "add": "+ Contact",
+        "addTitle": "Contact in the file",
+        "editTitle": "Edit contact",
+        "empty": "No contacts in the file yet.",
+        "primary": "Primary",
+        "channels": "Channels: {channels}"
+      },
+      "organization": {
+        "name": "Organization name *",
+        "nameShared": "Organization name (shared across Ankora, not edited here)",
+        "domain": "Domain",
+        "role": "What they do for the client",
+        "rolePlaceholder": "Bookkeeping and payroll",
+        "kind": "Kind",
+        "monthlyCost": "Monthly cost",
+        "currency": "Currency",
+        "notes": "Notes"
+      },
+      "organizations": {
+        "heading": "Vendors and service providers ({count})",
+        "add": "+ Organization",
+        "addTitle": "Organization in the file",
+        "editTitle": "Edit {name}",
+        "empty": "No regular vendors or service providers in the file yet.",
+        "perMonth": "{amount} a month"
+      },
+      "toast": {
+        "removeFailed": "Removal failed",
+        "removed": "Removed from the file"
+      }
+    },
+    "questions": {
+      "heading": "What to check with the client",
+      "intro": "The open questions, and items someone chose to ask about. Each line can be closed as not relevant, turned into a task for us, or put off to a date.",
+      "empty": "No open questions for the client right now.",
+      "noOpenQuestions": "No open questions",
+      "cardTitleTo": "{count, plural, =1 {One question} other {# questions}} for {latin, select, yes {{name}} other {{name}}}",
+      "cardTitleClient": "{count, plural, =1 {One question} other {# questions}} for the client",
+      "owner": "Responsible: {name}",
+      "showDraft": "Draft a message",
+      "hideDraft": "Hide message",
+      "allAsked": "All asked, waiting for an answer",
+      "draftLabel": "Message to the client",
+      "wait": "One moment...",
+      "copyAndMark": "Copy and mark as asked",
+      "sendTask": "Task to send it",
+      "nothingSent": "Nothing is sent from here. Send it in the client's channel.",
+      "copiedAndMarked": "Copied and marked as asked",
+      "sendTaskOpened": "A task to send it was opened",
+      "snoozed": "Put off:",
+      "returnsOn": "(back on {date})",
+      "internal": "internal, left out of the message",
+      "askedOn": "asked on {date}",
+      "dismissPlaceholder": "Why it is not relevant, in one line",
+      "dismissLabel": "Why it is not relevant",
+      "dismissed": "Closed as not relevant",
+      "saving": "Saving...",
+      "close": "Close",
+      "cancel": "Cancel",
+      "snoozeLabel": "Put off until",
+      "snoozedUntil": "Put off until {date}",
+      "snooze": "Put off",
+      "notRelevant": "Not relevant",
+      "checkOurselves": "We will check",
+      "taskOpenedForYou": "A task was opened for you",
+      "snoozeUntil": "Put off until...",
+      "uncertainSummary": "{count, plural, =1 {One item in the file is still uncertain} other {# items in the file are still uncertain}}. They are not questions until someone chooses to ask about them.",
+      "added": "Added to the questions",
+      "askClient": "Ask the client",
+      "confirmedWithClient": "Confirmed with the client",
+      "sourceConfirmed": "{code}: confirmed with the client.",
+      "loweredLine": "{count, plural, =1 {One item} other {# items}} from {code} ({title}) are uncertain only because Ankora wrote the source. If the client confirmed:",
+      "confirmNotePlaceholder": "How it was confirmed, in one line",
+      "confirmNoteLabel": "How it was confirmed",
+      "kinds": {
+        "question": "Open question",
+        "fact": "Item",
+        "contact": "Contact",
+        "organization": "Organization",
+        "system": "System",
+        "entity": "Entity",
+        "requestType": "Request type",
+        "process": "Process",
+        "policy": "Rule"
+      },
+      "toast": {
+        "copyFailed": "Copy failed",
+        "copyFailedHint": "You can select the text and copy it by hand.",
+        "markFailed": "Marking failed",
+        "copied": "Message copied",
+        "copiedHint": "The questions were marked as asked today.",
+        "taskFailed": "The task was not created",
+        "sendTaskHint": "The message is in the task.",
+        "failed": "That did not work",
+        "notAdded": "Not added"
+      }
+    },
+    "narratives": {
+      "heading": "Overview, background and our role",
+      "edit": "Edit",
+      "write": "Write",
+      "history": "Earlier versions ({count})",
+      "formHint": "Sources in brackets, for example [S1 08:13]. A code that is not in the register is refused. The previous version is kept.",
+      "saving": "Saving...",
+      "saveVersion": "Save new version",
+      "kinds": {
+        "OVERVIEW": {
+          "title": "Client overview",
+          "empty": "No overview written yet.",
+          "placeholder": "Company, an AI startup. Two entities: Inc in the US and LTD in Israel. [S1 08:13]"
+        },
+        "BACKGROUND": {
+          "title": "Background",
+          "empty": "No background written yet.",
+          "placeholder": "How we got here, and what came before us."
+        },
+        "OUR_ROLE": {
+          "title": "Our role",
+          "empty": "Our role has not been written yet.",
+          "placeholder": "HR, payroll and vendors. Not bookkeeping."
+        }
+      }
+    },
+    "extract": {
+      "tooltip": "Copies a prompt with the extraction rules and what is already in the file. Claude reads a meeting or a document, drafts with you, and sends proposals for approval",
+      "button": "Extract knowledge with Claude",
+      "copied": "Prompt copied. Paste it into a new chat in Ankora's organization account in Claude.",
+      "openClaude": "Open Claude",
+      "manual": "The browser did not allow automatic copying. The text is selected: copy it from here and paste it in Ankora's organization account in Claude.",
+      "promptLabel": "The prompt for Claude",
+      "copy": "Copy",
+      "close": "Close"
+    }
+  },
+  "vault": {
+    "reveal": {
+      "show": "Show login details",
+      "loading": "One moment...",
+      "cancel": "Cancel",
+      "username": "Username",
+      "password": "Password",
+      "notes": "Notes",
+      "logged": "This view was logged.",
+      "disappearsIn": "Disappears in {seconds} seconds",
+      "hideNow": "Hide now",
+      "notSaved": "Not saved",
+      "copy": "Copy {label}",
+      "errors": {
+        "notFound": "Login not found.",
+        "sessionExpired": "Your session has expired. Please sign in again.",
+        "rateLimited": "You have reached the maximum number of reveals for this hour. You can continue next hour.",
+        "unavailable": "The login details can't be shown right now.",
+        "stepUpFailed": "Verification failed."
+      },
+      "stepUp": {
+        "title": "Verify your identity",
+        "passkey": "Verify with Touch ID",
+        "orPassword": "Or your Ankora password.",
+        "passwordOnly": "Type your Ankora password. Verification lasts 5 minutes.",
+        "passwordLabel": "Your Ankora password",
+        "verify": "Verify",
+        "needsPasskey": "Viewing logins requires a passkey (Touch ID).",
+        "setUp": "Set one up in your profile"
       }
     }
   }

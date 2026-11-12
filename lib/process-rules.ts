@@ -3,7 +3,9 @@
 // 3.9, 7.2). Pure, so the screen, the file, the server and the tests read
 // a process the same way.
 
-import { findSecrets } from "@/lib/secret-scan";
+import { findSecrets, type SecretHit } from "@/lib/secret-scan";
+
+type SecretKind = SecretHit["kind"];
 
 export type StepModeLike = "MANUAL" | "ASSISTED" | "AUTOMATED";
 export type TriggerLike = "SCHEDULED" | "EVENT" | "ON_DEMAND" | "CONTINUOUS";
@@ -148,7 +150,14 @@ export function readSteps(value: unknown): ProcessStep[] {
     .filter((st) => st.title);
 }
 
-export type CheckResult = { code: string; message: string; step?: number };
+/// ADR 0006: what a check says, as a key a screen words in the reader's
+/// language. `message` stays the Hebrew sentence every other reader (the
+/// file, Claude, the stored approval) has always had; a screen that knows
+/// the key words it from clients.processes.checks.<key>.
+export type CheckKey = "humanOnlyAutomated" | "humanOnlyAssisted" | "clientMessageAutomated" | "automatedNoVerification" | "moneyNoApproval" | "secrets";
+export type KeyedCheck = { key: CheckKey; step?: number; tags?: ActionTag[]; thresholds?: string[]; secrets?: SecretKind[] };
+
+export type CheckResult = { code: string; message: string; step?: number; keyed?: KeyedCheck };
 
 /// The checks that block approval of a procedure (R1 to R4). `thresholds`
 /// are the titles of the client's approval rules in force (THRESHOLD,
@@ -162,20 +171,20 @@ export function blockingChecks(
     const n = i + 1;
     const humanOnly = st.actionTags.filter((t) => HUMAN_ONLY_TAGS.includes(t));
     if (humanOnly.length && st.mode === "AUTOMATED") {
-      out.push({ code: "R1", step: n, message: `שלב ${n}: ${humanOnly.map((t) => ACTION_TAG_LABELS[t]).join(", ")} לא נעשה אוטומטית. לפי ספר הנהלים זו החלטה של אדם.` });
+      out.push({ code: "R1", step: n, message: `שלב ${n}: ${humanOnly.map((t) => ACTION_TAG_LABELS[t]).join(", ")} לא נעשה אוטומטית. לפי ספר הנהלים זו החלטה של אדם.`, keyed: { key: "humanOnlyAutomated", step: n, tags: humanOnly } });
     } else if (humanOnly.length && st.mode === "ASSISTED" && !st.requiresApproval) {
-      out.push({ code: "R1", step: n, message: `שלב ${n}: כש-Claude מכין ${humanOnly.map((t) => ACTION_TAG_LABELS[t]).join(", ")}, אדם מאשר לפני הביצוע. צריך לסמן "דורש אישור".` });
+      out.push({ code: "R1", step: n, message: `שלב ${n}: כש-Claude מכין ${humanOnly.map((t) => ACTION_TAG_LABELS[t]).join(", ")}, אדם מאשר לפני הביצוע. צריך לסמן "דורש אישור".`, keyed: { key: "humanOnlyAssisted", step: n, tags: humanOnly } });
     }
     if (st.mode === "AUTOMATED" && !st.fixedMessage && st.actionTags.some((t) => HUMAN_REVIEWED_TAGS.includes(t))) {
-      out.push({ code: "R1", step: n, message: `שלב ${n}: הודעה ללקוח עוברת בדיקה של אדם לפני שהיא יוצאת, ולכן לא נשלחת אוטומטית.` });
+      out.push({ code: "R1", step: n, message: `שלב ${n}: הודעה ללקוח עוברת בדיקה של אדם לפני שהיא יוצאת, ולכן לא נשלחת אוטומטית.`, keyed: { key: "clientMessageAutomated", step: n } });
     }
     if (st.mode === "AUTOMATED" && !st.verification) {
-      out.push({ code: "R3", step: n, message: `שלב ${n} אוטומטי: צריך לכתוב איך אדם מוודא שזה קרה.` });
+      out.push({ code: "R3", step: n, message: `שלב ${n} אוטומטי: צריך לכתוב איך אדם מוודא שזה קרה.`, keyed: { key: "automatedNoVerification", step: n } });
     }
   });
   const moves = version.steps.some((st) => st.actionTags.some((t) => MONEY_TAGS.includes(t)));
   if (moves && thresholds.length > 0 && !version.steps.some((st) => st.requiresApproval)) {
-    out.push({ code: "R2", message: `בנוהל יש תשלום או רכישה, ולכללי האישור של הלקוח (${thresholds.join(", ")}) אין שלב אישור.` });
+    out.push({ code: "R2", message: `בנוהל יש תשלום או רכישה, ולכללי האישור של הלקוח (${thresholds.join(", ")}) אין שלב אישור.`, keyed: { key: "moneyNoApproval", thresholds } });
   }
   const text = [
     ...version.steps.flatMap((st) => [st.title, st.output, st.verification]),
@@ -185,7 +194,7 @@ export function blockingChecks(
     .filter(Boolean)
     .join("\n");
   const secrets = findSecrets(text);
-  if (secrets.length) out.push({ code: "R4", message: `בנוהל יש ${secrets.map((x) => x.label).join(", ")}. סודות נשמרים בכספת, לא בנוהל.` });
+  if (secrets.length) out.push({ code: "R4", message: `בנוהל יש ${secrets.map((x) => x.label).join(", ")}. סודות נשמרים בכספת, לא בנוהל.`, keyed: { key: "secrets", secrets: secrets.map((x) => x.kind) } });
   return out;
 }
 
@@ -216,7 +225,9 @@ export function mergeStepChecks<T extends { code: string; message: string; step?
   const out: (T & { steps?: number[] })[] = [];
   for (const c of checks) {
     if (c.code === "R3" && c.step) {
-      if (c === r3[0]) out.push({ ...c, step: undefined, steps, message: automatedStepsMessage(steps) });
+      // The merged sentence has no key of its own: a screen words it from
+      // the message.
+      if (c === r3[0]) out.push({ ...c, step: undefined, steps, message: automatedStepsMessage(steps), keyed: undefined });
       continue;
     }
     out.push(c);

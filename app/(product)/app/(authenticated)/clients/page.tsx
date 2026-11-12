@@ -1,3 +1,4 @@
+import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { can, canManageClients } from "@/lib/app-auth/permissions";
 import { engagementDeletesOn } from "@/lib/comms/engagement";
@@ -5,7 +6,7 @@ import { listClients, listArchivedClients } from "@/lib/app-domain/clients";
 import { getCurrentHourBanksForClients, getPrepaidForecastsForClients, getRecentHourBanksForClients } from "@/lib/app-domain/hour-banks";
 import { countApprovalsByClient } from "@/lib/app-domain/approvals";
 import { countOpenTasksByClient } from "@/lib/app-domain/tasks";
-import { assessClient, attentionRank, bankDisplay, LOW_REMAINING_SHARE, PACE_MIN_DAYS, PACKAGE_ENDING_DAYS } from "@/lib/client-attention";
+import { assessClient, attentionRank, bankDisplay, LOW_REMAINING_SHARE, PACE_MIN_DAYS, PACKAGE_ENDING_DAYS, type ReasonCode } from "@/lib/client-attention";
 import { formatDecimalHours } from "@/lib/hours-format";
 import { Forbidden } from "@/components/app/Forbidden";
 import { Drawer } from "@/components/app/Drawer";
@@ -51,8 +52,9 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
   // 2.11.2026: an archived client's conversations and recordings are kept
   // 30 days for the export, then deleted. Managers export them from here.
   const manager = canManageClients(user.role);
-  const exportDeadline = (archivedAt: Date) =>
-    new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: "Asia/Jerusalem" }).format(engagementDeletesOn(archivedAt));
+  const t = await getTranslations("clients.list");
+  const format = await getFormatter();
+  const exportDeadline = (archivedAt: Date) => format.dateTime(engagementDeletesOn(archivedAt), { day: "numeric", month: "numeric" });
 
   // One batched lookup for the whole list.
   //
@@ -81,9 +83,13 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
   // 3.11.2026 (Ariel): every client in one grid, the ones that need
   // attention first, each card with its hours "X of Y", why it needs
   // attention, and its last cycles. The rules: lib/client-attention.ts.
-  const day = (d: Date, year = false) =>
-    new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", ...(year ? { year: "numeric" } : {}), timeZone: "Asia/Jerusalem" }).format(d);
-  const month = (d: Date) => new Intl.DateTimeFormat("he-IL", { month: "short", timeZone: "Asia/Jerusalem" }).format(d);
+  const day = (d: Date, year = false) => format.dateTime(d, { day: "numeric", month: "numeric", ...(year ? { year: "numeric" } : {}) });
+  const month = (d: Date) => format.dateTime(d, { month: "short" });
+  const reasonText = (r: ReasonCode) => {
+    const values: Record<string, string | number> = {};
+    for (const [k, v] of Object.entries(r.values)) values[k] = v instanceof Date ? day(v) : v;
+    return t(`reasons.${r.key}`, values);
+  };
 
   // Per client, what the figures at the top of the screen add up.
   const totals = new Map<string, { remaining: number; used: number; overran: boolean; ending: boolean }>();
@@ -133,10 +139,10 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
     const ended = snap.bank.cycleEnd.getTime() <= now.getTime();
     const kindLabel =
       snap.bank.kind === "PREPAID"
-        ? `חבילה מראש, בתוקף עד ${day(snap.bank.cycleEnd, true)}`
+        ? t("bank.prepaid", { date: day(snap.bank.cycleEnd, true) })
         : ended
-          ? `המחזור הסתיים ב-${day(snap.bank.cycleEnd)}`
-          : `מחזור, מתחדש ב-${day(snap.bank.cycleEnd)}`;
+          ? t("bank.ended", { date: day(snap.bank.cycleEnd) })
+          : t("bank.renews", { date: day(snap.bank.cycleEnd) });
 
     // The bars: hours used against the size of each cycle, on one scale.
     const bars = history.map((h) => {
@@ -145,12 +151,12 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
     });
     const top = Math.max(1, ...bars.map(({ d }) => Math.max(d.usedMinutes, d.sizeMinutes)));
     const historyBars: HistoryBar[] = bars.map(({ h, d }) => ({
-      label: h.id === snap.bank.id ? (h.kind === "PREPAID" ? "נוכחית" : month(h.cycleStart)) : month(h.cycleStart),
+      label: h.id === snap.bank.id ? (h.kind === "PREPAID" ? t("history.current") : month(h.cycleStart)) : month(h.cycleStart),
       usedShare: Math.max(0, d.usedMinutes) / top,
       sizeShare: d.sizeMinutes > 0 ? d.sizeMinutes / top : null,
       over: d.sizeMinutes > 0 && d.usedMinutes > d.sizeMinutes,
       current: h.id === snap.bank.id,
-      title: `${month(h.cycleStart)}: ${d.consumed} מתוך ${d.total}`,
+      title: t("history.title", { month: month(h.cycleStart), used: d.consumed, total: d.total }),
     }));
 
     return {
@@ -164,7 +170,7 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
         pct: snap.utilization.utilizationPct,
         expectedPct: ended ? null : assessment.expectedPct,
       },
-      assessment: { attention: assessment.attention, tone: assessment.tone, reasons: assessment.reasons },
+      assessment: { attention: assessment.attention, tone: assessment.tone, reasons: assessment.reasonCodes.map(reasonText) },
       rank: attentionRank(assessment),
       history: historyBars,
     };
@@ -193,17 +199,17 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
     endingCount: ending.length,
     endingNames: ending.slice(0, 2).join(", "),
   };
-  const rulesLine = `מסומן "דורש תשומת לב" כשהבנק נגמר, כשהמחזור הקודם חרג, כשנשאר פחות מ-${Math.round(LOW_REMAINING_SHARE * 100)}% מהבנק, כשהקצב מהיר אחרי ${PACE_MIN_DAYS} ימים במחזור, או כשחבילה צפויה להיגמר תוך ${PACKAGE_ENDING_DAYS} ימים.`;
+  const rulesLine = t("rules", { pct: Math.round(LOW_REMAINING_SHARE * 100), paceDays: PACE_MIN_DAYS, endingDays: PACKAGE_ENDING_DAYS });
 
   return (
     <>
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-medium text-app-text-primary">לקוחות</h1>
-            <p className="mt-1 text-sm text-app-text-secondary">ניהול לקוחות Ankora, סטטוס וניצול בנק השעות.</p>
+            <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
+            <p className="mt-1 text-sm text-app-text-secondary">{t("subtitle")}</p>
           </div>
-          <Drawer triggerLabel="לקוח חדש" title="לקוח חדש">
+          <Drawer triggerLabel={t("newClient")} title={t("newClient")}>
             <CreateClientForm />
           </Drawer>
         </div>
@@ -226,20 +232,20 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
         {archived.length > 0 && (
           <details className="rounded-2xl border border-app-border bg-white p-5">
             <summary className="cursor-pointer text-sm font-medium text-app-text-primary">
-              בארכיון ({archived.length})
+              {t("archived.summary", { count: archived.length })}
             </summary>
             <ul className="mt-3 divide-y divide-app-border">
               {archived.map((c) => (
                 <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <span className="text-sm text-app-text-primary">{c.name}</span>
+                  <span dir="auto" className="text-sm text-app-text-primary">{c.name}</span>
                   <span className="flex flex-wrap items-center gap-3">
                     {manager && c.deletedAt ? (
                       <a
                         href={`/api/clients/${c.id}/comms-export`}
                         className="inline-flex min-h-11 items-center text-sm text-app-text-accent hover:underline"
-                        title={`השיחות וההקלטות נמחקות ב-${exportDeadline(c.deletedAt)}`}
+                        title={t("archived.exportTitle", { date: exportDeadline(c.deletedAt) })}
                       >
-                        ייצוא שיחות והקלטות (עד {exportDeadline(c.deletedAt)})
+                        {t("archived.export", { date: exportDeadline(c.deletedAt) })}
                       </a>
                     ) : null}
                     <RestoreClientButton clientId={c.id} />

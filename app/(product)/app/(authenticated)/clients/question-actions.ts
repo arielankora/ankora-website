@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { ForbiddenError } from "@/lib/app-auth/permissions";
+import { knowledgeErrorT, knowledgeErrorText } from "./knowledge-errors";
 import { askClientAbout, checkQuestionOurselves, createQuestionsTask, dismissQuestion, markQuestionsAsked, snoozeQuestion } from "@/lib/app-domain/client-questions";
 
 // "שאלות ללקוח" on the client's page (1.11.2026, lib/client-questions.ts).
@@ -9,12 +9,6 @@ import { askClientAbout, checkQuestionOurselves, createQuestionsTask, dismissQue
 // audit row.
 
 type Result = { error?: string; ok?: boolean; taskId?: string };
-
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
-  if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
-}
 
 async function run(clientId: string, fn: () => Promise<unknown>, tasks = false): Promise<Result> {
   try {
@@ -24,7 +18,7 @@ async function run(clientId: string, fn: () => Promise<unknown>, tasks = false):
     const taskId = (r as { taskId?: string } | null)?.taskId;
     return taskId ? { ok: true, taskId } : { ok: true };
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
 }
 
@@ -59,6 +53,6 @@ export async function checkQuestionOurselvesAction(clientId: string, itemId: str
 /// that morning, Israel time.
 export async function snoozeQuestionAction(clientId: string, itemId: string, until: string): Promise<Result> {
   const user = await requireUser();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(until)) return { error: "צריך לבחור תאריך." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(until)) return { error: (await knowledgeErrorT())("chooseDate") };
   return run(clientId, () => snoozeQuestion(user, clientId, [itemId], new Date(`${until}T06:00:00Z`)));
 }

@@ -1,7 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
-import { ForbiddenError } from "@/lib/app-auth/permissions";
+import { badSourcesError, clientActionError as friendlyError } from "./action-errors";
 import { shekelsToMinor } from "@/lib/money";
 import { parseSourceRefs } from "@/lib/knowledge-sources";
 import {
@@ -45,12 +46,6 @@ const AUDIENCES: KnowledgeAudience[] = [
   "RESTRICTED",
 ];
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError)
-    return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
-  if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
-}
 
 function pick<T extends string>(
   value: FormDataEntryValue | null,
@@ -65,22 +60,22 @@ function text(formData: FormData, name: string): string | null {
 }
 
 /// Every field, empty ones as null, so an edit can clear what it removes.
-function parseSystem(formData: FormData, selfId?: string): {
+async function parseSystem(formData: FormData, selfId?: string): Promise<{
   error?: string;
   value?: Omit<SystemAccessInput, "clientId">;
-} {
+}> {
   const { refs, invalid } = parseSourceRefs(
     String(formData.get("sources") ?? ""),
   );
   if (invalid.length)
     return {
-      error: `מקור לא מובן: ${invalid.join(", ")}. כותבים קוד ודקה, למשל S1 08:13.`,
+      error: await badSourcesError(invalid),
     };
   const costRaw = String(formData.get("billingCost") ?? "").trim();
   let billingCostMinor: number | null = null;
   if (costRaw) {
     billingCostMinor = shekelsToMinor(costRaw);
-    if (billingCostMinor === null) return { error: "עלות לא תקינה." };
+    if (billingCostMinor === null) return { error: (await getTranslations("clients.systems"))("invalidCost") };
   }
   const value: Omit<SystemAccessInput, "clientId"> = {
     systemName: String(formData.get("systemName") ?? ""),
@@ -126,12 +121,12 @@ export async function addSystemAccessAction(
 ): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parseSystem(formData, user.id);
+  const parsed = await parseSystem(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   try {
     await addSystemAccess(user, { ...parsed.value, clientId });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
@@ -144,12 +139,12 @@ export async function updateSystemAccessAction(
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
   const id = String(formData.get("id") ?? "");
-  const parsed = parseSystem(formData, user.id);
+  const parsed = await parseSystem(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   try {
     await updateSystemAccess(user, id, parsed.value);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
@@ -163,7 +158,7 @@ export async function removeSystemAccessAction(
   try {
     await removeSystemAccess(user, id);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };

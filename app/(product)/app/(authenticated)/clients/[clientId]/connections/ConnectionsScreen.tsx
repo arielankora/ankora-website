@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from "react";
 import type { ConnectionKind } from "@prisma/client";
+import { useFormatter, useTranslations } from "next-intl";
 import { addAppPasswordAction, disconnectAction, testConnectionAction } from "./actions";
 
 // The connections screen as designed (artboard "חיבורים של הלקוח",
@@ -21,19 +22,17 @@ type Row = {
 };
 
 const INPUT = "w-full rounded-[10px] border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary";
-const KIND: Record<ConnectionKind, string> = { GOOGLE_OAUTH: "Google של הלקוח", MAIL_APP_PASSWORD: "מייל של הלקוח", MANAGER_SEND: "שליחה מהתיבה של מנהל התיק" };
+type ScopeTag = "appPassword" | "mailOnly" | "viaGoogle" | "sendOnly" | "mailReplies" | "driveRead" | "driveWrite";
 
-function scopeTags(r: Row): string[] {
-  if (r.kind === "MAIL_APP_PASSWORD") return ["סיסמת אפליקציה", "מייל בלבד"];
-  if (r.kind === "MANAGER_SEND") return ["דרך Google", "שליחה בלבד"];
-  const t = ["דרך Google"];
-  if (r.scopes.some((s) => s.endsWith("gmail.metadata"))) t.push("מייל: רק אם הגיעה תשובה");
-  if (r.scopes.some((s) => s.endsWith("drive.metadata.readonly"))) t.push("דרייב: רואה קבצים בתיקייה");
-  if (r.scopes.some((s) => s.endsWith("drive.file"))) t.push("דרייב: כותב קבצים שהנוהל יוצר");
+function scopeTags(r: Row): ScopeTag[] {
+  if (r.kind === "MAIL_APP_PASSWORD") return ["appPassword", "mailOnly"];
+  if (r.kind === "MANAGER_SEND") return ["viaGoogle", "sendOnly"];
+  const t: ScopeTag[] = ["viaGoogle"];
+  if (r.scopes.some((s) => s.endsWith("gmail.metadata"))) t.push("mailReplies");
+  if (r.scopes.some((s) => s.endsWith("drive.metadata.readonly"))) t.push("driveRead");
+  if (r.scopes.some((s) => s.endsWith("drive.file"))) t.push("driveWrite");
   return t;
 }
-
-const day = (iso: string) => new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "numeric" });
 
 export function ConnectionsScreen(props: {
   clientId: string;
@@ -43,9 +42,12 @@ export function ConnectionsScreen(props: {
   mayManage: boolean;
   googleReady: boolean;
   userId: string;
-  notice: string | null;
+  notice: { text: string; error: boolean } | null;
 }) {
-  const [msg, setMsg] = useState<{ id: string | null; text: string; error: boolean } | null>(props.notice ? { id: null, text: props.notice, error: props.notice.includes("נכשל") || props.notice.includes("לא") } : null);
+  const t = useTranslations("clients.connections");
+  const format = useFormatter();
+  const day = (iso: string) => format.dateTime(new Date(iso), { day: "numeric", month: "numeric", year: "numeric" });
+  const [msg, setMsg] = useState<{ id: string | null; text: string; error: boolean } | null>(props.notice ? { id: null, text: props.notice.text, error: props.notice.error } : null);
   const [folder, setFolder] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
   // 5.11.2026: a browser confirm() never showed in an embedded browser, and
@@ -60,13 +62,13 @@ export function ConnectionsScreen(props: {
   };
   const confirmBox = (id: string, question: string) =>
     confirming === id && (
-      <div className="flex basis-full flex-wrap items-center gap-2 rounded-[10px] bg-app-error-soft px-3 py-2" role="alertdialog" aria-label="אישור ניתוק" data-testid="disconnect-confirm">
+      <div className="flex basis-full flex-wrap items-center gap-2 rounded-[10px] bg-app-error-soft px-3 py-2" role="alertdialog" aria-label={t("confirmLabel")} data-testid="disconnect-confirm">
         <span className="text-xs text-app-error">{question}</span>
         <button type="button" onClick={() => runDisconnect(id)} className="h-11 rounded-[10px] bg-app-error px-3 text-sm font-medium text-white">
-          כן, לנתק
+          {t("confirmYes")}
         </button>
         <button type="button" onClick={() => setConfirming(null)} className="h-11 rounded-[10px] border border-app-border bg-white px-3 text-sm text-app-text-primary">
-          ביטול
+          {t("cancel")}
         </button>
       </div>
     );
@@ -78,9 +80,9 @@ export function ConnectionsScreen(props: {
     <div className="flex flex-col gap-5" data-testid="connections-screen">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <span className="text-xs text-app-text-secondary">{props.clientName} · תיק הלקוח</span>
-          <h1 className="text-xl font-medium text-app-text-primary">חיבורים</h1>
-          <p className="text-sm text-app-text-secondary">מערכות של הלקוח שהנהלים שלו קוראים מהן או כותבים אליהן. כל שימוש נרשם ביומן.</p>
+          <span className="text-xs text-app-text-secondary">{t("eyebrow", { name: props.clientName })}</span>
+          <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
+          <p className="text-sm text-app-text-secondary">{t("intro")}</p>
         </div>
       </header>
 
@@ -96,27 +98,27 @@ export function ConnectionsScreen(props: {
           .map((c) => (
             <li key={c.id} className="flex flex-col gap-3 rounded-[14px] border border-app-border bg-white p-5" data-testid="connection-card">
               <div className="flex items-center justify-between gap-2">
-                <strong className="text-base font-medium text-app-text-primary">{KIND[c.kind]}</strong>
-                <span className="rounded-full bg-app-success-soft px-2.5 py-0.5 text-xs font-medium text-app-success">מחובר</span>
+                <strong className="text-base font-medium text-app-text-primary">{t(`kinds.${c.kind}`)}</strong>
+                <span className="rounded-full bg-app-success-soft px-2.5 py-0.5 text-xs font-medium text-app-success">{t("connected")}</span>
               </div>
               <span className="text-sm text-app-text-secondary" dir="ltr">
                 {c.account}
               </span>
               <div className="flex flex-wrap gap-1.5">
-                {scopeTags(c).map((t) => (
-                  <span key={t} className="rounded-md bg-app-neutral-soft px-2 py-0.5 text-xs text-app-text-secondary">
-                    {t}
+                {scopeTags(c).map((tag) => (
+                  <span key={tag} className="rounded-md bg-app-neutral-soft px-2 py-0.5 text-xs text-app-text-secondary">
+                    {t(`scopes.${tag}`)}
                   </span>
                 ))}
               </div>
               <span className="text-xs text-app-text-secondary">
-                {c.consentText ?? "אישור לא נרשם"} · {day(c.connectedAt)}
-                {c.connectedByName ? ` · חיבר: ${c.connectedByName}` : ""}
+                {c.consentText ?? t("noConsent")} · {day(c.connectedAt)}
+                {c.connectedByName ? ` · ${t("connectedBy", { name: c.connectedByName })}` : ""}
               </span>
-              <span className="text-xs text-app-text-secondary">{c.usedBy ? `בשימוש ב-${c.usedBy} נהלים` : "עוד לא בשימוש בנוהל"}</span>
+              <span className="text-xs text-app-text-secondary">{c.usedBy ? t("usedBy", { count: c.usedBy }) : t("notUsed")}</span>
               {c.kind === "GOOGLE_OAUTH" && (
                 <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-                  מזהה תיקייה בדרייב, לבדיקה (רשות)
+                  {t("folderId")}
                   <input dir="ltr" value={folder[c.id] ?? ""} onChange={(e) => setFolder({ ...folder, [c.id]: e.target.value })} className={INPUT} />
                 </label>
               )}
@@ -132,7 +134,7 @@ export function ConnectionsScreen(props: {
                     })}
                     className="h-11 flex-1 rounded-[10px] border border-app-border bg-white text-sm text-app-text-primary"
                   >
-                    בדיקת חיבור
+                    {t("test")}
                   </button>
                   <button
                     type="button"
@@ -140,47 +142,47 @@ export function ConnectionsScreen(props: {
                     onClick={() => setConfirming(c.id)}
                     className="h-11 flex-1 rounded-[10px] border border-app-border bg-white text-sm text-app-error"
                   >
-                    ניתוק
+                    {t("disconnect")}
                   </button>
                 </div>
               )}
-              {confirmBox(c.id, c.usedBy ? `החיבור בשימוש ב-${c.usedBy} נהלים, והם ייעצרו בצומת שמשתמש בו. לנתק?` : "לנתק את החיבור ולבטל את ההרשאה ב-Google?")}
+              {confirmBox(c.id, c.usedBy ? t("confirmInUse", { count: c.usedBy }) : t("confirmGoogle"))}
             </li>
           ))}
 
         {props.mayManage && (
           <li className="flex flex-col gap-3 rounded-[14px] border border-dashed border-app-border-strong bg-white p-5">
-            <strong className="text-base font-medium text-app-text-primary">חיבור חדש</strong>
-            <span className="text-sm text-app-text-secondary">איך הלקוח מתחבר:</span>
+            <strong className="text-base font-medium text-app-text-primary">{t("new.title")}</strong>
+            <span className="text-sm text-app-text-secondary">{t("new.how")}</span>
             {props.googleReady ? (
               <a href={google("CLIENT")} className="flex min-h-16 flex-col gap-0.5 rounded-[10px] border-2 border-app-accent px-3.5 py-2.5 text-start text-app-text-primary">
-                <span className="text-sm font-medium">חיבור דרך Google (מומלץ)</span>
-                <span className="text-xs text-app-text-secondary">הלקוח מאשר במסך של Google. מייל ודרייב.</span>
+                <span className="text-sm font-medium">{t("new.google")}</span>
+                <span className="text-xs text-app-text-secondary">{t("new.googleHint")}</span>
               </a>
             ) : (
-              <p className="rounded-[10px] bg-app-neutral-soft px-3 py-2 text-xs text-app-text-secondary">חיבור דרך Google עוד לא מוגדר בסביבה הזו.</p>
+              <p className="rounded-[10px] bg-app-neutral-soft px-3 py-2 text-xs text-app-text-secondary">{t("new.googleNotReady")}</p>
             )}
             <details className="rounded-[10px] border border-app-border px-3.5 py-2.5">
-              <summary className="cursor-pointer text-sm font-medium text-app-text-primary">שם משתמש וסיסמת אפליקציה</summary>
+              <summary className="cursor-pointer text-sm font-medium text-app-text-primary">{t("new.appPassword")}</summary>
               <form action={formAction} className="mt-3 flex flex-col gap-2">
                 <input type="hidden" name="clientId" value={props.clientId} />
-                <p className="text-xs text-app-text-secondary">מייל בלבד. נשמר בכספת. סיסמת אפליקציה של Google דורשת אימות דו-שלבי בחשבון.</p>
+                <p className="text-xs text-app-text-secondary">{t("new.appPasswordHint")}</p>
                 <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-                  כתובת המייל
+                  {t("new.email")}
                   <input name="account" dir="ltr" autoComplete="off" className={INPUT} />
                 </label>
                 <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-                  סיסמת אפליקציה
+                  {t("new.password")}
                   <input name="appPassword" type="password" dir="ltr" autoComplete="new-password" className={INPUT} />
                 </label>
                 <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-                  מי אצל הלקוח מסר את הגישה, ומתי
+                  {t("new.consent")}
                   <input name="consentText" className={INPUT} />
                 </label>
                 {formState?.error && <p className="text-xs text-app-error">{formState.error}</p>}
                 {formState?.ok && <p className="text-xs text-app-success">{formState.ok}</p>}
                 <button type="submit" disabled={formPending} className="h-11 rounded-[10px] bg-app-surface-nav text-sm font-medium text-app-surface-page">
-                  שמירת החיבור
+                  {t("new.save")}
                 </button>
               </form>
             </details>
@@ -189,12 +191,12 @@ export function ConnectionsScreen(props: {
       </ul>
 
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-app-border bg-white px-4 py-3.5">
-        <strong className="text-sm font-medium text-app-text-primary">שליחה</strong>
-        <span className="text-sm text-app-text-secondary">מיילים שהנהלים של הלקוח הזה שולחים יוצאים מהתיבה של מנהל התיק.</span>
+        <strong className="text-sm font-medium text-app-text-primary">{t("send.title")}</strong>
+        <span className="text-sm text-app-text-secondary">{t("send.intro")}</span>
         {mine ? (
           <span className="ms-auto flex flex-wrap items-center gap-2" data-testid="send-connection">
             <span className="rounded-full bg-app-success-soft px-2.5 py-0.5 text-xs font-medium text-app-success" dir="auto">
-              התיבה שלך מחוברת: {mine.account}
+              {t("send.mine", { account: mine.account })}
             </span>
             <button
               type="button"
@@ -205,7 +207,7 @@ export function ConnectionsScreen(props: {
               })}
               className="h-11 rounded-[10px] border border-app-border bg-white px-3 text-sm text-app-text-primary"
             >
-              בדיקת חיבור
+              {t("test")}
             </button>
             <button
               type="button"
@@ -213,23 +215,23 @@ export function ConnectionsScreen(props: {
               onClick={() => setConfirming(mine.id)}
               className="h-11 rounded-[10px] border border-app-border bg-white px-3 text-sm text-app-error"
             >
-              ניתוק
+              {t("disconnect")}
             </button>
-            {confirmBox(mine.id, "לנתק את התיבה שלך מהשליחה ולבטל את ההרשאה ב-Google?")}
+            {confirmBox(mine.id, t("send.confirm"))}
             {msg?.id === mine.id && <span className={`basis-full text-xs ${msg.error ? "text-app-error" : "text-app-success"}`}>{msg.text}</span>}
           </span>
         ) : props.mayManage && props.googleReady ? (
           <a href={google("SEND")} className="ms-auto rounded-[10px] border border-app-border px-3 py-2 text-sm text-app-text-primary">
-            חיבור התיבה שלי לשליחה
+            {t("send.connect")}
           </a>
         ) : (
-          <span className="ms-auto text-xs text-app-text-tertiary">התיבה שלך לא מחוברת.</span>
+          <span className="ms-auto text-xs text-app-text-tertiary">{t("send.notConnected")}</span>
         )}
       </div>
 
       {props.aiExcluded && (
         <p className="rounded-[10px] bg-app-info-soft px-4 py-3 text-sm text-app-info">
-          הלקוח מסומן &quot;בלי AI&quot;: בדיקות פשוטות (הגיעה תשובה, יש קובץ) עדיין רצות, אבל קלוד לא קורא דרך החיבורים.
+          {t("aiExcluded")}
         </p>
       )}
     </div>

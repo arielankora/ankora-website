@@ -14,7 +14,8 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { canReplyTo } from "@/lib/whatsapp-poc/access";
 import { canSeeCall, commsAccess } from "@/lib/comms/access";
-import { parseLineOwners, storedCallLine } from "@/lib/comms/call-lines";
+import { storedCallLine } from "@/lib/comms/call-lines";
+import { lineOwnerEmails as lineOwnerEmailsFromGrants } from "@/lib/comms/grants";
 import { chatsWithPhone, findChat, loadMessages, loadWhatsapp, lookupAccounts, type ChannelInfo, type PageMessage } from "@/lib/comms/inbox-loader";
 import { matchPhones, type PhoneMatch } from "@/lib/whatsapp-poc/clients-by-phone";
 import { normalizePhone } from "@/lib/contact-normalize";
@@ -586,8 +587,8 @@ export default async function CommunicationsPage(props: {
     }
   }
   // "צוות" (5.11.2026, Ariel): a chat belongs to its number's owner, a
-  // call to its line's owner (ALOHA_LINE_OWNERS).
-  const lineOwnerEmails = parseLineOwners(process.env.ALOHA_LINE_OWNERS);
+  // call to its line's owner (lib/comms/grants.ts: the app, then ALOHA_LINE_OWNERS).
+  const lineOwnerEmails = await lineOwnerEmailsFromGrants();
   const lineOwnerUsers = lineOwnerEmails.size
     ? await prisma.user.findMany({ where: { email: { in: [...new Set(lineOwnerEmails.values())] } }, select: { id: true, email: true, name: true } })
     : [];

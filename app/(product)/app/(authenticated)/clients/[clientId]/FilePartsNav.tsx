@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ALL_LABEL, FILE_SECTION_COOKIE, FILE_SECTIONS, sectionOfAnchor, type FileSection, type FileSectionKey } from "@/lib/client-file-parts";
+import { useTranslations } from "next-intl";
+import { FILE_SECTION_COOKIE, FILE_SECTIONS, sectionOfAnchor, type FileSection, type FileSectionKey } from "@/lib/client-file-parts";
 
 // The index of the client file's parts (31.10.2026). On a wide screen a
 // column beside the file, on a phone a row of chips above it. Choosing a
@@ -16,6 +17,7 @@ function remember(s: FileSection) {
 }
 
 export function FilePartsNav({ base, current, counts }: { base: string; current: FileSection; counts: Partial<Record<FileSectionKey, PartCount>> }) {
+  const t = useTranslations("clients.file.parts");
   const router = useRouter();
 
   // A link that points at something in the file (#item-…, #processes)
@@ -31,8 +33,8 @@ export function FilePartsNav({ base, current, counts }: { base: string; current:
 
   type Item = { key: FileSection; label: string; count: number | null; attention?: boolean };
   const all: Item[] = [
-    { key: "all", label: ALL_LABEL, count: null },
-    ...FILE_SECTIONS.map((s): Item => ({ key: s.key, label: s.label, count: counts[s.key]?.count ?? null, attention: counts[s.key]?.attention })),
+    { key: "all", label: t("all"), count: null },
+    ...FILE_SECTIONS.map((s): Item => ({ key: s.key, label: t(s.key), count: counts[s.key]?.count ?? null, attention: counts[s.key]?.attention })),
   ];
   const items = all
     // "ממתין לאישור" leads the index while something waits, and is gone otherwise.
@@ -40,7 +42,7 @@ export function FilePartsNav({ base, current, counts }: { base: string; current:
     .sort((a, b) => (a.key === "pending" ? -1 : b.key === "pending" ? 1 : 0));
 
   return (
-    <nav aria-label="חלקי התיק" className="lg:sticky lg:top-4 lg:self-start" data-testid="file-parts-nav">
+    <nav aria-label={t("label")} className="lg:sticky lg:top-4 lg:self-start" data-testid="file-parts-nav">
       <ul className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:rounded-2xl lg:border lg:border-app-border lg:bg-white lg:p-2">
         {items.map((it) => {
           const on = it.key === current;

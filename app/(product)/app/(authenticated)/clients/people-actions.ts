@@ -1,7 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { shekelsToMinor } from "@/lib/money";
 import {
   addClientContact,
@@ -15,6 +14,7 @@ import { normalizeEmail, normalizePhone, parseList } from "@/lib/contact-normali
 import { parseSourceRefs, type SourceRef } from "@/lib/knowledge-sources";
 import type { ContactRelationship, KnowledgeAudience, KnowledgeStatus } from "@prisma/client";
 import { itemExtrasFrom } from "./item-extras";
+import { knowledgeErrorT, knowledgeErrorText, type KnowledgeErrorT } from "./knowledge-errors";
 
 // Org brain, phase 2: the people and organizations panel on the client
 // screen (spec 3.5).
@@ -24,12 +24,6 @@ type FormState = { error?: string; ok?: boolean };
 const RELATIONSHIPS: ContactRelationship[] = ["CLIENT_STAFF", "PROVIDER", "ADVISOR", "INVESTOR", "SUPPLIER", "ANKORA"];
 const STATUSES: KnowledgeStatus[] = ["CONFIRMED", "UNCERTAIN", "MISSING"];
 const AUDIENCES: KnowledgeAudience[] = ["ALL_STAFF", "ACCOUNT_TEAM", "RESTRICTED"];
-
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
-  if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
-}
 
 function pick<T extends string>(value: FormDataEntryValue | null, allowed: T[]): T | undefined {
   const v = String(value ?? "");
@@ -42,20 +36,20 @@ function text(formData: FormData, name: string): string | null {
 
 /// "S1 08:13, S3" from the sources field. Unreadable entries are refused
 /// by name; whether the codes exist is the domain's to say.
-function parseSources(formData: FormData): { error?: string; refs?: SourceRef[] } {
+function parseSources(formData: FormData, t: KnowledgeErrorT): { error?: string; refs?: SourceRef[] } {
   const { refs, invalid } = parseSourceRefs(String(formData.get("sources") ?? ""));
-  if (invalid.length) return { error: `מקור לא מובן: ${invalid.join(", ")}. כותבים קוד ודקה, למשל S1 08:13.` };
+  if (invalid.length) return { error: t("badSource", { entries: invalid.join(", ") }) };
   return { refs };
 }
 
 /// Emails and phones arrive as one field each. An entry that is not an
 /// address or a number is refused by name, rather than dropped quietly.
-function parseContactFields(formData: FormData, selfId?: string): { error?: string; value?: Parameters<typeof addClientContact>[1] } {
+function parseContactFields(formData: FormData, t: KnowledgeErrorT, selfId?: string): { error?: string; value?: Parameters<typeof addClientContact>[1] } {
   const emails = parseList(String(formData.get("emails") ?? ""), normalizeEmail);
-  if (emails.invalid.length) return { error: `כתובת מייל לא תקינה: ${emails.invalid.join(", ")}` };
+  if (emails.invalid.length) return { error: t("invalidEmail", { entries: emails.invalid.join(", ") }) };
   const phones = parseList(String(formData.get("phones") ?? ""), normalizePhone);
-  if (phones.invalid.length) return { error: `מספר טלפון לא תקין: ${phones.invalid.join(", ")}` };
-  const sources = parseSources(formData);
+  if (phones.invalid.length) return { error: t("invalidPhone", { entries: phones.invalid.join(", ") }) };
+  const sources = parseSources(formData, t);
   if (sources.error) return { error: sources.error };
   return {
     value: {
@@ -91,13 +85,13 @@ function parseContactFields(formData: FormData, selfId?: string): { error?: stri
 
 export async function addClientContactAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
-  const parsed = parseContactFields(formData, user.id);
+  const parsed = parseContactFields(formData, await knowledgeErrorT(), user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
-  if (!parsed.value.clientId) return { error: "לקוח לא נמצא." };
+  if (!parsed.value.clientId) return { error: (await knowledgeErrorT())("clientNotFound") };
   try {
     await addClientContact(user, parsed.value);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
   revalidatePath(`/app/clients/${parsed.value.clientId}`);
   return { ok: true };
@@ -106,14 +100,14 @@ export async function addClientContactAction(_prev: FormState | undefined, formD
 export async function updateClientContactAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const id = String(formData.get("id") ?? "");
-  const parsed = parseContactFields(formData, user.id);
+  const parsed = parseContactFields(formData, await knowledgeErrorT(), user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   const { clientId, organizationName: _org, ...rest } = parsed.value;
   void _org;
   try {
     await updateClientContact(user, id, rest);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
@@ -124,20 +118,20 @@ export async function removeClientContactAction(id: string, clientId: string): P
   try {
     await removeClientContact(user, id);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
 }
 
-function parseOrganizationFields(formData: FormData, selfId: string): { error?: string; value?: Parameters<typeof addClientOrganization>[1] } {
+function parseOrganizationFields(formData: FormData, t: KnowledgeErrorT, selfId: string): { error?: string; value?: Parameters<typeof addClientOrganization>[1] } {
   const costRaw = String(formData.get("monthlyCost") ?? "").trim();
   let monthlyCostMinor: number | null = null;
   if (costRaw) {
     monthlyCostMinor = shekelsToMinor(costRaw);
-    if (monthlyCostMinor === null) return { error: "עלות חודשית לא תקינה." };
+    if (monthlyCostMinor === null) return { error: t("invalidMonthlyCost") };
   }
-  const sources = parseSources(formData);
+  const sources = parseSources(formData, t);
   if (sources.error) return { error: sources.error };
   return {
     value: {
@@ -163,12 +157,12 @@ function parseOrganizationFields(formData: FormData, selfId: string): { error?: 
 
 export async function addClientOrganizationAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
-  const parsed = parseOrganizationFields(formData, user.id);
+  const parsed = parseOrganizationFields(formData, await knowledgeErrorT(), user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   try {
     await addClientOrganization(user, parsed.value);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
   revalidatePath(`/app/clients/${parsed.value.clientId}`);
   return { ok: true };
@@ -177,14 +171,14 @@ export async function addClientOrganizationAction(_prev: FormState | undefined, 
 export async function updateClientOrganizationAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const id = String(formData.get("id") ?? "");
-  const parsed = parseOrganizationFields(formData, user.id);
+  const parsed = parseOrganizationFields(formData, await knowledgeErrorT(), user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   const { clientId, name: _name, ...rest } = parsed.value;
   void _name;
   try {
     await updateClientOrganization(user, id, rest);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
@@ -195,7 +189,7 @@ export async function removeClientOrganizationAction(id: string, clientId: strin
   try {
     await removeClientOrganization(user, id);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await knowledgeErrorText(err) };
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };

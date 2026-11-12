@@ -3,7 +3,8 @@ import type { CommsChannel, TranscriptStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { matchPhones } from "@/lib/whatsapp-poc/clients-by-phone";
 import type { PocChat, PocMessage } from "@/lib/whatsapp-poc/unipile";
-import { blockStateFor, canSeeConversation, isExcludedViewer, parseViewerEmails } from "./visibility";
+import { blockStateFor, canSeeConversation, isExcludedViewer } from "./visibility";
+import { fullViewerEmails } from "./grants";
 import { chatPhone } from "@/lib/whatsapp-poc/inbox";
 
 // Stage 3: the communications screen reads a stored number's WhatsApp
@@ -48,7 +49,7 @@ export async function listStoredChats(channel: CommsChannel, viewer: { id: strin
       c.accountManagerId,
     ]),
   );
-  const fullViewers = parseViewerEmails(process.env.COMMS_FULL_VIEWERS);
+  const fullViewers = await fullViewerEmails();
 
   return conversations
     .filter((c) => {
@@ -136,7 +137,7 @@ export async function withLiveChats(
   stored: PocChat[],
   live: PocChat[],
 ): Promise<PocChat[]> {
-  const fullViewers = parseViewerEmails(process.env.COMMS_FULL_VIEWERS);
+  const fullViewers = await fullViewerEmails();
   const email = viewer.email.trim().toLowerCase();
   if (isExcludedViewer(channel, viewer.id)) return stored;
   if (channel.ownerUserId !== viewer.id && !fullViewers.includes(email)) return stored;
