@@ -45,10 +45,12 @@ export const SHOTS = [
   { name: "calendar", path: "/app/calendar", user: SUPER, full: true },
   { name: "important-dates", path: "/app/important-dates", user: SUPER },
   { name: "clients", path: "/app/clients", user: SUPER },
-  { name: "credentials", path: "/app/credentials", user: SUPER },
+  { name: "credentials", path: "/app/credentials?clientId=demo-client-a", user: SUPER },
   { name: "categories", path: "/app/categories", user: SUPER },
   { name: "client-file-tab", path: "/app/clients/demo-client-a?tab=file", user: SUPER, full: true },
-  { name: "client-file-read", path: "/app/clients/demo-client-a/client-file", user: SUPER, full: true },
+  // Built in Hebrew whatever the reader's language (client-file-view.ts),
+  // so only the Hebrew set has it.
+  { name: "client-file-read", path: "/app/clients/demo-client-a/client-file", user: SUPER, full: true, langs: ["he"] },
   { name: "client-processes", path: "/app/clients/demo-client-a?tab=file", user: SUPER, card: { he: "^תהליכים \\(", en: "^Processes \\(" } },
   { name: "client-rules", path: "/app/clients/demo-client-a?tab=file", user: SUPER, card: { he: "כללים של הלקוח", en: "Client rules" } },
   { name: "approvals", path: "/app/approvals", user: SUPER },
@@ -58,10 +60,10 @@ export const SHOTS = [
   { name: "users", path: "/app/users", user: SUPER },
   { name: "audit-log", path: "/app/audit-log", user: SUPER },
   { name: "integrations", path: "/app/integrations", user: SUPER },
-  { name: "hour-banks", path: "/app/hour-banks", user: SUPER, full: true },
-  { name: "alerts", path: "/app/alerts", user: SUPER, full: true },
+  { name: "hour-banks", path: "/app/hour-banks?clientId=demo-client-a", user: SUPER, full: true },
+  { name: "alerts", path: "/app/alerts?clientId=demo-client-a", user: SUPER, full: true },
   { name: "reports", path: "/app/reports", user: SUPER },
-  { name: "report-schedules", path: "/app/report-schedules", user: SUPER },
+  { name: "report-schedules", path: "/app/report-schedules?clientId=demo-client-a", user: SUPER },
   { name: "portal-home", path: "/app/portal", user: CLIENT, full: true },
   { name: "portal-decisions", path: "/app/portal/decisions", user: CLIENT },
   { name: "portal-activity", path: "/app/portal/activity", user: CLIENT },
@@ -111,6 +113,7 @@ async function main() {
   try {
     for (const shot of SHOTS) {
       if (ONLY && !ONLY.has(shot.name)) continue;
+      if (shot.langs && !shot.langs.includes(LANG)) continue;
       const key = shot.user ?? "anon";
       if (!pages.has(key)) {
         const context = await browser.newContext({
@@ -137,8 +140,13 @@ async function main() {
           // The heading as a pattern, so "Processes (3)" is not "Processes and procedures".
           const heading = page.getByText(new RegExp(shot.card[LANG])).first();
           const card = heading.locator("xpath=ancestor::*[contains(@class,'rounded')][1]");
-          await card.scrollIntoViewIfNeeded();
-          await card.screenshot({ path: file });
+          // A clip of the full page, not an element screenshot: a card
+          // taller than the window is scrolled through in pieces, and the
+          // sticky page header gets drawn over the middle of it.
+          await page.evaluate(() => window.scrollTo(0, 0));
+          const box = await card.boundingBox();
+          if (!box) throw new Error(`no box for the card "${shot.card[LANG]}"`);
+          await page.screenshot({ path: file, fullPage: true, clip: box });
         } else {
           await page.screenshot({ path: file, fullPage: !!shot.full });
         }

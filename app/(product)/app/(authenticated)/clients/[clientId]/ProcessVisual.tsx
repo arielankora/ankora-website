@@ -90,7 +90,7 @@ function tickText(tick: VisualTick, dayZero: string, date: string | null, t: Vis
 
 /// lib/process-visual's dayLabel, in the reader's language.
 function dayText(day: number, t: VisualT): string {
-  return day >= 0 ? t("day", { day: String(day) }) : t("daysBefore", { days: String(-day) });
+  return day >= 0 ? t("day", { day: String(day) }) : t("daysBefore", { days: -day });
 }
 
 const COLS: Record<number, string> = { 1: "sm:grid-cols-1", 2: "sm:grid-cols-2", 3: "sm:grid-cols-3", 4: "sm:grid-cols-2 lg:grid-cols-4" };
