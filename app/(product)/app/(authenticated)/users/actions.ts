@@ -1,6 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import {
   inviteUser,
@@ -37,10 +39,22 @@ type InviteState = {
 };
 type FormState = { error?: string; ok?: boolean };
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
+async function errorsT() {
+  return getTranslations("users.errors");
+}
+
+async function errorText(key: "missingFields" | "userNotFound" | "fileNotFound" | "checkFileFirst" | "signedDateRequired" | "alreadyHandled" | "reasonRequired") {
+  const t = await errorsT();
+  return t(key);
+}
+
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await errorsT();
+  if (err instanceof ForbiddenError) return t("forbidden");
+  const domain = await domainErrorText(err);
+  if (domain) return domain;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
 }
 
 export async function inviteUserAction(_prev: InviteState | undefined, formData: FormData): Promise<InviteState> {
@@ -49,7 +63,7 @@ export async function inviteUserAction(_prev: InviteState | undefined, formData:
   const email = String(formData.get("email") || "").trim();
   const role = String(formData.get("role") || "") as UserRole;
 
-  if (!name || !email || !role) return { error: "יש למלא שם, אימייל ותפקיד." };
+  if (!name || !email || !role) return { error: await errorText("missingFields") };
 
   const clientIds = formData.getAll("clientIds").map(String).filter(Boolean);
   const clientUserRole = (String(formData.get("clientUserRole") || "") as ClientUserRole) || undefined;
@@ -83,7 +97,7 @@ export async function inviteUserAction(_prev: InviteState | undefined, formData:
       emailSent,
     };
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 }
 
@@ -99,7 +113,7 @@ export async function resendInviteAction(
 ): Promise<ResendState> {
   const actor = await requireUser();
   const userId = String(formData.get("userId") || "");
-  if (!userId) return { error: "משתמש לא נמצא." };
+  if (!userId) return { error: await errorText("userNotFound") };
 
   try {
     const { setPasswordToken, emailSent } = await resendInvite(actor, userId);
@@ -113,7 +127,7 @@ export async function resendInviteAction(
 
     return { sent: emailSent, inviteLink: `${origin}/app/reset-password?token=${setPasswordToken}` };
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 }
 
@@ -130,7 +144,7 @@ export async function updateUserRoleStatusAction(
 ): Promise<RoleStatusState> {
   const actor = await requireUser();
   const userId = String(formData.get("userId") || "");
-  if (!userId) return { error: "משתמש לא נמצא." };
+  if (!userId) return { error: await errorText("userNotFound") };
 
   let saved: { role: UserRole; status: UserStatus };
   try {
@@ -140,7 +154,7 @@ export async function updateUserRoleStatusAction(
     });
     saved = { role: user.role, status: user.status };
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/users");
@@ -151,14 +165,14 @@ export async function updateUserRoleStatusAction(
 export async function setUserClientAccessAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const actor = await requireUser();
   const userId = String(formData.get("userId") || "");
-  if (!userId) return { error: "משתמש לא נמצא." };
+  if (!userId) return { error: await errorText("userNotFound") };
 
   const clientIds = formData.getAll("clientIds").map(String).filter(Boolean);
 
   try {
     await setUserClientAccess(actor, userId, clientIds);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath(`/app/users/${userId}`);
@@ -240,8 +254,7 @@ export async function credentialExposureReportAction(userId: string): Promise<Ex
       })),
     };
   } catch (err) {
-    if (err instanceof ForbiddenError) return { ok: false, error: "אין לך הרשאה לבצע פעולה זו." };
-    return { ok: false, error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
+    return { ok: false, error: await friendlyError(err) };
   }
 }
 
@@ -250,11 +263,11 @@ export async function credentialExposureReportAction(userId: string): Promise<Ex
 export async function setExceptionApproverAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const actor = await requireUser();
   const userId = String(formData.get("userId") || "");
-  if (!userId) return { error: "משתמש לא נמצא." };
+  if (!userId) return { error: await errorText("userNotFound") };
   try {
     await setUserCanApproveExceptions(actor, userId, formData.get("canApproveExceptions") === "on");
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath(`/app/users/${userId}`);
   return { ok: true };
@@ -264,11 +277,11 @@ export async function setExceptionApproverAction(_prev: FormState | undefined, f
 export async function setPersonalEmailAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const actor = await requireUser();
   const userId = String(formData.get("userId") || "");
-  if (!userId) return { error: "משתמש לא נמצא." };
+  if (!userId) return { error: await errorText("userNotFound") };
   try {
     await setUserPersonalEmail(actor, userId, String(formData.get("personalEmail") || ""));
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath(`/app/users/${userId}`);
   return { ok: true };
@@ -287,7 +300,7 @@ export async function issueDeletionDeclarationAction(
 ): Promise<DeletionLinkState> {
   const actor = await requireUser();
   const userId = String(formData.get("userId") || "");
-  if (!userId) return { error: "משתמש לא נמצא." };
+  if (!userId) return { error: await errorText("userNotFound") };
   try {
     const { url, emailSent } = await issueDeletionDeclarationLink(actor, userId, {
       confirmActive: formData.get("confirm") === "on",
@@ -295,7 +308,7 @@ export async function issueDeletionDeclarationAction(
     revalidatePath(`/app/users/${userId}`);
     return { sent: emailSent, link: url };
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 }
 
@@ -317,14 +330,14 @@ export async function recordPdfUploadAction(_prev: FormState | undefined, formDa
   const actor = await requireUser();
   const userId = String(formData.get("userId") || "");
   const documentId = String(formData.get("documentId") || "");
-  if (!userId || !documentId) return { error: "הקובץ לא נמצא." };
+  if (!userId || !documentId) return { error: await errorText("fileNotFound") };
   const checked = formData.get("checked") === "on";
-  if (!checked) return { error: "יש לסמן שבדקת את הקובץ לפני הרישום." };
+  if (!checked) return { error: await errorText("checkFileFirst") };
   const date = String(formData.get("signedAt") || "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "יש לבחור את תאריך החתימה." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: await errorText("signedDateRequired") };
   try {
     const kind = await pendingUploadOf(userId, documentId);
-    if (!kind) return { error: "הקובץ כבר טופל, או שאינו של המשתמש הזה." };
+    if (!kind) return { error: await errorText("alreadyHandled") };
     await recordPdfSignatureFromDocument(actor, {
       userId,
       kind,
@@ -334,7 +347,7 @@ export async function recordPdfUploadAction(_prev: FormState | undefined, formDa
       documentId,
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath(`/app/users/${userId}`);
   revalidatePath("/app/approvals");
@@ -345,14 +358,14 @@ export async function dismissPdfUploadAction(_prev: FormState | undefined, formD
   const actor = await requireUser();
   const userId = String(formData.get("userId") || "");
   const documentId = String(formData.get("documentId") || "");
-  if (!userId || !documentId) return { error: "הקובץ לא נמצא." };
+  if (!userId || !documentId) return { error: await errorText("fileNotFound") };
   const reason = String(formData.get("reason") || "").trim();
-  if (!reason) return { error: "יש לכתוב למה הקובץ מוחזר." };
+  if (!reason) return { error: await errorText("reasonRequired") };
   try {
-    if (!(await pendingUploadOf(userId, documentId))) return { error: "הקובץ כבר טופל, או שאינו של המשתמש הזה." };
+    if (!(await pendingUploadOf(userId, documentId))) return { error: await errorText("alreadyHandled") };
     await dismissPdfUpload(actor, documentId, reason);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath(`/app/users/${userId}`);
   revalidatePath("/app/approvals");

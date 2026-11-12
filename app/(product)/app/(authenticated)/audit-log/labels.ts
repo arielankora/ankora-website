@@ -14,6 +14,23 @@
 // here, so the next omission is caught before it ships instead of a year
 // later by accident.
 
+import en from "@/messages/en.json";
+
+// ADR 0006: ACTION_LABEL below stays the Hebrew registry. It is not only
+// the screen's: the client file's "יומן עדכונים" (lib/app-domain/
+// client-file-view.ts) writes these labels into a file Claude and the
+// team read, and that file does not change with a reader's language.
+// The screen itself shows `auditLog.actions.<actionMessageKey(action)>`
+// from the dictionaries, whose Hebrew is these same strings
+// (tests/unit/audit-labels.test.ts holds the two equal).
+
+/// The dictionary key for an action: dots and underscores folded into
+/// camelCase ("user.invite.resent" -> "userInviteResent"), because a dot in
+/// a next-intl key means nesting and "user.invite" is itself an action.
+export function actionMessageKey(action: string): string {
+  return action.replace(/[._]+([a-z0-9])/g, (_, c: string) => c.toUpperCase());
+}
+
 export const ENTITY_TYPES = [
   "User",
   "Client",
@@ -371,15 +388,19 @@ export const ACTION_LABEL: Record<string, string> = {
 // kinds from the action string's own naming convention (verified against
 // every action key in ACTION_LABEL above) rather than adding a parallel
 // "kind" column to the schema.
-export function classifyAction(action: string): { label: string; tone: "green" | "amber" | "gray" | "red" } {
+export type AuditKind = "failure" | "reveal" | "report" | "login" | "access" | "delete" | "create" | "edit";
+
+/// The row's tag. Returns a kind, not words: the screen words it from
+/// `auditLog.kinds.<kind>` in the reader's language.
+export function classifyAction(action: string): { kind: AuditKind; tone: "green" | "amber" | "gray" | "red" } {
   if (action.includes("failure") || action.endsWith("_failed") || action.endsWith("_denied"))
-    return { label: "כשלון", tone: "red" };
+    return { kind: "failure", tone: "red" };
   // A secret was shown to someone. Not an edit, and the one row an admin
   // reading this screen most needs to be able to pick out.
-  if (action.endsWith(".reveal")) return { label: "חשיפה", tone: "amber" };
-  if (action.endsWith("_report")) return { label: "דוח", tone: "gray" };
+  if (action.endsWith(".reveal")) return { kind: "reveal", tone: "amber" };
+  if (action.endsWith("_report")) return { kind: "report", tone: "gray" };
   if (action.startsWith("login.") || action === "logout" || action.includes("logout_all_sessions"))
-    return { label: "התחברות", tone: "gray" };
+    return { kind: "login", tone: "gray" };
   if (
     action.includes("role_status_change") ||
     action.includes("client_access_change") ||
@@ -391,10 +412,10 @@ export function classifyAction(action: string): { label: string; tone: "green" |
     action.includes(".revoke") ||
     action.includes(".granted")
   )
-    return { label: "הרשאות", tone: "amber" };
-  if (action.includes(".delete") || action.includes(".archive")) return { label: "מחיקה", tone: "red" };
-  if (action.includes(".create") || action.includes(".requested")) return { label: "יצירה", tone: "green" };
-  return { label: "עריכה", tone: "amber" };
+    return { kind: "access", tone: "amber" };
+  if (action.includes(".delete") || action.includes(".archive")) return { kind: "delete", tone: "red" };
+  if (action.includes(".create") || action.includes(".requested")) return { kind: "create", tone: "green" };
+  return { kind: "edit", tone: "amber" };
 }
 
 /// What the audit screen's search box looks in.
@@ -406,7 +427,8 @@ export function classifyAction(action: string): { label: string; tone: "green" |
 ///
 ///   - the action key, as before, for anyone who knows it;
 ///   - the Hebrew label: every key whose label contains the words typed,
-///     so "משימה" finds task.create, task.update and the rest;
+///     so "משימה" finds task.create, task.update and the rest, and the
+///     English label the same way;
 ///   - who did it, by name or email;
 ///   - the client;
 ///   - the entity, by type or by id, with a leading "#" dropped so the
@@ -419,8 +441,13 @@ export function auditSearchWhere(raw: string) {
   if (!q) return {};
   const contains = { contains: q, mode: "insensitive" as const };
   const idQuery = q.replace(/^#/, "");
+  // ADR 0006: the English labels too, so a reader of the English screen
+  // finds a row by the words that screen shows. The export runs the same
+  // search, so the file still holds the rows the screen showed.
+  const englishLabels = en.auditLog.actions as Record<string, string>;
+  const lower = q.toLowerCase();
   const labelled = Object.entries(ACTION_LABEL)
-    .filter(([, label]) => label.includes(q))
+    .filter(([action, label]) => label.includes(q) || englishLabels[actionMessageKey(action)]?.toLowerCase().includes(lower))
     .map(([action]) => action);
   return {
     OR: [

@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import { toggleReportScheduleAction, deleteReportScheduleAction, sendReportScheduleNowAction } from "./actions";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { Switch } from "@/components/app/Switch";
+import { useTranslations } from "next-intl";
 
 // App redesign (handoff README, screen 12 "דוחות מתוזמנים"): the
 // prototype's per-schedule row has a real on/off switch (42x24px, per the
@@ -15,6 +16,7 @@ import { Switch } from "@/components/app/Switch";
 // of a fabricated one.
 export function ScheduleActions({ scheduleId, enabled }: { scheduleId: string; enabled: boolean }) {
   const { showToast } = useToast();
+  const t = useTranslations("reportSchedules.actions");
   const [isPending, startTransition] = useTransition();
   const [checked, setChecked] = useState(enabled);
   const [sending, setSending] = useState(false);
@@ -25,13 +27,13 @@ export function ScheduleActions({ scheduleId, enabled }: { scheduleId: string; e
       const result = await toggleReportScheduleAction(scheduleId, next);
       if (!result.ok) {
         setChecked(!next);
-        showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
+        showToast({ tone: "error", title: t("updateFailed"), description: result.error });
         return;
       }
       if (isUndo) return;
       showToast({
         tone: next ? "success" : "warning",
-        title: next ? "הדוח המתוזמן הופעל" : "הדוח המתוזמן הושבת",
+        title: next ? t("enabled") : t("disabled"),
         undo: () => toggle(!next, true),
       });
     });
@@ -43,19 +45,19 @@ export function ScheduleActions({ scheduleId, enabled }: { scheduleId: string; e
     setSending(false);
     showToast(
       result.ok
-        ? { tone: "success", title: "נשלח בהצלחה (בדיקה)" }
-        : { tone: "error", title: "השליחה נכשלה", description: result.reason ?? "שגיאה לא ידועה" }
+        ? { tone: "success", title: t("sentTest") }
+        : { tone: "error", title: t("sendFailed"), description: result.reason ?? t("unknownError") }
     );
   }
 
   function handleDelete() {
-    if (!confirm("למחוק את הדוח המתוזמן? הפעולה בלתי הפיכה.")) return;
+    if (!confirm(t("confirmDelete"))) return;
     startTransition(async () => {
       const result = await deleteReportScheduleAction(scheduleId);
       showToast(
         result.ok
-          ? { tone: "success", title: "הדוח המתוזמן נמחק" }
-          : { tone: "error", title: "המחיקה נכשלה", description: result.error }
+          ? { tone: "success", title: t("deleted") }
+          : { tone: "error", title: t("deleteFailed"), description: result.error }
       );
     });
   }
@@ -68,16 +70,16 @@ export function ScheduleActions({ scheduleId, enabled }: { scheduleId: string; e
         onClick={handleSendNow}
         className="rounded-full border border-app-border px-3.5 py-2 text-xs text-app-text-primary transition-colors hover:border-gold disabled:opacity-50"
       >
-        {sending ? "שולח..." : "שליחה עכשיו"}
+        {sending ? t("sending") : t("sendNow")}
       </button>
-      <Switch checked={checked} onChange={() => toggle(!checked)} disabled={isPending} label="הפעלה או כיבוי" />
+      <Switch checked={checked} onChange={() => toggle(!checked)} disabled={isPending} label={t("toggle")} />
       <button
         type="button"
         disabled={isPending}
         onClick={handleDelete}
         className="text-xs font-medium text-app-error underline decoration-app-error/30 underline-offset-2 disabled:opacity-50"
       >
-        מחיקה
+        {t("delete")}
       </button>
     </div>
   );

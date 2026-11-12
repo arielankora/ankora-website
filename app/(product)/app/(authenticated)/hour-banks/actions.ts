@@ -13,13 +13,40 @@ import { can } from "@/lib/app-auth/permissions";
 import { dayStartInZone } from "@/lib/timezone";
 import type { RoundingMode, BillingAggregationScope, RolloverMode } from "@prisma/client";
 import { parseHoursInput } from "@/lib/hours-input";
+import { RunningTimersOnClientError } from "@/lib/app-domain/closed-bank-guard";
+import { getFormatter, getTranslations } from "next-intl/server";
+import type messages from "@/messages/he.json";
+import { domainErrorText, domainText } from "@/lib/i18n/domain-errors";
 
 type FormState = { error?: string; ok?: boolean };
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
+/// ADR 0006: in the reader's language. A running-timers refusal names
+/// each timer's start in the reader's time zone, not the Hebrew list the
+/// domain's message carries.
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("hourBanks.errors");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  if (err instanceof RunningTimersOnClientError) {
+    const format = await getFormatter();
+    const timers = err.timers
+      .map((timer) =>
+        t("runningTimer", {
+          name: timer.employeeName,
+          start: format.dateTime(timer.startAt, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }),
+        })
+      )
+      .join(", ");
+    return domainText(`domainErrors.${err.code}`, { timers });
+  }
+  const text = await domainErrorText(err);
+  if (text) return text;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
+}
+
+async function errorText(key: keyof (typeof messages)["hourBanks"]["errors"]): Promise<string> {
+  const t = await getTranslations("hourBanks.errors");
+  return t(key);
 }
 
 function parseDateInput(value: FormDataEntryValue | null): Date | null {
@@ -31,7 +58,7 @@ function parseDateInput(value: FormDataEntryValue | null): Date | null {
 export async function upsertBillingPolicyAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") || "");
-  if (!clientId) return { error: "יש לבחור לקוח." };
+  if (!clientId) return { error: await errorText("pickClient") };
 
   try {
     await upsertBillingPolicy(user, clientId, {
@@ -41,7 +68,7 @@ export async function upsertBillingPolicyAction(_prev: FormState | undefined, fo
       aggregationScope: String(formData.get("aggregationScope") || "PER_ENTRY") as BillingAggregationScope,
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/hour-banks");
@@ -51,22 +78,22 @@ export async function upsertBillingPolicyAction(_prev: FormState | undefined, fo
 export async function openHourBankCycleAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") || "");
-  if (!clientId) return { error: "יש לבחור לקוח." };
+  if (!clientId) return { error: await errorText("pickClient") };
 
   const cycleStart = parseDateInput(formData.get("cycleStart"));
   const cycleEnd = parseDateInput(formData.get("cycleEnd"));
-  if (!cycleStart || !cycleEnd) return { error: "יש להזין תאריך התחלה ותאריך סיום תקינים." };
+  if (!cycleStart || !cycleEnd) return { error: await errorText("cycleDates") };
 
   // The form speaks hours; the domain keeps minutes. See lib/hours-input.ts.
   const purchasedMinutes = parseHoursInput(formData.get("purchasedHours"));
-  if (purchasedMinutes === null) return { error: "יש להזין שעות שנרכשו, למשל 111 או 98:30." };
+  if (purchasedMinutes === null) return { error: await errorText("cycleHours") };
   const rolloverMode = String(formData.get("rolloverMode") || "NONE") as RolloverMode;
   const capRaw = String(formData.get("rolloverCapHours") || "").trim();
   const rolloverCapMinutes = capRaw ? parseHoursInput(capRaw) : undefined;
-  if (rolloverCapMinutes === null) return { error: "תקרת ה-Rollover אינה מספר שעות תקין." };
+  if (rolloverCapMinutes === null) return { error: await errorText("capInvalid") };
   const manualRaw = String(formData.get("manualRolloverInHours") || "").trim();
   const manualRolloverInMinutes = manualRaw ? parseHoursInput(manualRaw) : undefined;
-  if (manualRolloverInMinutes === null) return { error: "ה-Rollover הידני אינו מספר שעות תקין." };
+  if (manualRolloverInMinutes === null) return { error: await errorText("manualRolloverInvalid") };
 
   try {
     await openHourBankCycle(user, clientId, {
@@ -78,7 +105,7 @@ export async function openHourBankCycleAction(_prev: FormState | undefined, form
       manualRolloverInMinutes,
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/hour-banks");
@@ -90,9 +117,9 @@ export async function recordAdjustmentAction(_prev: FormState | undefined, formD
   const clientId = String(formData.get("clientId") || "");
   const reason = String(formData.get("reason") || "").trim();
   const minutes = parseHoursInput(formData.get("hours"), { allowNegative: true });
-  if (!clientId) return { error: "יש לבחור לקוח." };
-  if (!reason) return { error: "יש להזין סיבה להתאמה." };
-  if (!minutes) return { error: "יש להזין שעות שונות מאפס, למשל 2, 1:30 או -0:45." };
+  if (!clientId) return { error: await errorText("pickClient") };
+  if (!reason) return { error: await errorText("adjustmentReason") };
+  if (!minutes) return { error: await errorText("adjustmentHours") };
 
   try {
     await recordHourBankAdjustment(user, clientId, {
@@ -101,7 +128,7 @@ export async function recordAdjustmentAction(_prev: FormState | undefined, formD
       reason,
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/hour-banks");
@@ -126,9 +153,9 @@ export type LoadPreviewState = {
 
 export async function previewPrepaidLoadAction(clientId: string, purchaseDate: string): Promise<LoadPreviewState> {
   const user = await requireUser();
-  if (!can(user.role, "hour_bank.manage")) return { error: "אין לך הרשאה לבצע פעולה זו." };
+  if (!can(user.role, "hour_bank.manage")) return { error: await errorText("forbidden") };
   const startAt = purchaseInstant(purchaseDate);
-  if (!startAt) return { error: "יש לבחור תאריך רכישה." };
+  if (!startAt) return { error: await errorText("pickPurchaseDate") };
   try {
     const preview = await previewPrepaidLoad(clientId, startAt);
     return {
@@ -140,22 +167,22 @@ export async function previewPrepaidLoadAction(clientId: string, purchaseDate: s
       carryInMinutes: preview.carryInMinutes,
     };
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 }
 
 export async function loadPrepaidPackageAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") || "");
-  if (!clientId) return { error: "יש לבחור לקוח." };
+  if (!clientId) return { error: await errorText("pickClient") };
 
   const startAt = purchaseInstant(formData.get("purchaseDate"));
-  if (!startAt) return { error: "יש להזין תאריך רכישה תקין." };
+  if (!startAt) return { error: await errorText("purchaseDateInvalid") };
   const purchasedMinutes = parseHoursInput(formData.get("purchasedHours"));
-  if (!purchasedMinutes) return { error: "יש להזין כמה שעות נרכשו, למשל 30 או 12.5." };
+  if (!purchasedMinutes) return { error: await errorText("packageHours") };
   const expiresRaw = String(formData.get("expiresAt") || "").trim();
   const expiresAt = expiresRaw ? dayStartInZone(expiresRaw) : undefined;
-  if (expiresRaw && !expiresAt) return { error: "תאריך התוקף אינו תקין." };
+  if (expiresRaw && !expiresAt) return { error: await errorText("expiresInvalid") };
 
   try {
     await loadPrepaidPackage(user, clientId, {
@@ -164,7 +191,7 @@ export async function loadPrepaidPackageAction(_prev: FormState | undefined, for
       expiresAt,
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/hour-banks");

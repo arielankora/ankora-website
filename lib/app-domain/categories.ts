@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { DomainError } from "@/lib/domain-error";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import type { User, CategoryVisibility } from "@prisma/client";
@@ -34,7 +35,7 @@ export async function createCategory(
 ) {
   assertCan(actor.role, "category.manage");
   if (input.visibility === "CLIENT" && !input.clientId) {
-    throw new Error("A client-specific category requires a client.");
+    throw new DomainError("categories.clientRequired", "A client-specific category requires a client.");
   }
 
   const category = await prisma.category.create({

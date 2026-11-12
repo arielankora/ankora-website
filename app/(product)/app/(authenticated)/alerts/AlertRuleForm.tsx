@@ -1,30 +1,33 @@
 "use client";
 import { createAlertRuleAction } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
+import { useTranslations } from "next-intl";
 
 function SubmitButton({ pending }: { pending: boolean }) {
+  const t = useTranslations("alerts.form");
   return (
     <button
       type="submit"
       disabled={pending}
       className="rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
-      {pending ? "יוצר..." : "יצירת כלל התראה"}
+      {pending ? t("creating") : t("submit")}
     </button>
   );
 }
 
 // Spec 9.1's four threshold types (Forecast is deliberately excluded -
 // see ADR 11.5, that row is marked "Future" in the spec itself).
-const THRESHOLD_TYPES: { value: string; label: string }[] = [
-  { value: "UTILIZATION_PCT", label: "אחוז ניצול (%)" },
-  { value: "REMAINING_MINUTES", label: "דקות שנותרו (יורד מתחת ל...)" },
-  { value: "CONSUMED_MINUTES", label: "דקות שנוצלו" },
-  { value: "OVERAGE", label: "חריגה מהמכסה (דקות)" },
-];
+const THRESHOLD_TYPES = [
+  { value: "UTILIZATION_PCT", key: "typeUtilizationPct" },
+  { value: "REMAINING_MINUTES", key: "typeRemainingMinutes" },
+  { value: "CONSUMED_MINUTES", key: "typeConsumedMinutes" },
+  { value: "OVERAGE", key: "typeOverage" },
+] as const;
 
 export function AlertRuleForm({ clientId }: { clientId: string }) {
   const { onSubmit, pending, error, ok } = useActionForm(createAlertRuleAction);
+  const t = useTranslations("alerts.form");
 
   return (
     <form
@@ -34,22 +37,22 @@ export function AlertRuleForm({ clientId }: { clientId: string }) {
       <input type="hidden" name="clientId" value={clientId} />
 
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">סוג סף *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("type")}</label>
         <select
           name="type"
           required
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
-          {THRESHOLD_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
+          {THRESHOLD_TYPES.map((type) => (
+            <option key={type.value} value={type.value}>
+              {t(type.key)}
             </option>
           ))}
         </select>
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">ערך סף *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("value")}</label>
         <input
           type="number"
           name="thresholdValue"
@@ -61,12 +64,12 @@ export function AlertRuleForm({ clientId }: { clientId: string }) {
       <div className="flex items-end">
         <label className="flex items-center gap-2 text-xs font-medium text-app-text-secondary">
           <input type="checkbox" name="allowRetrigger" className="h-4 w-4 rounded border-app-border" />
-          לאפשר התראה חוזרת אחרי שנפתרה
+          {t("allowRetrigger")}
         </label>
       </div>
 
       <div className="sm:col-span-2 lg:col-span-2">
-        <label className="block text-xs font-medium text-app-text-secondary">נמענים אצל Ankora (מופרד בפסיקים)</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("recipientsAnkora")}</label>
         <input
           name="recipientsAnkora"
           placeholder="ops@ankora.co.il, manager@ankora.co.il"
@@ -74,7 +77,7 @@ export function AlertRuleForm({ clientId }: { clientId: string }) {
         />
       </div>
       <div className="sm:col-span-2 lg:col-span-2">
-        <label className="block text-xs font-medium text-app-text-secondary">נמענים אצל הלקוח (מופרד בפסיקים)</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("recipientsClient")}</label>
         <input
           name="recipientsClient"
           placeholder="finance@client.com"
@@ -84,7 +87,7 @@ export function AlertRuleForm({ clientId }: { clientId: string }) {
 
       <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
         {error && <p className="text-sm text-app-error">{error}</p>}
-        {ok && <p className="text-sm text-app-success">כלל ההתראה נוצר.</p>}
+        {ok && <p className="text-sm text-app-success">{t("created")}</p>}
         <div className="ms-auto">
           <SubmitButton pending={pending} />
         </div>

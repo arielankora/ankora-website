@@ -173,12 +173,19 @@ export class ClosedBankOverrideReasonRequiredError extends DomainError {
 /// would otherwise land in the bank that just closed.
 export type RunningTimerOnClient = { employeeName: string; startAt: Date };
 
-export class RunningTimersOnClientError extends Error {
+/// ADR 0006: a DomainError, so the Hour Banks screen can word it. The
+/// message is unchanged (MCP and tests read it). `timers` in the values is
+/// the Hebrew list; the screen rebuilds it from `timers` in the reader's
+/// language and time zone (hour-banks/actions.ts).
+export class RunningTimersOnClientError extends DomainError {
   constructor(public readonly timers: RunningTimerOnClient[]) {
+    const list = timers
+      .map((t) => `${t.employeeName} מ-${new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }).format(t.startAt)}`)
+      .join(", ");
     super(
-      `רצים כרגע טיימרים על הלקוח: ${timers
-        .map((t) => `${t.employeeName} מ-${new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }).format(t.startAt)}`)
-        .join(", ")}. אפשר לטעון חבילה או לפתוח מחזור רק אחרי שהם נעצרים.`
+      "hourBanks.runningTimersOnClient",
+      `רצים כרגע טיימרים על הלקוח: ${list}. אפשר לטעון חבילה או לפתוח מחזור רק אחרי שהם נעצרים.`,
+      { timers: list }
     );
     this.name = "RunningTimersOnClientError";
   }

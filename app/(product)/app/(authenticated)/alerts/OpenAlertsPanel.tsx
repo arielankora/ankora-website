@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { resolveAlertEventAction, unresolveAlertEventAction } from "./actions";
+import { useTranslations } from "next-intl";
 
 export type OpenAlertRow = {
   id: string;
@@ -29,13 +30,14 @@ export type OpenAlertRow = {
 // was picked and made "0 open alerts" on the home screen look like a bug.
 export function OpenAlertsPanel({ alerts, emptyText }: { alerts: OpenAlertRow[]; emptyText: string }) {
   const { showToast } = useToast();
+  const t = useTranslations("alerts.panel");
   const [hidden, setHidden] = useState<Set<string>>(new Set());
 
   async function resolve(alert: OpenAlertRow, isUndo = false) {
     const action = isUndo ? unresolveAlertEventAction : resolveAlertEventAction;
     const result = await action(alert.id);
     if (!result.ok) {
-      showToast({ tone: "error", title: "הפעולה נכשלה", description: result.error });
+      showToast({ tone: "error", title: t("actionFailed"), description: result.error });
       return;
     }
     setHidden((prev) => {
@@ -47,7 +49,7 @@ export function OpenAlertsPanel({ alerts, emptyText }: { alerts: OpenAlertRow[];
     if (!isUndo) {
       showToast({
         tone: "success",
-        title: "ההתראה סומנה כטופלה",
+        title: t("resolvedToast"),
         description: `${alert.clientName} · ${alert.description}`,
         undo: () => resolve(alert, true),
       });
@@ -69,24 +71,26 @@ export function OpenAlertsPanel({ alerts, emptyText }: { alerts: OpenAlertRow[];
       {visible.map((alert) => (
         <div key={alert.id} className="rounded-2xl border border-app-error/30 bg-white p-5">
           <div className="flex items-center justify-between gap-2.5">
-            <span className="text-xs text-app-error">דורש החלטה</span>
+            <span className="text-xs text-app-error">{t("needsDecision")}</span>
             <span className="text-[11px] text-app-text-tertiary">{alert.triggeredAgo}</span>
           </div>
           <p className="mt-2.5 text-sm text-app-text-primary">{alert.description}</p>
-          <p className="mt-1 text-xs text-app-text-secondary">{alert.clientName}</p>
+          <p dir="auto" className="mt-1 text-xs text-app-text-secondary">
+            {alert.clientName}
+          </p>
           <div className="mt-3.5 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => resolve(alert)}
               className="rounded-full bg-app-accent px-4 py-2 text-xs font-medium text-app-text-primary"
             >
-              סימון כטופל
+              {t("resolve")}
             </button>
             <Link
               href={`/app/hour-banks?clientId=${alert.clientId}`}
               className="rounded-full border border-app-border px-4 py-2 text-xs text-app-text-primary transition-colors hover:border-gold"
             >
-              פתיחת בנק השעות
+              {t("openBank")}
             </Link>
           </div>
         </div>

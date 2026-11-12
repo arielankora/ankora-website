@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import {
@@ -15,12 +17,23 @@ import { VaultUnavailableError, VaultKeyMismatchError } from "@/lib/vault/keys";
 
 type FormState = { error?: string; ok?: boolean };
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
+// The vault's own refusal when no key is set at all. Any other
+// VaultUnavailableError message names a misconfigured setting for whoever
+// runs the environment, and is shown as it is.
+const VAULT_UNSET = new VaultUnavailableError().message;
+
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("credentials.errors");
+  if (err instanceof ForbiddenError) return t("forbidden");
+  // CredentialNotFoundError and the field and link refusals are
+  // DomainErrors (ADR 0006).
+  const domain = await domainErrorText(err);
+  if (domain) return domain;
   if (err instanceof CredentialNotFoundError) return err.message;
-  if (err instanceof VaultUnavailableError || err instanceof VaultKeyMismatchError) return err.message;
+  if (err instanceof VaultKeyMismatchError) return t("vaultKeyMismatch");
+  if (err instanceof VaultUnavailableError) return err.message === VAULT_UNSET ? t("vaultUnavailable") : err.message;
   if (err instanceof Error && /[֐-׿]/.test(err.message)) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
 }
 
 function str(formData: FormData, key: string): string | undefined {
@@ -40,7 +53,7 @@ export async function createCredentialAction(_prev: FormState | undefined, formD
       notes: str(formData, "notes"),
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath("/app/credentials");
   return { ok: true };
@@ -59,7 +72,7 @@ export async function updateCredentialAction(_prev: FormState | undefined, formD
       clear,
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath("/app/credentials");
   return { ok: true };
@@ -70,7 +83,7 @@ export async function deleteCredentialAction(id: string): Promise<FormState> {
   try {
     await deleteCredential(user, id);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath("/app/credentials");
   return { ok: true };

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { RunningTimersOnClientError } from "@/lib/app-domain/closed-bank-guard";
+import { DomainError } from "@/lib/domain-error";
 import { afterResponse } from "@/lib/after-response";
 import { closeOpenAlertsOutsideBank, reconcileBankAfterHoursLoaded } from "@/lib/app-domain/alert-closure";
 import {
@@ -385,7 +386,7 @@ export async function openHourBankCycle(
   assertCan(actor.role, "hour_bank.manage");
 
   if (input.cycleEnd.getTime() <= input.cycleStart.getTime()) {
-    throw new Error("cycleEnd must be after cycleStart");
+    throw new DomainError("hourBanks.cycleEndBeforeStart", "cycleEnd must be after cycleStart");
   }
   await assertNoRunningTimersOnClient(clientId);
 
@@ -514,7 +515,7 @@ export async function recordHourBankAdjustment(
 
   const reason = input.reason.trim();
   if (!reason) {
-    throw new Error("An adjustment requires a reason (spec 8.2 audit trail).");
+    throw new DomainError("hourBanks.adjustmentReasonRequired", "An adjustment requires a reason (spec 8.2 audit trail).");
   }
 
   let hourBankId = input.hourBankId ?? null;
@@ -796,7 +797,7 @@ export async function previewPrepaidLoad(clientId: string, startAt: Date): Promi
   });
   if (!previous) return { previous: null, carryInMinutes: 0 };
   if (startAt.getTime() <= previous.cycleStart.getTime()) {
-    throw new Error("תאריך הרכישה חייב להיות אחרי תחילת החבילה או המחזור הקודמים.");
+    throw new DomainError("hourBanks.purchaseBeforePrevious", "תאריך הרכישה חייב להיות אחרי תחילת החבילה או המחזור הקודמים.");
   }
 
   const stillValid = previous.cycleEnd.getTime() > startAt.getTime();
@@ -839,10 +840,10 @@ export async function loadPrepaidPackage(
   assertCan(actor.role, "hour_bank.manage");
 
   const purchasedMinutes = Math.round(input.purchasedMinutes);
-  if (!(purchasedMinutes > 0)) throw new Error("יש להזין כמה שעות נרכשו.");
-  if (input.startAt.getTime() > Date.now()) throw new Error("תאריך הרכישה לא יכול להיות בעתיד.");
+  if (!(purchasedMinutes > 0)) throw new DomainError("hourBanks.purchasedHoursRequired", "יש להזין כמה שעות נרכשו.");
+  if (input.startAt.getTime() > Date.now()) throw new DomainError("hourBanks.purchaseInFuture", "תאריך הרכישה לא יכול להיות בעתיד.");
   const expiresAt = input.expiresAt ?? defaultPackageExpiry(input.startAt);
-  if (expiresAt.getTime() <= input.startAt.getTime()) throw new Error("התוקף חייב להיות אחרי תאריך הרכישה.");
+  if (expiresAt.getTime() <= input.startAt.getTime()) throw new DomainError("hourBanks.expiryBeforePurchase", "התוקף חייב להיות אחרי תאריך הרכישה.");
   await assertNoRunningTimersOnClient(clientId);
 
   const preview = await previewPrepaidLoad(clientId, input.startAt);

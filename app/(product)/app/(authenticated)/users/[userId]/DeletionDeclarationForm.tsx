@@ -1,4 +1,5 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { useFormState, useFormStatus } from "react-dom";
 import { issueDeletionDeclarationAction } from "../actions";
 
@@ -10,13 +11,14 @@ import { issueDeletionDeclarationAction } from "../actions";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
+  const t = useTranslations("users.deletionDeclaration");
   return (
     <button
       type="submit"
       disabled={pending}
       className="rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-gold hover:text-app-text-primary disabled:opacity-50"
     >
-      {pending ? "שולח..." : "שליחת הצהרת מחיקה"}
+      {pending ? t("sending") : t("send")}
     </button>
   );
 }
@@ -30,10 +32,11 @@ export function DeletionDeclarationForm({
   isActive: boolean;
   hasPersonalEmail: boolean;
 }) {
+  const t = useTranslations("users.deletionDeclaration");
   const [state, formAction] = useFormState(issueDeletionDeclarationAction, {});
 
   if (!hasPersonalEmail) {
-    return <p className="mt-3 text-xs text-app-text-secondary">כדי לשלוח, יש להוסיף מייל פרטי למעלה.</p>;
+    return <p className="mt-3 text-xs text-app-text-secondary">{t("needPersonalEmail")}</p>;
   }
 
   return (
@@ -42,7 +45,7 @@ export function DeletionDeclarationForm({
       {isActive && (
         <label className="flex items-center gap-2 text-xs text-app-text-secondary">
           <input type="checkbox" name="confirm" className="h-4 w-4 accent-gold" />
-          המשתמש עדיין פעיל. השליחה מכוונת.
+          {t("confirmActive")}
         </label>
       )}
       <SubmitButton />
@@ -51,9 +54,7 @@ export function DeletionDeclarationForm({
       {state.link && (
         <div className="rounded-xl border border-app-border bg-app-surface-page p-3">
           <p className="text-xs text-app-text-secondary">
-            {state.sent
-              ? "נשלח מייל עם קישור לשבעה ימים. קישורים קודמים בוטלו."
-              : "הקישור נוצר, אבל שליחת המייל נכשלה. אפשר להעביר אותו ידנית:"}
+            {state.sent ? t("sent") : t("sendFailed")}
           </p>
           <p dir="ltr" className="mt-2 break-all text-[11px] text-app-text-secondary">
             {state.link}

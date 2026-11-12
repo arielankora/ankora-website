@@ -4,18 +4,20 @@ import { adminCreateEntryAction } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
 import { ClosedBankNotice } from "../my-time/ClosedBankNotice";
 import { useToast } from "@/components/app/toast/ToastProvider";
+import { useTranslations } from "next-intl";
 
 type Option = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
 
 function SubmitButton({ pending }: { pending: boolean }) {
+  const t = useTranslations("timeEntriesAdmin.create");
   return (
     <button
       type="submit"
       disabled={pending}
       className="rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
-      {pending ? "שומר..." : "הוספת דיווח לאיש צוות"}
+      {pending ? t("saving") : t("submit")}
     </button>
   );
 }
@@ -43,6 +45,7 @@ export function AdminCreateEntryForm({
   const [date, setDate] = useState(todayKey());
   const [open, setOpen] = useState(false);
   const { showToast } = useToast();
+  const t = useTranslations("timeEntriesAdmin.create");
   // Closes on success, like every other create form in the app. It used
   // to stay open and rely on the person noticing the new row appear in
   // the table below - which says nothing when the row is slow to arrive,
@@ -67,8 +70,8 @@ export function AdminCreateEntryForm({
     const person = users.find((u) => u.id === userId);
     showToast({
       tone: "success",
-      title: "הדיווח נשמר",
-      description: person ? `נרשם על שם ${person.name}.` : undefined,
+      title: t("saved"),
+      description: person ? t("savedFor", { name: person.name }) : undefined,
     });
     setUserId("");
     setClientId("");
@@ -88,7 +91,7 @@ export function AdminCreateEntryForm({
         onClick={() => setOpen(true)}
         className="rounded-full border border-app-border bg-white px-5 py-2.5 text-sm font-medium text-app-text-primary hover:border-gold"
       >
-        + דיווח עבור איש צוות
+        {t("open")}
       </button>
     );
   }
@@ -105,7 +108,7 @@ export function AdminCreateEntryForm({
       <input ref={intoOpenBankRef} type="hidden" name="intoOpenBank" defaultValue="false" />
       <input ref={overrideReasonRef} type="hidden" name="closedBankOverrideReason" defaultValue="" />
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">איש צוות *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("employee")}</label>
         <select
           name="userId"
           required
@@ -113,16 +116,16 @@ export function AdminCreateEntryForm({
           onChange={(e) => setUserId(e.target.value)}
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
-          <option value="">בחירה</option>
+          <option value="">{t("pick")}</option>
           {users.map((u) => (
-            <option key={u.id} value={u.id}>
+            <option key={u.id} value={u.id} dir="auto">
               {u.name}
             </option>
           ))}
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">תאריך *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("date")}</label>
         <input
           type="date"
           name="date"
@@ -134,7 +137,7 @@ export function AdminCreateEntryForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">שעת התחלה *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("startTime")}</label>
         <input
           type="time"
           name="startTime"
@@ -143,7 +146,7 @@ export function AdminCreateEntryForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">שעת סיום *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("endTime")}</label>
         <input
           type="time"
           name="endTime"
@@ -152,7 +155,7 @@ export function AdminCreateEntryForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">לקוח *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("client")}</label>
         <select
           name="clientId"
           required
@@ -160,42 +163,42 @@ export function AdminCreateEntryForm({
           onChange={(e) => setClientId(e.target.value)}
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
-          <option value="">בחירה</option>
+          <option value="">{t("pick")}</option>
           {clients.map((c) => (
-            <option key={c.id} value={c.id}>
+            <option key={c.id} value={c.id} dir="auto">
               {c.name}
             </option>
           ))}
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">קטגוריה *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("category")}</label>
         <select
           name="categoryId"
           required
           disabled={!clientId}
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
         >
-          <option value="">בחירה</option>
+          <option value="">{t("pick")}</option>
           {availableCategories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
+            <option key={cat.id} value={cat.id} dir="auto">
               {cat.name}
             </option>
           ))}
         </select>
       </div>
       <div className="sm:col-span-2">
-        <label className="block text-xs font-medium text-app-text-secondary">הערה *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("note")}</label>
         <input
           name="note"
           required
-          placeholder="מה נעשה עבור הלקוח?"
+          placeholder={t("notePlaceholder")}
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       {isBackdated && (
         <div className="sm:col-span-2">
-          <label className="block text-xs font-medium text-app-text-secondary">סיבת דיווח ליום קודם *</label>
+          <label className="block text-xs font-medium text-app-text-secondary">{t("backdateReason")}</label>
           <input
             name="backdateReason"
             required
@@ -206,7 +209,7 @@ export function AdminCreateEntryForm({
       <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-4">
         <input type="checkbox" id="allowOverlapOverride" name="allowOverlapOverride" className="h-4 w-4" />
         <label htmlFor="allowOverlapOverride" className="text-xs text-app-text-secondary">
-          לאפשר שמירה גם אם קיימת חפיפה עם דיווח אחר (override)
+          {t("allowOverlap")}
         </label>
       </div>
 
@@ -230,7 +233,7 @@ export function AdminCreateEntryForm({
         {error && <p className="text-sm text-app-error">{error}</p>}
         <div className="ms-auto flex gap-3">
           <button type="button" onClick={() => setOpen(false)} className="text-sm text-app-text-secondary hover:text-app-text-primary">
-            ביטול
+            {t("cancel")}
           </button>
           <SubmitButton pending={pending} />
         </div>

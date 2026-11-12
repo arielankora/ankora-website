@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { ExportMenu } from "@/components/app/ExportMenu";
+import { useTranslations } from "next-intl";
 
 // 20.10.2026: a document navigation, not the router. A router navigation
 // can be dropped and leave the screen unchanged while the address says the
@@ -25,6 +26,7 @@ export function FilterBar({
   users: Option[];
   current: { clientId?: string; userId?: string; from?: string; to?: string };
 }) {
+  const t = useTranslations("timeEntriesAdmin.filters");
   const [clientId, setClientId] = useState(current.clientId ?? "");
   const [userId, setUserId] = useState(current.userId ?? "");
   const [from, setFrom] = useState(current.from ?? "");
@@ -59,37 +61,37 @@ export function FilterBar({
   return (
     <div className="grid grid-cols-1 gap-4 rounded-2xl border border-app-border bg-white p-6 sm:grid-cols-2 lg:grid-cols-5">
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">לקוח</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("client")}</label>
         <select
           value={clientId}
           onChange={(e) => setClientId(e.target.value)}
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
-          <option value="">כל הלקוחות</option>
+          <option value="">{t("allClients")}</option>
           {clients.map((c) => (
-            <option key={c.id} value={c.id}>
+            <option key={c.id} value={c.id} dir="auto">
               {c.name}
             </option>
           ))}
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">איש צוות</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("employee")}</label>
         <select
           value={userId}
           onChange={(e) => setUserId(e.target.value)}
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
-          <option value="">כל אנשי הצוות</option>
+          <option value="">{t("allEmployees")}</option>
           {users.map((u) => (
-            <option key={u.id} value={u.id}>
+            <option key={u.id} value={u.id} dir="auto">
               {u.name}
             </option>
           ))}
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">מתאריך</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("from")}</label>
         <input
           type="date"
           value={from}
@@ -98,7 +100,7 @@ export function FilterBar({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">עד תאריך</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("to")}</label>
         <input
           type="date"
           value={to}
@@ -112,10 +114,10 @@ export function FilterBar({
           onClick={apply}
           className="rounded-full bg-app-accent px-4 py-2 text-sm font-medium text-app-text-primary"
         >
-          סינון
+          {t("apply")}
         </button>
         <button type="button" onClick={clear} className="text-sm text-app-text-secondary hover:text-app-text-primary">
-          איפוס
+          {t("reset")}
         </button>
         <ExportMenu baseHref={exportHref} />
       </div>

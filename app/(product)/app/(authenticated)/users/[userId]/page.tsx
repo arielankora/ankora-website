@@ -1,5 +1,6 @@
 import { PageBack } from "@/components/app/BackSlot";
 import { notFound } from "next/navigation";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
@@ -13,23 +14,24 @@ import { ExposureReport } from "./ExposureReport";
 import { logoutAllSessionsAction, resetPasskeysAction, revokeClaudeGrantsAction } from "../actions";
 import { countClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 import { listAgreementsForUser, pendingPdfUploads } from "@/lib/app-domain/agreements";
-import { AGREEMENT_CHANNEL_LABEL, AGREEMENT_KIND_LABEL, CURRENT_AGREEMENTS, agreementCode } from "@/lib/agreements";
+import { CURRENT_AGREEMENTS, agreementCode } from "@/lib/agreements";
 import { localDateKey } from "@/lib/timezone";
 import { PendingPdfReview, type PendingPdf } from "./PendingPdfReview";
 import { PersonalEmailForm } from "./PersonalEmailForm";
 import { DeletionDeclarationForm } from "./DeletionDeclarationForm";
 
-const UPLOADED_ON = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", day: "numeric", month: "numeric" });
+// Display only; the reader's locale and time zone (ADR 0006). The
+// uploaded-on date the form starts from stays an Israel date (localDateKey).
+const UPLOADED_ON = { day: "numeric", month: "numeric" } as const;
 
-const SIGNED_AT = new Intl.DateTimeFormat("he-IL", {
-  timeZone: "Asia/Jerusalem",
+const SIGNED_AT = {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
   hour: "2-digit",
   minute: "2-digit",
   hour12: false,
-});
+} as const;
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -76,6 +78,9 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
   ]);
   if (!targetUser) notFound();
 
+  const t = await getTranslations("users.detail");
+  const format = await getFormatter();
+
   const isStaff = targetUser.role !== "CLIENT_USER";
   const [claudeGrantCount, agreements, passkeyCount, pending] = await Promise.all([
     countClaudeGrantsForUser(user, targetUser.id),
@@ -96,10 +101,10 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
           const driveFileId = pendingDocs.find((d) => d.id === p.documentId)?.driveFileId;
           return {
             documentId: p.documentId,
-            kindLabel: AGREEMENT_KIND_LABEL[kind],
+            kindLabel: t(`agreementKind.${kind}`),
             code: agreementCode(kind, CURRENT_AGREEMENTS[kind]),
             uploadedOn: localDateKey(p.uploadedAt),
-            uploadedLabel: UPLOADED_ON.format(p.uploadedAt),
+            uploadedLabel: format.dateTime(p.uploadedAt, UPLOADED_ON),
             fileUrl: driveFileId ? `https://drive.google.com/file/d/${encodeURIComponent(driveFileId)}/view` : null,
           };
         })
@@ -112,15 +117,15 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
     <>
       <div className="space-y-6">
         <div>
-          <PageBack href="/app/users" label="משתמשים" />
-          <h1 className="mt-3 text-xl font-medium text-app-text-primary">{targetUser.name}</h1>
+          <PageBack href="/app/users" label={t("back")} />
+          <h1 dir="auto" className="mt-3 text-xl font-medium text-app-text-primary">{targetUser.name}</h1>
           <p className="mt-1 text-sm text-app-text-secondary">{targetUser.email}</p>
         </div>
 
         {pendingItems.length > 0 && <PendingPdfReview userId={targetUser.id} userName={targetUser.name} items={pendingItems} />}
 
         <div className="rounded-2xl border border-app-border bg-white p-6">
-          <h2 className="mb-4 text-sm font-medium text-app-text-primary">תפקיד וסטטוס</h2>
+          <h2 className="mb-4 text-sm font-medium text-app-text-primary">{t("roleStatusTitle")}</h2>
           {/* An explicit literal, not the row. The narrowed prop type on the
               component is the declaration; this is the enforcement - a prop
               typed narrower still serialises every field the object actually
@@ -133,7 +138,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
 
         {targetUser.role !== "CLIENT_USER" && (
           <div className="rounded-2xl border border-app-border bg-white p-6">
-            <h2 className="mb-4 text-sm font-medium text-app-text-primary">הרשאות מיוחדות</h2>
+            <h2 className="mb-4 text-sm font-medium text-app-text-primary">{t("specialPermissionsTitle")}</h2>
             <ExceptionApproverForm userId={targetUser.id} value={targetUser.canApproveExceptions} />
           </div>
         )}
@@ -144,17 +149,17 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
         {targetUser.role !== "CLIENT_USER" && (
           <div className="rounded-2xl border border-app-border bg-white p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-medium text-app-text-primary">מסמכים חתומים</h2>
+              <h2 className="text-sm font-medium text-app-text-primary">{t("signedDocsTitle")}</h2>
               {/* The blank forms for the PDF channel. A plain link: the
                   route answers with the file as an attachment. */}
               <span className="text-xs text-app-text-secondary">
-                הורדת טופס לחתימה:{" "}
+                {t("blankForms")}{" "}
                 <a href="/app/agreements/blank/confidentiality" download className="text-app-text-accent underline underline-offset-2 hover:text-app-text-primary">
-                  התחייבות לסודיות
+                  {t("agreementKind.CONFIDENTIALITY")}
                 </a>
                 {" · "}
                 <a href="/app/agreements/blank/deletion-declaration" download className="text-app-text-accent underline underline-offset-2 hover:text-app-text-primary">
-                  הצהרת מחיקה
+                  {t("agreementKind.DELETION_DECLARATION")}
                 </a>
               </span>
             </div>
@@ -162,16 +167,19 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
 
             <div className="mt-5 border-t border-app-border pt-5">
               {agreements.length === 0 ? (
-                <p className="text-sm text-app-text-secondary">עדיין לא נחתם אף מסמך.</p>
+                <p className="text-sm text-app-text-secondary">{t("noSignedDocs")}</p>
               ) : (
                 <ul className="divide-y divide-app-border text-sm">
                   {agreements.map((a) => (
                     <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                       <span className="text-app-text-primary">
-                        {AGREEMENT_KIND_LABEL[a.kind]} <span className="text-app-text-tertiary">· {a.version}</span>
+                        {t(`agreementKind.${a.kind}`)}{" "}
+                        <span className="text-app-text-tertiary">
+                          · <bdi>{a.version}</bdi>
+                        </span>
                       </span>
                       <span className="text-xs text-app-text-secondary">
-                        {AGREEMENT_CHANNEL_LABEL[a.channel]} · {SIGNED_AT.format(a.signedAt)}
+                        {t(`agreementChannel.${a.channel}`)} · {format.dateTime(a.signedAt, SIGNED_AT)}
                         {a.driveFileId ? (
                           <>
                             {" · "}
@@ -185,7 +193,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
                             </a>
                           </>
                         ) : (
-                          " · ללא PDF"
+                          ` · ${t("noPdf")}`
                         )}
                       </span>
                     </li>
@@ -195,9 +203,9 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
             </div>
 
             <div className="mt-5 border-t border-app-border pt-5">
-              <p className="text-sm font-medium text-app-text-primary">הצהרת מחיקה</p>
+              <p className="text-sm font-medium text-app-text-primary">{t("agreementKind.DELETION_DECLARATION")}</p>
               <p className="mt-1 text-sm text-app-text-secondary">
-                בסיום העבודה נשלח למייל הפרטי קישור חד-פעמי לשבעה ימים, לקריאה ולאישור של הצהרת המחיקה והחזרת הציוד.
+                {t("deletionIntro")}
               </p>
               <DeletionDeclarationForm
                 userId={targetUser.id}
@@ -209,7 +217,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
         )}
 
         <div className="rounded-2xl border border-app-border bg-white p-6">
-          <h2 className="mb-4 text-sm font-medium text-app-text-primary">גישה ללקוחות</h2>
+          <h2 className="mb-4 text-sm font-medium text-app-text-primary">{t("clientAccessTitle")}</h2>
           <ClientAccessForm
             userId={targetUser.id}
             clients={clients.filter((c) => c.status === "ACTIVE").map((c) => ({ id: c.id, name: c.name }))}
@@ -223,19 +231,18 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
             client access with them. */}
         {targetUser.status === "INVITED" && (
           <div className="rounded-2xl border border-app-border bg-white p-6">
-            <h2 className="text-sm font-medium text-app-text-primary">הזמנה ממתינה</h2>
+            <h2 className="text-sm font-medium text-app-text-primary">{t("pendingInviteTitle")}</h2>
             <p className="mt-1 text-sm text-app-text-secondary">
-              המשתמש טרם בחר סיסמה. שליחה מחדש מנפיקה קישור חדש לארבעים ושמונה שעות ומבטלת את
-              הקישור הקודם.
+              {t("pendingInviteIntro")}
             </p>
             <ResendInviteForm userId={targetUser.id} />
           </div>
         )}
 
         <div className="rounded-2xl border border-app-border bg-white p-6">
-          <h2 className="text-sm font-medium text-app-text-primary">אבטחה</h2>
+          <h2 className="text-sm font-medium text-app-text-primary">{t("securityTitle")}</h2>
           <p className="mt-1 text-sm text-app-text-secondary">
-            ניתוק כל ההתחברויות הפעילות של המשתמש. שימושי אם יש חשד שהחשבון נפגע.
+            {t("logoutAllIntro")}
           </p>
           <form action={logoutAllSessionsAction} className="mt-3">
             <input type="hidden" name="userId" value={targetUser.id} />
@@ -243,7 +250,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
               type="submit"
               className="rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-gold hover:text-app-text-primary"
             >
-              ניתוק כל ההתחברויות
+              {t("logoutAll")}
             </button>
           </form>
 
@@ -259,11 +266,9 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
               looks the same whether there are three grants or none is
               guessing. With none, there is nothing to press. */}
           <div className="mt-5 border-t border-app-border pt-5">
-            <p className="text-sm font-medium text-app-text-primary">חיבור Claude (MCP)</p>
+            <p className="text-sm font-medium text-app-text-primary">{t("claudeTitle")}</p>
             <p className="mt-1 text-sm text-app-text-secondary">
-              {claudeGrantCount > 0
-                ? `למשתמש יש ${claudeGrantCount} חיבורים פעילים ל-Claude. ניתוק מבטל את כולם מיידית, בלי לנתק אותו משאר המערכת.`
-                : "למשתמש אין חיבורים פעילים ל-Claude."}
+              {claudeGrantCount > 0 ? t("claudeActive", { count: claudeGrantCount }) : t("claudeNone")}
             </p>
             {claudeGrantCount > 0 && (
               <form action={revokeClaudeGrantsAction} className="mt-3">
@@ -272,7 +277,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
                   type="submit"
                   className="rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-app-error hover:text-app-error"
                 >
-                  ניתוק Claude
+                  {t("claudeRevoke")}
                 </button>
               </form>
             )}
@@ -282,11 +287,9 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
               device: clear the passkeys, end every session, and the person
               enrols a new one at their next sign-in, after their password. */}
           <div className="mt-5 border-t border-app-border pt-5">
-            <p className="text-sm font-medium text-app-text-primary">Passkeys ואימות דו-שלבי</p>
+            <p className="text-sm font-medium text-app-text-primary">{t("passkeysTitle")}</p>
             <p className="mt-1 text-sm text-app-text-secondary">
-              {passkeyCount > 0
-                ? `למשתמש רשומים ${passkeyCount} מכשירים. אם מכשיר אבד, איפוס מוחק את כולם ומנתק את כל ההתחברויות. בכניסה הבאה המשתמש ירשום מכשיר חדש אחרי הסיסמה.`
-                : "למשתמש אין passkey רשום. בכניסה הבאה הוא יתבקש לרשום מכשיר, אם האימות הדו-שלבי חל עליו."}
+              {passkeyCount > 0 ? t("passkeysSome", { count: passkeyCount }) : t("passkeysNone")}
             </p>
             {passkeyCount > 0 && !isSelf && (
               <form action={resetPasskeysAction} className="mt-3">
@@ -295,7 +298,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
                   type="submit"
                   className="rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-app-error hover:text-app-error"
                 >
-                  איפוס passkeys
+                  {t("passkeysReset")}
                 </button>
               </form>
             )}
@@ -308,10 +311,9 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
             reveals anything. */}
         {targetUser.role !== "CLIENT_USER" && (
           <div className="rounded-2xl border border-app-border bg-white p-6">
-            <h2 className="text-sm font-medium text-app-text-primary">גישות של לקוחות שנצפו</h2>
+            <h2 className="text-sm font-medium text-app-text-primary">{t("exposureTitle")}</h2>
             <p className="mt-1 text-sm text-app-text-secondary">
-              פרטי הגישה של לקוחות שהמשתמש צפה בהם ב-90 הימים האחרונים, לפי לקוח, עם הודעה מוכנה לכל לקוח. בעזיבת ספק פנימי,
-              שולחים לכל לקוח את ההודעה שלו כדי שיחליף את הסיסמאות האלה.
+              {t("exposureIntro")}
             </p>
             <div className="mt-3">
               <ExposureReport userId={targetUser.id} />

@@ -1,17 +1,19 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { createCategoryAction } from "./actions";
 import { useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 
 function SubmitButton({ pending }: { pending: boolean }) {
+  const t = useTranslations("categories.create");
   return (
     <button
       type="submit"
       disabled={pending}
       className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
-      {pending ? "נוצרת..." : "הוספת קטגוריה"}
+      {pending ? t("submitting") : t("submit")}
     </button>
   );
 }
@@ -20,6 +22,7 @@ function SubmitButton({ pending }: { pending: boolean }) {
 // see docs/adr/0001 addendum and CreateClientForm's comment for the same
 // change applied consistently across every list screen.
 export function CreateCategoryForm({ clients }: { clients: { id: string; name: string }[] }) {
+  const t = useTranslations("categories.create");
   const [visibility, setVisibility] = useState<"GLOBAL" | "CLIENT">("GLOBAL");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(createCategoryAction, close);
@@ -27,7 +30,7 @@ export function CreateCategoryForm({ clients }: { clients: { id: string; name: s
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">שם הקטגוריה *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("name")}</label>
         <input
           name="name"
           required
@@ -35,32 +38,32 @@ export function CreateCategoryForm({ clients }: { clients: { id: string; name: s
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">תיאור</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("description")}</label>
         <input
           name="description"
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">היקף</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("scope")}</label>
         <select
           name="visibility"
           value={visibility}
           onChange={(e) => setVisibility(e.target.value as "GLOBAL" | "CLIENT")}
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
-          <option value="GLOBAL">כללית (כל הלקוחות)</option>
-          <option value="CLIENT">ספציפית ללקוח</option>
+          <option value="GLOBAL">{t("scopeGlobal")}</option>
+          <option value="CLIENT">{t("scopeClient")}</option>
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-app-text-secondary">לקוח</label>
+        <label className="block text-xs font-medium text-app-text-secondary">{t("client")}</label>
         <select
           name="clientId"
           disabled={visibility === "GLOBAL"}
           className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
         >
-          <option value="">בחירת לקוח</option>
+          <option value="">{t("chooseClient")}</option>
           {clients.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
