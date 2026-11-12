@@ -20,6 +20,7 @@ import {
   type TierReasonCode,
 } from "@/lib/knowledge-proposals";
 import type { ProcedureAlongside } from "@/lib/app-domain/processes";
+import type { FlagText } from "@/lib/knowledge-flag-words";
 import { detailLine, sourceKindLabel, targetLabel as kindLabelOf, type KnowledgeT } from "./labels";
 import { approveProposalAction, approveEditedProposalAction, approveWithSuggestionAction, approveProposalsAction, attachProposalAction, mergeProposalAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction, revertProposalAction } from "./actions";
 
@@ -38,7 +39,9 @@ export type ReviewProposal = {
   sources: string[];
   reason: string | null;
   quote: string | null;
-  flags: ProposalFlag[];
+  /// `text`: the flag in the reader's words, worded on the server
+  /// (lib/knowledge-flag-words.ts); without it, the stored sentence.
+  flags: (ProposalFlag & { text?: FlagText })[];
   link: string | null;
   existing: { body: string } | null;
   /// A new item that is already in the file, as it stands now: what is
@@ -577,19 +580,20 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
           )}
           {/* "Already in the file" is said once, above, with what is there. */}
           {p.flags.filter((f) => !(p.alreadyIn && f.code === "DUPLICATE")).map((f, i) => (
-            // The flag's sentences are written by the domain in Hebrew and
-            // stored with the proposal (ADR 0006: not yet coded), so they
-            // read in their own direction.
+            // ADR 0006: worded in the reader's language on the server
+            // (`text`). A sentence it does not know, and a suggested
+            // wording (it is what goes into the file), keep the Hebrew
+            // they were stored in, so they read in their own direction.
             <p key={i} className={`mt-1 text-xs ${f.block ? "font-medium text-app-error" : "text-app-warning"}`} data-testid="proposal-flag">
-              <bdi>{f.message}</bdi>
-              {f.why && (
+              <bdi>{f.text?.message ?? f.message}</bdi>
+              {(f.text ? f.text.why : f.why) && (
                 <span className="block font-normal text-app-text-secondary">
-                  {t("proposal.why")} <bdi>{f.why}</bdi>
+                  {t("proposal.why")} <bdi>{f.text ? f.text.why : f.why}</bdi>
                 </span>
               )}
               {f.fix && (
                 <span className="block font-normal text-app-text-secondary" data-testid="proposal-suggested">
-                  {t("proposal.suggested")} <bdi className="text-app-text-primary">{f.fix.label}</bdi>
+                  {t("proposal.suggested")} <bdi className="text-app-text-primary">{f.text?.fix ?? f.fix.label}</bdi>
                 </span>
               )}
               {/* The same item under another spelling: added to it, not a second one. */}

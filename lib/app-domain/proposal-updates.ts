@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, User } from "@prisma/client";
 import { readSourceRefs, type SourceRef } from "@/lib/knowledge-sources";
@@ -84,7 +85,7 @@ export async function applyUpdate(
   procedure?: { steps: unknown[]; highlights?: string | null; outputs?: string | null } | null
 ): Promise<string> {
   const now = await currentItem(p.clientId, p.target, p.targetId);
-  if (!now) throw new Error("הפריט שההצעה מעדכנת כבר לא בתיק. דוחים את ההצעה.");
+  if (!now) throw new DomainError("knowledgeProposals.updatedItemGone", "הפריט שההצעה מעדכנת כבר לא בתיק. דוחים את ההצעה.");
   const input = { ...given(fields), sources: mergedSources(now.sources, added) };
   if (p.target === "CONTACT") await updateClientContact(actor, p.targetId, input as Parameters<typeof updateClientContact>[2]);
   if (p.target === "ORGANIZATION") {

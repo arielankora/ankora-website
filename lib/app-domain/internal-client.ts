@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canManageClients } from "@/lib/app-auth/permissions";
@@ -30,22 +31,22 @@ export async function internalClientIds(clients: { id: string; isInternal?: bool
 
 async function assertInternal(clientId: string): Promise<void> {
   const client = await prisma.client.findFirst({ where: { id: clientId, deletedAt: null }, select: { id: true, isInternal: true } });
-  if (!client) throw new Error("הלקוח לא נמצא.");
-  if (!(await internalClientIds([client])).has(client.id)) throw new Error("רק בתיק הפנימי של אנקורה מאשרים כך. אצל לקוח, מאמתים מולו.");
+  if (!client) throw new DomainError("internalClient.clientNotFound", "הלקוח לא נמצא.");
+  if (!(await internalClientIds([client])).has(client.id)) throw new DomainError("internalClient.internalOnly", "רק בתיק הפנימי של אנקורה מאשרים כך. אצל לקוח, מאמתים מולו.");
 }
 
 /// A proposed rule of the internal file, uncertain only because Ankora
 /// wrote it: confirmed, then approved, in one step. Manager only.
 export async function approveInternalRule(actor: User, policyId: string) {
-  if (!canManageClients(actor.role)) throw new Error("רק מנהל מאשר כלל.");
+  if (!canManageClients(actor.role)) throw new DomainError("internalClient.managerOnly", "רק מנהל מאשר כלל.");
   const rule = await prisma.clientPolicy.findFirst({ where: { id: policyId, deletedAt: null } });
-  if (!rule) throw new Error("הכלל לא נמצא.");
+  if (!rule) throw new DomainError("internalClient.ruleNotFound", "הכלל לא נמצא.");
   await assertClientAccess(actor, rule.clientId);
   await assertInternal(rule.clientId);
-  if (rule.status !== "PROPOSED") throw new Error("רק כלל מוצע מאשרים.");
+  if (rule.status !== "PROPOSED") throw new DomainError("internalClient.onlyProposed", "רק כלל מוצע מאשרים.");
   if (rule.knowledgeStatus !== "CONFIRMED") {
     if (rule.knowledgeStatus !== "UNCERTAIN" || rule.toResolve !== SECONDARY_ONLY_TO_RESOLVE) {
-      throw new Error("הכלל לא ודאי מסיבה אחרת. קודם סוגרים את מה שחסר בו.");
+      throw new DomainError("internalClient.uncertainOtherwise", "הכלל לא ודאי מסיבה אחרת. קודם סוגרים את מה שחסר בו.");
     }
     const after = await prisma.clientPolicy.update({ where: { id: rule.id }, data: { knowledgeStatus: "CONFIRMED", toResolve: null } });
     await recordAudit({

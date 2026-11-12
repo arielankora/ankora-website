@@ -1623,6 +1623,11 @@ export type TaskThreadEntry =
       /// The fields that actually changed, in Hebrew, for the lines
       /// where knowing "what" is the whole point. Empty on creation.
       changed: string[];
+      /// ADR 0006: the audit action and the changed fields' names, for a
+      /// screen that words them in the reader's language. `label` and
+      /// `changed` stay the Hebrew MCP and the tests read.
+      action: string;
+      changedKeys: string[];
     }
   | {
       kind: "comment";
@@ -1695,7 +1700,8 @@ const DERIVED_FIELDS = new Set([
   "approvedAt",
 ]);
 
-function changedFields(before: unknown, after: unknown): string[] {
+/// The fields of FIELD_LABELS that changed, by name.
+function changedFieldKeys(before: unknown, after: unknown): string[] {
   if (!before || !after || typeof before !== "object" || typeof after !== "object") return [];
   const b = before as Record<string, unknown>;
   const a = after as Record<string, unknown>;
@@ -1705,10 +1711,13 @@ function changedFields(before: unknown, after: unknown): string[] {
     // JSON round-trips dates to strings on one side and not the other, so
     // compare the serialised form rather than the values.
     if (JSON.stringify(b[key]) === JSON.stringify(a[key])) continue;
-    const label = FIELD_LABELS[key];
-    if (label) names.push(label);
+    if (FIELD_LABELS[key]) names.push(key);
   }
   return names;
+}
+
+function changedFields(before: unknown, after: unknown): string[] {
+  return changedFieldKeys(before, after).map((key) => FIELD_LABELS[key]);
 }
 
 /// Everything one task screen shows, in one call.
@@ -2013,6 +2022,8 @@ export async function getTaskDetail(actor: User, taskId: string) {
         actorName: row.actor?.name ?? null,
         label: TASK_AUDIT_LABELS[row.action] ?? "שינוי במשימה",
         changed: row.action === "task.create" ? [] : changedFields(row.beforeJson, row.afterJson),
+        action: row.action,
+        changedKeys: row.action === "task.create" ? [] : changedFieldKeys(row.beforeJson, row.afterJson),
       })),
     ...comments.map((c) => ({
       kind: "comment" as const,

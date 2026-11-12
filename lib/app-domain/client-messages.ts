@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
@@ -255,7 +256,7 @@ export async function recordClientMessage(
   input: { clientId: string; taskId?: string | null; kind: MessageKind; channel: MessageChannel; body: string }
 ) {
   const body = input.body.trim();
-  if (!body) throw new Error("אין מה לשמור: ההודעה ריקה.");
+  if (!body) throw new DomainError("clientMessages.empty", "אין מה לשמור: ההודעה ריקה.");
 
   // The task is checked here, and it has to be checked here.
   //

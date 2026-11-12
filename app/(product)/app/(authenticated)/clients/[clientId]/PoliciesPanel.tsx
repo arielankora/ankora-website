@@ -34,7 +34,7 @@ import type { ActionTag } from "@/lib/process-rules";
 
 export type PanelPolicy = {
   /// Spec 3.11: what it said before, newest first.
-  history?: { version: number; title: string; statement: string; interimStatement: string | null; checked: string | null; approvedByName: string | null; approvedAt: string | null; until: string | null }[];
+  history?: { version: number; title: string; statement: string; interimStatement: string | null; kind: PolicyKindLike | null; params: PolicyParams; approvedByName: string | null; approvedAt: string | null; until: string | null }[];
   /// When a person last confirmed it, as ISO.
   verifiedAt?: string | null;
   /// Spec 3.1: the team's refs, as form text and as labels.
@@ -55,13 +55,10 @@ export type PanelPolicy = {
   interimStatement: string | null;
   params: PolicyParams;
   interimParams: PolicyParams;
-  /// Spec 3.11: YYYY-MM-DD, and the two as a line.
+  /// Spec 3.11: YYYY-MM-DD; the panel words them (datesLine below).
   effectiveFrom?: string | null;
   reviewBy?: string | null;
-  datesLine?: string | null;
   reviewDue?: boolean;
-  /// What the server checks now, in a line; null when nothing.
-  checked: string | null;
   approvedByName: string | null;
   approvedAt: string | null;
   knowledgeStatus: KnowledgeStatusLike;
@@ -338,7 +335,7 @@ function RetireForm({ clientId, policy }: { clientId: string; policy: PanelPolic
 
 /// Spec 3.11: the rule's earlier versions, folded, so what was agreed
 /// before can be read without the audit log.
-function PolicyHistory({ history }: { history: NonNullable<PanelPolicy["history"]> }) {
+function PolicyHistory({ history, entityName }: { history: NonNullable<PanelPolicy["history"]>; entityName: (id: string) => string }) {
   const t = useTranslations("clients.policies");
   const format = useFormatter();
   const shortDay = (iso: string) => format.dateTime(new Date(iso), NUMERIC_DAY);
@@ -353,7 +350,10 @@ function PolicyHistory({ history }: { history: NonNullable<PanelPolicy["history"
             </p>
             <p dir="auto">{h.statement}</p>
             {h.interimStatement && <p className="text-app-text-secondary">{t("history.interim")} <span dir="auto">{h.interimStatement}</span></p>}
-            {h.checked && <p className="text-app-text-secondary">{t("history.checked")} {h.checked}</p>}
+            {(() => {
+              const checked = h.kind ? checkedLine(t, h.kind, h.params, entityName) : null;
+              return checked && <p className="text-app-text-secondary">{t("history.checked")} {checked}</p>;
+            })()}
             <p className="text-[11px] text-app-text-tertiary">
               {[
                 h.approvedByName
@@ -523,7 +523,7 @@ export function PoliciesPanel({
                   </p>
                 )}
                 <ItemTags item={p} disclose />
-                {p.history && p.history.length > 0 && <PolicyHistory history={p.history} />}
+                {p.history && p.history.length > 0 && <PolicyHistory history={p.history} entityName={entityName} />}
                 <SourceCodes sources={p.sources} options={sourceOptions} />
                 {exceptions
                   .filter((e) => e.policyId === p.id)

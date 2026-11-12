@@ -11,8 +11,11 @@ import {
 import { useTaskList } from "./TaskListProvider";
 import { taskHref } from "./list-query";
 import { useToast } from "@/components/app/toast/ToastProvider";
-import { SUPPLIER_EXPERIENCE_LABELS, waitingTitle } from "@/lib/app-domain/portal-labels";
+import { waitingTitle } from "./waiting-title";
 import type { SupplierExperience, TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
+
+/// In the order they are offered, best first.
+const SUPPLIER_EXPERIENCES: SupplierExperience[] = ["GOOD", "OK", "AVOID"];
 
 // Status and priority names come from the dictionary,
 // tasks.common.status.<TaskStatus> and tasks.common.priority.<TaskPriority>
@@ -90,6 +93,7 @@ export function TaskRow({
   const { listQuery, categories } = useTaskList();
   const t = useTranslations("tasks.row");
   const tc = useTranslations("tasks.common");
+  const tBlock = useTranslations("tasks.detail.block");
   const format = useFormatter();
   const { showToast } = useToast();
   const [status, setStatus] = useState(task.status);
@@ -221,7 +225,7 @@ export function TaskRow({
     setSupplierExperience(experience);
     await writePortal(
       { supplierName: name, supplierExperience: experience },
-      { title: t("supplierRecorded"), description: `${name} · ${SUPPLIER_EXPERIENCE_LABELS[experience]}` }
+      { title: t("supplierRecorded"), description: `${name} · ${t(`experience.${experience}`)}` }
     );
   }
 
@@ -659,7 +663,7 @@ export function TaskRow({
                     placeholder={t("supplierPlaceholder")}
                     className="w-40 max-w-full rounded-[8px] border border-app-border bg-white px-2.5 py-1.5 text-[12px] text-app-text-primary outline-none focus:border-gold"
                   />
-                  {(Object.keys(SUPPLIER_EXPERIENCE_LABELS) as SupplierExperience[]).map((key) => (
+                  {SUPPLIER_EXPERIENCES.map((key) => (
                     <button
                       key={key}
                       type="button"
@@ -667,7 +671,7 @@ export function TaskRow({
                       onClick={() => saveSupplier(key)}
                       className="rounded-full border border-app-border bg-white px-2.5 py-1 text-[11px] text-app-text-secondary hover:border-gold disabled:opacity-40"
                     >
-                      {SUPPLIER_EXPERIENCE_LABELS[key]}
+                      {t(`experience.${key}`)}
                     </button>
                   ))}
                   {task.supplierName && (
@@ -689,7 +693,7 @@ export function TaskRow({
                   className="block max-w-full truncate text-start text-[11.5px] text-app-text-accent hover:underline"
                 >
                   {supplierName
-                    ? `${supplierName}${supplierExperience ? ` · ${SUPPLIER_EXPERIENCE_LABELS[supplierExperience]}` : ""}`
+                    ? `${supplierName}${supplierExperience ? ` · ${t(`experience.${supplierExperience}`)}` : ""}`
                     : t("supplierAsk")}
                 </button>
               )}
@@ -804,7 +808,7 @@ export function TaskRow({
             type="button"
             aria-pressed={blockedOn !== null}
             aria-label={blockedOn ? t("stopWaiting") : t("markWaiting")}
-            title={blockedOn ? waitingTitle(blockedOn, blockedSince) : t("notWaiting")}
+            title={blockedOn ? waitingTitle(tBlock, blockedOn, blockedSince) : t("notWaiting")}
             disabled={portalPending}
             onClick={toggleWaiting}
             className={`shrink-0 rounded-full border p-1.5 transition-colors disabled:opacity-50 ${

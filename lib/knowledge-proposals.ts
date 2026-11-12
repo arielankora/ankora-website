@@ -5,11 +5,11 @@
 
 import { z } from "zod";
 import { citedCodes, readSourceRefs } from "@/lib/knowledge-sources";
-import { factShapeError } from "@/lib/client-facts";
+import { factShapeError, factShapeProblem } from "@/lib/client-facts";
 import { NEEDS_INTERIM, type PolicyKindLike } from "@/lib/client-policies";
 import { automatedStepsMessage, blockingChecks, readSteps, VERIFICATION_FIELD_LABEL } from "@/lib/process-rules";
 import { clientVisibleBlocker } from "@/lib/knowledge";
-import { DatePayload, dateShapeError, dateWhen } from "@/lib/date-proposals";
+import { DatePayload, dateShapeError, dateShapeProblem, dateWhen } from "@/lib/date-proposals";
 import { parseExternalRefs, readExternalRefs, refLabel } from "@/lib/external-refs";
 import { addBusinessDays } from "@/lib/business-calendar";
 
@@ -256,9 +256,22 @@ export const ACTION_LABELS: Record<ProposalActionLike, string> = {
 /// `block`: approving it as it stands would break a rule that is not
 /// waived (spec 5.2: "הפרה של כלל חובה: האישור חסום"). It can be edited
 /// and approved, or rejected. Everything else is advice for the reviewer.
+/// A sentence as a dictionary key (ADR 0006), resolved from the root of
+/// messages/*.json by the review card (lib/knowledge-flag-words.ts). A
+/// value may itself be a key, or a list joined with ", ".
+export type FlagWords = { key: string; values?: Record<string, FlagWordsValue> };
+export type FlagWordsValue = string | number | FlagWords | { join: (string | FlagWords)[] };
+/// A flag's sentences as keys: what it says, and why it matters.
+export type FlagSay = { message: FlagWords; why?: FlagWords };
+
 export type ProposalFlag = {
   code: string;
   message: string;
+  /// ADR 0006: `message` and `why` as keys, for the screen. Set on the
+  /// problems said again when the card is read (proposalProblems); the
+  /// flags stored with a proposal are recognised from their message
+  /// (storedFlagSay). `message` stays the Hebrew Claude reads.
+  say?: FlagSay;
   block?: boolean;
   /// Why the field is needed, in one sentence, so the reviewer knows what
   /// the missing part is for before completing it (3.11.2026).
@@ -266,7 +279,7 @@ export type ProposalFlag = {
   /// A ready wording that completes the proposal: shown in full on the
   /// card, and approved with it in one press. `edits` are recomputed on the
   /// server from the proposal as stored, never taken from the browser.
-  fix?: { label: string; edits: Record<string, unknown> };
+  fix?: { label: string; edits: Record<string, unknown>; say?: FlagWords };
   /// The steps one flag stands for, when the same note applies to several.
   steps?: number[];
   /// SIMILAR, by name: the item in the file it may be, so the reviewer
@@ -292,6 +305,19 @@ export const suggestedToResolve = (sourceTitle?: string | null) => (sourceTitle?
 /// length: then the plain wording.
 export const suggestedVerification = (output?: string | null) => (output?.trim() && output.trim().length <= 200 ? `אדם בודק ש${output.trim()} קיים.` : "אדם בודק שהשלב בוצע.");
 
+/// "Already in the file", by kind of item (proposal-existing.ts says it).
+export const DUPLICATE_MESSAGES: Record<string, string> = {
+  FACT: "אותו פריט כבר קיים בתיק.",
+  CONTACT: "איש קשר עם המייל או הטלפון הזה כבר בתיק.",
+  ORGANIZATION: "הארגון כבר בתיק.",
+  SYSTEM: "המערכת, באותו חשבון, כבר במפת המערכות.",
+  ENTITY: "ישות בשם הזה כבר בתיק.",
+  PROCESS: "תהליך בשם הזה כבר בתיק.",
+  DATE: "מועד בשם הזה כבר אצל הלקוח.",
+  DOMAIN: "הדומיין כבר בתיק.",
+  POLICY: "כלל עם אותו שם או אותו נוסח כבר בתיק.",
+};
+
 /// The labels of the fields a missing-field note sends the reviewer to,
 /// as the edit form on the review card shows them (ReviewBatch uses these
 /// same words), so the note names the field the reviewer will see.
@@ -308,20 +334,28 @@ export const EDIT_FIELD_LABELS = {
 /// "בעריכה, בשדה "X"": where the reviewer fills it in.
 const inField = (label: string) => `בעריכה, בשדה "${label}"`;
 
+type EditField = keyof typeof EDIT_FIELD_LABELS;
+/// A key under knowledge.flags (ADR 0006).
+const fw = (key: string, values?: FlagWords["values"]): FlagWords => ({ key: `knowledge.flags.${key}`, ...(values ? { values } : {}) });
+const fieldWords = (field: EditField): FlagWords => fw(`fields.${field}`);
+
 /// Which field completes a fact that fails its shape, by the same order
 /// factShapeError checks it in.
-function factShapeField(payload: Record<string, unknown>): string | null {
-  if (typeof payload.body !== "string" || !payload.body.trim()) return EDIT_FIELD_LABELS.body;
-  if (payload.kind === "TEMPORARY") return EDIT_FIELD_LABELS.validUntilEvent;
-  if (payload.kind === "ONE_OFF_DECISION") return EDIT_FIELD_LABELS.decidedAt;
+function factShapeField(payload: Record<string, unknown>): EditField | null {
+  if (typeof payload.body !== "string" || !payload.body.trim()) return "body";
+  if (payload.kind === "TEMPORARY") return "validUntilEvent";
+  if (payload.kind === "ONE_OFF_DECISION") return "decidedAt";
   return null;
 }
 
 /// A date is completed in the edit only when what it lacks is its day (a
 /// one-off or annual date); a monthly or weekly day has no field there.
-function dateShapeField(payload: Record<string, unknown>): string | null {
-  return payload.recurrence === "ONCE" || payload.recurrence === "ANNUAL" ? EDIT_FIELD_LABELS.date : null;
+function dateShapeField(payload: Record<string, unknown>): EditField | null {
+  return payload.recurrence === "ONCE" || payload.recurrence === "ANNUAL" ? "date" : null;
 }
+
+/// The sentence on the draft a process enters as, after a check.
+const PROCESS_DRAFT = " (התהליך ייכנס כטיוטה, והנוהל לא יאושר עד שזה יתוקן.)";
 
 /// The edit form has "מה יסגור את זה" for every item but a task, a date
 /// and a question (a question is closed by its answer).
@@ -335,7 +369,15 @@ export function proposalProblems(target: ProposalTargetLike, payload: Record<str
   const out: ProposalFlag[] = [];
   const known = new Set(registerCodes);
   const unknown = [...new Set(Object.values(payload).flatMap((v) => (typeof v === "string" ? citedCodes(v) : [])))].filter((c) => !known.has(c));
-  if (unknown.length) out.push({ code: "R17", block: true, why: "כל פריט בתיק מפנה למקור שאפשר לפתוח, וקוד שלא במרשם הוא כנראה טעות הקלדה.", message: `הטקסט מצטט ${unknown.join(", ")}, ${unknown.length === 1 ? "שלא קיים" : "שלא קיימים"} במרשם המקורות של הלקוח. מתקנים את הקוד בעריכה, או דוחים.` });
+  if (unknown.length) {
+    out.push({
+      code: "R17",
+      block: true,
+      why: "כל פריט בתיק מפנה למקור שאפשר לפתוח, וקוד שלא במרשם הוא כנראה טעות הקלדה.",
+      message: `הטקסט מצטט ${unknown.join(", ")}, ${unknown.length === 1 ? "שלא קיים" : "שלא קיימים"} במרשם המקורות של הלקוח. מתקנים את הקוד בעריכה, או דוחים.`,
+      say: { message: fw("r17", { codes: unknown.join(", "), count: unknown.length }), why: fw("whyR17") },
+    });
+  }
   const s = (k: string) => (typeof payload[k] === "string" ? (payload[k] as string) : null);
   if (target === "FACT") {
     const shape = factShapeError({ kind: payload.kind as never, body: s("body") ?? "", validUntil: s("validUntil") ? new Date(s("validUntil")!) : null, validUntilEvent: s("validUntilEvent"), decidedAt: s("decidedAt") ? new Date(s("decidedAt")!) : null });
@@ -346,17 +388,36 @@ export function proposalProblems(target: ProposalTargetLike, payload: Record<str
           ? "בלי תאריך אי אפשר לדעת אם ההחלטה עדיין בתוקף."
           : undefined;
     const field = factShapeField(payload);
-    if (shape) out.push({ code: "SHAPE", block: true, why, message: `${shape} משלימים ${field ? inField(field) : "בעריכה"}, או דוחים.` });
-  }
-  if (target === "DATE") {
-    const shape = dateShapeError(payload);
-    const field = dateShapeField(payload);
+    const problem = factShapeProblem({ kind: payload.kind as never, body: s("body") ?? "", validUntil: s("validUntil") ? new Date(s("validUntil")!) : null, validUntilEvent: s("validUntilEvent"), decidedAt: s("decidedAt") ? new Date(s("decidedAt")!) : null });
+    const shapeWords: FlagWords = { key: "domainErrors.clientFacts.shape", values: { problem: problem ?? "other" } };
     if (shape) {
       out.push({
         code: "SHAPE",
         block: true,
+        why,
+        message: `${shape} משלימים ${field ? inField(EDIT_FIELD_LABELS[field]) : "בעריכה"}, או דוחים.`,
+        say: {
+          message: field ? fw("completeInField", { shape: shapeWords, field: fieldWords(field) }) : fw("completeInEdit", { shape: shapeWords }),
+          why: payload.kind === "TEMPORARY" ? fw("whyTemporary") : payload.kind === "ONE_OFF_DECISION" ? fw("whyDecision") : undefined,
+        },
+      });
+    }
+  }
+  if (target === "DATE") {
+    const shape = dateShapeError(payload);
+    const field = dateShapeField(payload);
+    const problem = dateShapeProblem(payload);
+    if (shape && problem) {
+      const shapeWords = fw(`dateShape.${problem}`);
+      out.push({
+        code: "SHAPE",
+        block: true,
         why: "בלי היום שבו המועד חל, המערכת לא יודעת מתי להזכיר.",
-        message: field ? `${shape} משלימים ${inField(field)}, או דוחים.` : `${shape} לזה אין שדה בעריכה: דוחים, ומבקשים מ-Claude לשלוח את המועד שוב עם היום.`,
+        message: field ? `${shape} משלימים ${inField(EDIT_FIELD_LABELS[field])}, או דוחים.` : `${shape} לזה אין שדה בעריכה: דוחים, ומבקשים מ-Claude לשלוח את המועד שוב עם היום.`,
+        say: {
+          message: field ? fw("completeInField", { shape: shapeWords, field: fieldWords(field) }) : fw("dateNoField", { shape: shapeWords }),
+          why: fw("whyDate"),
+        },
       });
     }
   }
@@ -366,7 +427,10 @@ export function proposalProblems(target: ProposalTargetLike, payload: Record<str
       block: true,
       why: "כלל מוצע לא חל עד שמאשרים אותו, ולכן צריך לכתוב מה עושים בינתיים.",
       message: `חסר כלל ביניים: מה עושים עד שהכלל מאושר. משלימים בנוסח המוצע, או ${inField(EDIT_FIELD_LABELS.interimStatement)}, או דוחים.`,
+      // The suggested wording is what goes into the file, so it is shown
+      // as it will be written, in any language.
       fix: { label: SUGGESTED_INTERIM, edits: { interimStatement: SUGGESTED_INTERIM } },
+      say: { message: fw("interimMissing", { field: fieldWords("interimStatement") }), why: fw("whyInterim") },
     });
   }
   // Rule 1: anything short of confirmed says what would confirm it.
@@ -381,6 +445,10 @@ export function proposalProblems(target: ProposalTargetLike, payload: Record<str
       why: "בלי זה אף אחד לא יודע איך מאמתים את הפריט, והוא נשאר לא ודאי לתמיד.",
       message: `סומן לא ודאי או חסר, ולא כתוב מה יאמת אותו. משלימים בנוסח המוצע${hasToResolveField(target, payload) ? `, או ${inField(EDIT_FIELD_LABELS.toResolve)}` : ""}, או דוחים.`,
       fix: { label: toResolve, edits: { toResolve } },
+      say: {
+        message: hasToResolveField(target, payload) ? fw("toResolveMissingField", { field: fieldWords("toResolve") }) : fw("toResolveMissing"),
+        why: fw("whyToResolve"),
+      },
     });
   }
   // Spec 3.1: shown to the client only when nothing forbids it.
@@ -392,17 +460,35 @@ export function proposalProblems(target: ProposalTargetLike, payload: Record<str
         block: true,
         why: "הלקוח רואה בפורטל רק פריט שאין סיבה להסתיר ממנו.",
         message: `${why} מורידים את "גלוי ללקוח" בנוסח המוצע, או ${inField(EDIT_FIELD_LABELS.clientVisible)} בוחרים "לא", או דוחים.`,
-        fix: { label: 'בלי "גלוי ללקוח"', edits: { clientVisible: false } },
+        fix: { label: 'בלי "גלוי ללקוח"', edits: { clientVisible: false }, say: fw("withoutVisible") },
+        say: {
+          message: fw("visible", { reason: fw(s("sensitivity") === "SENSITIVE" ? "notShown.sensitive" : "notShown.doNotDisclose"), field: fieldWords("clientVisible") }),
+          why: fw("whyVisible"),
+        },
       });
     }
   }
   if (target === "PROCESS" && Array.isArray(payload.steps) && payload.steps.length) {
-    const draft = " (התהליך ייכנס כטיוטה, והנוהל לא יאושר עד שזה יתוקן.)";
+    const draft = PROCESS_DRAFT;
     const checks = blockingChecks({ steps: readSteps(payload.steps) }, []);
     // R3 on several steps is one line with the steps, not one per step
     // (3.11.2026: five identical lines said nothing the first did not).
     const r3 = checks.filter((c) => c.code === "R3" && c.step);
-    for (const c of checks.filter((c) => !(c.code === "R3" && c.step))) out.push({ code: c.code, message: `${c.message}${draft}` });
+    for (const c of checks.filter((c) => !(c.code === "R3" && c.step))) {
+      const k = c.keyed;
+      const check: FlagWordsValue = k
+        ? {
+            key: `clients.processes.checks.${k.key}`,
+            values: {
+              step: k.step ?? "",
+              tags: { join: (k.tags ?? []).map((x) => ({ key: `clients.processes.labels.actionTags.${x}` })) },
+              thresholds: (k.thresholds ?? []).join(", "),
+              secrets: { join: (k.secrets ?? []).map((x) => ({ key: `clients.processes.labels.secrets.${x}` })) },
+            },
+          }
+        : c.message;
+      out.push({ code: c.code, message: `${c.message}${draft}`, say: { message: fw("processCheck", { check }) } });
+    }
     if (r3.length) {
       const steps = r3.map((c) => c.step!);
       const edits = {
@@ -420,6 +506,16 @@ export function proposalProblems(target: ProposalTargetLike, payload: Record<str
         // The review's edit has no steps: the procedure's editor has the
         // field, on the process, once it is in the file.
         message: `${automatedStepsMessage(steps)} משלימים בנוסח המוצע, או אחרי האישור בנוהל של התהליך, ${steps.length === 1 ? "בשלב" : "בכל שלב"} בשדה "${VERIFICATION_FIELD_LABEL}".${draft}`,
+        say: {
+          message: fw("r3", {
+            count: steps.length,
+            steps:
+              steps.length === 1
+                ? { key: "clients.processes.checks.automatedNoVerification", values: { step: steps[0] } }
+                : fw("automatedSteps", { steps: steps.slice(0, -1).join(", "), last: String(steps[steps.length - 1]) }),
+          }),
+          why: fw("whyR3"),
+        },
         // The wording in full, step by step, before anyone presses.
         fix: { label: readSteps(payload.steps).flatMap((st, i) => (steps.includes(i + 1) ? [`שלב ${i + 1}: ${suggestedVerification(st.output)}`] : [])).join(" "), edits },
       });

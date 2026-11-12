@@ -23,6 +23,7 @@ import {
 } from "@/lib/approvals";
 import { rankApprovals } from "@/lib/next-steps";
 import { ApprovalRow } from "./ApprovalRow";
+import { procedureWords, stepTextWords, type LooseT } from "./procedure-words";
 import { BulkRules } from "./BulkRules";
 import { KnowledgeReview } from "../knowledge/KnowledgeReview";
 
@@ -55,6 +56,10 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
   // approvals.ts chose at runtime, so they are looked up untyped here;
   // ApprovalItemKey checks them against he.json where they are written.
   const tItems = t as unknown as (key: string, values?: Record<string, string | number>) => string;
+  // A process decision and a procedure's preview are worded from what lib
+  // gives as keys and data (./procedure-words.ts).
+  const tProc = (await getTranslations("clients.processes")) as unknown as LooseT;
+  const tPrev = (await getTranslations("approvals.preview")) as unknown as LooseT;
   const say = (m: ApprovalText): string =>
     tItems(
       `items.${m.key}`,
@@ -98,6 +103,17 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
   // process decision's words from lib/next-steps.ts).
   const rowOf = (i: ApprovalItem, showLabel: boolean) => {
     const w = i.screen ?? {};
+    const st = i.stepText;
+    const proc = i.procedureWords ? procedureWords(tProc, tPrev, i.procedureWords) : null;
+    const preview =
+      proc && i.preview
+        ? {
+            ...i.preview,
+            sections: i.preview.sections.map((sec) =>
+              sec.headingKey === "steps" ? { ...sec, lines: proc.steps } : sec.headingKey === "excepted" ? { ...sec, lines: proc.excepted } : sec
+            ),
+          }
+        : (i.preview ?? null);
     return {
       kind: i.kind,
       id: i.id,
@@ -105,24 +121,28 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
       clientId: i.clientId,
       clientName: i.clientName,
       title: w.title ? say(w.title) : i.title,
-      detail: w.detail ? say(w.detail) : i.detail,
+      detail: w.detail ? say(w.detail) : st ? stepTextWords(tProc, st.title, i.detail ?? "") : i.detail,
       waited: waited(i.since),
       by: i.by,
       // The way back from the item to this view, tab and client.
       href: withApprovalsBack(i.href, tab, clientId),
       actions: {
-        approve: i.actions.approve && w.approve ? say(w.approve) : i.actions.approve,
+        approve: i.actions.approve && w.approve ? say(w.approve) : i.actions.approve && st ? stepTextWords(tProc, st.fix, i.actions.approve) : i.actions.approve,
         reject: i.actions.reject ? { ...i.actions.reject, label: w.reject ? say(w.reject) : i.actions.reject.label } : null,
       },
       blocked: w.blocked ? say(w.blocked) : i.blocked,
-      failing: i.failing ?? null,
-      preview: i.preview ?? null,
+      failing: i.failing ? (proc?.problems ?? i.failing) : null,
+      preview,
       label: t(`kinds.${i.kind}`),
       tone: KIND_TONES[i.kind],
       showLabel,
-      recommend: w.recommend ? { text: say(w.recommend.text), why: w.recommend.why ? say(w.recommend.why) : null } : (i.recommend ?? null),
+      recommend: w.recommend
+        ? { text: say(w.recommend.text), why: w.recommend.why ? say(w.recommend.why) : null }
+        : i.recommend && st
+          ? { text: stepTextWords(tProc, st.recommend, i.recommend.text), why: i.recommend.why ? stepTextWords(tProc, st.why, i.recommend.why) : null }
+          : (i.recommend ?? null),
       op: i.op ?? null,
-      go: i.go ? { label: w.go ? say(w.go) : i.go.label, href: withApprovalsBack(i.go.href, tab, clientId) } : null,
+      go: i.go ? { label: w.go ? say(w.go) : st ? stepTextWords(tProc, st.fix, i.go.label) : i.go.label, href: withApprovalsBack(i.go.href, tab, clientId) } : null,
     };
   };
 

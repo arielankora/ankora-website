@@ -14,6 +14,8 @@ import {
   type ProposalTargetLike,
 } from "@/lib/knowledge-proposals";
 import { localDateKey } from "@/lib/timezone";
+import { flagText } from "@/lib/knowledge-flag-words";
+import type { FlagWords } from "@/lib/knowledge-proposals";
 import type { listOpenBatches } from "@/lib/app-domain/knowledge-proposals";
 import type { ReviewProposal, SourceDetails } from "./ReviewBatch";
 
@@ -23,7 +25,9 @@ import type { ReviewProposal, SourceDetails } from "./ReviewBatch";
 
 export type OpenBatch = Awaited<ReturnType<typeof listOpenBatches>>[number];
 
-export function reviewProposals(b: OpenBatch): ReviewProposal[] {
+/// `render` words a flag's keys (flagWordsRenderer over the reader's
+/// dictionary); without it, a flag shows the sentence it was stored with.
+export function reviewProposals(b: OpenBatch, render?: (w: FlagWords) => string): ReviewProposal[] {
   const fireflies =
     b.source && Array.isArray(b.source.externalRefs)
       ? ((b.source.externalRefs as { system?: string; id?: string }[]).find((r) => r?.system === "FIREFLIES")?.id ?? null)
@@ -51,7 +55,7 @@ export function reviewProposals(b: OpenBatch): ReviewProposal[] {
       sources: readSourceRefs(payload.sources).map(formatSourceRef),
       reason: p.reason,
       quote: p.quote,
-      flags,
+      flags: render ? flags.map((f) => ({ ...f, text: flagText(f, render) })) : flags,
       link: fireflies ? firefliesLink(fireflies, at) : null,
       existing: p.existing ? { body: p.existing.body } : null,
       alreadyIn: p.alreadyIn ? { body: p.alreadyIn.body, addsSources: p.alreadyIn.addsSources } : null,

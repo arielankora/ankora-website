@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { formatMinor } from "@/lib/money";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
@@ -322,6 +322,7 @@ export function PeoplePanel({
 }) {
   const { showToast } = useToast();
   const t = useTranslations("clients.people");
+  const locale = useLocale();
 
   async function removeContact(c: PanelContact) {
     const result = await removeClientContactAction(c.id, clientId);
@@ -408,7 +409,7 @@ export function PeoplePanel({
                     <p className="mt-1 text-xs text-app-text-secondary">
                       {t("organizations.perMonth", {
                         // As before: the amount reads the same in either language.
-                        amount: o.currency === "USD" ? `$${(o.monthlyCostMinor / 100).toLocaleString("en-US")}` : formatMinor(o.monthlyCostMinor) ?? "",
+                        amount: o.currency === "USD" ? `$${(o.monthlyCostMinor / 100).toLocaleString("en-US")}` : formatMinor(o.monthlyCostMinor, locale) ?? "",
                       })}
                     </p>
                   )}

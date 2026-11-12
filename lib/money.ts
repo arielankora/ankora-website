@@ -19,11 +19,16 @@ export function shekelsToMinor(value: string | number | null | undefined): numbe
 
 /// 14990 in, "149.90 ₪" out. Whole amounts lose the decimals, because
 /// "500 ₪" is what a person writes and "500.00 ₪" is what a system does.
-export function formatMinor(minor: number | null | undefined): string | null {
+///
+/// `locale` is the reader's Intl tag (ADR 0006: next-intl's locale, he-IL
+/// or en-IL). Hebrew keeps the sign after the number, as it always was;
+/// English puts it first ("₪149.90"). The default is Hebrew, for what is
+/// written for a client (the portal, a procedure document, the client file).
+export function formatMinor(minor: number | null | undefined, locale: string = "he-IL"): string | null {
   if (minor === null || minor === undefined) return null;
   const shekels = minor / 100;
   const text = Number.isInteger(shekels)
-    ? shekels.toLocaleString("he-IL")
-    : shekels.toLocaleString("he-IL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `${text} ₪`;
+    ? shekels.toLocaleString(locale)
+    : shekels.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return locale.startsWith("he") ? `${text} ₪` : `₪${text}`;
 }

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Download, ChevronDown } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 // Redesign direction A: replaces 3 separately stacked "ייצוא ל-CSV /
 // ל-Excel / ל-PDF" buttons/links (Time Entries, Reports, Client Portal
@@ -11,6 +12,7 @@ import { Download, ChevronDown } from "lucide-react";
 // as the old buttons did - no API route changes.
 export function ExportMenu({ baseHref, primary = false }: { baseHref: string; primary?: boolean }) {
   const [open, setOpen] = useState(false);
+  const t = useTranslations("shell.exportMenu");
 
   const items = [
     { format: undefined, label: "CSV" },
@@ -32,13 +34,13 @@ export function ExportMenu({ baseHref, primary = false }: { baseHref: string; pr
         }
       >
         <Download size={15} strokeWidth={1.75} />
-        ייצוא
+        {t("label")}
         <ChevronDown size={14} strokeWidth={1.75} />
       </button>
 
       {open && (
         <>
-          <button type="button" aria-label="סגירה" onClick={() => setOpen(false)} className="fixed inset-0 z-10" />
+          <button type="button" aria-label={t("close")} onClick={() => setOpen(false)} className="fixed inset-0 z-10" />
           <div
             role="menu"
             className="absolute end-0 z-20 mt-1.5 w-36 overflow-hidden rounded-lg border border-app-border bg-white shadow-lg"

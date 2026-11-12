@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
@@ -68,8 +68,8 @@ export type PanelSystem = {
 
 type VaultOption = { id: string; systemName: string };
 
-function money(minor: number, currency: string | null) {
-  return currency === "USD" ? `$${(minor / 100).toLocaleString("en-US")}` : formatMinor(minor);
+function money(minor: number, currency: string | null, locale: string) {
+  return currency === "USD" ? `$${(minor / 100).toLocaleString("en-US")}` : formatMinor(minor, locale);
 }
 
 function SystemForm({
@@ -235,6 +235,7 @@ export function SystemsPanel({
 }) {
   const { showToast } = useToast();
   const t = useTranslations("clients.systems");
+  const locale = useLocale();
   const gaps = systems.filter((s) => isAccessGap(s.accessStatus)).length;
 
   async function remove(s: PanelSystem) {
@@ -280,7 +281,7 @@ export function SystemsPanel({
                   {s.clientAdmin && <p className="mt-1 text-xs text-app-text-secondary">{t("clientAdminLine", { value: s.clientAdmin })}</p>}
                   {s.billingCostMinor !== null && (
                     <p className="mt-1 text-xs text-app-text-secondary">
-                      {money(s.billingCostMinor, s.billingCurrency)} {s.billingCycle && s.billingCycle !== "OTHER" ? t(`per.${s.billingCycle}`) : ""}
+                      {money(s.billingCostMinor, s.billingCurrency, locale)} {s.billingCycle && s.billingCycle !== "OTHER" ? t(`per.${s.billingCycle}`) : ""}
                       {s.cardLast4 && <span dir="ltr"> · ****{s.cardLast4}</span>}
                       {s.invoiceTo && (
                         <>

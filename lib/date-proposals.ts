@@ -44,15 +44,33 @@ export const DatePayload = z.object({
 export type DatePayloadValue = z.infer<typeof DatePayload>;
 
 /// What is missing for the date to ever occur, in words; null when whole.
-export function dateShapeError(p: Record<string, unknown>): string | null {
+/// What a proposed date lacks, as a code (ADR 0006: the review card words
+/// it as knowledge.flags.dateShape.<code>), in the order it is checked.
+export type DateShapeProblem = "onceDate" | "annualDate" | "monthlyDay" | "weeklyDay" | "intervalMonthlyOnly" | "pastDate";
+
+const DATE_SHAPE_MESSAGES: Record<DateShapeProblem, string> = {
+  onceDate: "מועד חד-פעמי צריך תאריך.",
+  annualDate: "מועד שנתי צריך יום וחודש (date).",
+  monthlyDay: "מועד חודשי צריך יום בחודש.",
+  weeklyDay: "מועד שבועי צריך יום בשבוע.",
+  intervalMonthlyOnly: '"כל כמה חודשים" רק למועד חודשי.',
+  pastDate: "התאריך כבר עבר.",
+};
+
+export function dateShapeProblem(p: Record<string, unknown>): DateShapeProblem | null {
   const r = p.recurrence;
   const has = (k: string) => p[k] !== undefined && p[k] !== null && p[k] !== "";
-  if ((r === "ONCE" || r === "ANNUAL") && !has("date")) return r === "ONCE" ? "מועד חד-פעמי צריך תאריך." : "מועד שנתי צריך יום וחודש (date).";
-  if (r === "MONTHLY" && !has("dayOfMonth") && !(Array.isArray(p.dayAlternatives) && p.dayAlternatives.length)) return "מועד חודשי צריך יום בחודש.";
-  if (r === "WEEKLY" && !has("weekday")) return "מועד שבועי צריך יום בשבוע.";
-  if (has("intervalMonths") && r !== "MONTHLY") return '"כל כמה חודשים" רק למועד חודשי.';
-  if (r === "ONCE" && has("date") && new Date(`${p.date}T00:00:00Z`).getTime() < Date.now() - 86_400_000) return "התאריך כבר עבר.";
+  if ((r === "ONCE" || r === "ANNUAL") && !has("date")) return r === "ONCE" ? "onceDate" : "annualDate";
+  if (r === "MONTHLY" && !has("dayOfMonth") && !(Array.isArray(p.dayAlternatives) && p.dayAlternatives.length)) return "monthlyDay";
+  if (r === "WEEKLY" && !has("weekday")) return "weeklyDay";
+  if (has("intervalMonths") && r !== "MONTHLY") return "intervalMonthlyOnly";
+  if (r === "ONCE" && has("date") && new Date(`${p.date}T00:00:00Z`).getTime() < Date.now() - 86_400_000) return "pastDate";
   return null;
+}
+
+export function dateShapeError(p: Record<string, unknown>): string | null {
+  const problem = dateShapeProblem(p);
+  return problem ? DATE_SHAPE_MESSAGES[problem] : null;
 }
 
 /// The schedule the dates engine takes (createImportantDate).

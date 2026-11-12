@@ -1,7 +1,7 @@
 "use client";
 import { decisionAnchor } from "@/lib/approval-links";
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useFormState, useFormStatus } from "react-dom";
 import { createDecisionAction, cancelDecisionAction } from "../actions";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -81,6 +81,7 @@ export function DecisionsPanel({
 }) {
   const { showToast } = useToast();
   const t = useTranslations("clients.decisions");
+  const locale = useLocale();
   const [state, formAction] = useFormState(createDecisionAction, {});
   const [open, setOpen] = useState(false);
 
@@ -104,7 +105,7 @@ export function DecisionsPanel({
 
       <p className="mt-1.5 text-[12px] text-app-text-tertiary">
         {ceilingMinor !== null
-          ? t("ceiling", { amount: formatMinor(ceilingMinor) ?? "" })
+          ? t("ceiling", { amount: formatMinor(ceilingMinor, locale) ?? "" })
           : t("noCeiling")}
       </p>
 
@@ -189,7 +190,7 @@ export function DecisionsPanel({
             <li key={d.id} id={decisionAnchor(d.id)} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
               <span dir="auto" className="text-sm text-app-text-primary">{d.question}</span>
               <span className="flex items-center gap-2.5 text-[11.5px] text-app-text-tertiary">
-                {formatMinor(d.amountMinor) && <span dir="ltr" className="font-jbmono">{formatMinor(d.amountMinor)}</span>}
+                {formatMinor(d.amountMinor, locale) && <span dir="ltr" className="font-jbmono">{formatMinor(d.amountMinor, locale)}</span>}
                 {d.status === "ANSWERED" && d.answer && (
                   <span className="text-app-success">{t("chosen", { option: d.answer.optionLabel })}</span>
                 )}

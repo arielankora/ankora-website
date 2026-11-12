@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "@/lib/domain-error";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createImportantDate } from "@/lib/app-domain/important-dates";
@@ -17,7 +18,7 @@ import type { ProcessDateSchedule } from "@/lib/process-date-schedule";
 /// run the date opens is the work, and a daily date would remind daily.
 export async function addProcessDate(actor: User, processId: string, schedule: ProcessDateSchedule) {
   const process = await prisma.process.findFirst({ where: { id: processId, deletedAt: null }, select: { id: true, clientId: true, code: true, title: true, ownerId: true } });
-  if (!process) throw new Error("התהליך לא נמצא.");
+  if (!process) throw new DomainError("processes.notFound", "התהליך לא נמצא.");
   await assertClientAccess(actor, process.clientId);
   const created = await createImportantDate(actor, {
     clientId: process.clientId,

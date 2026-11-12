@@ -6,7 +6,7 @@ import { useToast } from "@/components/app/toast/ToastProvider";
 import { toggleTaskDoneAction } from "./actions";
 import { useTaskList } from "./TaskListProvider";
 import { taskHref } from "./list-query";
-import { waitingTitle } from "@/lib/app-domain/portal-labels";
+import { waitingTitle } from "./waiting-title";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 
 // Tasks phase 4, the board.
@@ -217,6 +217,7 @@ export function TaskBoard({ cards }: { cards: BoardCard[] }) {
 
 function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
   const t = useTranslations("tasks.board");
+  const tBlock = useTranslations("tasks.detail.block");
   const format = useFormatter();
   const { listQuery } = useTaskList();
   const overdue =
@@ -263,7 +264,7 @@ function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
       {card.blockedOn && (
         <p className="mt-1.5 flex items-center gap-1 text-[11.5px] text-app-warning">
           <Hourglass size={12} strokeWidth={1.8} />
-          {waitingTitle(card.blockedOn, card.blockedSince)}
+          {waitingTitle(tBlock, card.blockedOn, card.blockedSince)}
         </p>
       )}
 

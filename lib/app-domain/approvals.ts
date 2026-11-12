@@ -252,6 +252,7 @@ async function procedures(s: Scope): Promise<ApprovalItem[]> {
       preview,
       blocked: held ? "הנוהל לא עובר את הבדיקות. מתקנים אותו בתהליך, ואז מאשרים." : separated,
       failing: held ? preview.problems : undefined,
+      procedureWords: { steps, systemName: systems, checks },
       actions: { approve: held || separated ? null : "אישור הנוהל", reject: null },
       recommend: held
         ? { text: "לתקן בתהליך, ואז לאשר", why: "נוהל שלא עומד בכללים של הלקוח לא מאושר." }
@@ -462,6 +463,7 @@ async function processes(s: Scope): Promise<ApprovalItem[]> {
         href,
         actions: { approve: step.fix.kind === "op" ? step.fix.label : null, reject: null },
         recommend: step.recommend ? { text: step.recommend, why: step.why } : null,
+        stepText: step.text,
         op: step.fix.kind === "op" ? step.fix.op : null,
         go: step.fix.kind === "op" ? null : { label: step.fix.label, href },
         blocking: step.blocking,

@@ -4,7 +4,7 @@
 // Pure: the domain reads the version, the rule or the plan, and this
 // turns it into lines; the row shows them under "הצגת ...".
 
-import { ACTION_TAG_LABELS, CHANNEL_LABELS, STEP_MODE_LABELS, mergeStepChecks, type ProcessStep } from "@/lib/process-rules";
+import { ACTION_TAG_LABELS, CHANNEL_LABELS, STEP_MODE_LABELS, mergeStepChecks, type KeyedCheck, type ProcessStep } from "@/lib/process-rules";
 import { formatAmount } from "@/lib/policy-params";
 
 /// The screen's words for the toggle and the headings are keys under
@@ -22,7 +22,7 @@ export type ApprovalPreview = {
   problems: string[];
 };
 
-export type PreviewCheck = { message: string; severity: string; excepted?: boolean; code?: string; step?: number };
+export type PreviewCheck = { message: string; severity: string; excepted?: boolean; code?: string; step?: number; keyed?: KeyedCheck };
 
 /// One line per step, as the client's page writes it.
 export function stepLine(st: ProcessStep, i: number, systemName: Record<string, string>): string {
