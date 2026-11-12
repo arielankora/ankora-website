@@ -135,7 +135,11 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
                 aria-label={t("prevWeek")}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-app-border text-app-text-primary hover:border-gold"
               >
-                ›
+                {/* The glyph points back in the reading direction: right in
+                    Hebrew, turned around left to right (ADR 0006). */}
+                <span aria-hidden="true" className="inline-block ltr:rotate-180">
+                  ›
+                </span>
               </Link>
               <span className="text-[13.5px] font-medium text-app-text-primary">
                 {t("weekRange", { start: formatDay(format, days[0]), end: formatDay(format, days[6]) })}
@@ -145,7 +149,9 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
                 aria-label={t("nextWeek")}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-app-border text-app-text-primary hover:border-gold"
               >
-                ‹
+                <span aria-hidden="true" className="inline-block ltr:rotate-180">
+                  ‹
+                </span>
               </Link>
             </div>
             <span className="text-[12.5px] text-app-text-secondary">
