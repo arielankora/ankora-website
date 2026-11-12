@@ -384,5 +384,22 @@
       "already_revoked": "החיבור לא נמצא, או שכבר נותק.",
       "no_user": "לא צוין משתמש."
     }
+  },
+  "tasks": {
+    "common": {
+      "status": {
+        "OPEN": "פתוחה",
+        "IN_PROGRESS": "בביצוע",
+        "PENDING_APPROVAL": "ממתינה לאישור",
+        "DONE": "הושלמה",
+        "ARCHIVED": "בארכיון"
+      },
+      "priority": {
+        "LOW": "נמוכה",
+        "NORMAL": "רגילה",
+        "HIGH": "גבוהה",
+        "URGENT": "דחופה"
+      }
+    }
   }
 }

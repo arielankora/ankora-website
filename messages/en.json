@@ -384,5 +384,22 @@
       "already_revoked": "The connection was not found, or is already disconnected.",
       "no_user": "No user was specified."
     }
+  },
+  "tasks": {
+    "common": {
+      "status": {
+        "OPEN": "Open",
+        "IN_PROGRESS": "In progress",
+        "PENDING_APPROVAL": "Awaiting approval",
+        "DONE": "Done",
+        "ARCHIVED": "Archived"
+      },
+      "priority": {
+        "LOW": "Low",
+        "NORMAL": "Normal",
+        "HIGH": "High",
+        "URGENT": "Urgent"
+      }
+    }
   }
 }
