@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { decideVendorCheckAction } from "./actions";
 
@@ -9,6 +10,7 @@ import { decideVendorCheckAction } from "./actions";
 // business day opens the run anyway (lib/app-domain/vendor-detections.ts).
 
 export function VendorCheckCard({ taskId, detectionId, vendor, matched }: { taskId: string; detectionId: string; vendor: string | null; matched: string }) {
+  const t = useTranslations("tasks.detail.vendor");
   const { showToast } = useToast();
   const [name, setName] = useState(vendor ?? "");
   const [pending, setPending] = useState(false);
@@ -19,23 +21,23 @@ export function VendorCheckCard({ taskId, detectionId, vendor, matched }: { task
     const result = await decideVendorCheckAction({ taskId, detectionId, decision, vendor: name.trim() || null });
     setPending(false);
     if (!result.ok) {
-      showToast({ tone: "error", title: "לא נשמר", description: result.error });
+      showToast({ tone: "error", title: t("notSaved"), description: result.error });
       return;
     }
     showToast({
       tone: "success",
-      title: result.status === "OPENED" ? "נפתחה ריצת P8" : result.status === "EXISTING" ? "נרשם בריצה הקיימת של הספק" : "נרשם שזה לא ספק חדש",
+      title: result.status === "OPENED" ? t("opened") : result.status === "EXISTING" ? t("existing") : t("notVendorSaved"),
     });
   }
 
   return (
     <section className="rounded-2xl border border-gold/40 bg-gold/[0.04] p-5" data-testid="vendor-check">
-      <h2 className="text-sm font-medium text-app-text-primary">נראה כמו חיבור של ספק חדש</h2>
+      <h2 className="text-sm font-medium text-app-text-primary">{t("title")}</h2>
       <p className="mt-1 text-xs text-app-text-secondary">
-        זוהה: {matched}. אם הספק ייגש למידע של לקוחות דרך האפליקציה או השירות, נפתחת ריצת P8 (הוספת תת-מעבד). בלי תשובה תוך יום עסקים, הריצה נפתחת לבד.
+        {t("body", { matched })}
       </p>
       <label className="mt-3 block text-xs text-app-text-secondary">
-        שם הספק
+        {t("name")}
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -51,7 +53,7 @@ export function VendorCheckCard({ taskId, detectionId, vendor, matched }: { task
           onClick={() => decide("OPEN_RUN")}
           className="min-h-[44px] rounded-full bg-app-accent px-5 py-2 text-sm font-medium text-app-text-primary disabled:opacity-50"
         >
-          לפתוח ריצת P8
+          {t("openRun")}
         </button>
         <button
           type="button"
@@ -59,7 +61,7 @@ export function VendorCheckCard({ taskId, detectionId, vendor, matched }: { task
           onClick={() => decide("NOT_A_VENDOR")}
           className="min-h-[44px] text-sm text-app-text-secondary hover:text-app-text-primary disabled:opacity-50"
         >
-          לא ספק חדש
+          {t("notVendor")}
         </button>
       </div>
     </section>

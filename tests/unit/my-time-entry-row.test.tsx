@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { intlWrapper } from "../helpers/intl";
 
 // The row on "הזמן שלי" that edits and deletes an entry.
 //
@@ -75,7 +76,7 @@ describe("editing an entry", () => {
       ok: true,
       entry: { ...entry, note: "after", isEdited: true, updatedAt: "2026-10-13T08:05:00.000Z" },
     });
-    render(<EntryRow entry={entry} />);
+    render(<EntryRow entry={entry} />, { wrapper: intlWrapper() });
     await editNoteTo("after");
 
     expect(document.querySelector("form")).toBeNull();
@@ -86,7 +87,7 @@ describe("editing an entry", () => {
 
   it("stays open with the server's sentence when the save is refused", async () => {
     updateMyEntryAction.mockResolvedValue({ error: "חלון העריכה העצמית הסתיים; נדרשת הרשאת מנהל." });
-    render(<EntryRow entry={entry} />);
+    render(<EntryRow entry={entry} />, { wrapper: intlWrapper() });
     await editNoteTo("after");
 
     expect(document.querySelector("form")).not.toBeNull();
@@ -99,7 +100,7 @@ describe("editing an entry", () => {
       ok: true,
       entry: { ...entry, note: "after", isEdited: true, updatedAt: "2026-10-13T08:05:00.000Z" },
     });
-    const { rerender } = render(<EntryRow entry={entry} />);
+    const { rerender } = render(<EntryRow entry={entry} />, { wrapper: intlWrapper() });
     await editNoteTo("after");
 
     rerender(<EntryRow entry={{ ...entry, note: "changed elsewhere", updatedAt: "2026-10-13T08:10:00.000Z" }} />);
@@ -110,7 +111,7 @@ describe("editing an entry", () => {
 describe("deleting an entry", () => {
   it("takes the row off the screen on the server's word, and asks the screen to re-read once", async () => {
     deleteMyEntryAction.mockResolvedValue({ ok: true });
-    render(<EntryRow entry={entry} />);
+    render(<EntryRow entry={entry} />, { wrapper: intlWrapper() });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "מחיקה" }));
     });
@@ -123,7 +124,7 @@ describe("deleting an entry", () => {
 
   it("keeps the row and says why when the delete is refused", async () => {
     deleteMyEntryAction.mockResolvedValue({ error: "אין הרשאה." });
-    render(<EntryRow entry={entry} />);
+    render(<EntryRow entry={entry} />, { wrapper: intlWrapper() });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "מחיקה" }));
     });

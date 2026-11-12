@@ -17,15 +17,7 @@ export const SORT_KEYS = ["client", "title", "category", "due", "assignee", "sta
 export type SortKey = (typeof SORT_KEYS)[number];
 export type Sort = { key: SortKey; desc: boolean } | null;
 
-export const SORT_LABELS: Record<SortKey, string> = {
-  client: "לקוח",
-  title: "משימה",
-  category: "קטגוריה",
-  due: "תאריך",
-  assignee: "אחראי",
-  status: "סטטוס",
-  supervisor: "מפקח",
-};
+// Each column's name is tasks.list.sort.columns.<key> in the dictionary.
 
 /// The order a person reads statuses in, the same as the row's select:
 /// not yet started, in hand, waiting, finished. Alphabetical would put

@@ -6,6 +6,8 @@
 // tool and the task screen both reach the database through it, so a plan
 // written by Claude and a plan edited by hand obey the same limits.
 
+import { DomainError, type DomainErrorValues } from "./domain-error";
+
 /// Long enough for a real plan with its reasoning, short enough that a
 /// paste of a whole email thread is refused rather than stored as "the
 /// plan". About eight printed pages of Hebrew.
@@ -22,10 +24,11 @@ export const MAX_STEP_LENGTH = 200;
 /// person, in Hebrew, and both callers show it as it is: the screen next
 /// to the editor, and the MCP tools back to the model, which relays it.
 /// A separate class so the MCP error mapper can tell it apart from an
-/// unexpected failure, which it must never echo.
-export class TaskPlanRuleError extends Error {
-  constructor(message: string) {
-    super(message);
+/// unexpected failure, which it must never echo. A DomainError (ADR 0006),
+/// so a screen can word it in the reader's language from `code`.
+export class TaskPlanRuleError extends DomainError {
+  constructor(code: string, message: string, values?: DomainErrorValues) {
+    super(code, message, values);
     this.name = "TaskPlanRuleError";
   }
 }
@@ -38,8 +41,8 @@ export const TOO_MANY_STEPS_MESSAGE = `אפשר עד ${MAX_PLAN_STEPS} שלבי�
 /// Throws a sentence a person can act on when it cannot be stored.
 export function normalizePlanBody(body: string): string {
   const text = body.replace(/\r\n?/g, "\n").trim();
-  if (!text) throw new TaskPlanRuleError(EMPTY_PLAN_MESSAGE);
-  if (text.length > MAX_PLAN_LENGTH) throw new TaskPlanRuleError(PLAN_TOO_LONG_MESSAGE);
+  if (!text) throw new TaskPlanRuleError("taskPlans.empty", EMPTY_PLAN_MESSAGE);
+  if (text.length > MAX_PLAN_LENGTH) throw new TaskPlanRuleError("taskPlans.tooLong", PLAN_TOO_LONG_MESSAGE, { max: String(MAX_PLAN_LENGTH) });
   return text;
 }
 
@@ -62,7 +65,7 @@ export function normalizePlanSteps(steps: readonly string[] | undefined | null):
     seen.add(line);
     out.push(line.length > MAX_STEP_LENGTH ? `${line.slice(0, MAX_STEP_LENGTH - 1).trimEnd()}…` : line);
   }
-  if (out.length > MAX_PLAN_STEPS) throw new TaskPlanRuleError(TOO_MANY_STEPS_MESSAGE);
+  if (out.length > MAX_PLAN_STEPS) throw new TaskPlanRuleError("taskPlans.tooManySteps", TOO_MANY_STEPS_MESSAGE, { max: String(MAX_PLAN_STEPS) });
   return out;
 }
 

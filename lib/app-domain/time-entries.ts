@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { assertCan, can, canManageClients, ForbiddenError } from "@/lib/app-auth/permissions";
+import { DomainError } from "@/lib/domain-error";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { computeEntryBillableSeconds } from "@/lib/app-domain/billing";
 import { flagAffectedCyclesRecalculated } from "@/lib/app-domain/hour-banks";
@@ -49,7 +50,7 @@ const SELF_EDIT_WINDOW_HOURS = 48;
 /// client/category/time range).
 type OverlapConflict = TimeEntry & { client: { name: string }; category: { name: string } };
 
-export class OverlapError extends Error {
+export class OverlapError extends DomainError {
   constructor(
     public readonly conflicting: OverlapConflict,
     /// True when the conflict is against an entry for the EXACT SAME
@@ -60,7 +61,7 @@ export class OverlapError extends Error {
     /// time-entry-overlap.ts).
     public readonly sameClient: boolean
   ) {
-    super("This time range overlaps an existing entry.");
+    super("timeEntries.overlap", "This time range overlaps an existing entry.");
     this.name = "OverlapError";
   }
 }
@@ -72,37 +73,37 @@ export class OverlapError extends Error {
 /// person. Each carries the running timers so the caller can name them.
 export type RunningTimerSummary = { id: string; clientId: string; clientName: string; startAt: Date };
 
-export class SameClientTimerError extends Error {
+export class SameClientTimerError extends DomainError {
   constructor(public readonly running: RunningTimerSummary) {
-    super("A timer is already running for this client.");
+    super("timeEntries.sameClientTimer", "A timer is already running for this client.");
     this.name = "SameClientTimerError";
   }
 }
 
-export class TimerLimitError extends Error {
+export class TimerLimitError extends DomainError {
   constructor(public readonly running: RunningTimerSummary[]) {
-    super(`At most ${MAX_PARALLEL_TIMERS} timers can run at the same time.`);
+    super("timeEntries.timerLimit", `At most ${MAX_PARALLEL_TIMERS} timers can run at the same time.`, { max: String(MAX_PARALLEL_TIMERS) });
     this.name = "TimerLimitError";
   }
 }
 
-export class ParallelTimerConfirmationRequiredError extends Error {
+export class ParallelTimerConfirmationRequiredError extends DomainError {
   constructor(public readonly running: RunningTimerSummary[]) {
-    super("Another timer is running. Starting this one runs both in parallel and needs confirmation.");
+    super("timeEntries.parallelTimerConfirmation", "Another timer is running. Starting this one runs both in parallel and needs confirmation.");
     this.name = "ParallelTimerConfirmationRequiredError";
   }
 }
 
-export class EditWindowExpiredError extends Error {
+export class EditWindowExpiredError extends DomainError {
   constructor() {
-    super("The self-edit window for this entry has expired; a manager must make this change.");
+    super("timeEntries.editWindowExpired", "The self-edit window for this entry has expired; a manager must make this change.");
     this.name = "EditWindowExpiredError";
   }
 }
 
-export class BackdateReasonRequiredError extends Error {
+export class BackdateReasonRequiredError extends DomainError {
   constructor() {
-    super("A reason is required when reporting time for a previous day.");
+    super("timeEntries.backdateReasonRequired", "A reason is required when reporting time for a previous day.");
     this.name = "BackdateReasonRequiredError";
   }
 }
@@ -116,9 +117,9 @@ export class BackdateReasonRequiredError extends Error {
 /// A task says what the work was, so an entry on a task needs nothing
 /// more. An entry on no task needs a few words. The message is Hebrew
 /// because every screen surfaces `err.message` as-is.
-export class NoteRequiredError extends Error {
+export class NoteRequiredError extends DomainError {
   constructor() {
-    super("דיווח שלא משויך למשימה צריך הערה קצרה: מה נעשה עבור הלקוח.");
+    super("timeEntries.noteRequired", "דיווח שלא משויך למשימה צריך הערה קצרה: מה נעשה עבור הלקוח.");
     this.name = "NoteRequiredError";
   }
 }
@@ -138,9 +139,9 @@ function assertNoteOrTask(note: string | null | undefined, taskId: string | null
 /// time-TRACKING app has no legitimate case for logging hours that
 /// haven't happened yet. Thrown by both createManualEntry and
 /// updateTimeEntry whenever the resulting startAt/endAt lands after now.
-export class FutureEntryError extends Error {
+export class FutureEntryError extends DomainError {
   constructor() {
-    super("Time entries cannot be dated in the future.");
+    super("timeEntries.futureEntry", "Time entries cannot be dated in the future.");
     this.name = "FutureEntryError";
   }
 }
@@ -152,9 +153,9 @@ export class FutureEntryError extends Error {
 /// someone else changed this entry after this editor loaded it. The
 /// update is rejected before any write happens; the caller is expected to
 /// refresh and re-apply their edit rather than silently overwriting.
-export class ConflictError extends Error {
+export class ConflictError extends DomainError {
   constructor(public readonly current: TimeEntry) {
-    super("This entry was changed by someone else since you opened it.");
+    super("timeEntries.conflict", "This entry was changed by someone else since you opened it.");
     this.name = "ConflictError";
   }
 }
@@ -201,10 +202,10 @@ async function assertActiveTargets(actor: User, clientId: string, categoryId: st
     prisma.category.findUniqueOrThrow({ where: { id: categoryId } }),
   ]);
   if (!hasOverride && (client.status !== "ACTIVE" || !category.active)) {
-    throw new Error("This client or category is inactive.");
+    throw new DomainError("timeEntries.inactiveTarget", "This client or category is inactive.");
   }
   if (category.visibility === "CLIENT" && category.clientId !== clientId) {
-    throw new Error("This category does not belong to the selected client.");
+    throw new DomainError("timeEntries.categoryOtherClient", "This category does not belong to the selected client.");
   }
 }
 
@@ -221,9 +222,9 @@ async function assertActiveTargets(actor: User, clientId: string, categoryId: st
 async function assertTaskMatchesClient(clientId: string, taskId: string | null | undefined) {
   if (!taskId) return;
   const task = await prisma.task.findFirst({ where: { id: taskId, deletedAt: null } });
-  if (!task) throw new Error("Task not found.");
+  if (!task) throw new DomainError("timeEntries.taskNotFound", "Task not found.");
   if (task.clientId !== clientId) {
-    throw new Error("That task belongs to a different client than this time entry.");
+    throw new DomainError("timeEntries.taskOtherClient", "That task belongs to a different client than this time entry.");
   }
 }
 
@@ -231,7 +232,7 @@ async function assertTaskMatchesClient(clientId: string, taskId: string | null |
 /// active timer) there is nothing to compare yet.
 function assertValidRange(startAt: Date, endAt: Date | null) {
   if (endAt && startAt.getTime() >= endAt.getTime()) {
-    throw new Error("Start time must be before end time.");
+    throw new DomainError("timeEntries.invalidRange", "Start time must be before end time.");
   }
 }
 
@@ -634,11 +635,11 @@ export async function moveEntryIntoOpenBank(actor: User, timeEntryId: string) {
 
   const hit = await closedBankForStoppedEntry(entry);
   if (!hit || !hit.open || !entry.endAt) {
-    throw new Error("הרישום הזה לא רץ בזמן שהחבילה או המחזור נסגרו, ולכן אי אפשר להעביר אותו.");
+    throw new DomainError("timeEntries.notStoppedAcrossClosure", "הרישום הזה לא רץ בזמן שהחבילה או המחזור נסגרו, ולכן אי אפשר להעביר אותו.");
   }
   const moved = movedRange(hit.open, entry.startAt, entry.endAt);
   if (moved.endAt.getTime() > Date.now() + FUTURE_ENTRY_GRACE_MS) {
-    throw new Error("החבילה הפתוחה נפתחה לפני פחות זמן מאורך הרישום, ולכן הוא עוד לא נכנס בה. אפשר להעביר אותו מאוחר יותר.");
+    throw new DomainError("timeEntries.openBankTooRecentToMove", "החבילה הפתוחה נפתחה לפני פחות זמן מאורך הרישום, ולכן הוא עוד לא נכנס בה. אפשר להעביר אותו מאוחר יותר.");
   }
   const overlap = await assertNoOverlap(actor, entry.userId, entry.clientId, moved.startAt, moved.endAt, false, entry.id);
   const note = appendNoteLine(entry.note, movedEntryNoteLine(entry.startAt, hit.closed));
@@ -779,7 +780,7 @@ export async function updateActiveTimerNote(actor: User, timeEntryId: string, no
     where: { id: timeEntryId, userId: actor.id, endAt: null, deletedAt: null },
     data: { note: note.trim() || null },
   });
-  if (count === 0) throw new Error("Active timer not found.");
+  if (count === 0) throw new DomainError("timeEntries.activeTimerNotFound", "Active timer not found.");
 }
 
 // ---------------------------------------------------------------------
@@ -835,7 +836,8 @@ export async function createManualEntry(
     if (input.intoOpenBank && hit.open) {
       const moved = movedRange(hit.open, input.startAt, input.endAt);
       if (moved.endAt.getTime() > Date.now() + FUTURE_ENTRY_GRACE_MS) {
-        throw new Error(
+        throw new DomainError(
+          "timeEntries.openBankTooRecentToRecord",
           "החבילה הפתוחה נפתחה לפני פחות זמן מאורך הרישום, ולכן הוא עוד לא נכנס בה. אפשר לרשום אותו מאוחר יותר."
         );
       }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { OPEN_STATUSES, listTasks, supervisionCounts } from "@/lib/app-domain/tasks";
@@ -18,7 +19,7 @@ import { TaskListView } from "./TaskListView";
 import { TasksViewSwitch } from "./TasksViewSwitch";
 import { TASKS_VIEW_COOKIE, resolveTasksView } from "@/lib/tasks-view";
 import { listQueryOf } from "./list-query";
-import { MINE_OPTIONS, mineFilters, mineParam, parseMineScope, type MineScope } from "./mine-scope";
+import { MINE_SCOPES, mineFilters, mineParam, parseMineScope, type MineScope } from "./mine-scope";
 import { ListChecks } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 
@@ -36,18 +37,16 @@ export const metadata = { robots: { index: false, follow: false } };
 // list that grows by every task ever closed is not a working view, and
 // the closed ones have their own pill. ARCHIVED still has no pill and is
 // reachable only through a row's own status control, as before.
-const FILTER_PILLS: { value: TaskStatus | "ACTIVE"; label: string }[] = [
-  { value: "ACTIVE", label: "פעילות" },
-  { value: "OPEN", label: "פתוחות" },
-  { value: "IN_PROGRESS", label: "בטיפול" },
-  { value: "PENDING_APPROVAL", label: "ממתינות לאישור" },
-  { value: "DONE", label: "הושלמו" },
-];
+// The pills' names are tasks.list.pills.<value> in the dictionary.
+const FILTER_PILLS = ["ACTIVE", "OPEN", "IN_PROGRESS", "PENDING_APPROVAL", "DONE"] as const satisfies readonly (
+  | TaskStatus
+  | "ACTIVE"
+)[];
 
 /// The pill values that are real statuses, derived from the list above so
 /// a pill added there is selectable without a second edit.
-const FILTER_STATUSES = new Set(
-  FILTER_PILLS.map((p) => p.value).filter((v): v is TaskStatus => v !== "ACTIVE"),
+const FILTER_STATUSES = new Set<TaskStatus>(
+  FILTER_PILLS.filter((v): v is Exclude<(typeof FILTER_PILLS)[number], "ACTIVE"> => v !== "ACTIVE"),
 );
 
 /// "פעילות": every status that is still somebody's work.
@@ -92,6 +91,7 @@ export default async function TasksPage(props: {
 }) {
   const searchParams = await props.searchParams;
   const user = await requireUser();
+  const t = await getTranslations("tasks.list");
 
   if (!can(user.role, "time_entry.create_self")) {
     return (
@@ -243,9 +243,9 @@ export default async function TasksPage(props: {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-app-text-primary">משימות</h1>
+          <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
           <p className="mt-1 text-sm text-app-text-secondary">
-            משימות פתוחות ואחרונות, לפי לקוח, קטגוריה וסטטוס.
+            {t("subtitle")}
           </p>
         </div>
 
@@ -281,7 +281,7 @@ export default async function TasksPage(props: {
               "משימה חדשה" sits in the top bar and opens this same drawer
               (openKey), and two buttons for one action is one too many.
               The top bar is hidden below md, so a phone keeps this one. */}
-            <Drawer triggerLabel="משימה" title="משימה חדשה" openKey={NEW_TASK_KEY} triggerClassName="md:hidden">
+            <Drawer triggerLabel={t("newTaskTrigger")} title={t("newTaskTitle")} openKey={NEW_TASK_KEY} triggerClassName="md:hidden">
               <CreateTaskForm clients={clients} categories={categories} />
             </Drawer>
           </div>
@@ -305,15 +305,15 @@ export default async function TasksPage(props: {
               >
                 {FILTER_PILLS.map((pill) => (
                   <Link
-                    key={pill.value}
-                    href={pillHref(pill.value)}
+                    key={pill}
+                    href={pillHref(pill)}
                     className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
-                      activePill === pill.value
+                      activePill === pill
                         ? "bg-app-surface-nav text-cream"
                         : "text-app-text-secondary hover:text-app-text-primary"
                     }`}
                   >
-                    {pill.label}
+                    {t(`pills.${pill}`)}
                   </Link>
                 ))}
               </div>
@@ -327,14 +327,14 @@ export default async function TasksPage(props: {
               data-testid="mine-scope"
               className="flex max-w-full overflow-x-auto rounded-full border border-app-border bg-white p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-              {MINE_OPTIONS.map((option) => (
+              {MINE_SCOPES.map((scope) => ({ scope, label: t(`mine.${scope}`) })).map((option) => (
                 <Link
                   key={option.scope}
                   href={href({ mine: option.scope })}
                   aria-current={mineScope === option.scope ? "true" : undefined}
                   aria-label={
                     option.scope === "supervising" && supervision.pending > 0
-                      ? `${option.label}, ${supervision.pending} ממתינות לאישורך`
+                      ? t("supervisingPending", { label: option.label, count: supervision.pending })
                       : undefined
                   }
                   className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
@@ -371,7 +371,7 @@ export default async function TasksPage(props: {
                     : "border-app-border bg-white text-app-text-secondary hover:text-app-text-primary"
                 }`}
               >
-                לפי לקוח
+                {t("groupByClient")}
               </Link>
             )}
           </div>
@@ -382,9 +382,9 @@ export default async function TasksPage(props: {
               leaving somebody to wonder where March went. */}
           {!board && listStatus === "DONE" && !allClosed && (
             <p className="text-[12.5px] text-app-text-secondary">
-              מוצגות משימות שהושלמו ב-{DONE_WINDOW_DAYS} הימים האחרונים.{" "}
+              {t("doneWindow", { days: DONE_WINDOW_DAYS })}{" "}
               <Link href={allClosedHref} className="text-app-text-accent underline underline-offset-4">
-                להצגת כל ההיסטוריה
+                {t("showAllHistory")}
               </Link>
             </p>
           )}

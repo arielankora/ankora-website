@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { CheckCircle2, Clock, Eye, EyeOff, Hourglass, Pause, Play, Share2, ShieldCheck, Undo2 } from "lucide-react";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
 import { formatDuration } from "@/lib/time-entry-format";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { useActiveTimer } from "@/components/app/ActiveTimerProvider";
 import { renderMarkdownLite } from "@/lib/markdown-lite";
-import { TASK_BLOCKER_LABELS, waitingTitle } from "@/lib/app-domain/portal-labels";
 import {
   startTimerForTaskAction,
   stopTimerForTaskAction,
@@ -14,28 +14,14 @@ import {
 } from "./actions";
 import { moveEntryIntoOpenBankAction } from "../../timer/actions";
 import { TaskManualEntry } from "./TaskManualEntry";
-import { TaskShare, type SharePerson } from "./TaskShare";
+import { MESSAGE_PRIORITY_LABELS, MESSAGE_STATUS_LABELS, TaskShare, type SharePerson } from "./TaskShare";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
-import { AI_EXCLUSION_SOURCE_LABEL, type AiExclusionSource } from "@/lib/ai-exclusion";
+import type { AiExclusionSource } from "@/lib/ai-exclusion";
 
-// Mirrors the label maps in lib/app-domain/tasks.ts. Duplicated rather
-// than imported for the same reason TaskRow duplicates its own: that
-// module starts with `import "server-only"`, which a "use client" file
-// can never pull in.
-const STATUS_LABELS: Record<TaskStatus, string> = {
-  OPEN: "פתוחה",
-  IN_PROGRESS: "בביצוע",
-  PENDING_APPROVAL: "ממתינה לאישור",
-  DONE: "הושלמה",
-  ARCHIVED: "בארכיון",
-};
-
-const PRIORITY_LABELS: Record<TaskPriority, string> = {
-  LOW: "נמוכה",
-  NORMAL: "רגילה",
-  HIGH: "גבוהה",
-  URGENT: "דחופה",
-};
+// ADR 0006: status and priority labels come from tasks.common in the
+// reader's language. The share message is content for a colleague and
+// keeps its Hebrew labels (MESSAGE_*_LABELS in TaskShare).
+const BLOCKERS: TaskBlocker[] = ["CLIENT", "SUPPLIER", "INTERNAL", "OTHER"];
 
 const PRIORITY_CLASSES: Record<TaskPriority, string> = {
   LOW: "bg-app-neutral-soft text-app-text-secondary",
@@ -124,6 +110,8 @@ export function TaskDetail({
   /// Google account even when the browser is signed in to several.
   viewerEmail?: string | null;
 }) {
+  const t = useTranslations("tasks.detail");
+  const tc = useTranslations("tasks.common");
   const { showToast } = useToast();
   const [pending, setPending] = useState(false);
   /// Which of the two panels under the header is open, if either:
@@ -178,7 +166,7 @@ export function TaskDetail({
       setClientOutcome(task.clientOutcome ?? "");
       setSupervisorId(task.supervisorId ?? "");
       setRequiresApproval(task.requiresApproval);
-      showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
+      showToast({ tone: "error", title: t("toast.updateFailed"), description: result.error });
       return false;
     }
     setStatus(result.status);
@@ -205,7 +193,7 @@ export function TaskDetail({
     }
     const previous = status;
     setStatus(next);
-    const ok = await write({ status: next }, { title: `הסטטוס: ${STATUS_LABELS[next]}`, description: title });
+    const ok = await write({ status: next }, { title: t("toast.status", { label: tc(`status.${next}`) }), description: title });
     if (!ok) setStatus(previous);
   }
 
@@ -221,7 +209,7 @@ export function TaskDetail({
     await write(
       { status: next, clientOutcome: outcome },
       {
-        title: next === "DONE" ? "המשימה הושלמה" : "נשלחה לאישור",
+        title: next === "DONE" ? t("toast.completed") : t("toast.sentForApproval"),
         description: outcome,
       }
     );
@@ -244,7 +232,7 @@ export function TaskDetail({
                     setTitle(task.title);
                     return;
                   }
-                  await write({ title: next }, { title: "הכותרת עודכנה", description: next });
+                  await write({ title: next }, { title: t("toast.titleUpdated"), description: next });
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") e.currentTarget.blur();
@@ -258,13 +246,14 @@ export function TaskDetail({
             ) : (
               <button
                 type="button"
+                dir="auto"
                 onClick={() => setEditingTitle(true)}
                 className="w-full text-start text-lg font-medium text-app-text-primary hover:text-app-text-secondary"
               >
                 {title}
               </button>
             )}
-            <p className="mt-1 text-[13px] text-app-text-secondary">{task.clientName}</p>
+            <p dir="auto" className="mt-1 text-[13px] text-app-text-secondary">{task.clientName}</p>
           </div>
 
           {/* Ariel, 19.10.2026: the timer was here, the hours it had
@@ -286,7 +275,7 @@ export function TaskDetail({
                 className="flex items-center gap-2 rounded-full border border-app-border bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary hover:border-app-border-strong"
               >
                 <Share2 size={15} />
-                שיתוף
+                {t("header.share")}
               </button>
               <button
                 type="button"
@@ -295,7 +284,7 @@ export function TaskDetail({
                 className="flex items-center gap-2 rounded-full border border-app-border bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary hover:border-app-border-strong"
               >
                 <Clock size={15} />
-                דיווח ידני
+                {t("header.manualEntry")}
               </button>
               <TimerButton task={task} activeTimers={activeTimers} disabled={pending} />
             </div>
@@ -304,13 +293,12 @@ export function TaskDetail({
               data-testid="task-reported-total"
               className="text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
             >
-              {task.reportedSeconds > 0 ? (
-                <>
-                  דווחו עד כה <span className="font-jbmono text-app-text-primary">{formatDuration(task.reportedSeconds)}</span> שעות
-                </>
-              ) : (
-                "עוד לא דווח זמן"
-              )}
+              {task.reportedSeconds > 0
+                ? t.rich("header.reportedSoFar", {
+                    duration: formatDuration(task.reportedSeconds),
+                    num: (chunks) => <span className="font-jbmono text-app-text-primary">{chunks}</span>,
+                  })
+                : t("header.nothingReported")}
             </a>
           </div>
         </div>
@@ -323,9 +311,9 @@ export function TaskDetail({
             task={{
               title,
               clientName: task.clientName,
-              statusLabel: STATUS_LABELS[status],
+              statusLabel: MESSAGE_STATUS_LABELS[status],
               dueDate: task.dueDate,
-              priorityLabel: priority === "HIGH" || priority === "URGENT" ? PRIORITY_LABELS[priority] : null,
+              priorityLabel: priority === "HIGH" || priority === "URGENT" ? MESSAGE_PRIORITY_LABELS[priority] : null,
             }}
             url={taskUrl}
             people={shareWith}
@@ -337,18 +325,18 @@ export function TaskDetail({
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
           <Select
-            label="סטטוס"
+            label={t("fields.status")}
             value={status}
             disabled={pending}
-            options={STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_LABELS[s] }))}
+            options={STATUS_OPTIONS.map((s) => ({ value: s, label: tc(`status.${s}`) }))}
             onChange={(v) => changeStatus(v as TaskStatus)}
           />
           <Select
-            label="עדיפות"
+            label={t("fields.priority")}
             value={priority}
             disabled={pending}
             badgeClass={PRIORITY_CLASSES[priority]}
-            options={PRIORITY_OPTIONS.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }))}
+            options={PRIORITY_OPTIONS.map((p) => ({ value: p, label: tc(`priority.${p}`) }))}
             onChange={async (v) => {
               const next = v as TaskPriority;
               const previous = priority;
@@ -358,48 +346,48 @@ export function TaskDetail({
               // to wonder whether they still need to call.
               const messaged =
                 next === "URGENT" && previous !== "URGENT" && task.assignedToId && task.assignedToId !== viewerId
-                  ? `${task.assignedToName ?? "האחראי"} קיבל/ה הודעה עם קישור למשימה.`
+                  ? t("toast.urgentMessaged", { name: task.assignedToName ?? t("toast.assigneeFallback") })
                   : title;
               const ok = await write(
                 { priority: next },
-                { title: `העדיפות: ${PRIORITY_LABELS[next]}`, description: messaged }
+                { title: t("toast.priority", { label: tc(`priority.${next}`) }), description: messaged }
               );
               if (!ok) setPriority(previous);
             }}
           />
           <Select
-            label="אחראי"
+            label={t("fields.assignee")}
             value={task.assignedToId ?? ""}
             disabled={pending}
-            options={[{ value: "", label: "ללא אחראי" }, ...people.map((p) => ({ value: p.id, label: p.name }))]}
+            options={[{ value: "", label: t("fields.noAssignee") }, ...people.map((p) => ({ value: p.id, label: p.name }))]}
             onChange={async (v) => {
               const name = people.find((p) => p.id === v)?.name;
               await write(
                 { assignedToId: v || null },
-                { title: name ? `המשימה שויכה ל${name}` : "השיוך הוסר", description: title }
+                { title: name ? t("toast.assignedTo", { name }) : t("toast.unassigned"), description: title }
               );
             }}
           />
           <Select
-            label="קטגוריה"
+            label={t("fields.category")}
             value={task.categoryId ?? ""}
             disabled={pending}
-            options={[{ value: "", label: "ללא קטגוריה" }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
+            options={[{ value: "", label: t("fields.noCategory") }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
             onChange={async (v) =>
-              write({ categoryId: v || null }, { title: "הקטגוריה עודכנה", description: title })
+              write({ categoryId: v || null }, { title: t("toast.categoryUpdated"), description: title })
             }
           />
           <label className="flex items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary">
-            תאריך יעד
+            {t("fields.dueDate")}
             <input
               type="date"
-              aria-label="תאריך יעד"
+              aria-label={t("fields.dueDate")}
               disabled={pending}
               defaultValue={task.dueDate ? task.dueDate.slice(0, 10) : ""}
               onChange={async (e) =>
                 write(
                   { dueDate: e.target.value || null },
-                  { title: e.target.value ? "תאריך היעד עודכן" : "תאריך היעד הוסר", description: title }
+                  { title: e.target.value ? t("toast.dueDateUpdated") : t("toast.dueDateRemoved"), description: title }
                 )
               }
               className="bg-transparent text-app-text-primary outline-none"
@@ -419,15 +407,15 @@ export function TaskDetail({
                 const ok = await write(
                   { mappingTask: next },
                   {
-                    title: next ? "סומנה כמשימת מיפוי" : "הסימון כמשימת מיפוי הוסר",
-                    description: "מה שנלמד במשימת מיפוי מוצע לתיק הלקוח לפני הסגירה.",
+                    title: next ? t("toast.mappingOn") : t("toast.mappingOff"),
+                    description: t("toast.mappingHint"),
                   }
                 );
                 if (!ok) setMappingTask(!next);
               }}
               className="h-3.5 w-3.5 accent-app-text-primary"
             />
-            משימת מיפוי: הממצאים מוצעים לתיק הלקוח לפני הסגירה
+            {t("mapping.label")}
           </label>
         )}
 
@@ -435,7 +423,7 @@ export function TaskDetail({
             above, it is a fact here, not a toggle. */}
         {task.aiExclusionSource === "CLIENT" || task.aiExclusionSource === "PARENT_TASK" ? (
           <p className="mt-3 w-fit rounded-full border border-app-border bg-app-surface-sunken px-3 py-1.5 text-[13px] text-app-text-secondary">
-            בלי AI: {AI_EXCLUSION_SOURCE_LABEL[task.aiExclusionSource]}. מטופל בידי אדם בלבד.
+            {t("ai.inherited", { source: t(`ai.source.${task.aiExclusionSource}`) })}
           </p>
         ) : (
           aiExcluded !== null && (
@@ -450,16 +438,16 @@ export function TaskDetail({
                   const ok = await write(
                     { aiExcluded: next },
                     {
-                      title: next ? "המשימה סומנה בלי AI" : "הסימון בלי AI הוסר",
-                      description: next ? "המשימה, השלבים והמסמכים שלה לא יעברו דרך מערכות AI." : title,
+                      title: next ? t("toast.aiOn") : t("toast.aiOff"),
+                      description: next ? t("toast.aiOnHint") : title,
                     }
                   );
                   if (!ok) setAiExcluded(!next);
                 }}
                 className="h-3.5 w-3.5 accent-app-text-primary"
               />
-              בלי AI: המשימה מטופלת בידי אדם בלבד
-              {aiExcluded && !canClearAiExclusion && <span className="text-app-text-tertiary">(רק מנהל יכול להסיר)</span>}
+              {t("ai.label")}
+              {aiExcluded && !canClearAiExclusion && <span className="text-app-text-tertiary">{t("ai.managerOnly")}</span>}
             </label>
           )
         )}
@@ -481,14 +469,14 @@ export function TaskDetail({
 
       <section className="rounded-2xl border border-app-border bg-white p-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-app-text-secondary">תיאור</h2>
+          <h2 className="text-sm font-medium text-app-text-secondary">{t("description.title")}</h2>
           {!editingDescription && (
             <button
               type="button"
               onClick={() => setEditingDescription(true)}
               className="text-[12.5px] text-app-text-accent hover:text-app-text-primary"
             >
-              {description ? "עריכה" : "הוספת תיאור"}
+              {description ? t("description.edit") : t("description.add")}
             </button>
           )}
         </div>
@@ -498,16 +486,17 @@ export function TaskDetail({
             <textarea
               autoFocus
               rows={7}
+              dir="auto"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="מה צריך לעשות, כתובת, מספר אסמכתא, מה כבר נוסה."
+              placeholder={t("description.placeholder")}
               className="w-full rounded-lg border border-app-border-strong px-3 py-2 text-[14px] leading-relaxed text-app-text-primary outline-none focus:border-app-accent"
             />
             {/* The subset, said once where somebody is typing it. Naming
                 what is supported is cheaper than letting a person
                 discover that a heading does nothing. */}
             <p className="text-[12px] text-app-text-tertiary">
-              אפשר **מודגש**, *נטוי*, `קוד`, רשימות עם - או 1. וקישורים [טקסט](כתובת).
+              {t("description.markdownHint")}
             </p>
             <div className="flex gap-2">
               <button
@@ -519,12 +508,12 @@ export function TaskDetail({
                   if (next === (task.description ?? "")) return;
                   await write(
                     { description: next || null },
-                    { title: next ? "התיאור עודכן" : "התיאור הוסר", description: title }
+                    { title: next ? t("toast.descriptionUpdated") : t("toast.descriptionRemoved"), description: title }
                   );
                 }}
                 className="rounded-full bg-app-surface-nav px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-50"
               >
-                שמירה
+                {t("description.save")}
               </button>
               <button
                 type="button"
@@ -534,12 +523,13 @@ export function TaskDetail({
                 }}
                 className="rounded-full border border-app-border px-4 py-1.5 text-[13px] text-app-text-secondary"
               >
-                ביטול
+                {t("description.cancel")}
               </button>
             </div>
           </div>
         ) : description ? (
           <div
+            dir="auto"
             className="mt-3 space-y-2 text-[14px] leading-relaxed text-app-text-primary [&_p]:m-0"
             // The only dangerouslySetInnerHTML in this screen, and the
             // reason lib/markdown-lite.ts escapes the whole input before
@@ -552,16 +542,17 @@ export function TaskDetail({
           // rather than "אין תיאור": it is usually the whole brief.
           <div className="mt-3">
             <p className="text-xs text-app-text-tertiary">
-              {leadComment.author ? `מהתגובה של ${leadComment.author}` : "מהתגובה הראשונה"}
+              {leadComment.author ? t("description.fromCommentBy", { name: leadComment.author }) : t("description.fromFirstComment")}
             </p>
             <div
+              dir="auto"
               className="mt-1.5 space-y-2 border-s-2 border-gold/50 ps-3 text-[14px] leading-relaxed text-app-text-primary [&_p]:m-0"
               // Same renderer, same escaping, as the description above.
               dangerouslySetInnerHTML={{ __html: renderMarkdownLite(leadComment.body) }}
             />
           </div>
         ) : (
-          <p className="mt-3 text-sm text-app-text-tertiary">אין תיאור. כל מה שנמצא היום בוואטסאפ שייך לכאן.</p>
+          <p className="mt-3 text-sm text-app-text-tertiary">{t("description.empty")}</p>
         )}
       </section>
 
@@ -569,7 +560,7 @@ export function TaskDetail({
         <section role="status" className="rounded-2xl border border-app-warning/30 bg-app-warning-soft p-5">
           <p className="flex items-center gap-2 text-[13.5px] font-medium text-app-text-primary">
             <Hourglass size={15} className="text-app-warning" />
-            עוד לא בתיק הלקוח
+            {t("procedureReminder.title")}
           </p>
           <p className="mt-1 text-[12.5px] text-app-text-secondary">{procedureReminder.text}</p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -577,14 +568,14 @@ export function TaskDetail({
               href={procedureReminder.reviewHref}
               className="rounded-full bg-app-surface-nav px-4 py-1.5 text-[13px] font-medium text-cream"
             >
-              למסך הבדיקה
+              {t("procedureReminder.review")}
             </a>
             <button
               type="button"
               onClick={() => setProcedureReminder(null)}
               className="text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
             >
-              הבנתי
+              {t("procedureReminder.dismiss")}
             </button>
           </div>
         </section>
@@ -649,6 +640,8 @@ function Supervision({
   ) => Promise<boolean>;
   onChangeStatus: (next: TaskStatus) => Promise<void>;
 }) {
+  const t = useTranslations("tasks.detail");
+  const format = useFormatter();
   const waiting = status === "PENDING_APPROVAL";
   const finished = status === "DONE" || status === "ARCHIVED";
   const supervisorName = people.find((p) => p.id === supervisorId)?.name ?? task.supervisorName;
@@ -657,15 +650,15 @@ function Supervision({
     <section className="rounded-2xl border border-app-border bg-white p-5">
       <h2 className="flex items-center gap-2 text-sm font-medium text-app-text-secondary">
         <ShieldCheck size={15} strokeWidth={1.75} className="text-app-text-tertiary" />
-        פיקוח ואישור
+        {t("supervision.title")}
       </h2>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Select
-          label="מפקח"
+          label={t("supervision.supervisor")}
           value={supervisorId}
           disabled={pending}
-          options={[{ value: "", label: "ללא מפקח" }, ...people.map((p) => ({ value: p.id, label: p.name }))]}
+          options={[{ value: "", label: t("supervision.noSupervisor") }, ...people.map((p) => ({ value: p.id, label: p.name }))]}
           onChange={async (v) => {
             const name = people.find((p) => p.id === v)?.name;
             await write(
@@ -676,7 +669,7 @@ function Supervision({
               // stopped: clearing the supervisor clears the requirement
               // with it.
               { supervisorId: v || null, ...(v ? {} : { requiresApproval: false }) },
-              { title: name ? `${name} מפקח על המשימה` : "הפיקוח הוסר", description: task.title }
+              { title: name ? t("supervision.supervisorSet", { name }) : t("supervision.supervisorRemoved"), description: task.title }
             );
           }}
         />
@@ -690,14 +683,14 @@ function Supervision({
               write(
                 { requiresApproval: e.target.checked },
                 {
-                  title: e.target.checked ? "המשימה תדרוש אישור" : "המשימה לא דורשת אישור",
+                  title: e.target.checked ? t("supervision.approvalRequired") : t("supervision.approvalNotRequired"),
                   description: task.title,
                 }
               )
             }
             className="h-3.5 w-3.5 accent-app-text-primary"
           />
-          דורשת אישור לפני סגירה
+          {t("supervision.requiresApproval")}
         </label>
       </div>
 
@@ -705,16 +698,16 @@ function Supervision({
           click it. A control that does nothing and explains nothing is
           the thing people file a bug about. */}
       {!supervisorId && !requiresApproval && (
-        <p className="mt-2 text-[12px] text-app-text-tertiary">בחרו מפקח כדי לדרוש אישור.</p>
+        <p className="mt-2 text-[12px] text-app-text-tertiary">{t("supervision.pickSupervisorHint")}</p>
       )}
 
       {waiting && (
         <div className="mt-4 rounded-xl border border-app-border bg-app-surface-sunken p-4">
           {canApprove ? (
             <>
-              <p className="text-[13.5px] font-medium text-app-text-primary">המשימה מחכה לאישור שלך.</p>
+              <p className="text-[13.5px] font-medium text-app-text-primary">{t("supervision.awaitingYou")}</p>
               {task.clientOutcome && (
-                <p className="mt-1 text-[12.5px] text-app-text-secondary">{task.clientOutcome}</p>
+                <p dir="auto" className="mt-1 text-[12.5px] text-app-text-secondary">{task.clientOutcome}</p>
               )}
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -724,7 +717,7 @@ function Supervision({
                   className="inline-flex items-center gap-1.5 rounded-full bg-app-surface-nav px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
                 >
                   <CheckCircle2 size={14} />
-                  אישור וסגירה
+                  {t("supervision.approveAndClose")}
                 </button>
                 <button
                   type="button"
@@ -733,14 +726,14 @@ function Supervision({
                   className="inline-flex items-center gap-1.5 rounded-full border border-app-border px-4 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-40"
                 >
                   <Undo2 size={14} />
-                  החזרה לביצוע
+                  {t("supervision.backToProgress")}
                 </button>
               </div>
             </>
           ) : (
             <>
               <p className="text-[13.5px] text-app-text-primary">
-                {supervisorName ? `ממתינה לאישור של ${supervisorName}.` : "ממתינה לאישור."}
+                {supervisorName ? t("supervision.awaitingNamed", { name: supervisorName }) : t("supervision.awaiting")}
               </p>
               <button
                 type="button"
@@ -749,7 +742,7 @@ function Supervision({
                 className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-app-border px-4 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-40"
               >
                 <Undo2 size={14} />
-                ביטול השליחה
+                {t("supervision.cancelSubmission")}
               </button>
             </>
           )}
@@ -768,14 +761,17 @@ function Supervision({
           className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-app-surface-nav px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
         >
           <ShieldCheck size={14} />
-          שליחה לאישור
+          {t("supervision.submit")}
         </button>
       )}
 
       {task.approvedAt && status === "DONE" && (
         <p className="mt-4 flex items-center gap-1.5 text-[12.5px] text-app-success">
           <CheckCircle2 size={14} />
-          אושרה על ידי {task.approvedByName ?? "המערכת"} ב{formatDate(task.approvedAt)}
+          {t("supervision.approvedBy", {
+            name: task.approvedByName ?? t("supervision.system"),
+            date: formatDate(format, task.approvedAt),
+          })}
         </p>
       )}
     </section>
@@ -783,10 +779,12 @@ function Supervision({
 }
 
 function Timestamps({ task }: { task: TaskDetailData }) {
+  const t = useTranslations("tasks.detail.timestamps");
+  const format = useFormatter();
   const rows: { label: string; value: string | null }[] = [
-    { label: "נפתחה", value: task.createdAt },
-    { label: "יצאה לדרך", value: task.startedAt },
-    { label: "הושלמה", value: task.completedAt },
+    { label: t("created"), value: task.createdAt },
+    { label: t("started"), value: task.startedAt },
+    { label: t("completed"), value: task.completedAt },
   ];
   return (
     <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-2 border-t border-app-border pt-4 text-[12.5px]">
@@ -795,20 +793,16 @@ function Timestamps({ task }: { task: TaskDetailData }) {
         .map((r) => (
           <div key={r.label} className="flex gap-1.5">
             <dt className="text-app-text-tertiary">{r.label}</dt>
-            <dd className="text-app-text-secondary">{formatDate(r.value!)}</dd>
+            <dd className="text-app-text-secondary">{formatDate(format, r.value!)}</dd>
           </div>
         ))}
     </dl>
   );
 }
 
-function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("he-IL", {
-    day: "numeric",
-    month: "numeric",
-    year: "2-digit",
-    timeZone: "Asia/Jerusalem",
-  }).format(new Date(iso));
+/// In the reader's locale and time zone (ADR 0006).
+function formatDate(format: ReturnType<typeof useFormatter>, iso: string): string {
+  return format.dateTime(new Date(iso), { day: "numeric", month: "numeric", year: "2-digit" });
 }
 
 function Select({
@@ -881,6 +875,7 @@ function BlockSection({
   ) => Promise<boolean>;
   isClosed: boolean;
 }) {
+  const t = useTranslations("tasks.detail.block");
   const [open, setOpen] = useState(false);
   const [on, setOn] = useState<TaskBlocker>(task.blockedOn ?? "CLIENT");
   const [reason, setReason] = useState(task.blockedReason ?? "");
@@ -890,7 +885,7 @@ function BlockSection({
   async function save() {
     const ok = await write(
       { block: { on, reason: reason.trim() || null } },
-      { title: TASK_BLOCKER_LABELS[on], description: reason.trim() || task.title }
+      { title: t(`on.${on}`), description: reason.trim() || task.title }
     );
     if (ok) setOpen(false);
   }
@@ -898,15 +893,15 @@ function BlockSection({
   return (
     <section className="rounded-2xl border border-app-border bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-medium text-app-text-secondary">ממתינים למשהו?</h2>
+        <h2 className="text-sm font-medium text-app-text-secondary">{t("title")}</h2>
         {blocked ? (
           <button
             type="button"
             disabled={pending}
-            onClick={() => write({ block: null }, { title: "המשימה חזרה לטיפול", description: task.title })}
+            onClick={() => write({ block: null }, { title: t("resumed"), description: task.title })}
             className="rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-50"
           >
-            כבר לא ממתינים
+            {t("notWaitingAnymore")}
           </button>
         ) : (
           !isClosed && (
@@ -917,7 +912,7 @@ function BlockSection({
               className="flex items-center gap-1.5 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-50"
             >
               <Hourglass size={14} />
-              {open ? "ביטול" : "סימון כממתין"}
+              {open ? t("cancel") : t("mark")}
             </button>
           )
         )}
@@ -927,23 +922,22 @@ function BlockSection({
         <div className="mt-3">
           <p className="flex items-center gap-2 text-[13.5px] text-app-text-primary">
             <Hourglass size={15} className="text-app-warning" />
-            {waitingTitle(task.blockedOn!, task.blockedSince)}
+            {waitingTitle(t, task.blockedOn!, task.blockedSince)}
           </p>
           {task.blockedReason ? (
-            <p className="mt-1 text-[12.5px] text-app-text-secondary">{task.blockedReason}</p>
+            <p dir="auto" className="mt-1 text-[12.5px] text-app-text-secondary">{task.blockedReason}</p>
           ) : (
             <p className="mt-1 text-[12.5px] text-app-text-tertiary">
-              לא נכתבה סיבה. מי שיפתח את המשימה בעוד שבוע לא ידע למה היא עצרה.
+              {t("noReason")}
             </p>
           )}
         </div>
       ) : isClosed ? (
-        <p className="mt-2 text-[12.5px] text-app-text-tertiary">משימה שהושלמה לא ממתינה לאף אחד.</p>
+        <p className="mt-2 text-[12.5px] text-app-text-tertiary">{t("closed")}</p>
       ) : (
         !open && (
           <p className="mt-2 text-[12.5px] text-app-text-secondary">
-            לא ממתינה לאף אחד. אם העבודה עצרה כי מחכים לתשובה, כדאי לסמן: המדד של ההבטחות התקועות
-            מפריד בין מה שתקוע אצלנו למה שתקוע אצלם.
+            {t("notWaiting")}
           </p>
         )
       )}
@@ -951,7 +945,7 @@ function BlockSection({
       {open && !blocked && (
         <div className="mt-3 space-y-2.5">
           <div className="flex flex-wrap gap-1.5">
-            {(Object.keys(TASK_BLOCKER_LABELS) as TaskBlocker[]).map((key) => (
+            {BLOCKERS.map((key) => (
               <button
                 key={key}
                 type="button"
@@ -963,7 +957,7 @@ function BlockSection({
                     : "border-app-border bg-white text-app-text-secondary hover:border-gold"
                 }`}
               >
-                {TASK_BLOCKER_LABELS[key]}
+                {t(`on.${key}`)}
               </button>
             ))}
           </div>
@@ -971,13 +965,14 @@ function BlockSection({
             value={reason}
             disabled={pending}
             onChange={(e) => setReason(e.target.value)}
-            aria-label="סיבת ההמתנה"
-            placeholder="למה עצרנו, במשפט. לא חובה, ושווה."
+            dir="auto"
+            aria-label={t("reasonLabel")}
+            placeholder={t("reasonPlaceholder")}
             className="w-full rounded-lg border border-app-border-strong px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-app-accent"
           />
           {on === "CLIENT" && task.clientVisible && (
             <p className="text-[12px] text-app-text-secondary">
-              הסיבה נשארת פנימית. מה שהלקוח רואה תחת &quot;מחכה לך&quot; כותבים ב&quot;מה הלקוח רואה&quot;, בשדה &quot;מה מבקשים מהלקוח&quot;.
+              {t("clientHint")}
             </p>
           )}
           <button
@@ -986,7 +981,7 @@ function BlockSection({
             onClick={save}
             className="rounded-full bg-app-surface-nav px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
           >
-            שמירה
+            {t("save")}
           </button>
         </div>
       )}
@@ -1025,13 +1020,14 @@ function ClientSection({
   ) => Promise<boolean>;
   isDone: boolean;
 }) {
+  const t = useTranslations("tasks.detail.client");
   const [clientTitle, setClientTitle] = useState(task.clientTitle ?? "");
   const [clientRequest, setClientRequest] = useState(task.clientRequest ?? "");
 
   return (
     <section className="rounded-2xl border border-app-border bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-medium text-app-text-secondary">מה הלקוח רואה</h2>
+        <h2 className="text-sm font-medium text-app-text-secondary">{t("title")}</h2>
         <button
           type="button"
           disabled={pending}
@@ -1046,7 +1042,7 @@ function ClientSection({
                 ...(clientVisible && task.blockedOn === "CLIENT" ? { block: null } : {}),
               },
               {
-                title: clientVisible ? "המשימה הוסרה מהפורטל" : "המשימה מוצגת ללקוח",
+                title: clientVisible ? t("hiddenToast") : t("shownToast"),
                 description: clientTitle || task.title,
               }
             )
@@ -1054,15 +1050,16 @@ function ClientSection({
           className="flex items-center gap-1.5 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-50"
         >
           {clientVisible ? <Eye size={14} /> : <EyeOff size={14} />}
-          {clientVisible ? "מוצגת בפורטל" : "פנימית"}
+          {clientVisible ? t("visible") : t("internal")}
         </button>
       </div>
 
       {clientVisible && (
         <div className="mt-4 space-y-4">
           <div>
-            <label className="text-[12.5px] text-app-text-tertiary">הכותרת שהלקוח קורא</label>
+            <label className="text-[12.5px] text-app-text-tertiary">{t("titleLabel")}</label>
             <input
+              dir="auto"
               value={clientTitle}
               disabled={pending}
               onChange={(e) => setClientTitle(e.target.value)}
@@ -1070,7 +1067,7 @@ function ClientSection({
                 if (clientTitle.trim() === (task.clientTitle ?? "")) return;
                 await write(
                   { clientTitle: clientTitle.trim() || null },
-                  { title: "הכותרת ללקוח עודכנה", description: clientTitle.trim() || task.title }
+                  { title: t("titleUpdated"), description: clientTitle.trim() || task.title }
                 );
               }}
               placeholder={task.title}
@@ -1082,8 +1079,9 @@ function ClientSection({
               them, so it lives here with the other things they read, and
               not in the block reason, which stays ours. */}
           <div>
-            <label className="text-[12.5px] text-app-text-tertiary">מה מבקשים מהלקוח (מוצג תחת &quot;מחכה לך&quot;)</label>
+            <label className="text-[12.5px] text-app-text-tertiary">{t("requestLabel")}</label>
             <input
+              dir="auto"
               value={clientRequest}
               disabled={pending}
               onChange={(e) => setClientRequest(e.target.value)}
@@ -1091,20 +1089,21 @@ function ClientSection({
                 if (clientRequest.trim() === (task.clientRequest ?? "")) return;
                 await write(
                   { clientRequest: clientRequest.trim() || null },
-                  { title: "הבקשה ללקוח עודכנה", description: clientRequest.trim() || task.title }
+                  { title: t("requestUpdated"), description: clientRequest.trim() || task.title }
                 );
               }}
-              placeholder="במשפט אחד, ישירות ללקוח: מה לעשות, איפה, וכמה זמן זה לוקח."
+              placeholder={t("requestPlaceholder")}
               className="mt-1 w-full rounded-lg border border-app-border px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-app-accent"
             />
           </div>
 
           <div>
             <label className="text-[12.5px] text-app-text-tertiary">
-              משפט התוצאה{isDone ? "" : " (נדרש כדי לסגור)"}
+              {isDone ? t("outcomeLabel") : t("outcomeLabelRequired")}
             </label>
             <textarea
               rows={2}
+              dir="auto"
               value={clientOutcome}
               disabled={pending}
               onChange={(e) => setClientOutcome(e.target.value)}
@@ -1121,10 +1120,10 @@ function ClientSection({
                 }
                 await write(
                   { clientOutcome: next || null },
-                  { title: "משפט התוצאה עודכן", description: next || task.title }
+                  { title: t("outcomeUpdated"), description: next || task.title }
                 );
               }}
-              placeholder="במשפט אחד, בשפה של הלקוח: מה קרה בפועל."
+              placeholder={t("outcomePlaceholder")}
               className="mt-1 w-full rounded-lg border border-app-border px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-app-accent"
             />
           </div>
@@ -1135,10 +1134,10 @@ function ClientSection({
         <div className="mt-4 rounded-xl border border-app-warning/30 bg-app-warning-soft p-4">
           <p className="flex items-center gap-2 text-[13.5px] font-medium text-app-text-primary">
             <Hourglass size={15} className="text-app-warning" />
-            {closingTo === "DONE" ? "לפני הסגירה: מה קרה בפועל?" : "לפני השליחה לאישור: מה קרה בפועל?"}
+            {closingTo === "DONE" ? t("beforeClose") : t("beforeSubmit")}
           </p>
           <p className="mt-1 text-[12.5px] text-app-text-secondary">
-            המשפט הזה הוא מה שהלקוח קורא בפורטל ומה שנכנס לסיכום החודשי.
+            {t("outcomeExplainer")}
           </p>
           <textarea
             autoFocus
@@ -1146,7 +1145,8 @@ function ClientSection({
             // Named apart from the outcome field above it: both write the
             // same column, and a test (or a screen reader) needs to know
             // which one is being answered.
-            aria-label="משפט התוצאה לפני סגירה"
+            dir="auto"
+            aria-label={t("outcomeBeforeCloseLabel")}
             value={clientOutcome}
             onChange={(e) => setClientOutcome(e.target.value)}
             className="mt-3 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-app-accent"
@@ -1164,14 +1164,14 @@ function ClientSection({
                   exactly when this button is used, since the write before
                   it raised one. A screen reader hears two identical
                   buttons that do very different things. */}
-              {closingTo === "DONE" ? "סגירת המשימה" : "שליחה לאישור"}
+              {closingTo === "DONE" ? t("closeTask") : t("submit")}
             </button>
             <button
               type="button"
               onClick={onCancelClose}
               className="rounded-full border border-app-border px-4 py-1.5 text-[13px] text-app-text-secondary"
             >
-              ביטול
+              {t("cancel")}
             </button>
           </div>
         </div>
@@ -1211,6 +1211,7 @@ function TimerButton({
   activeTimers: TaskActiveTimer[];
   disabled?: boolean;
 }) {
+  const t = useTranslations("tasks.detail.timer");
   const { showToast } = useToast();
   // Tells the top bar pill and the other open tabs (19.10.2026).
   const { announce } = useActiveTimer();
@@ -1233,13 +1234,13 @@ function TimerButton({
     const result = await startTimerForTaskAction({ taskId: task.id, ...opts });
     setPending(false);
     if (!result.ok) {
-      showToast({ tone: "error", title: "הטיימר לא הופעל", description: result.error });
+      showToast({ tone: "error", title: t("startFailed"), description: result.error });
       return;
     }
     announce();
     showToast({
       tone: "success",
-      title: opts.confirmParallel ? "הטיימר רץ במקביל" : "הטיימר רץ",
+      title: opts.confirmParallel ? t("runningParallel") : t("running"),
       description: task.title,
     });
   }
@@ -1250,7 +1251,7 @@ function TimerButton({
     const result = await stopTimerForTaskAction({ taskId: task.id, timeEntryId: running.id });
     setPending(false);
     if (!result.ok) {
-      showToast({ tone: "error", title: "העצירה נכשלה", description: result.error });
+      showToast({ tone: "error", title: t("stopFailed"), description: result.error });
       return;
     }
     announce();
@@ -1259,28 +1260,28 @@ function TimerButton({
       const timeEntryId = running.id;
       showToast({
         tone: "warning",
-        title: "הטיימר נעצר",
+        title: t("stopped"),
         description: result.closedBank.message,
         ask: {
-          question: "להעביר?",
+          question: t("moveQuestion"),
           choices: [
-            { value: "move", label: "להעביר" },
-            { value: "keep", label: "להשאיר" },
+            { value: "move", label: t("move") },
+            { value: "keep", label: t("keep") },
           ],
           onAnswer: async (choice) => {
             if (choice !== "move") return;
             const moved = await moveEntryIntoOpenBankAction({ timeEntryId });
             if (!moved.ok) {
-              showToast({ tone: "error", title: "ההעברה נכשלה", description: moved.error });
+              showToast({ tone: "error", title: t("moveFailed"), description: moved.error });
               return;
             }
-            showToast({ tone: "success", title: "הרישום הועבר", description: "ההערה מציינת מתי העבודה נעשתה." });
+            showToast({ tone: "success", title: t("moved"), description: t("movedHint") });
           },
         },
       });
       return;
     }
-    showToast({ tone: "success", title: "הטיימר נעצר", description: task.title });
+    showToast({ tone: "success", title: t("stopped"), description: task.title });
   }
 
   function ask() {
@@ -1293,13 +1294,13 @@ function TimerButton({
     if (sameClient) {
       showToast({
         tone: "warning",
-        title: "כבר רץ טיימר על הלקוח הזה",
-        description: "ללקוח אחד רץ טיימר אחד. אפשר לעצור אותו ולהתחיל כאן.",
+        title: t("sameClientTitle"),
+        description: t("sameClientDescription"),
         ask: {
-          question: "לעצור את הטיימר של הלקוח ולהתחיל על המשימה הזו?",
+          question: t("sameClientQuestion"),
           choices: [
-            { value: "switch", label: "לעצור ולהתחיל כאן" },
-            { value: "keep", label: "להשאיר כמו שהוא" },
+            { value: "switch", label: t("stopAndStartHere") },
+            { value: "keep", label: t("keepAsIs") },
           ],
           onAnswer: async (value) => {
             if (value === "switch") await start({ stopTimerId: sameClient.id });
@@ -1312,13 +1313,13 @@ function TimerButton({
     if (activeTimers.length >= MAX_PARALLEL_TIMERS) {
       showToast({
         tone: "warning",
-        title: `רצים ${activeTimers.length} טיימרים`,
-        description: "כדי להתחיל כאן, עוצרים אחד מהם.",
+        title: t("manyRunning", { count: activeTimers.length }),
+        description: t("manyRunningDescription"),
         ask: {
-          question: "איזה טיימר לעצור?",
+          question: t("whichToStop"),
           choices: [
-            ...activeTimers.map((t) => ({ value: t.id, label: `לעצור את ${t.clientName}` })),
-            { value: "keep", label: "להשאיר כמו שהם" },
+            ...activeTimers.map((timer) => ({ value: timer.id, label: t("stopClient", { client: timer.clientName }) })),
+            { value: "keep", label: t("keepAll") },
           ],
           onAnswer: async (value) => {
             if (value !== "keep") await start({ stopTimerId: value });
@@ -1331,14 +1332,14 @@ function TimerButton({
     const other = activeTimers[0];
     showToast({
       tone: "warning",
-      title: `רץ טיימר על ${other.clientName}`,
-      description: "הפעלה במקביל סופרת את הזמן במלואו לשני הלקוחות.",
+      title: t("otherRunning", { client: other.clientName }),
+      description: t("parallelDescription"),
       ask: {
-        question: "להפעיל במקביל, או לעצור ולהתחיל כאן?",
+        question: t("parallelQuestion"),
         choices: [
-          { value: "parallel", label: "להפעיל במקביל" },
-          { value: "switch", label: "לעצור ולהתחיל כאן" },
-          { value: "keep", label: "ביטול" },
+          { value: "parallel", label: t("runParallel") },
+          { value: "switch", label: t("stopAndStartHere") },
+          { value: "keep", label: t("cancel") },
         ],
         onAnswer: async (value) => {
           if (value === "parallel") await start({ confirmParallel: true });
@@ -1358,7 +1359,7 @@ function TimerButton({
       >
         <Pause size={15} />
         <span className="font-jbmono">{formatElapsed(elapsed)}</span>
-        עצירה
+        {t("stop")}
       </button>
     );
   }
@@ -1371,7 +1372,7 @@ function TimerButton({
       className="flex items-center gap-2 rounded-full border border-app-surface-nav bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary disabled:opacity-50"
     >
       <Play size={15} />
-      הפעלת טיימר
+      {t("start")}
     </button>
   );
 }
@@ -1381,4 +1382,20 @@ function formatElapsed(totalSeconds: number): string {
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = Math.floor(totalSeconds % 60);
   return [h, m, s].map((n) => String(n).padStart(2, "0")).join(":");
+}
+
+/// "ממתין ללקוח, 6 ימים", in the reader's language. The same rule as
+/// waitingTitle in lib/app-domain/portal-labels.ts, which stays Hebrew
+/// for the portal and the lists that still read it.
+function waitingTitle(
+  t: ReturnType<typeof useTranslations<"tasks.detail.block">>,
+  on: TaskBlocker,
+  since: string | null
+): string {
+  const label = t(`on.${on}`);
+  if (!since) return label;
+  const days = Math.floor((Date.now() - new Date(since).getTime()) / 86_400_000);
+  if (days < 1) return t("sinceToday", { label });
+  if (days === 1) return t("sinceYesterday", { label });
+  return t("sinceDays", { label, count: days });
 }

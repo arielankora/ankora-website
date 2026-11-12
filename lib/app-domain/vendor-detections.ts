@@ -2,6 +2,7 @@ import "server-only";
 import type { User, VendorDetection } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
+import { DomainError } from "@/lib/domain-error";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { openProcessRun } from "@/lib/app-domain/process-runs";
 import { internalClientIds } from "@/lib/app-domain/internal-client";
@@ -237,7 +238,7 @@ export async function decidedVendorCheck(detectionId: string): Promise<{
 
 async function openRunFor(detection: VendorDetection, vendor: string, actorId: string | null) {
   const p8 = await p8Process();
-  if (!p8) throw new Error(NO_P8_MESSAGE);
+  if (!p8) throw new DomainError("vendorDetections.noP8", NO_P8_MESSAGE);
   const source = await prisma.task.findUnique({ where: { id: detection.sourceTaskId }, select: { id: true, title: true } });
   const base = appBaseUrl();
   const sourceLine = source ? `נפתחה מזיהוי אוטומטי במשימה "${source.title}": ${base}/app/tasks/${source.id}` : "נפתחה מזיהוי אוטומטי.";
@@ -249,7 +250,7 @@ async function openRunFor(detection: VendorDetection, vendor: string, actorId: s
     titleSuffix: vendor,
     descriptionPrefix: `**ספק:** ${vendor}\n${sourceLine}`,
   });
-  if (!run) throw new Error(NO_P8_MESSAGE);
+  if (!run) throw new DomainError("vendorDetections.noP8", NO_P8_MESSAGE);
   if (source) {
     await prisma.taskComment.create({
       data: { taskId: source.id, authorId: actorId, body: `נפתחה ריצת ${p8.code} (הוספת תת-מעבד) לספק ${vendor}: ${base}/app/tasks/${run.id}` },
@@ -266,10 +267,10 @@ export async function decideVendorCheck(
   vendorName?: string | null
 ): Promise<{ status: VendorDetection["status"]; runTaskId: string | null; runUrl: string | null; vendor: string | null }> {
   const row = await prisma.vendorDetection.findUnique({ where: { id: detectionId } });
-  if (!row) throw new Error("הזיהוי לא נמצא.");
+  if (!row) throw new DomainError("vendorDetections.notFound", "הזיהוי לא נמצא.");
   const accessible = await listAccessibleClients(actor);
-  if (!accessible.some((c) => c.id === row.clientId)) throw new Error("אין לך גישה למשימה הזו.");
-  if (row.status !== "PENDING") throw new Error(VENDOR_DECIDED_MESSAGE);
+  if (!accessible.some((c) => c.id === row.clientId)) throw new DomainError("vendorDetections.noAccess", "אין לך גישה למשימה הזו.");
+  if (row.status !== "PENDING") throw new DomainError("vendorDetections.alreadyDecided", VENDOR_DECIDED_MESSAGE);
 
   const vendor = vendorName?.trim() || row.vendorName;
   const now = new Date();
@@ -290,7 +291,7 @@ export async function decideVendorCheck(
     return { status: after.status, runTaskId: null, runUrl: null, vendor };
   }
 
-  if (!vendor) throw new Error(VENDOR_NAME_REQUIRED_MESSAGE);
+  if (!vendor) throw new DomainError("vendorDetections.vendorNameRequired", VENDOR_NAME_REQUIRED_MESSAGE);
   const key = vendorKey(vendor);
   // The same vendor already has a run (from another task): note it there.
   const existing = await prisma.vendorDetection.findFirst({

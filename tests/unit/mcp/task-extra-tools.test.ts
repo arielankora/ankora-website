@@ -667,7 +667,7 @@ describe("save_task_plan", () => {
 
   it("relays a plan rule refusal in its own words", async () => {
     const { TaskPlanRuleError, PLAN_TOO_LONG_MESSAGE } = await import("@/lib/task-plan-rules");
-    plans.saveTaskPlan.mockRejectedValue(new TaskPlanRuleError(PLAN_TOO_LONG_MESSAGE));
+    plans.saveTaskPlan.mockRejectedValue(new TaskPlanRuleError("taskPlans.tooLong", PLAN_TOO_LONG_MESSAGE));
     const result = await tools.get("save_task_plan")!.handler(
       { task: "התאמת", plan: "x", approved: true, baseVersion: 0 },
       CTX

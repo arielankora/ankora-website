@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { MessageSquare, Paperclip, Trash2, Eye, EyeOff, Download } from "lucide-react";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { renderMarkdownLite } from "@/lib/markdown-lite";
@@ -53,6 +54,8 @@ export function TaskThread({
   storageReady: boolean;
   maxBytes: number;
 }) {
+  const t = useTranslations("tasks.detail.thread");
+  const format = useFormatter();
   const { showToast } = useToast();
   const [body, setBody] = useState("");
   const [pending, setPending] = useState(false);
@@ -65,21 +68,21 @@ export function TaskThread({
     const result = await addTaskCommentAction({ taskId, body: text });
     setPending(false);
     if (!result.ok) {
-      showToast({ tone: "error", title: "ההערה לא נשמרה", description: result.error });
+      showToast({ tone: "error", title: t("notSaved"), description: result.error });
       return;
     }
     // Cleared only once the server has taken it. A textarea emptied
     // optimistically is a paragraph somebody has to write again.
     setBody("");
-    showToast({ tone: "success", title: "ההערה נוספה" });
+    showToast({ tone: "success", title: t("added") });
   }
 
   async function attach(file: File) {
     if (file.size > maxBytes) {
       showToast({
         tone: "error",
-        title: "הקובץ גדול מדי",
-        description: `עד ${Math.round(maxBytes / (1024 * 1024))}MB. אפשר לדחוס או לסרוק באיכות נמוכה יותר.`,
+        title: t("tooLarge"),
+        description: t("tooLargeHint", { mb: Math.round(maxBytes / (1024 * 1024)) }),
       });
       return;
     }
@@ -90,10 +93,10 @@ export function TaskThread({
     const result = await attachFileToTaskAction(form);
     setPending(false);
     if (!result.ok) {
-      showToast({ tone: "error", title: "הקובץ לא צורף", description: result.error });
+      showToast({ tone: "error", title: t("notAttached"), description: result.error });
       return;
     }
-    showToast({ tone: "success", title: "הקובץ צורף", description: file.name });
+    showToast({ tone: "success", title: t("attached"), description: file.name });
   }
 
   async function remove(id: string) {
@@ -101,17 +104,17 @@ export function TaskThread({
     const result = await deleteTaskCommentAction({ commentId: id });
     setPending(false);
     if (!result.ok) {
-      showToast({ tone: "error", title: "המחיקה נכשלה", description: result.error });
+      showToast({ tone: "error", title: t("deleteFailed"), description: result.error });
       return;
     }
-    showToast({ tone: "success", title: "ההערה נמחקה" });
+    showToast({ tone: "success", title: t("deleted") });
   }
 
   return (
     <section className="rounded-2xl border border-app-border bg-white p-5">
       <h2 className="flex items-center gap-2 text-sm font-medium text-app-text-secondary">
         <MessageSquare size={15} strokeWidth={1.75} className="text-app-text-tertiary" />
-        שרשור
+        {t("title")}
       </h2>
 
       <div className="mt-4">
@@ -119,9 +122,10 @@ export function TaskThread({
           rows={3}
           value={body}
           disabled={pending}
-          aria-label="הערה חדשה"
+          dir="auto"
+          aria-label={t("newComment")}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="מה קרה, מה נוסה, מה ענו. מה שהיה הולך לוואטסאפ."
+          placeholder={t("placeholder")}
           className="w-full rounded-lg border border-app-border-strong px-3 py-2 text-[14px] leading-relaxed text-app-text-primary outline-none focus:border-app-accent"
         />
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -131,14 +135,14 @@ export function TaskThread({
             onClick={post}
             className="rounded-full bg-app-surface-nav px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
           >
-            הוספת הערה
+            {t("add")}
           </button>
 
           <input
             ref={fileInput}
             type="file"
             className="hidden"
-            aria-label="צירוף קובץ"
+            aria-label={t("attach")}
             onChange={(e) => {
               const file = e.target.files?.[0];
               // Reset first: picking the same file twice in a row fires
@@ -151,22 +155,22 @@ export function TaskThread({
           <button
             type="button"
             disabled={pending || !storageReady}
-            title={storageReady ? undefined : "אחסון הקבצים עדיין לא חובר."}
+            title={storageReady ? undefined : t("storageNotReady")}
             onClick={() => fileInput.current?.click()}
             className="inline-flex items-center gap-1.5 rounded-full border border-app-border px-4 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-40"
           >
             <Paperclip size={14} />
-            צירוף קובץ
+            {t("attach")}
           </button>
 
           <span className="text-[12px] text-app-text-tertiary">
-            אפשר **מודגש**, *נטוי*, `קוד`, רשימות וקישורים.
+            {t("markdownHint")}
           </span>
         </div>
       </div>
 
       {entries.length === 0 ? (
-        <p className="mt-5 text-sm text-app-text-tertiary">אין עדיין כלום בשרשור.</p>
+        <p className="mt-5 text-sm text-app-text-tertiary">{t("empty")}</p>
       ) : (
         <ol className="mt-5 space-y-3.5">
           {entries.map((entry) => (
@@ -189,7 +193,7 @@ export function TaskThread({
                   {/* Nullable on purpose: a task opened by the nightly
                       important-dates job has no person behind it, and
                       saying "המערכת" is more honest than a blank. */}
-                  {entry.actorName ?? "המערכת"} · {formatWhen(entry.at)}
+                  {entry.actorName ?? t("system")} · {formatWhen(format, entry.at)}
                 </p>
               </div>
             </li>
@@ -199,7 +203,7 @@ export function TaskThread({
 
       {commentCount === 0 && entries.length > 0 && (
         <p className="mt-4 text-[12.5px] text-app-text-tertiary">
-          עדיין לא כתב כאן אף אחד. מה שכתוב למעלה זה מה שהמערכת תיעדה.
+          {t("noComments")}
         </p>
       )}
     </section>
@@ -217,9 +221,11 @@ function Comment({
   pending: boolean;
   onRemove: () => void;
 }) {
+  const t = useTranslations("tasks.detail.thread");
   return (
     <div className="rounded-xl border border-app-border bg-cream-dim/40 px-3.5 py-2.5">
       <div
+        dir="auto"
         className="space-y-2 text-[14px] leading-relaxed text-app-text-primary [&_p]:m-0"
         dangerouslySetInnerHTML={{ __html: renderMarkdownLite(entry.body) }}
       />
@@ -230,11 +236,11 @@ function Comment({
           onClick={onRemove}
           // Named in full rather than as an icon alone: a bare bin next
           // to somebody's words is the control people click by accident.
-          aria-label="מחיקת ההערה"
+          aria-label={t("deleteComment")}
           className="mt-2 inline-flex items-center gap-1 text-[12px] text-app-text-tertiary hover:text-app-error disabled:opacity-40"
         >
           <Trash2 size={12} />
-          מחיקה
+          {t("delete")}
         </button>
       )}
     </div>
@@ -242,6 +248,7 @@ function Comment({
 }
 
 function FileLine({ entry }: { entry: Extract<ThreadEntry, { kind: "file" }> }) {
+  const t = useTranslations("tasks.detail.thread");
   return (
     <p className="flex flex-wrap items-center gap-1.5 text-[13.5px] text-app-text-primary">
       <Paperclip size={13} className="text-app-text-tertiary" />
@@ -252,6 +259,7 @@ function FileLine({ entry }: { entry: Extract<ThreadEntry, { kind: "file" }> }) 
       <a
         href={`/api/documents/${encodeURIComponent(entry.id)}`}
         download
+        dir="auto"
         className="text-app-text-accent hover:underline"
       >
         {entry.title}
@@ -262,18 +270,18 @@ function FileLine({ entry }: { entry: Extract<ThreadEntry, { kind: "file" }> }) 
       <a
         href={`/api/documents/${encodeURIComponent(entry.id)}`}
         download
-        aria-label={`הורדת הקובץ ${entry.title}`}
+        aria-label={t("downloadFile", { title: entry.title })}
         className="inline-flex items-center gap-1 text-[12px] text-app-text-accent hover:underline"
       >
         <Download size={12} />
-        הורדה
+        {t("download")}
       </a>
       {/* Said on the line, because filing a document against a promise
           is a choice about what the client gets to see, and the next
           person should not have to go looking for it. */}
       <span className="inline-flex items-center gap-1 text-[12px] text-app-text-tertiary">
         {entry.clientVisible ? <Eye size={12} /> : <EyeOff size={12} />}
-        {entry.clientVisible ? "הלקוח רואה" : "פנימי"}
+        {entry.clientVisible ? t("clientSees") : t("internal")}
       </span>
     </p>
   );
@@ -296,12 +304,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatWhen(iso: string): string {
-  return new Intl.DateTimeFormat("he-IL", {
-    day: "numeric",
-    month: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Jerusalem",
-  }).format(new Date(iso));
+/// In the reader's locale and time zone (ADR 0006).
+function formatWhen(format: ReturnType<typeof useFormatter>, iso: string): string {
+  return format.dateTime(new Date(iso), { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
 }

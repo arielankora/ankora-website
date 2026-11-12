@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, Plus } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import {
   startTimerAction,
   stopTimerAction,
@@ -62,19 +63,22 @@ function formatHM(totalSeconds: number): string {
   return formatClockMinutes(Math.round(totalSeconds / 60));
 }
 
-function formatLastUsed(iso: string): string {
+type Translate = ReturnType<typeof useTranslations<"timer">>;
+type Formatter = ReturnType<typeof useFormatter>;
+
+/// Today and yesterday are Israel's days (the day keys stay on the work
+/// week's zone); the time itself is shown in the reader's locale and zone.
+function formatLastUsed(iso: string, t: Translate, format: Formatter): string {
   const date = new Date(iso);
   const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
   const yesterdayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(
     new Date(Date.now() - 24 * 3600_000)
   );
   const key = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(date);
-  const time = new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" }).format(
-    date
-  );
-  if (key === todayKey) return `היום ${time}`;
-  if (key === yesterdayKey) return `אתמול ${time}`;
-  return new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: "Asia/Jerusalem" }).format(date);
+  const time = format.dateTime(date, { hour: "2-digit", minute: "2-digit" });
+  if (key === todayKey) return t("widget.lastUsedToday", { time });
+  if (key === yesterdayKey) return t("widget.lastUsedYesterday", { time });
+  return format.dateTime(date, { day: "numeric", month: "numeric" });
 }
 
 function toActive(entry: {
@@ -124,6 +128,8 @@ export function TimerWidget({
 }) {
   const { showToast } = useToast();
   const { announce } = useActiveTimer();
+  const t = useTranslations("timer");
+  const format = useFormatter();
   const [actives, setActives] = useState<ActiveTimer[]>(() => [...activeTimers].sort(byStart));
   // 19.10.2026: the server's list wins whenever it changes. A timer
   // stopped in another tab (or by Claude) reaches this screen as a page
@@ -200,13 +206,16 @@ export function TimerWidget({
         const runningNames = result.runningClientNames.join(", ");
         showToast({
           tone: "warning",
-          title: `רץ טיימר על ${runningNames}`,
-          description: `הזמן ייספר במלואו לשני הלקוחות: ${runningNames} ו${client?.name ?? "הלקוח החדש"}.`,
+          title: t("widget.parallelTitle", { names: runningNames }),
+          description: t("widget.parallelDescription", {
+            names: runningNames,
+            client: client?.name ?? t("widget.newClientFallback"),
+          }),
           ask: {
-            question: "להפעיל את הטיימר במקביל?",
+            question: t("widget.parallelQuestion"),
             choices: [
-              { value: "parallel", label: "להפעיל במקביל" },
-              { value: "cancel", label: "ביטול" },
+              { value: "parallel", label: t("widget.parallelConfirm") },
+              { value: "cancel", label: t("widget.cancel") },
             ],
             onAnswer: async (value) => {
               if (value === "parallel") {
@@ -218,7 +227,7 @@ export function TimerWidget({
         return;
       }
       setError(result.error);
-      showToast({ tone: "error", title: "לא ניתן להתחיל טיימר", description: result.error });
+      showToast({ tone: "error", title: t("widget.startFailed"), description: result.error });
       return;
     }
 
@@ -235,12 +244,12 @@ export function TimerWidget({
     // one-click quick-start flow, exactly as the reference prototype's
     // own startTimer()/quick() split it. A deliberate start via the
     // client/category selects always confirms with a plain success toast.
-    const title = confirmParallel ? "הטיימר התחיל במקביל" : "הטיימר התחיל";
+    const title = confirmParallel ? t("widget.startedParallel") : t("widget.started");
     if (startedFromQuickStart && !note.trim()) {
       showToast({
         tone: "warning",
-        title: confirmParallel ? "הטיימר התחיל במקביל, בלי הערה" : "הטיימר התחיל בלי הערה",
-        description: `${client?.name ?? ""} · ${category?.name ?? ""}. אפשר להוסיף הערה עכשיו או בעצירה.`,
+        title: confirmParallel ? t("widget.startedParallelNoNote") : t("widget.startedNoNote"),
+        description: t("widget.startedNoNoteHint", { client: client?.name ?? "", category: category?.name ?? "" }),
       });
     } else {
       showToast({
@@ -254,9 +263,9 @@ export function TimerWidget({
   async function handleStart() {
     setError(null);
     if (!clientId || !categoryId) {
-      const msg = "יש לבחור לקוח וקטגוריה לפני התחלת הטיימר.";
+      const msg = t("widget.pickClientAndCategory");
       setError(msg);
-      showToast({ tone: "error", title: "לא ניתן להתחיל טיימר", description: "חסרים לקוח או קטגוריה." });
+      showToast({ tone: "error", title: t("widget.startFailed"), description: t("widget.missingClientOrCategory") });
       return;
     }
     await beginTimer(clientId, categoryId, false);
@@ -293,7 +302,7 @@ export function TimerWidget({
       error={error}
       pending={pending}
       onStart={handleStart}
-      startLabel={actives.length > 0 ? "הפעלה במקביל" : "התחלת טיימר"}
+      startLabel={actives.length > 0 ? t("widget.startParallel") : t("widget.start")}
     />
   );
 
@@ -302,11 +311,9 @@ export function TimerWidget({
       <div className="flex flex-col gap-3.5">
         {actives.length === 0 ? (
           <HeroCard>
-            <span className="text-xs tracking-[.06em] text-cream-warm/60">אין טיימר פעיל</span>
+            <span className="text-xs tracking-[.06em] text-cream-warm/60">{t("widget.idle")}</span>
             <p className="mt-3.5 font-jbmono text-[42px] font-medium text-cream-warm/30 sm:text-[58px]">00:00:00</p>
-            <p className="mb-5 mt-2.5 text-sm text-cream-warm/70">
-              בוחרים לקוח וקטגוריה, או מתחילים משילוב אחרון בלחיצה אחת.
-            </p>
+            <p className="mb-5 mt-2.5 text-sm text-cream-warm/70">{t("widget.idleHint")}</p>
             {startFields("dark")}
           </HeroCard>
         ) : (
@@ -334,10 +341,8 @@ export function TimerWidget({
           <div className="rounded-2xl border border-app-border bg-white p-[18px]">
             {addOpen ? (
               <>
-                <p className="text-[13px] font-medium text-app-text-primary">טיימר נוסף, על לקוח אחר</p>
-                <p className="mb-3 mt-1 text-[11.5px] text-app-text-secondary">
-                  שני הטיימרים ירוצו במקביל, וכל לקוח יחויב על הזמן המלא שלו.
-                </p>
+                <p className="text-[13px] font-medium text-app-text-primary">{t("widget.addTitle")}</p>
+                <p className="mb-3 mt-1 text-[11.5px] text-app-text-secondary">{t("widget.addHint")}</p>
                 {startFields("light")}
               </>
             ) : (
@@ -347,7 +352,7 @@ export function TimerWidget({
                 className="flex items-center gap-2 text-[13px] font-medium text-app-text-primary hover:text-app-text-accent"
               >
                 <Plus size={15} strokeWidth={2.25} />
-                הפעלת טיימר נוסף
+                {t("widget.addButton")}
               </button>
             )}
           </div>
@@ -355,7 +360,7 @@ export function TimerWidget({
 
         {!canStartAnother && (
           <p className="rounded-2xl border border-app-border bg-white px-[18px] py-3.5 text-[12.5px] text-app-text-secondary">
-            רצים {actives.length} טיימרים. כדי להתחיל עוד, עוצרים אחד.
+            {t("widget.limitReached", { count: actives.length })}
           </p>
         )}
       </div>
@@ -364,14 +369,12 @@ export function TimerWidget({
       <div className="flex flex-col gap-3.5">
         {canStartAnother && recent.length > 0 && (
           <div className="rounded-2xl border border-app-border bg-white p-[18px]">
-            <p className="text-[13px] font-medium text-app-text-primary">התחלה מהירה</p>
-            <p className="mb-2.5 mt-1 text-[11.5px] text-app-text-secondary">
-              הערה קצרה עכשיו חוסכת שחזור בסוף החודש ונכנסת לדוח ללקוח.
-            </p>
+            <p className="text-[13px] font-medium text-app-text-primary">{t("widget.quickStart")}</p>
+            <p className="mb-2.5 mt-1 text-[11.5px] text-app-text-secondary">{t("widget.quickStartHint")}</p>
             <input
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="על מה עובדים? (מומלץ)"
+              placeholder={t("widget.quickStartPlaceholder")}
               className="mb-2.5 w-full rounded-[10px] border border-gold/45 bg-app-surface-page px-3 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
             />
             <div className="flex flex-col gap-2">
@@ -396,7 +399,9 @@ export function TimerWidget({
                         {r.clientName} · {r.categoryName}
                       </span>
                       <span className="block text-[11px] text-app-text-tertiary">
-                        {blocked ? "כבר רץ טיימר על הלקוח הזה" : `אחרון: ${formatLastUsed(r.lastUsedAt)}`}
+                        {blocked
+                          ? t("widget.alreadyRunning")
+                          : t("widget.lastUsed", { when: formatLastUsed(r.lastUsedAt, t, format) })}
                       </span>
                     </span>
                   </button>
@@ -411,18 +416,18 @@ export function TimerWidget({
             the clock, so the part that ran in parallel is said out loud
             rather than left for someone to notice. */}
         <div className="rounded-2xl border border-app-border bg-white p-[18px]">
-          <p className="text-[13px] font-medium text-app-text-primary">היום</p>
+          <p className="text-[13px] font-medium text-app-text-primary">{t("widget.today")}</p>
           <p className="mb-3.5 mt-1 text-[11.5px] text-app-text-tertiary">
-            {todayEntries.length} דיווחים · סה&quot;כ {formatHM(today.totalSeconds)}
-            {today.parallel >= 60 && <> · מתוכם {formatHM(today.parallel)} במקביל</>}
+            {t("widget.todaySummary", { count: todayEntries.length, total: formatHM(today.totalSeconds) })}
+            {today.parallel >= 60 && t("widget.todayParallel", { parallel: formatHM(today.parallel) })}
           </p>
           {todayEntries.length === 0 ? (
-            <p className="text-[12.5px] text-app-text-tertiary">אין עדיין דיווחים סגורים היום.</p>
+            <p className="text-[12.5px] text-app-text-tertiary">{t("widget.todayEmpty")}</p>
           ) : (
             <div className="flex flex-col gap-2.5">
               {todayEntries.map((entry) => (
                 <div key={entry.id} className="flex items-center gap-2.5 text-[12.5px]">
-                  <span className="flex-1 truncate text-app-text-secondary">
+                  <span dir="auto" className="flex-1 truncate text-app-text-secondary">
                     {entry.clientName} · {entry.categoryName}
                   </span>
                   <span className="font-jbmono text-app-text-primary">{formatHM(entry.actualSeconds)}</span>
@@ -472,6 +477,7 @@ function RunningTimerCard({
   onReopened: (timer: ActiveTimer) => void;
 }) {
   const { showToast } = useToast();
+  const t = useTranslations("timer.card");
   const [note, setNote] = useState(timer.note ?? "");
   const [elapsed, setElapsed] = useState(0);
   const [pending, setPending] = useState(false);
@@ -531,7 +537,7 @@ function RunningTimerCard({
     // too (NoteRequiredError); asking here saves the round trip and
     // keeps the timer running while the note is written.
     if (!attached && !note.trim()) {
-      setError("כתבו הערה קצרה לפני העצירה: מה נעשה עבור הלקוח.");
+      setError(t("noteRequiredError"));
       noteInputRef.current?.focus();
       return;
     }
@@ -542,7 +548,7 @@ function RunningTimerCard({
     setPending(false);
     if (!result.ok) {
       setError(result.error);
-      showToast({ tone: "error", title: "העצירה נכשלה", description: result.error });
+      showToast({ tone: "error", title: t("stopFailed"), description: result.error });
       return;
     }
     onStopped(timer.id);
@@ -554,22 +560,22 @@ function RunningTimerCard({
     if (result.closedBank) {
       showToast({
         tone: "warning",
-        title: `הדיווח נשמר · ${durationText}`,
+        title: t("saved", { duration: durationText }),
         description: result.closedBank.message,
         ask: {
-          question: "להעביר?",
+          question: t("moveQuestion"),
           choices: [
-            { value: "move", label: "להעביר" },
-            { value: "keep", label: "להשאיר" },
+            { value: "move", label: t("move") },
+            { value: "keep", label: t("keep") },
           ],
           onAnswer: async (choice) => {
             if (choice !== "move") return;
             const moved = await moveEntryIntoOpenBankAction({ timeEntryId: timer.id });
             if (!moved.ok) {
-              showToast({ tone: "error", title: "ההעברה נכשלה", description: moved.error });
+              showToast({ tone: "error", title: t("moveFailed"), description: moved.error });
               return;
             }
-            showToast({ tone: "success", title: "הרישום הועבר", description: "ההערה מציינת מתי העבודה נעשתה." });
+            showToast({ tone: "success", title: t("moved"), description: t("movedHint") });
           },
         },
       });
@@ -583,17 +589,17 @@ function RunningTimerCard({
     if (promise) {
       showToast({
         tone: "success",
-        title: `הדיווח נשמר · ${durationText}`,
+        title: t("saved", { duration: durationText }),
         description: promise.label,
         ask: {
-          question: "ומה השלב עכשיו?",
+          question: t("stageQuestion"),
           choices: [
-            { value: "IN_PROGRESS", label: "בטיפול" },
-            { value: "WAITING_ON_CLIENT", label: "מחכה ללקוח" },
+            { value: "IN_PROGRESS", label: t("stageInProgress") },
+            { value: "WAITING_ON_CLIENT", label: t("stageWaiting") },
             {
               value: "DONE",
-              label: "הושלם",
-              prompt: { label: "מה נגיד ללקוח שקרה?", placeholder: "משפט אחד, בשפה שלו" },
+              label: t("stageDone"),
+              prompt: { label: t("outcomeLabel"), placeholder: t("outcomePlaceholder") },
             },
           ],
           onAnswer: async (stage, written) => {
@@ -603,21 +609,21 @@ function RunningTimerCard({
               clientOutcome: written,
             });
             if (!recorded.ok) {
-              showToast({ tone: "error", title: "העדכון נכשל", description: recorded.error });
+              showToast({ tone: "error", title: t("stageFailed"), description: recorded.error });
               return;
             }
             showToast({
               tone: "success",
-              title: "הלקוח מעודכן",
+              title: t("clientUpdated"),
               description: written || promise.label,
             });
             // 20.10.2026: "הושלם" closed the task; see TaskRow.
             if (recorded.procedureReminder) {
               showToast({
                 tone: "warning",
-                title: "עוד לא בתיק הלקוח",
+                title: t("notInFileYet"),
                 description: recorded.procedureReminder.text,
-                link: { label: "למסך הבדיקה", href: recorded.procedureReminder.reviewHref },
+                link: { label: t("toReview"), href: recorded.procedureReminder.reviewHref },
               });
             }
           },
@@ -628,19 +634,19 @@ function RunningTimerCard({
 
     showToast({
       tone: "success",
-      title: `הדיווח נשמר · ${durationText}`,
+      title: t("saved", { duration: durationText }),
       description: [client?.name, category?.name].filter(Boolean).join(" · "),
       undo: async () => {
         const reopened = await reopenTimerAction({ timeEntryId: timer.id });
         if (!reopened.ok) {
-          showToast({ tone: "error", title: "שחזור הטיימר נכשל", description: reopened.error });
+          showToast({ tone: "error", title: t("reopenFailed"), description: reopened.error });
           return;
         }
         // reopenTimer() never touches startAt, so this is exactly the
         // original start time the elapsed-time ticker needs to resume
         // counting from where it left off.
         onReopened(toActive(reopened.entry));
-        showToast({ tone: "info", title: "הטיימר שוחזר", description: `ממשיך מ־${durationText}` });
+        showToast({ tone: "info", title: t("reopened"), description: t("resumesFrom", { duration: durationText }) });
       },
     });
   }
@@ -651,18 +657,18 @@ function RunningTimerCard({
     const result = await discardActiveTimerAction({ timeEntryId: timer.id });
     setDiscarding(false);
     if (!result.ok) {
-      showToast({ tone: "error", title: "המחיקה נכשלה", description: result.error });
+      showToast({ tone: "error", title: t("discardFailed"), description: result.error });
       return;
     }
     onStopped(timer.id);
-    showToast({ tone: "warning", title: "הטיימר נמחק ללא שמירה", description: "לא נוצר דיווח זמן." });
+    showToast({ tone: "warning", title: t("discarded"), description: t("discardedHint") });
   }
 
   return (
     <HeroCard compact={compact}>
       <div className="flex items-center gap-2">
         <span className="h-2 w-2 shrink-0 animate-pulse-dot rounded-full bg-gold-light" aria-hidden="true" />
-        <span className="text-xs tracking-[.06em] text-cream-warm/60">טיימר פעיל</span>
+        <span className="text-xs tracking-[.06em] text-cream-warm/60">{t("active")}</span>
       </div>
       <p
         className={`font-jbmono font-medium tracking-tight tabular-nums text-cream ${
@@ -671,23 +677,23 @@ function RunningTimerCard({
       >
         {formatElapsed(elapsed)}
       </p>
-      <p className="mt-2.5 text-sm text-cream-warm/75">
-        {client?.name ?? "לקוח"} · {category?.name ?? "קטגוריה"}
+      <p dir="auto" className="mt-2.5 text-sm text-cream-warm/75">
+        {client?.name ?? t("clientFallback")} · {category?.name ?? t("categoryFallback")}
       </p>
       {isLongRunning && (
         <p className="mt-3.5 inline-flex items-center gap-1.5 rounded-full border border-gold-light/40 bg-gold/22 px-3 py-1.5 text-xs text-cream-warm">
-          הטיימר רץ מעל 8 שעות, כדאי לבדוק
+          {t("longRunning", { hours: LONG_TIMER_WARNING_SECONDS / 3600 })}
         </p>
       )}
       <label className={`block ${compact ? "mt-4" : "mt-5"}`}>
         <span className="mb-1.5 block text-[11.5px] text-cream-warm/60">
-          {noteRequired ? "הערה, חובה לפני העצירה. נשמרת תוך כדי עבודה" : "הערה, נשמרת תוך כדי עבודה"}
+          {noteRequired ? t("noteLabelRequired") : t("noteLabel")}
         </span>
         <input
           ref={noteInputRef}
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="על מה עובדים עכשיו?"
+          placeholder={t("notePlaceholder")}
           className="w-full rounded-[10px] border border-gold-light/40 bg-hairline px-3 py-2.5 text-sm text-cream outline-none placeholder:text-cream-warm/40 focus:border-gold-light"
         />
       </label>
@@ -706,7 +712,7 @@ function RunningTimerCard({
           disabled={pending || discarding}
           className="rounded-full bg-app-accent px-6 py-3 text-[14.5px] font-medium text-app-text-primary disabled:opacity-50"
         >
-          {pending ? "עוצר..." : "עצירה ושמירה"}
+          {pending ? t("stopping") : t("stop")}
         </button>
         <button
           type="button"
@@ -714,11 +720,11 @@ function RunningTimerCard({
           disabled={pending || discarding}
           className="rounded-full border border-cream/16 bg-hairline px-5 py-3 text-sm text-cream-warm/80 hover:bg-cream/14 disabled:opacity-50"
         >
-          {discarding ? "מוחק..." : "מחיקה ללא שמירה"}
+          {discarding ? t("discarding") : t("discard")}
         </button>
       </div>
       {!compact && (
-        <p className="mt-4 text-[11.5px] text-cream-warm/45">העצירה נשמרת מיד. אפשר לבטל מההודעה שתופיע.</p>
+        <p className="mt-4 text-[11.5px] text-cream-warm/45">{t("stopHint")}</p>
       )}
     </HeroCard>
   );
@@ -762,6 +768,7 @@ function StartFields({
   onStart: () => void;
   startLabel: string;
 }) {
+  const t = useTranslations("timer.fields");
   const dark = tone === "dark";
   const label = dark ? "mb-1.5 block text-[11.5px] text-cream-warm/60" : "mb-1.5 block text-[11.5px] text-app-text-secondary";
   const field = dark
@@ -775,10 +782,10 @@ function StartFields({
     <div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">
         <label className="block">
-          <span className={label}>לקוח</span>
+          <span className={label}>{t("client")}</span>
           <select value={clientId} onChange={(e) => onClient(e.target.value)} className={field}>
             <option value="" className="text-app-text-primary">
-              בחירת לקוח
+              {t("pickClient")}
             </option>
             {clients.map((c) => (
               <option key={c.id} value={c.id} className="text-app-text-primary">
@@ -788,19 +795,19 @@ function StartFields({
           </select>
         </label>
         <label className="block">
-          <span className={label}>קטגוריה</span>
+          <span className={label}>{t("category")}</span>
           {/* aria-label pins the name to the visible label: through the wrapping
               label it also took the shown option, and "קודם בוחרים לקוח"
               made this field answer to "לקוח" as well. */}
           <select
-            aria-label="קטגוריה"
+            aria-label={t("category")}
             value={categoryId}
             onChange={(e) => onCategory(e.target.value)}
             disabled={!clientId}
             className={field}
           >
             <option value="" className="text-app-text-primary">
-              {clientId ? "בחירת קטגוריה" : "קודם בוחרים לקוח"}
+              {clientId ? t("pickCategory") : t("pickClientFirst")}
             </option>
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id} className="text-app-text-primary">
@@ -815,10 +822,10 @@ function StartFields({
             and cannot answer. */}
         {clientId && promises.length > 0 && (
           <label className="block">
-            <span className={label}>הבטחה ללקוח</span>
+            <span className={label}>{t("promise")}</span>
             <select value={taskId} onChange={(e) => onTask(e.target.value)} className={field}>
               <option value="" className="text-app-text-primary">
-                לא משויך
+                {t("unlinked")}
               </option>
               {promises.map((t) => (
                 <option key={t.id} value={t.id} className="text-app-text-primary">
@@ -830,8 +837,8 @@ function StartFields({
         )}
       </div>
       <label className="mt-3 block">
-        <span className={label}>משימה / הערה</span>
-        <input value={note} onChange={(e) => onNote(e.target.value)} placeholder="למשל: עדכון דוח שבועי" className={input} />
+        <span className={label}>{t("note")}</span>
+        <input value={note} onChange={(e) => onNote(e.target.value)} placeholder={t("notePlaceholder")} className={input} />
       </label>
       {error && (
         <p
@@ -847,7 +854,7 @@ function StartFields({
         disabled={pending || !clientId || !categoryId}
         className="mt-5 rounded-full bg-app-accent px-7 py-3 text-[14.5px] font-medium text-app-text-primary disabled:opacity-50"
       >
-        {pending ? "מתחיל..." : startLabel}
+        {pending ? t("starting") : startLabel}
       </button>
     </div>
   );

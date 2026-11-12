@@ -2,6 +2,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ADVANCE_TIMER_LABELS, advanceTimerNotice, type AdvanceTimerOutcome } from "@/lib/advance-timer";
+import { intlWrapper } from "../helpers/intl";
 
 // "קדם עם קלוד והפעל טיימר" (Ariel, 3.11.2026): about a minute of billable
 // time was lost on every task between pasting the prompt and Claude's
@@ -67,7 +68,7 @@ describe("AdvanceWithClaude with a timer", () => {
       order.push("timer");
       return { outcome: "started" };
     });
-    render(<AdvanceWithClaude taskId="t1" prompt="PROMPT" hasPlan={false} />);
+    render(<AdvanceWithClaude taskId="t1" prompt="PROMPT" hasPlan={false} />, { wrapper: intlWrapper() });
     await click(ADVANCE_TIMER_LABELS.plan);
     expect(order).toEqual(["copy", "timer"]);
     expect(writeText).toHaveBeenCalledWith("PROMPT");
@@ -78,7 +79,7 @@ describe("AdvanceWithClaude with a timer", () => {
 
   it("does not start a parallel timer: another client's timer leaves the question to Claude", async () => {
     startAction.mockResolvedValue({ outcome: "other_client" });
-    render(<AdvanceWithClaude taskId="t1" prompt="PROMPT" hasPlan={false} />);
+    render(<AdvanceWithClaude taskId="t1" prompt="PROMPT" hasPlan={false} />, { wrapper: intlWrapper() });
     await click(ADVANCE_TIMER_LABELS.plan);
     expect(writeText).toHaveBeenCalled();
     expect(announce).not.toHaveBeenCalled();
@@ -88,7 +89,7 @@ describe("AdvanceWithClaude with a timer", () => {
   it("still starts the timer when the browser refuses the copy, and shows the manual box", async () => {
     writeText.mockRejectedValue(new Error("denied"));
     startAction.mockResolvedValue({ outcome: "started" });
-    render(<AdvanceWithClaude taskId="t1" prompt="PROMPT" hasPlan={false} />);
+    render(<AdvanceWithClaude taskId="t1" prompt="PROMPT" hasPlan={false} />, { wrapper: intlWrapper() });
     await click(ADVANCE_TIMER_LABELS.plan);
     expect(screen.getByLabelText("הפרומט לקלוד")).toBeTruthy();
     expect(startAction).toHaveBeenCalled();
@@ -96,14 +97,14 @@ describe("AdvanceWithClaude with a timer", () => {
 
   it("reports a failed action without throwing, and the prompt stays copied", async () => {
     startAction.mockRejectedValue(new Error("network"));
-    render(<AdvanceWithClaude taskId="t1" prompt="PROMPT" hasPlan={false} />);
+    render(<AdvanceWithClaude taskId="t1" prompt="PROMPT" hasPlan={false} />, { wrapper: intlWrapper() });
     await click(ADVANCE_TIMER_LABELS.plan);
     expect(recordAction).toHaveBeenCalled();
     expect(screen.getByTestId("advance-timer-notice").textContent).toMatch(/לא הופעל/);
   });
 
   it("the plain button copies and starts nothing", async () => {
-    render(<AdvanceWithClaude taskId="t1" prompt="PROMPT" hasPlan={false} />);
+    render(<AdvanceWithClaude taskId="t1" prompt="PROMPT" hasPlan={false} />, { wrapper: intlWrapper() });
     await click("קדם עם קלוד");
     expect(writeText).toHaveBeenCalled();
     expect(startAction).not.toHaveBeenCalled();
@@ -112,7 +113,7 @@ describe("AdvanceWithClaude with a timer", () => {
 
   it("is offered on a closed task's summary too", async () => {
     startAction.mockResolvedValue({ outcome: "running_on_client" });
-    render(<AdvanceWithClaude taskId="t1" prompt="PROMPT" hasPlan={false} mode="lessons" />);
+    render(<AdvanceWithClaude taskId="t1" prompt="PROMPT" hasPlan={false} mode="lessons" />, { wrapper: intlWrapper() });
     await click(ADVANCE_TIMER_LABELS.lessons);
     expect(startAction).toHaveBeenCalledWith({ taskId: "t1" });
     expect(screen.getByTestId("advance-timer-notice").textContent).toMatch(/כבר רץ/);

@@ -2,6 +2,7 @@
 import { taskHref } from "../list-query";
 import Link from "next/link";
 import { useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { Plus } from "lucide-react";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -58,12 +59,13 @@ export function TaskSteps({
   parentIsClosed: boolean;
   templates: TemplateChoice[];
 }) {
+  const t = useTranslations("tasks.detail.steps");
   const done = steps.filter((s) => !OPEN.includes(s.status)).length;
 
   return (
     <div className="rounded-2xl border border-app-border bg-white p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="text-sm font-medium text-app-text-secondary">שלבים</h2>
+        <h2 className="text-sm font-medium text-app-text-secondary">{t("title")}</h2>
         {steps.length > 0 && (
           <span className="font-jbmono text-[13px] text-app-text-secondary">
             {done}/{steps.length}
@@ -73,7 +75,7 @@ export function TaskSteps({
 
       {steps.length === 0 ? (
         <p className="mt-1.5 text-[12.5px] text-app-text-secondary">
-          אפשר לפרק את המשימה לשלבים. לכל שלב אפשר לתת אחראי, תאריך יעד וטיימר משלו.
+          {t("empty")}
         </p>
       ) : (
         <ul className="mt-3 divide-y divide-app-border">
@@ -97,6 +99,8 @@ export function TaskSteps({
 }
 
 function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; listQuery: string }) {
+  const t = useTranslations("tasks.detail.steps");
+  const format = useFormatter();
   const isDone = !OPEN.includes(step.status);
   const { showToast } = useToast();
   const [pending, setPending] = useState(false);
@@ -108,8 +112,8 @@ function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; 
     setError(null);
     const result = await setTaskStepDoneAction({ stepId: step.id, parentId, done: !isDone });
     if (!result.ok) setError(result.error);
-    else if (result.outcome === "sent") showToast({ tone: "success", title: "נשלח לאישור", description: step.approverName ? `${step.approverName} קיבל/ה התראה.` : undefined });
-    else if (result.outcome === "approved") showToast({ tone: "success", title: "אושר" });
+    else if (result.outcome === "sent") showToast({ tone: "success", title: t("sentForApproval"), description: step.approverName ? t("approverNotified", { name: step.approverName }) : undefined });
+    else if (result.outcome === "approved") showToast({ tone: "success", title: t("approved") });
     setPending(false);
   }
 
@@ -123,12 +127,13 @@ function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; 
         // The step's own title, so a screen reader announcing a column of
         // checkboxes says what each one closes rather than "checkbox,
         // checkbox, checkbox".
-        aria-label={`סימון השלב ${step.title} כהושלם`}
+        aria-label={t("markDone", { title: step.title })}
         className="mt-[3px] h-4 w-4 shrink-0 cursor-pointer accent-app-text-primary"
       />
       <div className="min-w-0 flex-1">
         <Link
           href={taskHref(step.id, listQuery)}
+          dir="auto"
           className={`block text-[13.5px] transition-colors hover:text-app-text-primary ${
             isDone ? "text-app-text-tertiary line-through" : "text-app-text-primary"
           }`}
@@ -137,12 +142,16 @@ function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; 
         </Link>
         {step.approverName && (
           <p className={`mt-0.5 text-[11.5px] ${step.status === "PENDING_APPROVAL" ? "font-medium text-app-warning" : "text-app-text-tertiary"}`}>
-            {step.status === "PENDING_APPROVAL" ? `מחכה לאישור של ${step.approverName}` : isDone ? `אושר` : `דורש אישור של ${step.approverName}`}
+            {step.status === "PENDING_APPROVAL"
+              ? t("awaitingApprovalOf", { name: step.approverName })
+              : isDone
+                ? t("approved")
+                : t("requiresApprovalOf", { name: step.approverName })}
           </p>
         )}
         {(step.assignedToName || step.dueDate) && (
           <p className="mt-0.5 text-[11.5px] text-app-text-tertiary">
-            {[step.assignedToName, step.dueDate ? formatDay(step.dueDate) : null].filter(Boolean).join(" · ")}
+            {[step.assignedToName, step.dueDate ? formatDay(format, step.dueDate) : null].filter(Boolean).join(" · ")}
           </p>
         )}
         {error && <p className="mt-1 text-[11.5px] text-app-error">{error}</p>}
@@ -152,6 +161,7 @@ function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; 
 }
 
 function AddStep({ taskId, clientId }: { taskId: string; clientId: string }) {
+  const t = useTranslations("tasks.detail.steps");
   const [title, setTitle] = useState("");
   const { onSubmit, pending, error } = useActionForm(
     (_prev, data: FormData) =>
@@ -166,8 +176,9 @@ function AddStep({ taskId, clientId }: { taskId: string; clientId: string }) {
         name="title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        aria-label="שלב חדש"
-        placeholder="מה צריך לקרות"
+        dir="auto"
+        aria-label={t("newStep")}
+        placeholder={t("placeholder")}
         className="min-w-0 flex-1 border-b border-app-border-strong bg-transparent py-1.5 text-[13.5px] text-app-text-primary outline-none placeholder:text-app-text-tertiary focus:border-app-surface-nav"
       />
       <button
@@ -175,15 +186,16 @@ function AddStep({ taskId, clientId }: { taskId: string; clientId: string }) {
         disabled={pending || !title.trim()}
         className="shrink-0 rounded-full border border-app-border px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold disabled:opacity-40"
       >
-        {pending ? "מוסיף..." : "הוספה"}
+        {pending ? t("adding") : t("add")}
       </button>
       {error && <p className="w-full text-[11.5px] text-app-error">{error}</p>}
     </form>
   );
 }
 
-function formatDay(iso: string) {
-  return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "short" });
+/// In the reader's locale and time zone (ADR 0006).
+function formatDay(format: ReturnType<typeof useFormatter>, iso: string) {
+  return format.dateTime(new Date(iso), { day: "numeric", month: "short" });
 }
 
 /// The procedures from the SOP book, one click away.
@@ -198,6 +210,7 @@ function formatDay(iso: string) {
 /// they are in, and the step list will answer the other question a
 /// second later.
 function FromTheBook({ taskId, templates }: { taskId: string; templates: TemplateChoice[] }) {
+  const t = useTranslations("tasks.detail.steps");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -219,7 +232,7 @@ function FromTheBook({ taskId, templates }: { taskId: string; templates: Templat
         onClick={() => setOpen(true)}
         className="mt-3 text-[12.5px] text-app-text-accent transition-colors hover:text-app-text-primary"
       >
-        מתוך ספר הנהלים
+        {t("fromBook")}
       </button>
     );
   }
@@ -227,17 +240,17 @@ function FromTheBook({ taskId, templates }: { taskId: string; templates: Templat
   return (
     <div className="mt-3 rounded-xl border border-app-border bg-cream/40 p-3">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-[12.5px] font-medium text-app-text-primary">מתוך ספר הנהלים</p>
+        <p className="text-[12.5px] font-medium text-app-text-primary">{t("fromBook")}</p>
         <button
           type="button"
           onClick={() => setOpen(false)}
           className="text-[11.5px] text-app-text-tertiary hover:text-app-text-primary"
         >
-          סגירה
+          {t("close")}
         </button>
       </div>
       <p className="mt-0.5 text-[11.5px] text-app-text-secondary">
-        השלבים נוספים למה שכבר יש כאן, ולא במקומו.
+        {t("bookHint")}
       </p>
       <ul className="mt-2 space-y-1">
         {templates.map((t) => (

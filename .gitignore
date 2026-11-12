@@ -12,3 +12,4 @@ tsconfig.tsbuildinfo
 
 # QA suite run artefacts (the reports are per-run, not source of truth)
 qa/reports/
+messages/.merge-lock

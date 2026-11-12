@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { renderMarkdownLite } from "@/lib/markdown-lite";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { applyPlanStepsAction, approveTaskPlanAction, saveTaskPlanAction } from "./actions";
@@ -29,18 +30,24 @@ export type PlanView = {
   stepsAppliedAt: string | null;
 };
 
-function day(iso: string) {
-  return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "numeric" });
+type PlanT = ReturnType<typeof useTranslations<"tasks.detail.plan">>;
+type Format = ReturnType<typeof useFormatter>;
+
+/// A date in the reader's locale and time zone (ADR 0006).
+function day(format: Format, iso: string) {
+  return format.dateTime(new Date(iso), { day: "numeric", month: "numeric", year: "numeric" });
 }
 
-function metaLine(p: PlanView): string {
-  const parts = [`גרסה ${p.version}`];
+function metaLine(t: PlanT, format: Format, p: PlanView): string {
+  const parts = [t("meta.version", { version: p.version })];
   if (p.status === "APPROVED") {
-    parts.push(`אושרה${p.approvedByName ? ` על ידי ${p.approvedByName}` : ""}, ${day(p.approvedAt ?? p.createdAt)}`);
+    const date = day(format, p.approvedAt ?? p.createdAt);
+    parts.push(p.approvedByName ? t("meta.approvedBy", { name: p.approvedByName, date }) : t("meta.approved", { date }));
   } else {
-    parts.push(`טיוטה${p.createdByName ? ` של ${p.createdByName}` : ""}, ${day(p.createdAt)}`);
+    const date = day(format, p.createdAt);
+    parts.push(p.createdByName ? t("meta.draftBy", { name: p.createdByName, date }) : t("meta.draft", { date }));
   }
-  parts.push(p.origin === "MCP" ? "נכתבה עם קלוד" : "נערכה במערכת");
+  parts.push(p.origin === "MCP" ? t("meta.withClaude") : t("meta.inApp"));
   return parts.join(" · ");
 }
 
@@ -59,6 +66,8 @@ export function TaskPlanPanel({
   /// Existing steps that a copy from the plan would replace.
   openStepCount: number;
 }) {
+  const t = useTranslations("tasks.detail.plan");
+  const format = useFormatter();
   const { showToast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -76,7 +85,7 @@ export function TaskPlanPanel({
     const r = await approveTaskPlanAction({ taskId, version: plan.version });
     setBusy(false);
     if (!r.ok) setError(r.error);
-    else showToast({ tone: "success", title: "התוכנית אושרה" });
+    else showToast({ tone: "success", title: t("approvedToast") });
   }
 
   async function applySteps() {
@@ -91,8 +100,8 @@ export function TaskPlanPanel({
     }
     showToast({
       tone: "success",
-      title: "השלבים עודכנו לפי התוכנית",
-      description: r.kept > 0 ? `${r.kept} שלבים שבוצעו או שדווח עליהם זמן נשארו כמו שהם.` : undefined,
+      title: t("stepsUpdated"),
+      description: r.kept > 0 ? t("keptSteps", { count: r.kept }) : undefined,
     });
   }
 
@@ -113,22 +122,26 @@ export function TaskPlanPanel({
     setEditing(false);
     showToast({
       tone: "success",
-      title: `נשמרה גרסה ${r.version}`,
-      description: r.stepsAdded ? "למשימה לא היו שלבים, אז שלבי התוכנית נוספו אליה." : undefined,
+      title: t("savedVersion", { version: r.version }),
+      description: r.stepsAdded ? t("stepsAddedToEmpty") : undefined,
     });
   }
 
   return (
     <section className="rounded-2xl border border-app-border bg-white p-5" data-testid="task-plan">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="text-sm font-medium text-app-text-secondary">תוכנית עבודה</h2>
-        <span className="text-[12px] text-app-text-tertiary">{metaLine(plan)}</span>
+        <h2 className="text-sm font-medium text-app-text-secondary">{t("title")}</h2>
+        <span className="text-[12px] text-app-text-tertiary">{metaLine(t, format, plan)}</span>
       </div>
-      {plan.changeNote && <p className="mt-1 text-[12px] text-app-text-secondary">מה השתנה: {plan.changeNote}</p>}
+      {plan.changeNote && (
+        <p dir="auto" className="mt-1 text-[12px] text-app-text-secondary">
+          {t("changeNote", { note: plan.changeNote })}
+        </p>
+      )}
 
       {plan.status === "DRAFT" && (
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-cream/50 px-3 py-2">
-          <span className="text-[12.5px] text-app-text-secondary">התוכנית הזו עדיין טיוטה ולא אושרה.</span>
+          <span className="text-[12.5px] text-app-text-secondary">{t("draftNotice")}</span>
           {editable && (
             <button
               type="button"
@@ -136,7 +149,7 @@ export function TaskPlanPanel({
               onClick={approve}
               className="rounded-full bg-app-accent px-3 py-1 text-[12px] font-medium text-app-text-primary disabled:opacity-40"
             >
-              אישור התוכנית
+              {t("approve")}
             </button>
           )}
         </div>
@@ -145,22 +158,22 @@ export function TaskPlanPanel({
       {editing ? (
         <div className="mt-3 space-y-3">
           <label className="block">
-            <span className="text-[12px] text-app-text-secondary">התוכנית</span>
+            <span className="text-[12px] text-app-text-secondary">{t("body")}</span>
             <textarea
               value={draftBody}
               onChange={(e) => setDraftBody(e.target.value)}
               rows={14}
-              dir="rtl"
+              dir="auto"
               className="mt-1 w-full resize-y rounded-lg border border-app-border-strong p-2 text-[13.5px] leading-relaxed text-app-text-primary outline-none focus:border-app-surface-nav"
             />
           </label>
           <label className="block">
-            <span className="text-[12px] text-app-text-secondary">שלבים מוצעים, שורה לכל שלב</span>
+            <span className="text-[12px] text-app-text-secondary">{t("stepsLabel")}</span>
             <textarea
               value={draftSteps}
               onChange={(e) => setDraftSteps(e.target.value)}
               rows={6}
-              dir="rtl"
+              dir="auto"
               className="mt-1 w-full resize-y rounded-lg border border-app-border-strong p-2 text-[13.5px] text-app-text-primary outline-none focus:border-app-surface-nav"
             />
           </label>
@@ -171,7 +184,7 @@ export function TaskPlanPanel({
               onClick={save}
               className="rounded-full bg-app-accent px-4 py-1.5 text-[13px] font-medium text-app-text-primary disabled:opacity-40"
             >
-              {busy ? "שומר..." : "שמירה כגרסה חדשה"}
+              {busy ? t("saving") : t("saveVersion")}
             </button>
             <button
               type="button"
@@ -183,7 +196,7 @@ export function TaskPlanPanel({
               }}
               className="rounded-full border border-app-border px-4 py-1.5 text-[13px] text-app-text-secondary"
             >
-              ביטול
+              {t("cancel")}
             </button>
           </div>
         </div>
@@ -191,6 +204,7 @@ export function TaskPlanPanel({
         <>
           <div className="relative">
             <div
+              dir="auto"
               className={`mt-3 space-y-2 text-[14px] leading-relaxed text-app-text-primary [&_p]:m-0 ${
                 isLong && !expanded ? "max-h-72 overflow-hidden" : ""
               }`}
@@ -209,20 +223,20 @@ export function TaskPlanPanel({
               onClick={() => setExpanded((v) => !v)}
               className="mt-2 text-[12.5px] text-app-text-accent hover:text-app-text-primary"
             >
-              {expanded ? "צמצום" : "הצגת התוכנית המלאה"}
+              {expanded ? t("collapse") : t("expand")}
             </button>
           )}
 
           {plan.steps.length > 0 && (
             <div className="mt-4 border-t border-app-border pt-3">
-              <p className="text-[12.5px] font-medium text-app-text-secondary">שלבים מוצעים ({plan.steps.length})</p>
-              <ol className="mt-1.5 list-decimal space-y-0.5 ps-5 text-[13px] text-app-text-primary">
+              <p className="text-[12.5px] font-medium text-app-text-secondary">{t("proposedSteps", { count: plan.steps.length })}</p>
+              <ol dir="auto" className="mt-1.5 list-decimal space-y-0.5 ps-5 text-[13px] text-app-text-primary">
                 {plan.steps.map((s, i) => (
                   <li key={i}>{s}</li>
                 ))}
               </ol>
               {plan.stepsAppliedAt && (
-                <p className="mt-1.5 text-[11.5px] text-app-text-tertiary">הועתקו לשלבים של המשימה ב-{day(plan.stepsAppliedAt)}.</p>
+                <p className="mt-1.5 text-[11.5px] text-app-text-tertiary">{t("appliedOn", { date: day(format, plan.stepsAppliedAt) })}</p>
               )}
             </div>
           )}
@@ -236,7 +250,7 @@ export function TaskPlanPanel({
                   onClick={() => (openStepCount > 0 ? setConfirmApply(true) : applySteps())}
                   className="rounded-full border border-app-border px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold disabled:opacity-40"
                 >
-                  {plan.stepsAppliedAt ? "העתקה מחדש לשלבים" : "הפיכה לשלבים במשימה"}
+                  {plan.stepsAppliedAt ? t("reapply") : t("apply")}
                 </button>
               )}
               {!confirmApply && (
@@ -245,7 +259,7 @@ export function TaskPlanPanel({
                   onClick={() => setEditing(true)}
                   className="rounded-full px-3 py-1.5 text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
                 >
-                  עריכה
+                  {t("edit")}
                 </button>
               )}
             </div>
@@ -254,7 +268,7 @@ export function TaskPlanPanel({
           {confirmApply && (
             <div className="mt-3 rounded-xl border border-app-border bg-cream/40 p-3">
               <p className="text-[12.5px] text-app-text-secondary">
-                זה יחליף את {openStepCount} השלבים הקיימים בשלבי התוכנית. שלבים שבוצעו או שדווח עליהם זמן נשארים.
+                {t("confirmReplace", { count: openStepCount })}
               </p>
               <div className="mt-2 flex gap-2">
                 <button
@@ -263,14 +277,14 @@ export function TaskPlanPanel({
                   onClick={applySteps}
                   className="rounded-full bg-app-accent px-3 py-1 text-[12px] font-medium text-app-text-primary disabled:opacity-40"
                 >
-                  {busy ? "מעדכן..." : "המשך"}
+                  {busy ? t("updating") : t("continue")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmApply(false)}
                   className="rounded-full px-3 py-1 text-[12px] text-app-text-secondary hover:text-app-text-primary"
                 >
-                  ביטול
+                  {t("cancel")}
                 </button>
               </div>
             </div>
@@ -282,16 +296,17 @@ export function TaskPlanPanel({
 
       {history.length > 0 && (
         <details className="mt-4 border-t border-app-border pt-3">
-          <summary className="cursor-pointer text-[12.5px] text-app-text-secondary">גרסאות קודמות ({history.length})</summary>
+          <summary className="cursor-pointer text-[12.5px] text-app-text-secondary">{t("history", { count: history.length })}</summary>
           <ul className="mt-2 space-y-2">
             {history.map((h) => (
               <li key={h.version}>
                 <details className="rounded-lg bg-cream/30 px-3 py-2">
                   <summary className="cursor-pointer text-[12px] text-app-text-secondary">
-                    {metaLine(h)}
+                    {metaLine(t, format, h)}
                     {h.changeNote ? ` · ${h.changeNote}` : ""}
                   </summary>
                   <div
+                    dir="auto"
                     className="mt-2 space-y-2 text-[13px] leading-relaxed text-app-text-secondary [&_p]:m-0"
                     dangerouslySetInnerHTML={{ __html: renderMarkdownLite(h.body) }}
                   />
@@ -314,6 +329,7 @@ export function TaskPlanPanel({
 /// way in, and an empty box on every task would be one more thing to read
 /// past. Saved as version 1, approved, in the writer's name.
 export function NewPlanEditor({ taskId }: { taskId: string }) {
+  const t = useTranslations("tasks.detail.plan");
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
@@ -333,8 +349,8 @@ export function NewPlanEditor({ taskId }: { taskId: string }) {
     setOpen(false);
     showToast({
       tone: "success",
-      title: "תוכנית העבודה נשמרה",
-      description: r.stepsAdded ? "שלבי התוכנית נוספו למשימה." : undefined,
+      title: t("new.saved"),
+      description: r.stepsAdded ? t("new.stepsAdded") : undefined,
     });
   }
 
@@ -345,35 +361,35 @@ export function NewPlanEditor({ taskId }: { taskId: string }) {
         onClick={() => setOpen(true)}
         className="self-center text-[12.5px] text-app-text-tertiary transition-colors hover:text-app-text-primary"
       >
-        או לכתוב תוכנית ידנית
+        {t("new.open")}
       </button>
     );
   }
 
   return (
     <section className="w-full rounded-2xl border border-app-border bg-white p-5" data-testid="task-plan-new">
-      <h2 className="text-sm font-medium text-app-text-secondary">תוכנית עבודה חדשה</h2>
+      <h2 className="text-sm font-medium text-app-text-secondary">{t("new.title")}</h2>
       <p className="mt-1 text-[12px] text-app-text-secondary">
-        מודגש עם **כוכביות**, רשימות עם מקף או מספר. נשמרת כגרסה 1, מאושרת על שמכם.
+        {t("new.hint")}
       </p>
       <label className="mt-3 block">
-        <span className="text-[12px] text-app-text-secondary">התוכנית</span>
+        <span className="text-[12px] text-app-text-secondary">{t("body")}</span>
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={10}
-          dir="rtl"
-          placeholder={"**מטרה**\n...\n\n**שלבים**\n1. ...\n2. ..."}
+          dir="auto"
+          placeholder={t("new.placeholder")}
           className="mt-1 w-full resize-y rounded-lg border border-app-border-strong p-2 text-[13.5px] leading-relaxed text-app-text-primary outline-none placeholder:text-app-text-tertiary focus:border-app-surface-nav"
         />
       </label>
       <label className="mt-3 block">
-        <span className="text-[12px] text-app-text-secondary">שלבים מוצעים, שורה לכל שלב (לא חובה)</span>
+        <span className="text-[12px] text-app-text-secondary">{t("new.stepsLabel")}</span>
         <textarea
           value={steps}
           onChange={(e) => setSteps(e.target.value)}
           rows={5}
-          dir="rtl"
+          dir="auto"
           className="mt-1 w-full resize-y rounded-lg border border-app-border-strong p-2 text-[13.5px] text-app-text-primary outline-none focus:border-app-surface-nav"
         />
       </label>
@@ -384,7 +400,7 @@ export function NewPlanEditor({ taskId }: { taskId: string }) {
           onClick={save}
           className="rounded-full bg-app-accent px-4 py-1.5 text-[13px] font-medium text-app-text-primary disabled:opacity-40"
         >
-          {busy ? "שומר..." : "שמירה"}
+          {busy ? t("saving") : t("new.save")}
         </button>
         <button
           type="button"
@@ -394,7 +410,7 @@ export function NewPlanEditor({ taskId }: { taskId: string }) {
           }}
           className="rounded-full border border-app-border px-4 py-1.5 text-[13px] text-app-text-secondary"
         >
-          ביטול
+          {t("cancel")}
         </button>
       </div>
       {error && <p className="mt-2 text-[12px] text-app-error">{error}</p>}
