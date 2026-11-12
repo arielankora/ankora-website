@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { resolvePortalDocument } from "@/lib/app-domain/client-file";
@@ -32,7 +33,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ doc
 
   const file = await downloadFileFromDrive(doc.driveFileId);
   if (!file.ok || !file.body) {
-    return NextResponse.json({ error: "המסמך לא זמין כרגע. אפשר לבקש אותו מאיתנו בוואטסאפ." }, { status: 502 });
+    // ADR 0006: in the reader's language.
+    const t = await getTranslations("portal.documentRoute");
+    return NextResponse.json({ error: t("unavailable") }, { status: 502 });
   }
 
   return new NextResponse(file.body, {

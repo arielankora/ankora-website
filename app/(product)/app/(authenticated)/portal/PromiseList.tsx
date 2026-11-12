@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { PORTAL_STAGE_LABELS, type PortalPromise } from "@/lib/app-domain/client-portal";
+import { getFormatter, getTranslations } from "next-intl/server";
+import type { PortalPromise } from "@/lib/app-domain/client-portal";
+import { TIMEZONE } from "@/lib/timezone";
 
 // Portal phase 1. One row shape for a promise, used by the home screen
 // and by the activity stream, so the client learns to read it once.
@@ -18,10 +20,6 @@ const STAGE_TONE: Record<PortalPromise["stage"], string> = {
   DONE: "border-transparent bg-app-success-soft text-app-success",
 };
 
-function formatDay(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "short", timeZone: "Asia/Jerusalem" }).format(date);
-}
-
 /// Whole days, floored, in the client's own timezone sense of "a day".
 /// Zero reads as "today" rather than "0 days", because "מחכה לך 0 ימים"
 /// is the kind of sentence that makes a product feel unattended.
@@ -29,18 +27,24 @@ function daysSince(date: Date): number {
   return Math.max(0, Math.floor((Date.now() - date.getTime()) / (24 * 60 * 60 * 1000)));
 }
 
-function waitingLabel(since: Date): string {
-  const days = daysSince(since);
-  if (days === 0) return "מהיום";
-  if (days === 1) return "מאתמול";
-  return `כבר ${days} ימים`;
-}
+export async function PromiseRow({ promise, showStage = true }: { promise: PortalPromise; showStage?: boolean }) {
+  const t = await getTranslations("portal.promises");
+  const format = await getFormatter();
+  // ADR 0006: in the reader's language. A due date is an Israeli day, so it
+  // is written in Israel time; when the work moved is an instant, written
+  // in the reader's own time zone.
+  const formatDay = (date: Date, timeZone?: string) => format.dateTime(date, { day: "numeric", month: "short", timeZone });
+  const waitingLabel = (since: Date) => {
+    const days = daysSince(since);
+    if (days === 0) return t("waitingToday");
+    if (days === 1) return t("waitingYesterday");
+    return t("waitingDays", { days: String(days) });
+  };
 
-export function PromiseRow({ promise, showStage = true }: { promise: PortalPromise; showStage?: boolean }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 px-[18px] py-3.5">
       <span className="min-w-0 flex-1 text-sm text-app-text-primary">
-        {promise.title}
+        <bdi dir="auto">{promise.title}</bdi>
         {/* Team adoption: what came of it.
 
             A finished promise used to be its own title with a green pill
@@ -49,14 +53,16 @@ export function PromiseRow({ promise, showStage = true }: { promise: PortalPromi
             line is the answer, and it is why closing a visible promise
             without one is refused upstream rather than nudged. */}
         {promise.outcome && (
-          <span className="mt-1 block text-[12.5px] leading-relaxed text-app-text-secondary">{promise.outcome}</span>
+          <span dir="auto" className="mt-1 block text-[12.5px] leading-relaxed text-app-text-secondary">
+            {promise.outcome}
+          </span>
         )}
         {/* What is being asked of the client, and the shortest way to do
             it. The title says what the task is called; this says what to
             do, so the row can be acted on in ten seconds. */}
         {promise.stage === "WAITING_ON_CLIENT" && promise.waitingFor && (
           <span className="mt-1 block text-[12.5px] leading-relaxed text-app-text-secondary">
-            מה צריך ממך: {promise.waitingFor}
+            {t("whatIsNeeded", { what: promise.waitingFor })}
           </span>
         )}
         {/* 4.11.2026: the lines Ankora wrote for the client under this task,
@@ -64,7 +70,9 @@ export function PromiseRow({ promise, showStage = true }: { promise: PortalPromi
         {promise.notes.length > 0 && (
           <ul className="mt-1.5 space-y-0.5 text-[12.5px] leading-relaxed text-app-text-secondary">
             {promise.notes.map((n, i) => (
-              <li key={i}>{n}</li>
+              <li key={i} dir="auto">
+                {n}
+              </li>
             ))}
           </ul>
         )}
@@ -73,7 +81,7 @@ export function PromiseRow({ promise, showStage = true }: { promise: PortalPromi
             href="/app/portal/decisions"
             className="mt-1.5 inline-block rounded-full border border-gold/50 bg-white px-3 py-1 text-[12px] font-medium text-app-text-primary hover:border-gold"
           >
-            {promise.openDecisions === 1 ? "לענות על ההחלטה" : `לענות על ${promise.openDecisions} החלטות`}
+            {t("answerDecisions", { count: promise.openDecisions })}
           </Link>
         )}
       </span>
@@ -88,12 +96,12 @@ export function PromiseRow({ promise, showStage = true }: { promise: PortalPromi
         )}
         {promise.stage !== "DONE" && promise.dueDate && (
           <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
-            {formatDay(promise.dueDate)}
+            {formatDay(promise.dueDate, TIMEZONE)}
           </span>
         )}
         {showStage && (
           <span className={`rounded-full border px-2.5 py-1 text-[11px] ${STAGE_TONE[promise.stage]}`}>
-            {PORTAL_STAGE_LABELS[promise.stage]}
+            {t(`stages.${promise.stage}`)}
           </span>
         )}
       </span>

@@ -1793,6 +1793,9 @@
       "ruleNotFound": "הכלל לא נמצא.",
       "onlyProposed": "רק כלל מוצע מאשרים.",
       "uncertainOtherwise": "הכלל לא ודאי מסיבה אחרת. קודם סוגרים את מה שחסר בו."
+    },
+    "portalPreferences": {
+      "tooLong": "הטקסט ארוך מדי. אפשר לקצר, או לספר לנו את השאר בוואטסאפ."
     }
   },
   "auditLog": {
@@ -6658,6 +6661,367 @@
         "nothingToMark": "אין שיחות לסמן.",
         "keptAll": "{count} שיחות סומנו כנבדקו, וממשיכות להישמר."
       }
+    }
+  },
+  "portal": {
+    "context": {
+      "preview": "תצוגת לקוח: <b>{name}</b>. זה בדיוק מה שהלקוח רואה, וכל פעולה חסומה.",
+      "exitPreview": "יציאה מהתצוגה",
+      "shownFile": "התיק המוצג"
+    },
+    "home": {
+      "greeting": "שלום, {name}",
+      "headline": {
+        "decisions": "{count, plural, =1 {החלטה אחת מחכה לך.} other {# החלטות מחכות לך.}}",
+        "needsYou": "{count, plural, =1 {דבר אחד מחכה לך.} other {# דברים מחכים לך.}}",
+        "allClear": "הכל מטופל. אין כרגע דבר שדורש פעולה מצדך.",
+        "inProgress": "{count, plural, =1 {הבטחה אחת בטיפול. אין דבר שמחכה לך.} other {# הבטחות בטיפול. אין דבר שמחכה לך.}}"
+      },
+      "viewDecisions": "{count, plural, =1 {לצפייה בהחלטה} other {לצפייה ב-# החלטות}}",
+      "empty": {
+        "title": "כאן יופיע מה שאנחנו מטפלים בו עבורך",
+        "received": "כל בקשה שנכנסת מופיעה כאן ברגע שהיא מתקבלת אצלנו.",
+        "waiting": "כשמשהו מחכה לך, הוא יעלה לראש המסך.",
+        "done": "מה שהושלם נשאר כאן, עם התאריך.",
+        "firstItem": "הפריט הראשון שלך יופיע כאן תוך יום עבודה. בינתיים, כל בקשה נשלחת כרגיל בוואטסאפ למנהל התיק."
+      },
+      "waitingTitle": "מחכה לך",
+      "inProgressTitle": "בטיפול עכשיו",
+      "inProgressEmpty": "אין כרגע הבטחות פתוחות.",
+      "recentlyDoneTitle": "נסגר לאחרונה",
+      "allActivity": "כל הפעילות",
+      "managerNamed": "מנהל התיק שלך: {name}",
+      "managerUnnamed": "מנהל התיק שלך ב-Ankora",
+      "whatsapp": "וואטסאפ",
+      "whatsappSoon": "וואטסאפ: זמין בקרוב",
+      "package": "חבילת השעות: נוצלו <n>{consumed}</n> מתוך <n>{total}</n> שעות",
+      "packageLasts": "צפויה להספיק עד {date}",
+      "packageUsedUp": "החבילה נוצלה",
+      "cycle": "מחזור השעות הנוכחי: <n>{consumed}</n> מתוך <n>{total}</n> שעות",
+      "daysLeft": "{days} ימים לסיום",
+      "hoursDetail": "פירוט השעות"
+    },
+    "promises": {
+      "stages": {
+        "RECEIVED": "התקבל",
+        "IN_PROGRESS": "בטיפול",
+        "WAITING_ON_CLIENT": "מחכה לך",
+        "DONE": "הושלם"
+      },
+      "whatIsNeeded": "מה צריך ממך: {what}",
+      "answerDecisions": "{count, plural, =1 {לענות על ההחלטה} other {לענות על # החלטות}}",
+      "waitingToday": "מהיום",
+      "waitingYesterday": "מאתמול",
+      "waitingDays": "כבר {days} ימים"
+    },
+    "activity": {
+      "title": "הפעילות שלך",
+      "empty": "עדיין אין פעילות להצגה.",
+      "hoursLink": "שעות ודוחות"
+    },
+    "hours": {
+      "tabsLabel": "שעות ודוחות",
+      "tabs": {
+        "hours": "שעות",
+        "weekly": "לפי ימים",
+        "tasks": "משימות"
+      },
+      "packageTitle": "חבילת השעות",
+      "cycleTitle": "מחזור השעות הנוכחי",
+      "packageLoaded": "חבילת שעות שנטענה ב-{start} · בתוקף עד {end}",
+      "packageDaysLeft": "{days} ימים לסיום התוקף",
+      "currentCycle": "מחזור נוכחי: {start} עד {end}",
+      "cycleDaysLeft": "{days} ימים לסיום",
+      "noBank": "טרם הוגדר מחזור בנק שעות. פנו למנהל התיק שלכם ב-Ankora.",
+      "packageSize": "גודל החבילה",
+      "bankTotal": "סה\"כ בבנק",
+      "used": "נוצל",
+      "remaining": "נותר",
+      "usedPct": "<num>{pct}%</num> נוצל",
+      "pace": {
+        "over": "מעל הקצב",
+        "under": "מתחת לקצב",
+        "on": "בקצב"
+      },
+      "paceMarker": "הקו מסמן איפה צפוי להיות היום",
+      "carryMinus": "כולל קיזוז של <h>{hours}</h> שעות שנוצלו מעבר לחבילה הקודמת.",
+      "carryPlus": "כולל יתרה של <h>{hours}</h> שעות שעברו מהחבילה הקודמת ומנוצלות ראשונות.",
+      "decimalNote": "בשעות עשרוניות: 0.50 הן חצי שעה, 0.25 הן רבע שעה.",
+      "byCategory": "פילוח לפי תחום · החודש",
+      "noCategoryData": "אין עדיין נתונים לחודש הנוכחי.",
+      "thisWeek": "מה נעשה השבוע",
+      "byDays": "לפי ימים",
+      "noActivityThisWeek": "אין עדיין פעילות השבוע.",
+      "forecast": {
+        "depleted": "החבילה נוצלה. שעות נוספות יקוזזו מהטעינה הבאה.",
+        "insufficientData": "אין עדיין מספיק דיווחים מ-4 השבועות האחרונים כדי לצפות מתי היתרה תיגמר.",
+        "projected": "בקצב של {weekly} שעות בשבוע, היתרה צפויה להספיק עד {date}."
+      }
+    },
+    "weekly": {
+      "title": "פעילות שבועית",
+      "range": "{from} עד {to}",
+      "prevWeek": "שבוע קודם",
+      "nextWeek": "שבוע הבא",
+      "total": "סה\"כ",
+      "dayHint": "לחיצה על יום מציגה רק אותו",
+      "dayBarLabel": "{weekday} {day}: {hours} שעות",
+      "whatOnDay": "מה נעשה ב{day}",
+      "thisWeek": "מה נעשה השבוע",
+      "wholeWeek": "כל השבוע",
+      "noEntriesDay": "אין דיווחים ליום הזה.",
+      "noEntriesWeek": "אין עדיין דיווחים לשבוע זה.",
+      "columns": {
+        "date": "תאריך",
+        "activity": "פעילות",
+        "category": "קטגוריה",
+        "hours": "שעות"
+      },
+      "weekdays": {
+        "sun": "א׳",
+        "mon": "ב׳",
+        "tue": "ג׳",
+        "wed": "ד׳",
+        "thu": "ה׳",
+        "fri": "ו׳",
+        "sat": "ש׳"
+      }
+    },
+    "tasks": {
+      "title": "משימות · {month}",
+      "prevMonth": "חודש קודם",
+      "nextMonth": "חודש הבא",
+      "closedIn": "נסגרו ב{month}",
+      "openToday": "פתוחות היום",
+      "waitingOnYou": "מחכות לך",
+      "openTitle": "משימות פתוחות",
+      "openEmpty": "אין כרגע משימות פתוחות.",
+      "closedEmpty": "לא נסגרו משימות בחודש הזה."
+    },
+    "monthly": {
+      "title": "דוח {month}",
+      "fullDetail": "פירוט מלא של החודש, להורדה.",
+      "autoSendWeekly": "נשלח אוטומטית כל שבוע ביום {day}",
+      "autoSendMonthly": "נשלח אוטומטית ב-{day} לכל חודש",
+      "weekdays": {
+        "sun": "ראשון",
+        "mon": "שני",
+        "tue": "שלישי",
+        "wed": "רביעי",
+        "thu": "חמישי",
+        "fri": "שישי",
+        "sat": "שבת"
+      },
+      "prevMonth": "חודש קודם",
+      "nextMonth": "חודש הבא",
+      "monthHours": "שעות החודש: <h>{hours}</h>"
+    },
+    "history": {
+      "title": "היסטוריה",
+      "subtitle": "מחזורים וחבילות שעות קודמים, ודוחות שנשלחו.",
+      "cyclesTitle": "מחזורים וחבילות",
+      "columns": {
+        "start": "התחלה",
+        "end": "סיום",
+        "status": "סטטוס",
+        "usage": "ניצול",
+        "reportType": "סוג דוח",
+        "period": "תקופה",
+        "sentOn": "נשלח בתאריך"
+      },
+      "noCycles": "אין עדיין מחזורים או חבילות.",
+      "status": {
+        "OPEN": "פתוח",
+        "CLOSED": "סגור",
+        "RECALCULATED": "חושב מחדש"
+      },
+      "kind": {
+        "package": "חבילה",
+        "cycle": "מחזור"
+      },
+      "reportsTitle": "דוחות שנשלחו",
+      "noReports": "טרם נשלחו דוחות.",
+      "download": "הורדה",
+      "recipientsTitle": "ניהול נמענים לדוחות מתוזמנים",
+      "recipientsIntro": "כמנהל לקוח, ניתן לערוך כאן את רשימת הנמענים לכל דוח מתוזמן. סוג הדוח, התדירות וההפעלה/השבתה נשארים בשליטת Ankora.",
+      "noSchedules": "אין עדיין דוחות מתוזמנים עבור לקוח זה."
+    },
+    "recipients": {
+      "reportTypes": {
+        "MONTHLY_DETAILED": "דוח חודשי מפורט",
+        "WEEKLY_ACTIVITY": "פעילות שבועית",
+        "HOURS_BY_CATEGORY": "שעות לפי קטגוריה",
+        "HOUR_BANK_STATUS": "מצב בנק שעות"
+      },
+      "placeholder": "אימיילים מופרדים בפסיקים",
+      "save": "שמירת נמענים",
+      "saving": "שומר...",
+      "saved": "נשמר."
+    },
+    "file": {
+      "title": "התיק של {name}",
+      "intro": "מה שאנחנו יודעים עליך ומה שנאסף תוך כדי עבודה. הכול כאן כדי שלא תצטרך לזכור את זה.",
+      "preferencesTitle": "העדפות",
+      "preferencesCanEdit": "מה שתכתוב כאן מגיע למנהל התיק שלך, ומשנה איך אנחנו עובדים.",
+      "preferencesReadOnly": "רק מנהל הלקוח יכול לשנות את זה.",
+      "updatedOn": "עודכן לאחרונה ב-{date}",
+      "digestTitle": "כל כמה זמן לעדכן אותך",
+      "digestSubtitle": "לא נשלח יותר מזה, וגם לא פחות כשמשהו מחכה להחלטה שלך.",
+      "knowledge": {
+        "groups": {
+          "processes": {
+            "title": "מה אנחנו מנהלים עבורך",
+            "subtitle": "התהליכים שחוזרים אצלך, ואיפה כל אחד עומד."
+          },
+          "rules": {
+            "title": "כללים שקבעת",
+            "subtitle": "איך ביקשת שנעבוד. אנחנו בודקים כל נוהל מולם."
+          },
+          "requests": {
+            "title": "איך פונים אלינו",
+            "subtitle": "מה מגיע אלינו, ומה קורה איתו."
+          },
+          "systems": {
+            "title": "מערכות",
+            "subtitle": "המערכות שאנחנו עובדים בהן עבורך."
+          },
+          "facts": {
+            "title": "מה ידוע לנו",
+            "subtitle": "העדפות, דרישות ודברים שחשוב שנזכור."
+          },
+          "people": {
+            "title": "אנשים וגורמים",
+            "subtitle": "מי מעורב, ובמה."
+          },
+          "entities": {
+            "title": "ישויות",
+            "subtitle": "החברות שעבורן אנחנו עובדים."
+          }
+        },
+        "next": "הבא: {date}",
+        "from": "מ-{date}",
+        "askToConfirm": "נשמח לאישור שלך",
+        "confirmNote": "משהו לא מדויק, או מסומן לאישור? כתוב למנהל התיק שלך, ונעדכן.",
+        "tags": {
+          "handover": {
+            "WITH_CLIENT": "עדיין אצלך",
+            "IN_HANDOVER": "בחפיפה אלינו",
+            "WITH_ANKORA": "אצלנו",
+            "NOT_PLANNED": "נשאר אצלך"
+          },
+          "access": {
+            "HAS_ACCESS": "יש לנו גישה",
+            "PENDING": "ממתינים לגישה",
+            "NO_ACCESS": "אין לנו גישה"
+          },
+          "policyProposed": "בהטמעה אצלנו",
+          "factKind": {
+            "SCOPE_IN": "בתחום",
+            "SCOPE_OUT": "מחוץ לתחום",
+            "PREFERENCE": "העדפה",
+            "REQUIREMENT": "דרישה חוזרת",
+            "LOCATION": "מיקום",
+            "FINANCE": "כספים",
+            "TEMPORARY": "מידע זמני",
+            "ONE_OFF_DECISION": "החלטה חד-פעמית",
+            "QUESTION": "שאלה פתוחה",
+            "NOTE": "הערה"
+          }
+        }
+      },
+      "suppliersTitle": "ספקים וגורמים",
+      "suppliersSubtitle": "מי טיפל במה, מתי, ואיך היה.",
+      "suppliersEmpty": "עוד לא תיאמנו עבורך גורם חיצוני. כשנעשה זאת, הוא יירשם כאן.",
+      "experience": {
+        "GOOD": "מומלץ",
+        "OK": "בסדר",
+        "AVOID": "לא נשתמש שוב"
+      },
+      "documentsTitle": "מסמכים",
+      "documentsSubtitle": "פוליסות, אישורים וחוזים שנוצרו תוך כדי העבודה עבורך.",
+      "documentsEmpty": "עוד אין מסמכים בתיק. כל מסמך שייווצר בעבודה עבורך יופיע כאן להורדה.",
+      "documentKinds": {
+        "POLICY": "פוליסה",
+        "PROCEDURE": "נוהל",
+        "CERTIFICATE": "אישור",
+        "CONTRACT": "חוזה",
+        "INVOICE": "חשבונית",
+        "OTHER": "מסמך"
+      },
+      "download": "הורדה",
+      "datesTitle": "מועדים חוזרים",
+      "datesSubtitle": "חידושים, טיפולים ותשלומים שחוזרים כל שנה. אנחנו עוקבים אחריהם.",
+      "datesEmpty": "עוד לא רשמנו מועד חוזר עבורך.",
+      "claude": {
+        "title": "חיבור ל-Claude",
+        "subtitle": "אפשר לשאול את Claude מה המצב, מה מחכה לך ומה היה החודש, ולקבל תשובה מתוך הפורטל.",
+        "step1": "ב-Claude: הגדרות, Connectors, הוספת Connector מותאם אישית.",
+        "step2": "להדביק את הכתובת שלמטה ולאשר את החיבור עם המשתמש שלך באנקורה.",
+        "step3": "לשאול, למשל: \"איפה עומדת החפיפה?\" או \"מה מחכה לי?\".",
+        "copyLabel": "העתקת כתובת החיבור",
+        "note": "Claude רואה רק את מה שמופיע לך בפורטל. רק מנהל החשבון יכול לענות דרכו על החלטות."
+      }
+    },
+    "preferences": {
+      "fields": {
+        "contact": {
+          "label": "איך לדבר איתי",
+          "placeholder": "וואטסאפ עדיף. שיחות רק אחרי תשע, ולא בימי שישי."
+        },
+        "matters": {
+          "label": "מה חשוב לי",
+          "placeholder": "שהכול יהיה סגור לפני שאני שומע עליו. עדיף לשלם יותר ולא להתעסק."
+        },
+        "never": {
+          "label": "מה אסור שיקרה",
+          "placeholder": "שמישהו יגיע הביתה בלי שתיאמו איתי קודם."
+        }
+      },
+      "notRecorded": "עוד לא נרשם",
+      "saved": "נשמר. מנהל התיק שלך קיבל על זה הודעה.",
+      "saving": "שומר...",
+      "save": "שמירה",
+      "digest": {
+        "EVERY_DECISION": "כל החלטה, ברגע שהיא נפתחת",
+        "WEEKLY": "סיכום שבועי",
+        "MONTHLY": "רק הסיכום החודשי"
+      },
+      "digestSaved": "עודכן.",
+      "saveDigest": "שמירת התדירות"
+    },
+    "decisions": {
+      "answered": "התשובה שלך נקלטה. תודה.",
+      "chosen": "נבחר: {option}",
+      "noneTitle": "אין כרגע החלטות שמחכות לך",
+      "noneBody": "כשנגיע לצומת שדורשת הכרעה שלך, היא תופיע כאן עם האפשרויות, המחירים וההמלצה שלנו.",
+      "previous": "החלטות קודמות",
+      "record": "נבחר: {option} · אושר על ידי {name} ב-{date}",
+      "recordWithAmount": "נבחר: {option} · {amount} · אושר על ידי {name} ב-{date}",
+      "cancelled": "בוטל על ידי Ankora. לא נדרשה ממך החלטה."
+    },
+    "decisionCard": {
+      "sending": "נשלח...",
+      "recommended": "ההמלצה שלנו",
+      "dueBy": "נשמח לתשובה עד {date}",
+      "aboveCeiling": "הסכום גבוה מהתקרה שסוכמה איתך ({ceiling}), ולכן ההחלטה הזו שלך.",
+      "answered": "התשובה נקלטה. תודה.",
+      "noDueDate": "אין תאריך יעד להחלטה הזו",
+      "talk": "לדבר על זה",
+      "talkSoon": "לדבר על זה: זמין בקרוב",
+      "adminOnly": "רק מנהל הלקוח יכול לאשר. אפשר להעביר את זה אליו, או לדבר איתנו."
+    },
+    "errors": {
+      "forbidden": "אין לך הרשאה לבצע פעולה זו.",
+      "generic": "אירעה שגיאה. נסו שוב.",
+      "scheduleMissing": "חסר מזהה דוח מתוזמן.",
+      "noRecipients": "יש להזין לפחות נמען אחד.",
+      "preferencesAdminOnly": "רק מנהל הלקוח יכול לשנות את ההגדרות האלה.",
+      "invalidChoice": "בחירה לא תקינה.",
+      "decisionsAdminOnly": "רק מנהל הלקוח יכול לאשר החלטות.",
+      "noOption": "לא נבחרה אפשרות."
+    },
+    "documentRoute": {
+      "unavailable": "המסמך לא זמין כרגע. אפשר לבקש אותו מאיתנו בוואטסאפ."
     }
   }
 }

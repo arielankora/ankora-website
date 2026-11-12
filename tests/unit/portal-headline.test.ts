@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { portalHeadline } from "@/lib/app-domain/portal-labels";
+import { createTranslator } from "next-intl";
+import { portalHeadline, portalHeadlineKey } from "@/lib/app-domain/portal-labels";
+import he from "@/messages/he.json";
 
 // The one sentence at the top of the client's portal.
 //
@@ -49,6 +51,19 @@ describe("the portal's headline", () => {
     // creating the mental load it exists to remove.
     for (const inProgress of [0, 1, 4]) {
       expect(portalHeadline(0, 0, inProgress)).toContain("אין");
+    }
+  });
+});
+
+// ADR 0006: the home screen words the headline from the dictionary
+// (portal.home.headline) with portalHeadlineKey. In Hebrew it must read
+// exactly as portalHeadline does, or the two have drifted.
+describe("the portal's headline from the dictionary", () => {
+  it("says in Hebrew exactly what portalHeadline says", () => {
+    const t = createTranslator({ locale: "he-IL", messages: he, namespace: "portal.home.headline" });
+    for (const [d, w, p] of [[0, 0, 0], [0, 0, 1], [0, 0, 5], [1, 0, 0], [3, 0, 2], [0, 1, 0], [0, 2, 0], [1, 1, 0], [2, 3, 4]]) {
+      const { kind, count } = portalHeadlineKey(d, w, p);
+      expect(t(kind, { count })).toBe(portalHeadline(d, w, p));
     }
   });
 });

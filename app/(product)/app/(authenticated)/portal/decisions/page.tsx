@@ -1,4 +1,6 @@
+import { getFormatter, getLocale, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
+import { TIMEZONE } from "@/lib/timezone";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalDecisions } from "@/lib/app-domain/decisions";
 import { resolvePortalClient } from "@/lib/app-domain/client-portal";
@@ -8,10 +10,6 @@ import { whatsappHref } from "@/lib/whatsapp";
 import { DecisionCard } from "./DecisionCard";
 
 export const metadata = { robots: { index: false, follow: false } };
-
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
-}
 
 // Portal phase 2. The screen the portal exists for.
 //
@@ -35,6 +33,15 @@ export default async function PortalDecisionsPage(props: {
     throw err;
   }
 
+  const t = await getTranslations("portal.decisions");
+  const tCard = await getTranslations("portal.decisionCard");
+  const format = await getFormatter();
+  const locale = await getLocale();
+  // ADR 0006: in the reader's language. When an answer was given is an
+  // instant, in the reader's own time zone; a due date is an Israeli day.
+  const formatDate = (date: Date) => format.dateTime(date, { dateStyle: "medium" });
+  const money = (minor: number | null) => formatMinor(minor, locale);
+
   const canAnswer = ctx.clientUserRole === "ADMIN" && !ctx.isStaffPreview;
   const waHref = whatsappHref(ctx.client.whatsappNumber);
 
@@ -49,18 +56,18 @@ export default async function PortalDecisionsPage(props: {
 
       {justAnswered && (
         <div className="rounded-2xl border border-app-success/25 bg-app-success-soft px-[18px] py-3.5">
-          <p className="text-[13.5px] text-app-success">התשובה שלך נקלטה. תודה.</p>
+          <p className="text-[13.5px] text-app-success">{t("answered")}</p>
           {justAnswered.answer && (
-            <p className="mt-1 text-[12.5px] text-app-text-secondary">נבחר: {justAnswered.answer.optionLabel}</p>
+            <p className="mt-1 text-[12.5px] text-app-text-secondary">{t("chosen", { option: justAnswered.answer.optionLabel })}</p>
           )}
         </div>
       )}
 
       {decisions.open.length === 0 ? (
         <div className="rounded-2xl border border-app-border bg-white p-6">
-          <p className="text-[13.5px] font-medium text-app-text-primary">אין כרגע החלטות שמחכות לך</p>
+          <p className="text-[13.5px] font-medium text-app-text-primary">{t("noneTitle")}</p>
           <p className="mt-1.5 text-[13px] text-app-text-secondary">
-            כשנגיע לצומת שדורשת הכרעה שלך, היא תופיע כאן עם האפשרויות, המחירים וההמלצה שלנו.
+            {t("noneBody")}
           </p>
         </div>
       ) : (
@@ -77,7 +84,9 @@ export default async function PortalDecisionsPage(props: {
                 amountMinor: d.amountMinor,
                 ceilingMinor: d.ceilingMinor,
                 aboveCeiling: d.aboveCeiling,
-                dueAt: d.dueAt?.toISOString() ?? null,
+                dueLabel: d.dueAt
+                  ? tCard("dueBy", { date: format.dateTime(d.dueAt, { day: "numeric", month: "long", timeZone: TIMEZONE }) })
+                  : null,
                 taskTitle: d.taskTitle,
                 options: d.options,
               }}
@@ -89,20 +98,31 @@ export default async function PortalDecisionsPage(props: {
       {decisions.closed.length > 0 && (
         <div className="overflow-hidden rounded-2xl border border-app-border bg-white">
           <div className="border-b border-app-border px-[18px] py-3.5 text-[13.5px] font-medium text-app-text-primary">
-            החלטות קודמות
+            {t("previous")}
           </div>
           <div className="divide-y divide-app-border">
             {decisions.closed.map((d) => (
               <div key={d.id} className="px-[18px] py-3.5">
-                <p className="text-sm text-app-text-primary">{d.question}</p>
+                <p dir="auto" className="text-page-start text-sm text-app-text-primary">
+                  {d.question}
+                </p>
                 {d.answer ? (
                   <p className="mt-1 text-[12px] text-app-text-secondary">
-                    נבחר: {d.answer.optionLabel}
-                    {formatMinor(d.answer.amountMinor) ? ` · ${formatMinor(d.answer.amountMinor)}` : ""} · אושר על ידי{" "}
-                    {d.answer.respondedByName} ב-{formatDate(d.answer.respondedAt)}
+                    {money(d.answer.amountMinor)
+                      ? t("recordWithAmount", {
+                          option: d.answer.optionLabel,
+                          amount: money(d.answer.amountMinor) ?? "",
+                          name: d.answer.respondedByName,
+                          date: formatDate(d.answer.respondedAt),
+                        })
+                      : t("record", {
+                          option: d.answer.optionLabel,
+                          name: d.answer.respondedByName,
+                          date: formatDate(d.answer.respondedAt),
+                        })}
                   </p>
                 ) : (
-                  <p className="mt-1 text-[12px] text-app-text-tertiary">בוטל על ידי Ankora. לא נדרשה ממך החלטה.</p>
+                  <p className="mt-1 text-[12px] text-app-text-tertiary">{t("cancelled")}</p>
                 )}
               </div>
             ))}

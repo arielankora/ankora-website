@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { TOP_LEVEL_ONLY } from "@/lib/app-domain/tasks";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
+import { DomainError } from "@/lib/domain-error";
 import { resolvePortalClient, assertPortalWritable } from "@/lib/app-domain/client-portal";
 import { sendEmail } from "@/lib/email";
 import { portalKnowledge, type PortalKnowledgeGroup } from "@/lib/portal-knowledge";
@@ -233,7 +234,7 @@ export async function updatePortalPreferences(actor: User, input: PortalPreferen
 
   for (const value of [input.contact, input.matters, input.never]) {
     if (typeof value === "string" && value.length > PREFERENCE_MAX) {
-      throw new Error("הטקסט ארוך מדי. אפשר לקצר, או לספר לנו את השאר בוואטסאפ.");
+      throw new DomainError("portalPreferences.tooLong", "הטקסט ארוך מדי. אפשר לקצר, או לספר לנו את השאר בוואטסאפ.");
     }
   }
 

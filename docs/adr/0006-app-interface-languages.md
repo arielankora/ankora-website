@@ -195,8 +195,33 @@ thread event labels built in lib, the reminder after a task is closed
 4. Outgoing channels by the recipient's language: email, notifications,
    PDF and exports.
 5. Translating content on request, under the "בלי AI" rule above.
-6. The client portal, if clients ask for English. Until then the language
-   picker is offered to staff only.
+6. The client portal: done, see "The client portal" below.
+
+## The client portal (12.11.2026)
+
+Decided by Ariel on 12.11.2026, and built with it:
+
+* The portal is translated (every screen under `portal/`, the context bar
+  and the document download's refusal), and the language picker on the
+  profile is offered to everyone, client users included.
+* A client marked "בלי AI" may have the English interface as well. The
+  interface comes from the dictionary, written in advance by people; no AI
+  reads or writes anything of theirs to show it.
+* The confidentiality undertaking and the agreement signing and upload
+  pages stay in Hebrew (`HebrewOnly`, decision 5), unchanged.
+* Prompts to Claude stay in Hebrew.
+* What people wrote is never translated: notes to the client, outcomes,
+  what we need from them, task and decision titles, the client file's
+  items, the monthly summary. It is shown with `dir="auto"`.
+
+Labels that the portal shares with Hebrew output keep their lib functions
+for that output (`portalHeadline`, `PORTAL_STAGE_LABELS`, `DIGEST_LABELS`,
+the knowledge tags, `autoSendLabel`, `describeForecast`), and the screens
+word the same answer from the dictionary (`portalHeadlineKey`, the
+`tagCode` and `date` on a knowledge item, `autoSend`). What the portal
+sends out (the monthly export as PDF and Excel, the emails, the MCP
+answers) stays in Hebrew until outgoing channels follow the recipient's
+language (item 4 above).
 
 Until the screens a person uses are translated, choosing English shows
 those screens in Hebrew laid out left to right. That is expected in this

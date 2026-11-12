@@ -1,7 +1,8 @@
+import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
+import { TIMEZONE } from "@/lib/timezone";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalFile } from "@/lib/app-domain/client-file";
-import { DOCUMENT_KIND_LABELS, SUPPLIER_EXPERIENCE_LABELS } from "@/lib/app-domain/portal-labels";
 import { Forbidden } from "@/components/app/Forbidden";
 import { CopyValue } from "@/components/app/CopyValue";
 import { SITE_URL } from "@/lib/site";
@@ -14,9 +15,8 @@ import { PreferencesForm, DigestForm } from "./PreferencesForm";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-function formatDay(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jerusalem" }).format(date);
-}
+/// The groups lib/portal-knowledge.ts builds, by key (portal.file.knowledge.groups).
+type KnowledgeGroupKey = "processes" | "rules" | "requests" | "systems" | "facts" | "people" | "entities";
 
 function formatSize(bytes: number | null): string | null {
   if (!bytes) return null;
@@ -72,68 +72,95 @@ export default async function PortalFilePage() {
   }
 
   const { client, canEdit, preferences, digest, suppliers, documents, dates, knowledge } = file;
+  const t = await getTranslations("portal.file");
+  const format = await getFormatter();
+  // ADR 0006: in the reader's language. Days on this screen are Israeli
+  // days (a renewal, a supplier visit), so they are written in Israel time.
+  const formatDay = (date: Date) => format.dateTime(date, { day: "numeric", month: "short", year: "numeric", timeZone: TIMEZONE });
+  const knowledgeDay = (date: Date) => format.dateTime(date, { day: "numeric", month: "numeric", year: "numeric", timeZone: TIMEZONE });
+  // A tag code from lib/portal-knowledge.ts, under file.knowledge.tags. The
+  // code is built from a status, so it is looked up without a type check;
+  // portalKnowledge only sets codes for statuses that have a label.
+  const tagText = (code: string) => (t as unknown as (key: string) => string)(`knowledge.tags.${code}`);
 
   return (
     <div className="space-y-4">
 
       <div className="rounded-[20px] border border-gold/28 bg-app-surface-sunken p-6 sm:p-7">
-        <p className="text-xl font-medium text-app-text-primary">התיק של {client.name}</p>
+        <p className="text-xl font-medium text-app-text-primary">{t("title", { name: client.name })}</p>
         <p className="mt-1.5 text-[13.5px] text-app-text-secondary">
-          מה שאנחנו יודעים עליך ומה שנאסף תוך כדי עבודה. הכול כאן כדי שלא תצטרך לזכור את זה.
+          {t("intro")}
         </p>
       </div>
 
       <Block
-        title="העדפות"
-        subtitle={
-          canEdit
-            ? "מה שתכתוב כאן מגיע למנהל התיק שלך, ומשנה איך אנחנו עובדים."
-            : "רק מנהל הלקוח יכול לשנות את זה."
-        }
+        title={t("preferencesTitle")}
+        subtitle={canEdit ? t("preferencesCanEdit") : t("preferencesReadOnly")}
       >
         <PreferencesForm preferences={preferences} canEdit={canEdit} />
         {preferences.updatedAt && (
-          <p className="mt-3 text-[11.5px] text-app-text-tertiary">עודכן לאחרונה ב-{formatDay(preferences.updatedAt)}</p>
+          <p className="mt-3 text-[11.5px] text-app-text-tertiary">{t("updatedOn", { date: formatDay(preferences.updatedAt) })}</p>
         )}
       </Block>
 
-      <Block title="כל כמה זמן לעדכן אותך" subtitle="לא נשלח יותר מזה, וגם לא פחות כשמשהו מחכה להחלטה שלך.">
+      <Block title={t("digestTitle")} subtitle={t("digestSubtitle")}>
         <DigestForm digest={digest} canEdit={canEdit} />
       </Block>
 
       {/* The client file, as far as it is the client's to see (lib/portal-knowledge.ts). */}
       {knowledge.map((g) => (
-        <Block key={g.key} title={g.title} subtitle={g.subtitle}>
+        <Block
+          key={g.key}
+          title={t(`knowledge.groups.${g.key as KnowledgeGroupKey}.title`)}
+          subtitle={t(`knowledge.groups.${g.key as KnowledgeGroupKey}.subtitle`)}
+        >
           <ul className="divide-y divide-app-border" data-testid={`portal-knowledge-${g.key}`}>
-            {g.items.map((i, n) => (
+            {g.items.map((i, n) => {
+              // What people wrote stays as written; the date beside it is
+              // worded in the reader's language.
+              const detail =
+                [
+                  i.detailText,
+                  i.date ? t(i.date.kind === "next" ? "knowledge.next" : "knowledge.from", { date: knowledgeDay(i.date.at) }) : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || null;
+              return (
               <li key={n} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0">
-                <span className="text-sm text-app-text-primary">
+                <span dir="auto" className="text-sm text-app-text-primary">
                   {i.text}
-                  {i.detail && <span className="text-app-text-secondary"> · {i.detail}</span>}
+                  {detail && <span className="text-app-text-secondary"> · {detail}</span>}
                 </span>
                 <span className="flex items-center gap-2">
                   {i.askToConfirm && (
-                    <span className="rounded-full border border-app-warning/30 bg-app-warning-soft px-2.5 py-1 text-[11px] text-app-warning">נשמח לאישור שלך</span>
+                    <span className="rounded-full border border-app-warning/30 bg-app-warning-soft px-2.5 py-1 text-[11px] text-app-warning">
+                      {t("knowledge.askToConfirm")}
+                    </span>
                   )}
-                  {i.tag && <span className="rounded-full border border-app-border bg-app-surface-sunken px-2.5 py-1 text-[11px] text-app-text-secondary">{i.tag}</span>}
+                  {i.tagCode && (
+                    <span className="rounded-full border border-app-border bg-app-surface-sunken px-2.5 py-1 text-[11px] text-app-text-secondary">
+                      {tagText(i.tagCode)}
+                    </span>
+                  )}
                 </span>
               </li>
-            ))}
+              );
+            })}
           </ul>
           {g.items.some((i) => i.askToConfirm) && (
-            <p className="mt-3 text-[11.5px] text-app-text-tertiary">משהו לא מדויק, או מסומן לאישור? כתוב למנהל התיק שלך, ונעדכן.</p>
+            <p className="mt-3 text-[11.5px] text-app-text-tertiary">{t("knowledge.confirmNote")}</p>
           )}
         </Block>
       ))}
 
-      <Block title="ספקים וגורמים" subtitle="מי טיפל במה, מתי, ואיך היה.">
+      <Block title={t("suppliersTitle")} subtitle={t("suppliersSubtitle")}>
         {suppliers.length === 0 ? (
-          <Empty>עוד לא תיאמנו עבורך גורם חיצוני. כשנעשה זאת, הוא יירשם כאן.</Empty>
+          <Empty>{t("suppliersEmpty")}</Empty>
         ) : (
           <ul className="divide-y divide-app-border">
             {suppliers.map((s) => (
               <li key={s.taskId} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0">
-                <span className="text-sm text-app-text-primary">
+                <span dir="auto" className="text-sm text-app-text-primary">
                   {s.name}
                   <span className="text-app-text-secondary"> · {s.what}</span>
                 </span>
@@ -150,7 +177,7 @@ export default async function PortalFilePage() {
                           : "border-app-border bg-app-surface-sunken text-app-text-secondary"
                     }`}
                   >
-                    {SUPPLIER_EXPERIENCE_LABELS[s.experience]}
+                    {t(`experience.${s.experience}`)}
                   </span>
                 </span>
               </li>
@@ -159,9 +186,9 @@ export default async function PortalFilePage() {
         )}
       </Block>
 
-      <Block title="מסמכים" subtitle="פוליסות, אישורים וחוזים שנוצרו תוך כדי העבודה עבורך.">
+      <Block title={t("documentsTitle")} subtitle={t("documentsSubtitle")}>
         {documents.length === 0 ? (
-          <Empty>עוד אין מסמכים בתיק. כל מסמך שייווצר בעבודה עבורך יופיע כאן להורדה.</Empty>
+          <Empty>{t("documentsEmpty")}</Empty>
         ) : (
           <ul className="divide-y divide-app-border">
             {documents.map((d) => {
@@ -169,8 +196,8 @@ export default async function PortalFilePage() {
               return (
                 <li key={d.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0">
                   <span className="text-sm text-app-text-primary">
-                    {d.title}
-                    <span className="text-app-text-secondary"> · {DOCUMENT_KIND_LABELS[d.kind]}</span>
+                    <bdi dir="auto">{d.title}</bdi>
+                    <span className="text-app-text-secondary"> · {t(`documentKinds.${d.kind}`)}</span>
                   </span>
                   <span className="flex items-center gap-2.5">
                     {size && (
@@ -185,7 +212,7 @@ export default async function PortalFilePage() {
                         than a file: the server decides on every request
                         whether this person may have it. */}
                     <a href={`/api/portal/documents/${d.id}`} className="text-xs text-app-text-accent hover:underline">
-                      הורדה
+                      {t("download")}
                     </a>
                   </span>
                 </li>
@@ -195,14 +222,16 @@ export default async function PortalFilePage() {
         )}
       </Block>
 
-      <Block title="מועדים חוזרים" subtitle="חידושים, טיפולים ותשלומים שחוזרים כל שנה. אנחנו עוקבים אחריהם.">
+      <Block title={t("datesTitle")} subtitle={t("datesSubtitle")}>
         {dates.length === 0 ? (
-          <Empty>עוד לא רשמנו מועד חוזר עבורך.</Empty>
+          <Empty>{t("datesEmpty")}</Empty>
         ) : (
           <ul className="divide-y divide-app-border">
             {dates.map((d) => (
               <li key={d.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0">
-                <span className="text-sm text-app-text-primary">{d.title}</span>
+                <span dir="auto" className="text-sm text-app-text-primary">
+                  {d.title}
+                </span>
                 {d.nextAt && (
                   <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
                     {formatDay(d.nextAt)}
@@ -215,20 +244,20 @@ export default async function PortalFilePage() {
       </Block>
 
       <div id="claude">
-        <Block title="חיבור ל-Claude" subtitle="אפשר לשאול את Claude מה המצב, מה מחכה לך ומה היה החודש, ולקבל תשובה מתוך הפורטל.">
+        <Block title={t("claude.title")} subtitle={t("claude.subtitle")}>
           <ol className="list-decimal space-y-1.5 pe-5 text-[13px] leading-relaxed text-app-text-secondary">
-            <li>ב-Claude: הגדרות, Connectors, הוספת Connector מותאם אישית.</li>
-            <li>להדביק את הכתובת שלמטה ולאשר את החיבור עם המשתמש שלך באנקורה.</li>
-            <li>לשאול, למשל: &quot;איפה עומדת החפיפה?&quot; או &quot;מה מחכה לי?&quot;.</li>
+            <li>{t("claude.step1")}</li>
+            <li>{t("claude.step2")}</li>
+            <li>{t("claude.step3")}</li>
           </ol>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <code dir="ltr" className="rounded bg-app-surface-page px-2 py-1 font-jbmono text-[12px] text-app-text-primary">
               {PORTAL_CONNECTOR_URL}
             </code>
-            <CopyValue value={PORTAL_CONNECTOR_URL} label="העתקת כתובת החיבור" />
+            <CopyValue value={PORTAL_CONNECTOR_URL} label={t("claude.copyLabel")} />
           </div>
           <p className="mt-3 text-[12px] text-app-text-secondary">
-            Claude רואה רק את מה שמופיע לך בפורטל. רק מנהל החשבון יכול לענות דרכו על החלטות.
+            {t("claude.note")}
           </p>
         </Block>
       </div>

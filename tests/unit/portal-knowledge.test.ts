@@ -38,9 +38,22 @@ describe("what the client sees", () => {
       now
     );
     expect(g.map((x) => x.key)).toEqual(["processes", "systems", "facts"]);
-    expect(g[0].items).toEqual([{ text: "תשלומי ספקים", detail: "פעמיים בחודש · הבא: 10.11.2026", tag: "בחפיפה אלינו", askToConfirm: false }]);
-    expect(g[1].items).toEqual([{ text: "Mercury", detail: "בנק", tag: "ממתינים לגישה", askToConfirm: true }]);
-    expect(g[2].items).toEqual([{ text: "WhatsApp קודם", tag: "העדפה", askToConfirm: false }]);
+    expect(g[0].items).toEqual([
+      {
+        text: "תשלומי ספקים",
+        detail: "פעמיים בחודש · הבא: 10.11.2026",
+        tag: "בחפיפה אלינו",
+        askToConfirm: false,
+        // ADR 0006: the same item for a screen in the reader's language.
+        detailText: "פעמיים בחודש",
+        date: { kind: "next", at: new Date("2026-11-10T00:00:00Z") },
+        tagCode: "handover.IN_HANDOVER",
+      },
+    ]);
+    expect(g[1].items).toEqual([
+      { text: "Mercury", detail: "בנק", tag: "ממתינים לגישה", askToConfirm: true, detailText: "בנק", tagCode: "access.PENDING" },
+    ]);
+    expect(g[2].items).toEqual([{ text: "WhatsApp קודם", tag: "העדפה", askToConfirm: false, tagCode: "factKind.PREFERENCE" }]);
   });
 
   it("nothing marked, nothing shown", () => {

@@ -1,15 +1,22 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { respondToDecision } from "@/lib/app-domain/decisions";
 
 type FormState = { error?: string; ok?: boolean };
 
-function friendlyError(err: unknown): string {
-  if (err instanceof ForbiddenError) return "רק מנהל הלקוח יכול לאשר החלטות.";
+// ADR 0006: a refusal in the reader's language. respondToDecision's own
+// refusals are DomainErrors (decisions.*), worded by the dictionary.
+async function friendlyError(err: unknown): Promise<string> {
+  const t = await getTranslations("portal.errors");
+  if (err instanceof ForbiddenError) return t("decisionsAdminOnly");
+  const text = await domainErrorText(err);
+  if (text) return text;
   if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
+  return t("generic");
 }
 
 // Portal phase 2. The client's one write.
@@ -27,12 +34,12 @@ export async function respondToDecisionAction(
   const user = await requireUser();
   const decisionId = String(formData.get("decisionId") || "");
   const optionId = String(formData.get("optionId") || "");
-  if (!decisionId || !optionId) return { error: "לא נבחרה אפשרות." };
+  if (!decisionId || !optionId) return { error: (await getTranslations("portal.errors"))("noOption") };
 
   try {
     await respondToDecision(user, decisionId, optionId);
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
 
   revalidatePath("/app/portal/decisions");

@@ -1,15 +1,13 @@
+import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
+import { TIMEZONE } from "@/lib/timezone";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { parsePeriodOffset, MAX_MONTH_OFFSET, israelMonthReference } from "@/lib/period-offset";
 import { getPortalTaskReport } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { ViewTabs } from "@/components/app/ViewTabs";
-import { HOURS_TABS } from "../hours/tabs";
+import { hoursTabs } from "../hours/tabs";
 import { PromiseList } from "../PromiseList";
-
-function formatMonthTitle(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "Asia/Jerusalem" }).format(date);
-}
 
 // 11.11.2026 (Hadas's portal review): the "משימות" view of the hours screen
 // (?view=tasks), in the place of the monthly report. How many tasks closed
@@ -31,29 +29,33 @@ export async function TasksView({ searchParams }: { searchParams: { monthOffset?
     throw err;
   }
 
-  const month = formatMonthTitle(referenceDate);
+  const t = await getTranslations("portal.tasks");
+  const tHours = await getTranslations("portal.hours");
+  const format = await getFormatter();
+  // ADR 0006: an Israeli month, named in the reader's language.
+  const month = format.dateTime(referenceDate, { month: "long", year: "numeric", timeZone: TIMEZONE });
   const monthHref = (offset: number) => `/app/portal/hours?view=tasks&monthOffset=${offset}`;
 
   return (
     <div className="space-y-4">
-      <ViewTabs label="שעות ודוחות" active="tasks" tabs={HOURS_TABS} />
+      <ViewTabs label={tHours("tabsLabel")} active="tasks" tabs={hoursTabs((key) => tHours(`tabs.${key}`))} />
 
       <div className="rounded-2xl border border-app-border bg-white p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-[15px] font-medium text-app-text-primary">משימות · {month}</h1>
+          <h1 className="text-[15px] font-medium text-app-text-primary">{t("title", { month })}</h1>
           <div className="flex flex-wrap gap-2">
             <a
               href={monthHref(monthOffset - 1)}
               className="rounded-full border border-app-border-strong px-4 py-2 text-sm text-app-text-primary hover:border-app-accent"
             >
-              חודש קודם
+              {t("prevMonth")}
             </a>
             {monthOffset < 0 && (
               <a
                 href={monthHref(monthOffset + 1)}
                 className="rounded-full border border-app-border-strong px-4 py-2 text-sm text-app-text-primary hover:border-app-accent"
               >
-                חודש הבא
+                {t("nextMonth")}
               </a>
             )}
           </div>
@@ -61,25 +63,25 @@ export async function TasksView({ searchParams }: { searchParams: { monthOffset?
 
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <a href="#closed" className="rounded-xl border border-app-border p-3.5 hover:border-app-accent">
-            <span className="text-[11.5px] text-app-text-secondary">נסגרו ב{month}</span>
+            <span className="text-[11.5px] text-app-text-secondary">{t("closedIn", { month })}</span>
             <p className="mt-1.5 font-jbmono text-xl text-app-text-primary">{report.closed.length}</p>
           </a>
           <a href="#open" className="rounded-xl border border-app-border p-3.5 hover:border-app-accent">
-            <span className="text-[11.5px] text-app-text-secondary">פתוחות היום</span>
+            <span className="text-[11.5px] text-app-text-secondary">{t("openToday")}</span>
             <p className="mt-1.5 font-jbmono text-xl text-app-text-primary">{report.open.length}</p>
           </a>
           <a href="#open" className="rounded-xl border border-app-border p-3.5 hover:border-app-accent">
-            <span className="text-[11.5px] text-app-text-secondary">מחכות לך</span>
+            <span className="text-[11.5px] text-app-text-secondary">{t("waitingOnYou")}</span>
             <p className="mt-1.5 font-jbmono text-xl text-app-text-primary">{report.waitingOnClient}</p>
           </a>
         </div>
       </div>
 
       <div id="open" className="scroll-mt-6">
-        <PromiseList title="משימות פתוחות" promises={report.open} emptyText="אין כרגע משימות פתוחות." />
+        <PromiseList title={t("openTitle")} promises={report.open} emptyText={t("openEmpty")} />
       </div>
       <div id="closed" className="scroll-mt-6">
-        <PromiseList title={`נסגרו ב${month}`} promises={report.closed} emptyText="לא נסגרו משימות בחודש הזה." showStage={false} />
+        <PromiseList title={t("closedIn", { month })} promises={report.closed} emptyText={t("closedEmpty")} showStage={false} />
       </div>
     </div>
   );

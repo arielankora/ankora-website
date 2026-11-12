@@ -1793,6 +1793,9 @@
       "ruleNotFound": "Rule not found.",
       "onlyProposed": "Only a proposed rule can be approved.",
       "uncertainOtherwise": "The rule is uncertain for another reason. Close what's missing in it first."
+    },
+    "portalPreferences": {
+      "tooLong": "That's too long. You can shorten it, or tell us the rest on WhatsApp."
     }
   },
   "auditLog": {
@@ -6658,6 +6661,367 @@
         "nothingToMark": "No conversations to mark.",
         "keptAll": "{count, plural, one {# conversation} other {# conversations}} marked as reviewed, and still stored."
       }
+    }
+  },
+  "portal": {
+    "context": {
+      "preview": "Client view: <b>{name}</b>. This is exactly what the client sees, and every action is blocked.",
+      "exitPreview": "Leave client view",
+      "shownFile": "Showing"
+    },
+    "home": {
+      "greeting": "Hello, {name}",
+      "headline": {
+        "decisions": "{count, plural, =1 {One decision is waiting for you.} other {# decisions are waiting for you.}}",
+        "needsYou": "{count, plural, =1 {One thing is waiting for you.} other {# things are waiting for you.}}",
+        "allClear": "Everything is taken care of. Nothing needs you right now.",
+        "inProgress": "{count, plural, =1 {We're working on one thing for you. Nothing is waiting for you.} other {We're working on # things for you. Nothing is waiting for you.}}"
+      },
+      "viewDecisions": "{count, plural, =1 {View the decision} other {View # decisions}}",
+      "empty": {
+        "title": "This is where you'll see what we're handling for you",
+        "received": "Every request shows up here as soon as we receive it.",
+        "waiting": "When something is waiting for you, it moves to the top of the screen.",
+        "done": "Finished work stays here, with its date.",
+        "firstItem": "Your first item will appear here within one working day. Until then, send any request to your account manager on WhatsApp, as usual."
+      },
+      "waitingTitle": "Waiting for you",
+      "inProgressTitle": "In progress",
+      "inProgressEmpty": "Nothing is open right now.",
+      "recentlyDoneTitle": "Recently done",
+      "allActivity": "All activity",
+      "managerNamed": "Your account manager: {name}",
+      "managerUnnamed": "Your account manager at Ankora",
+      "whatsapp": "WhatsApp",
+      "whatsappSoon": "WhatsApp: coming soon",
+      "package": "Hour package: <n>{consumed}</n> of <n>{total}</n> hours used",
+      "packageLasts": "expected to last until {date}",
+      "packageUsedUp": "package used up",
+      "cycle": "Current hour cycle: <n>{consumed}</n> of <n>{total}</n> hours",
+      "daysLeft": "{days} days left",
+      "hoursDetail": "Hours in detail"
+    },
+    "promises": {
+      "stages": {
+        "RECEIVED": "Received",
+        "IN_PROGRESS": "In progress",
+        "WAITING_ON_CLIENT": "Waiting for you",
+        "DONE": "Done"
+      },
+      "whatIsNeeded": "What we need from you: {what}",
+      "answerDecisions": "{count, plural, =1 {Answer the decision} other {Answer # decisions}}",
+      "waitingToday": "since today",
+      "waitingYesterday": "since yesterday",
+      "waitingDays": "for {days} days"
+    },
+    "activity": {
+      "title": "Your activity",
+      "empty": "No activity to show yet.",
+      "hoursLink": "Hours and reports"
+    },
+    "hours": {
+      "tabsLabel": "Hours and reports",
+      "tabs": {
+        "hours": "Hours",
+        "weekly": "By day",
+        "tasks": "Tasks"
+      },
+      "packageTitle": "Hour package",
+      "cycleTitle": "Current hour cycle",
+      "packageLoaded": "Package loaded on {start} · valid until {end}",
+      "packageDaysLeft": "{days} days until it expires",
+      "currentCycle": "Current cycle: {start} to {end}",
+      "cycleDaysLeft": "{days} days left",
+      "noBank": "No hour bank cycle has been set up yet. Please talk to your account manager at Ankora.",
+      "packageSize": "Package size",
+      "bankTotal": "Total in the bank",
+      "used": "Used",
+      "remaining": "Left",
+      "usedPct": "<num>{pct}%</num> used",
+      "pace": {
+        "over": "Ahead of pace",
+        "under": "Behind pace",
+        "on": "On pace"
+      },
+      "paceMarker": "the line marks where we'd expect to be today",
+      "carryMinus": "Includes <h>{hours}</h> hours used beyond the previous package, deducted here.",
+      "carryPlus": "Includes <h>{hours}</h> hours carried over from the previous package, which are used first.",
+      "decimalNote": "In decimal hours: 0.50 is half an hour, 0.25 is a quarter of an hour.",
+      "byCategory": "By area · this month",
+      "noCategoryData": "No data for this month yet.",
+      "thisWeek": "What we did this week",
+      "byDays": "By day",
+      "noActivityThisWeek": "No activity this week yet.",
+      "forecast": {
+        "depleted": "The package is used up. Further hours will be deducted from the next package.",
+        "insufficientData": "There isn't enough activity from the last 4 weeks yet to forecast when the balance will run out.",
+        "projected": "At {weekly} hours a week, the balance should last until {date}."
+      }
+    },
+    "weekly": {
+      "title": "Weekly activity",
+      "range": "{from} to {to}",
+      "prevWeek": "Previous week",
+      "nextWeek": "Next week",
+      "total": "Total",
+      "dayHint": "Click a day to see only that day",
+      "dayBarLabel": "{weekday} {day}: {hours} hours",
+      "whatOnDay": "What we did on {day}",
+      "thisWeek": "What we did this week",
+      "wholeWeek": "Whole week",
+      "noEntriesDay": "No time entries for this day.",
+      "noEntriesWeek": "No time entries for this week yet.",
+      "columns": {
+        "date": "Date",
+        "activity": "Activity",
+        "category": "Category",
+        "hours": "Hours"
+      },
+      "weekdays": {
+        "sun": "Sun",
+        "mon": "Mon",
+        "tue": "Tue",
+        "wed": "Wed",
+        "thu": "Thu",
+        "fri": "Fri",
+        "sat": "Sat"
+      }
+    },
+    "tasks": {
+      "title": "Tasks · {month}",
+      "prevMonth": "Previous month",
+      "nextMonth": "Next month",
+      "closedIn": "Closed in {month}",
+      "openToday": "Open today",
+      "waitingOnYou": "Waiting for you",
+      "openTitle": "Open tasks",
+      "openEmpty": "No open tasks right now.",
+      "closedEmpty": "No tasks were closed this month."
+    },
+    "monthly": {
+      "title": "{month} report",
+      "fullDetail": "The month in full detail, to download.",
+      "autoSendWeekly": "Sent automatically every week on {day}",
+      "autoSendMonthly": "Sent automatically on day {day} of every month",
+      "weekdays": {
+        "sun": "Sunday",
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday"
+      },
+      "prevMonth": "Previous month",
+      "nextMonth": "Next month",
+      "monthHours": "Hours this month: <h>{hours}</h>"
+    },
+    "history": {
+      "title": "History",
+      "subtitle": "Past hour cycles and packages, and the reports we sent.",
+      "cyclesTitle": "Cycles and packages",
+      "columns": {
+        "start": "Start",
+        "end": "End",
+        "status": "Status",
+        "usage": "Usage",
+        "reportType": "Report",
+        "period": "Period",
+        "sentOn": "Sent on"
+      },
+      "noCycles": "No cycles or packages yet.",
+      "status": {
+        "OPEN": "Open",
+        "CLOSED": "Closed",
+        "RECALCULATED": "Recalculated"
+      },
+      "kind": {
+        "package": "Package",
+        "cycle": "Cycle"
+      },
+      "reportsTitle": "Reports sent",
+      "noReports": "No reports have been sent yet.",
+      "download": "Download",
+      "recipientsTitle": "Recipients of scheduled reports",
+      "recipientsIntro": "As the client admin, you can edit who receives each scheduled report here. The report type, how often it goes out, and whether it is on stay with Ankora.",
+      "noSchedules": "There are no scheduled reports for you yet."
+    },
+    "recipients": {
+      "reportTypes": {
+        "MONTHLY_DETAILED": "Detailed monthly report",
+        "WEEKLY_ACTIVITY": "Weekly activity",
+        "HOURS_BY_CATEGORY": "Hours by category",
+        "HOUR_BANK_STATUS": "Hour bank status"
+      },
+      "placeholder": "Email addresses, separated by commas",
+      "save": "Save recipients",
+      "saving": "Saving...",
+      "saved": "Saved."
+    },
+    "file": {
+      "title": "{name}'s file",
+      "intro": "What we know about you and what we've gathered along the way. It's all here so you don't have to remember it.",
+      "preferencesTitle": "Preferences",
+      "preferencesCanEdit": "What you write here goes to your account manager and changes how we work.",
+      "preferencesReadOnly": "Only your client admin can change this.",
+      "updatedOn": "Last updated on {date}",
+      "digestTitle": "How often to update you",
+      "digestSubtitle": "We won't send more than this, and won't send less when something is waiting for your decision.",
+      "knowledge": {
+        "groups": {
+          "processes": {
+            "title": "What we manage for you",
+            "subtitle": "Your recurring processes, and where each one stands."
+          },
+          "rules": {
+            "title": "Rules you set",
+            "subtitle": "How you asked us to work. We check every procedure against them."
+          },
+          "requests": {
+            "title": "How to reach us",
+            "subtitle": "What comes to us, and what happens with it."
+          },
+          "systems": {
+            "title": "Systems",
+            "subtitle": "The systems we work in for you."
+          },
+          "facts": {
+            "title": "What we know",
+            "subtitle": "Preferences, requirements and things we should remember."
+          },
+          "people": {
+            "title": "People and organizations",
+            "subtitle": "Who is involved, and in what."
+          },
+          "entities": {
+            "title": "Entities",
+            "subtitle": "The companies we work for."
+          }
+        },
+        "next": "Next: {date}",
+        "from": "From {date}",
+        "askToConfirm": "Please confirm",
+        "confirmNote": "Something not quite right, or marked for confirmation? Write to your account manager and we'll update it.",
+        "tags": {
+          "handover": {
+            "WITH_CLIENT": "Still with you",
+            "IN_HANDOVER": "Being handed over to us",
+            "WITH_ANKORA": "With us",
+            "NOT_PLANNED": "Stays with you"
+          },
+          "access": {
+            "HAS_ACCESS": "We have access",
+            "PENDING": "Waiting for access",
+            "NO_ACCESS": "We don't have access"
+          },
+          "policyProposed": "Being put in place",
+          "factKind": {
+            "SCOPE_IN": "In scope",
+            "SCOPE_OUT": "Out of scope",
+            "PREFERENCE": "Preference",
+            "REQUIREMENT": "Standing requirement",
+            "LOCATION": "Location",
+            "FINANCE": "Finance",
+            "TEMPORARY": "Temporary",
+            "ONE_OFF_DECISION": "One-off decision",
+            "QUESTION": "Open question",
+            "NOTE": "Note"
+          }
+        }
+      },
+      "suppliersTitle": "Suppliers and providers",
+      "suppliersSubtitle": "Who handled what, when, and how it went.",
+      "suppliersEmpty": "We haven't booked an outside provider for you yet. When we do, they'll be listed here.",
+      "experience": {
+        "GOOD": "Recommended",
+        "OK": "OK",
+        "AVOID": "Won't use again"
+      },
+      "documentsTitle": "Documents",
+      "documentsSubtitle": "Policies, certificates and contracts that came out of our work for you.",
+      "documentsEmpty": "No documents in your file yet. Every document from our work for you will appear here to download.",
+      "documentKinds": {
+        "POLICY": "Policy",
+        "PROCEDURE": "Procedure",
+        "CERTIFICATE": "Certificate",
+        "CONTRACT": "Contract",
+        "INVOICE": "Invoice",
+        "OTHER": "Document"
+      },
+      "download": "Download",
+      "datesTitle": "Recurring dates",
+      "datesSubtitle": "Renewals, services and payments that come round every year. We keep track of them.",
+      "datesEmpty": "We haven't recorded a recurring date for you yet.",
+      "claude": {
+        "title": "Connect to Claude",
+        "subtitle": "Ask Claude where things stand, what's waiting for you and what happened this month, and get an answer from your portal.",
+        "step1": "In Claude: Settings, Connectors, Add custom connector.",
+        "step2": "Paste the address below and approve the connection with your Ankora account.",
+        "step3": "Ask, for example: \"Where does the handover stand?\" or \"What's waiting for me?\"",
+        "copyLabel": "Copy the connection address",
+        "note": "Claude sees only what appears in your portal. Only your client admin can answer decisions through it."
+      }
+    },
+    "preferences": {
+      "fields": {
+        "contact": {
+          "label": "How to reach me",
+          "placeholder": "WhatsApp is best. Calls only after nine, and not on Fridays."
+        },
+        "matters": {
+          "label": "What matters to me",
+          "placeholder": "That everything is settled before I hear about it. I'd rather pay more than deal with it."
+        },
+        "never": {
+          "label": "What must never happen",
+          "placeholder": "Someone turning up at my home without checking with me first."
+        }
+      },
+      "notRecorded": "Not filled in yet",
+      "saved": "Saved. Your account manager has been notified.",
+      "saving": "Saving...",
+      "save": "Save",
+      "digest": {
+        "EVERY_DECISION": "Every decision, as soon as it opens",
+        "WEEKLY": "A weekly summary",
+        "MONTHLY": "Only the monthly summary"
+      },
+      "digestSaved": "Updated.",
+      "saveDigest": "Save how often"
+    },
+    "decisions": {
+      "answered": "We've got your answer. Thank you.",
+      "chosen": "Chosen: {option}",
+      "noneTitle": "No decisions are waiting for you",
+      "noneBody": "When we reach a point that needs your call, it will appear here with the options, the prices and our recommendation.",
+      "previous": "Past decisions",
+      "record": "Chosen: {option} · approved by {name} on {date}",
+      "recordWithAmount": "Chosen: {option} · {amount} · approved by {name} on {date}",
+      "cancelled": "Withdrawn by Ankora. No decision was needed from you."
+    },
+    "decisionCard": {
+      "sending": "Sending...",
+      "recommended": "Our recommendation",
+      "dueBy": "Please answer by {date}",
+      "aboveCeiling": "The amount is above the ceiling we agreed with you ({ceiling}), so this decision is yours.",
+      "answered": "Answer received. Thank you.",
+      "noDueDate": "No due date for this decision",
+      "talk": "Talk about it",
+      "talkSoon": "Talk about it: coming soon",
+      "adminOnly": "Only your client admin can approve. You can pass this on to them, or talk to us."
+    },
+    "errors": {
+      "forbidden": "You don't have permission to do this.",
+      "generic": "Something went wrong. Please try again.",
+      "scheduleMissing": "The scheduled report is missing.",
+      "noRecipients": "Enter at least one recipient.",
+      "preferencesAdminOnly": "Only your client admin can change these settings.",
+      "invalidChoice": "That choice isn't valid.",
+      "decisionsAdminOnly": "Only your client admin can approve decisions.",
+      "noOption": "No option was chosen."
+    },
+    "documentRoute": {
+      "unavailable": "This document isn't available right now. You can ask us for it on WhatsApp."
     }
   }
 }

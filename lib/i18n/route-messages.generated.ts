@@ -106,6 +106,11 @@ export const AREA_MESSAGE_PATHS = {
     "myTime.form",
     "myTime.overlap",
   ],
+  "portal": [
+    "portal.decisionCard",
+    "portal.preferences",
+    "portal.recipients",
+  ],
   "profile": [
     "auth.webauthn",
     "claude",

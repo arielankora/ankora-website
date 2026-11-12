@@ -394,14 +394,25 @@ async function tasksCompletedCount(clientId: string, from: Date, to: Date) {
 
 const WEEKDAY_LABELS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
-async function nextAutoSendLabel(clientId: string): Promise<string | null> {
+/// ADR 0006: when the monthly report goes out by itself, as data, so the
+/// portal can word it in the reader's language. `autoSendLabel` below is
+/// the same answer in Hebrew.
+export type PortalAutoSend = { frequency: "WEEKLY"; dayOfWeek: number } | { frequency: "MONTHLY"; dayOfMonth: number };
+
+async function nextAutoSend(clientId: string): Promise<PortalAutoSend | null> {
   const schedule = await prisma.reportSchedule.findFirst({
     where: { clientId, reportType: "MONTHLY_DETAILED", enabled: true },
     orderBy: { createdAt: "asc" },
   });
   if (!schedule) return null;
-  if (schedule.frequency === "WEEKLY") return `נשלח אוטומטית כל שבוע ביום ${WEEKDAY_LABELS[schedule.dayOfWeek ?? 0]}`;
-  return `נשלח אוטומטית ב-${schedule.dayOfMonth ?? 1} לכל חודש`;
+  if (schedule.frequency === "WEEKLY") return { frequency: "WEEKLY", dayOfWeek: schedule.dayOfWeek ?? 0 };
+  return { frequency: "MONTHLY", dayOfMonth: schedule.dayOfMonth ?? 1 };
+}
+
+function autoSendLabelOf(autoSend: PortalAutoSend | null): string | null {
+  if (!autoSend) return null;
+  if (autoSend.frequency === "WEEKLY") return `נשלח אוטומטית כל שבוע ביום ${WEEKDAY_LABELS[autoSend.dayOfWeek]}`;
+  return `נשלח אוטומטית ב-${autoSend.dayOfMonth} לכל חודש`;
 }
 
 /// Spec 13's Monthly Detailed report / spec 14.1's "Monthly Detailed" row:
@@ -412,10 +423,10 @@ export async function getMonthlyDetailed(actor: User, monthStart?: Date, opts: {
   const from = startOfMonth(monthStart ?? new Date());
   const to = endOfMonth(from);
 
-  const [rows, tasksCompleted, autoSendLabel] = await Promise.all([
+  const [rows, tasksCompleted, autoSend] = await Promise.all([
     fetchPortalEntries(client.id, from, to, client.portalShowEmployeeNames, opts.forAi),
     tasksCompletedCount(client.id, from, to),
-    nextAutoSendLabel(client.id),
+    nextAutoSend(client.id),
   ]);
   return {
     from,
@@ -423,7 +434,8 @@ export async function getMonthlyDetailed(actor: User, monthStart?: Date, opts: {
     rows: rows.map(publicRow),
     totalMinutes: sumMinutes(rows),
     tasksCompleted,
-    autoSendLabel,
+    autoSend,
+    autoSendLabel: autoSendLabelOf(autoSend),
     showEmployeeNames: client.portalShowEmployeeNames,
   };
 }
