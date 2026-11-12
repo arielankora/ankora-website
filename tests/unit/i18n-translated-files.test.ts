@@ -66,6 +66,12 @@ const TRANSLATED_FILES = [
   "app/api/step-up/passkey/verify/route.ts",
   "app/api/passkeys/register/options/route.ts",
   "app/api/passkeys/register/verify/route.ts",
+  "app/(product)/app/(authenticated)/guide/page.tsx",
+  "app/(product)/app/(authenticated)/guide/GuideBrowser.tsx",
+  "app/(product)/app/(authenticated)/guide/search.ts",
+  "app/(product)/app/(authenticated)/guide/content.en.ts",
+  // guide/content.ts is the Hebrew guide itself; content.en.ts is its English twin
+  // (tests/unit/guide-content-parity.test.ts keeps the two in step).
 ];
 
 describe("translated screens (ADR 0006)", () => {

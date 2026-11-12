@@ -384,5 +384,29 @@
       "already_revoked": "The connection was not found, or is already disconnected.",
       "no_user": "No user was specified."
     }
+  },
+  "guide": {
+    "page": {
+      "title": "User guide",
+      "subtitle": "A full explanation of everything the system can do: what each screen does, who can open it, and how to work with it.",
+      "introTitle": "How to use this guide",
+      "introBody": "The contents below are grouped by topic, and every section has a badge showing exactly which roles can see it, so the guide always reflects what you yourself can do in the system, not a general list of features. You can also jump straight to a section from the contents, or search for a word in the search box, instead of scrolling through the whole guide."
+    },
+    "search": {
+      "label": "Search the guide",
+      "placeholder": "Search the guide, for example: supervisor, hour bank, export",
+      "clear": "Clear search",
+      "noResults": "No sections found. Try another word, or fewer words.",
+      "foundOne": "1 section found",
+      "foundMany": "{count} sections found"
+    },
+    "toc": {
+      "label": "Contents",
+      "title": "Contents"
+    },
+    "section": {
+      "allUsers": "All users",
+      "howTo": "How to do it"
+    }
   }
 }
