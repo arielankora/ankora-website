@@ -154,7 +154,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   // Opened from "אישורים": back there, to the same tab (22.10.2026).
   const viaApprovals = approvalsBack(sp?.fromApprovals);
   const backHref = viaApprovals?.href ?? listBackHref("/app/clients", CLIENTS_LIST_KEYS, sp?.from);
-  const backLabel = viaApprovals?.label ?? clientsBackTitle(sp?.from);
+  const backLabel = viaApprovals?.label ?? clientsBackTitle(sp?.from, await getTranslations("clients.list"));
   const fromParam = [typeof sp?.from === "string" && sp.from ? `from=${encodeURIComponent(sp.from)}` : "", viaApprovals?.param ?? ""].filter(Boolean).join("&");
   const user = await requireUser();
 

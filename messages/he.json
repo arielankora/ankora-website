@@ -2300,7 +2300,9 @@
       "restore": {
         "restore": "החזרה לפעיל",
         "pending": "מחזיר..."
-      }
+      },
+      "back": "לקוחות",
+      "backSearch": "לקוחות · \"{q}\""
     },
     "create": {
       "submit": "הוספת לקוח",

@@ -2300,7 +2300,9 @@
       "restore": {
         "restore": "Make active again",
         "pending": "Restoring..."
-      }
+      },
+      "back": "Clients",
+      "backSearch": "Clients · \"{q}\""
     },
     "create": {
       "submit": "Add client",
