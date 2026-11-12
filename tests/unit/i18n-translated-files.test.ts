@@ -108,7 +108,20 @@ const TRANSLATED_FILES = [
   "components/app/MessageClient.tsx",
   // Not listed on purpose: tasks/[id]/TaskShare.tsx builds the Hebrew
   // message sent to a colleague (content, not interface); list-query.ts and
-  // mine-scope.ts keep Hebrew fallbacks for the calendar, translated later.
+  // mine-scope.ts used to keep Hebrew fallbacks for the calendar; listed below since phase 7.
+  "app/(product)/app/(authenticated)/calendar/CalendarClientSelect.tsx",
+  "app/(product)/app/(authenticated)/calendar/CalendarGrid.tsx",
+  "app/(product)/app/(authenticated)/calendar/actions.ts",
+  "app/(product)/app/(authenticated)/calendar/page.tsx",
+  "app/(product)/app/(authenticated)/important-dates/ImportantDateForm.tsx",
+  "app/(product)/app/(authenticated)/important-dates/ImportantDateRow.tsx",
+  "app/(product)/app/(authenticated)/important-dates/ImportantDateStatusSelect.tsx",
+  "app/(product)/app/(authenticated)/important-dates/[id]/page.tsx",
+  "app/(product)/app/(authenticated)/important-dates/actions.ts",
+  "app/(product)/app/(authenticated)/important-dates/page.tsx",
+  "app/(product)/app/(authenticated)/tasks/list-query.ts",
+  "app/(product)/app/(authenticated)/tasks/mine-scope.ts",
+  "lib/calendar-keys.ts",
 ];
 
 describe("translated screens (ADR 0006)", () => {

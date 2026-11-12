@@ -15,7 +15,9 @@
 // new namespace fails that test until the namespace is listed here.
 export const CLIENT_MESSAGE_PATHS = [
   "auth",
+  "calendar",
   "claude",
+  "importantDates",
   "messageClient",
   "myTime.closedBank",
   "myTime.entry",
