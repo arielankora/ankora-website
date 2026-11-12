@@ -388,5 +388,6 @@ document) tells the browser not to translate it.
 `translate="no"` is a request the browser honours, not a lock: a person
 can still copy the text into a translator; keeping "בלי AI" content out
 of translators by hand is a team rule, not something the app can enforce.
-Open for Ariel: browser translation of ordinary client content sends it
-to Google Translate, a service not on the sub-processor list today.
+Browser translation of ordinary client content goes to Google, which is
+already Ankora's vendor; decided 12.11.2026 that this adds no new
+sub-processor.
