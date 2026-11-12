@@ -92,8 +92,8 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
       // list says so instead of showing the day it was created.
       day: d.precision === "UNKNOWN" ? "?" : format.dateTime(occurrence, { day: "2-digit" }),
       month: d.precision === "UNKNOWN" ? t("missingMonth") : format.dateTime(occurrence, { month: "short" }),
+      clientName: d.client.name,
       meta: [
-        d.client.name,
         t(`recurrence.${d.recurrence}`),
         d.precision === "APPROXIMATE" && d.dayAlternatives.length > 1
           ? t("approximate", { days: format.list([...new Set(d.dayAlternatives)].sort((a, b) => a - b).map(String), { type: "disjunction" }) })

@@ -12,6 +12,8 @@ export type DateRow = {
   title: string;
   day: string;
   month: string;
+  /// The client's name, shown in its own direction (ADR 0006).
+  clientName: string;
   meta: string;
   tag: string;
   tone: "red" | "gold" | "gray" | "green";
@@ -74,7 +76,7 @@ export function ImportantDateRow({ date, listQuery }: { date: DateRow; listQuery
         <Link href={withFrom(`/app/important-dates/${date.id}`, listQuery)} dir="auto" className="block truncate text-sm text-app-text-primary hover:text-app-text-accent">
           {date.title}
         </Link>
-        <p className="mt-0.5 truncate text-[11.5px] text-app-text-tertiary">{date.meta}</p>
+        <p className="mt-0.5 truncate text-[11.5px] text-app-text-tertiary"><bdi>{date.clientName}</bdi> · {date.meta}</p>
       </div>
       <span className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium ${TONE_CLASSES[isHandled ? "green" : date.tone]}`}>
         {isHandled ? t("handled") : date.tag}
