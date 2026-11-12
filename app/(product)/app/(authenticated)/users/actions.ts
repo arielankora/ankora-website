@@ -278,14 +278,14 @@ export async function setExceptionApproverAction(_prev: FormState | undefined, f
 export async function setCommsAccessAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const actor = await requireUser();
   const userId = String(formData.get("userId") || "");
-  if (!userId) return { error: "משתמש לא נמצא." };
+  if (!userId) return { error: await errorText("userNotFound") };
   try {
     await setCommsAccess(actor, userId, {
       level: String(formData.get("level") || "NONE"),
       lines: formData.getAll("line").map(String).filter(Boolean),
     });
   } catch (err) {
-    return { error: friendlyError(err) };
+    return { error: await friendlyError(err) };
   }
   revalidatePath(`/app/users/${userId}`);
   return { ok: true };

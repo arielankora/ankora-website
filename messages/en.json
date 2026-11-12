@@ -1589,6 +1589,14 @@
       "dismissReasonRequired": "Write in one line why this is not relevant.",
       "taskExists": "There is already a task for this question.",
       "snooze": "{problem, select, date {Choose a date.} past {The date must be in the future.} other {You can snooze up to a year ahead.}}"
+    },
+    "commsAccess": {
+      "unknownLevel": "Unknown access level.",
+      "userNotFound": "User not found.",
+      "unknownLine": "Unknown phone line.",
+      "lineStaffOnly": "A phone line can belong only to an Ankora team member.",
+      "staffOnly": "Only Ankora team members can get access to the communications screen.",
+      "needsConfidentiality": "This level can be given only after the confidentiality undertaking is signed in both channels: in the app and as a PDF. Until then you can give \"Their own number and the clients they manage\"."
     }
   },
   "auditLog": {
@@ -1844,7 +1852,8 @@
       "commsWhatsappRetentionSweep": "WhatsApp conversations deleted by retention period",
       "commsGroupAssigned": "WhatsApp group assigned to a client",
       "commsEngagementEndSweep": "Conversations and recordings of a client whose engagement ended deleted",
-      "commsExportDownloaded": "Client conversations and recordings exported"
+      "commsExportDownloaded": "Client conversations and recordings exported",
+      "userCommsAccess": "Changed access to the communications screen"
     },
     "kinds": {
       "failure": "Failure",
@@ -2673,6 +2682,23 @@
       "returning": "Returning...",
       "returnSubmit": "Return the file",
       "cancel": "Cancel"
+    },
+    "commsAccess": {
+      "label": "Access to the communications screen",
+      "levels": {
+        "NONE": "No access",
+        "OWN": "Their own number and the clients they manage",
+        "CALLS": "Also every phone call",
+        "FULL": "Everything: all calls and all recordings"
+      },
+      "needsConfidentiality": "The two higher levels open once the confidentiality undertaking is signed in both channels: in the app and as a PDF.",
+      "environmentLevel": "Vercel's environment settings already give this person \"{level}\". The higher of the two applies.",
+      "lines": "Their phone lines in Aloha",
+      "lineOwner": "Currently {name}'s",
+      "linesHint": "Whoever owns a line sees every conversation on it, including clients they do not manage.",
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Saved."
     }
   },
   "categories": {

@@ -220,6 +220,7 @@ const TRANSLATED_FILES = [
   "app/(product)/app/(authenticated)/time-entries/page.tsx",
   "app/(product)/app/(authenticated)/users/InviteUserForm.tsx",
   "app/(product)/app/(authenticated)/users/[userId]/ClientAccessForm.tsx",
+  "app/(product)/app/(authenticated)/users/[userId]/CommsAccessForm.tsx",
   "app/(product)/app/(authenticated)/users/[userId]/DeletionDeclarationForm.tsx",
   "app/(product)/app/(authenticated)/users/[userId]/EditRoleStatusForm.tsx",
   "app/(product)/app/(authenticated)/users/[userId]/ExceptionApproverForm.tsx",

@@ -83,6 +83,7 @@ export const CLIENT_MESSAGE_PATHS = [
   "timeEntriesAdmin.table",
   "timer",
   "users.clientAccess",
+  "users.commsAccess",
   "users.deletionDeclaration",
   "users.exceptionApprover",
   "users.exposure",
