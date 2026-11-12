@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { getFormatter, getTranslations } from "next-intl/server";
+import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { Forbidden } from "@/components/app/Forbidden";
 import { canManageClients } from "@/lib/app-auth/permissions";
@@ -32,10 +34,12 @@ import { listChatsToReview } from "@/lib/comms/new-chats";
 export const metadata = { robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
-const STATUS_LABEL = { PENDING: "ממתין למנהל", APPROVED: "חסום", REJECTED: "נדחה", REVOKED: "בוטל" } as const;
-
 export default async function CommsSetupPage(props: { searchParams: Promise<{ started?: string }> }) {
   const { started } = await props.searchParams;
+  const t = await getTranslations("comms.setup");
+  const tc = await getTranslations("comms");
+  const format = await getFormatter();
+  const shownPhone = (phone: string) => displayPhone(phone, tc("phone.whatsappId"));
   const user = await requireUser();
   const access = await commsAccess(user);
   const manager = canManageClients(user.role);
@@ -70,7 +74,7 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
       accounts = (await listWhatsappAccounts(apiKey)).filter((a) => !connected.has(a.id));
     } catch (err) {
       if (!(err instanceof UnipileError)) throw err;
-      accountsError = err.message;
+      accountsError = (await domainErrorText(err)) ?? err.message;
     }
   }
 
@@ -85,7 +89,7 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
         chats = (await loadMergedChats({ apiKey, accountId: channel.accountId })).chats;
       } catch (err) {
         if (!(err instanceof UnipileError)) throw err;
-        chatsError = err.message;
+        chatsError = (await domainErrorText(err)) ?? err.message;
       }
       rows = chats.map((c) => {
         const phone = chatPhone(c);
@@ -94,7 +98,7 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
           key: c.id,
           value: `${kind}|${phone ?? c.id}|${c.name}`,
           name: c.name,
-          detail: phone ? displayPhone(phone) : c.type === "group" ? "קבוצה" : "",
+          detail: phone ? shownPhone(phone) : c.type === "group" ? t("group") : "",
           blocked: blockStateFor(channel.blocks, { phone, chatId: c.id }) !== "none",
         };
       });
@@ -109,9 +113,9 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
       conversationId: c.conversationId,
       name: c.name,
       detail: [
-        c.isGroup ? "קבוצה" : c.phone ? displayPhone(c.phone) : null,
-        `${c.messages} הודעות`,
-        c.firstAt ? `מאז ${new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: "Asia/Jerusalem" }).format(new Date(c.firstAt))}` : null,
+        c.isGroup ? t("group") : c.phone ? shownPhone(c.phone) : null,
+        t("messages", { count: c.messages }),
+        c.firstAt ? t("since", { date: format.dateTime(new Date(c.firstAt), { day: "numeric", month: "numeric" }) }) : null,
       ]
         .filter(Boolean)
         .join(" · "),
@@ -124,12 +128,12 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
       <section key={channel.id} className="space-y-4 rounded-2xl border border-app-border bg-white p-4">
         <div className="space-y-1 text-sm text-app-text-primary">
           <h2 className="text-base font-medium">
-            המספר של {channel.owner.name}{" "}
+            {t("numberOf", { name: channel.owner.name ?? "" })}{" "}
             <span dir="ltr" className="text-sm font-normal text-app-text-secondary">
               ({channel.owner.email})
             </span>
           </h2>
-          <p>מצב: {channel.storeEnabled ? "נשמר" : "עוד לא נשמר"}.</p>
+          <p>{channel.storeEnabled ? t("stateStored") : t("stateNotStored")}</p>
           {isOwnerOrManager ? (
             <ExcludedViewersForm
               channelId={channel.id}
@@ -141,11 +145,11 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
               allLocked={channel.ownerUserId !== user.id}
             />
           ) : channel.excludeAllViewers ? (
-            <p className="text-app-text-secondary">לא רואים שיחות מהמספר: כולם חוץ מבעל המספר.</p>
+            <p className="text-app-text-secondary">{t("excludedAll")}</p>
           ) : excludedNames.length ? (
-            <p className="text-app-text-secondary">לא רואים שיחות מהמספר: {excludedNames.join(", ")}.</p>
+            <p className="text-app-text-secondary">{t("excludedSome", { names: excludedNames.join(", ") })}</p>
           ) : null}
-          {channel.storeEnabled ? <p className="text-app-text-secondary">היסטוריה: נטענו {loaded} שיחות. ההמשך נטען בריצה הלילית, או עכשיו:</p> : null}
+          {channel.storeEnabled ? <p className="text-app-text-secondary">{t("history", { count: loaded })}</p> : null}
         </div>
         {channel.storeEnabled && isOwnerOrManager ? <LoadHistoryForm channelId={channel.id} /> : null}
         {manager ? (
@@ -158,17 +162,15 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
 
         {!channel.storeEnabled && isOwnerOrManager ? (
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-app-text-primary">מה לא לשמור</h3>
-            <p className="text-sm text-app-text-secondary">
-              סמנו כל שיחה אישית שלא צריכה להישמר, ולחצו &quot;שמירת הסימונים&quot;. מוצגות {rows.length} השיחות האחרונות.
-            </p>
+            <h3 className="text-sm font-medium text-app-text-primary">{t("whatNotToStore")}</h3>
+            <p className="text-sm text-app-text-secondary">{t("whatNotToStoreHint", { count: rows.length })}</p>
             {chatsError ? (
               <p role="alert" className="rounded-lg bg-app-error-soft p-3 text-sm text-app-error">
                 {chatsError}
               </p>
             ) : null}
             <BlockManyForm channelId={channel.id} rows={rows} />
-            <h3 className="pt-2 text-sm font-medium text-app-text-primary">התחלת השמירה</h3>
+            <h3 className="pt-2 text-sm font-medium text-app-text-primary">{t("startHeading")}</h3>
             <StartForm channelId={channel.id} />
           </div>
         ) : null}
@@ -181,17 +183,17 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
 
         {pending.length > 0 ? (
           <div className="space-y-2">
-            <h3 className="text-sm font-medium text-app-text-primary">בקשות חסימה שממתינות</h3>
+            <h3 className="text-sm font-medium text-app-text-primary">{t("pendingHeading")}</h3>
             <ul className="space-y-3">
               {pending.map((b) => (
                 <li key={b.id} className="space-y-2 rounded-lg bg-app-surface-sunken p-3">
                   <p className="text-sm text-app-text-primary">
-                    {b.label ?? "ללא שם"}{" "}
+                    <bdi>{b.label ?? tc("noName")}</bdi>{" "}
                     <span dir="ltr" className="text-xs text-app-text-secondary">
-                      {b.kind === "PHONE" ? displayPhone(b.value) : "קבוצה"}
+                      {b.kind === "PHONE" ? shownPhone(b.value) : t("group")}
                     </span>
                   </p>
-                  {manager ? <DecideForm blockId={b.id} /> : <p className="text-xs text-app-text-secondary">ממתין להחלטת מנהל.</p>}
+                  {manager ? <DecideForm blockId={b.id} /> : <p className="text-xs text-app-text-secondary">{t("awaitingManager")}</p>}
                 </li>
               ))}
             </ul>
@@ -200,17 +202,17 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
 
         <details>
           <summary className="flex min-h-11 cursor-pointer items-center text-sm text-app-text-primary underline">
-            רשימת החסימה ({active.length})
+            {t("blockList", { count: active.length })}
           </summary>
           <ul className="divide-y divide-app-border">
             {active.map((b) => (
               <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <span className="text-sm text-app-text-primary">
-                  {b.label ?? "ללא שם"}{" "}
+                  <bdi>{b.label ?? tc("noName")}</bdi>{" "}
                   <span dir="ltr" className="text-xs text-app-text-secondary">
-                    {b.kind === "PHONE" ? displayPhone(b.value) : "קבוצה"}
+                    {b.kind === "PHONE" ? shownPhone(b.value) : t("group")}
                   </span>{" "}
-                  <span className="text-xs text-app-text-secondary">· {STATUS_LABEL[b.status]}</span>
+                  <span className="text-xs text-app-text-secondary">· {t(`status.${b.status}`)}</span>
                 </span>
                 {manager ? <RevokeForm blockId={b.id} /> : null}
               </li>
@@ -225,18 +227,15 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
     <div className="space-y-4">
       <div className="space-y-1">
         <Link prefetch={false} href="/app/whatsapp-poc" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
-          חזרה למסך התקשורת
+          {t("backToComms")}
         </Link>
-        <h1 className="text-xl font-medium text-app-text-primary">שמירת שיחות WhatsApp</h1>
-        <p className="text-sm text-app-text-secondary">
-          כל השיחות של מספר נשמרות, חוץ ממה שמסמנים &quot;לא לשמור&quot;. חסימה של מנהל נכנסת לתוקף מיד ומוחקת מה שנשמר. חסימה של עובד
-          מסתירה את ההודעות עד שמנהל מחליט.
-        </p>
+        <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
+        <p className="text-sm text-app-text-secondary">{t("intro")}</p>
       </div>
 
       {started === "1" ? (
         <p role="status" className="rounded-lg bg-app-success-soft p-3 text-sm text-app-text-primary">
-          השמירה התחילה. מעכשיו כל הודעה חדשה נשמרת, חוץ ממה שברשימת החסימה. ההיסטוריה של השיחות נטענת בהדרגה.
+          {t("started")}
         </p>
       ) : null}
 
@@ -244,23 +243,16 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
 
       {manager ? (
         <section className="space-y-3 rounded-2xl border border-app-border bg-white p-4">
-          <h2 className="text-base font-medium text-app-text-primary">הקלטות שאלוהה שלחה ידנית</h2>
-          <p className="text-sm text-app-text-secondary">
-            כשאלוהה שולחת לתיבה מייל &quot;הקלטות עבור המספר ...&quot; עם קובצי שמע, הכפתור שומר אותם כשיחות בקו הזה, בלי המספר של הצד
-            השני. רק קו שמוגדר אצלנו נקלט, ושום הקלטה לא נשמרת פעמיים.
-          </p>
+          <h2 className="text-base font-medium text-app-text-primary">{t("manualHeading")}</h2>
+          <p className="text-sm text-app-text-secondary">{t("manualIntro")}</p>
           <ManualRecordingsForm />
         </section>
       ) : null}
 
       <section className="space-y-3 rounded-2xl border border-app-border bg-white p-4">
-        <h2 className="text-base font-medium text-app-text-primary">חיבור מספר</h2>
-        <p className="text-sm text-app-text-secondary">
-          קודם מחברים את המספר ב-Unipile. אחרי החיבור כאן, שום דבר לא נשמר עד שבעל המספר עובר על הרשימה ולוחץ &quot;התחל לשמור&quot;.
-        </p>
-        {accountsError ? (
-          <p className="text-sm text-app-text-secondary">לא הצלחתי לקבל מ-Unipile את רשימת המספרים ({accountsError}). אפשר להקליד את מזהה החשבון.</p>
-        ) : null}
+        <h2 className="text-base font-medium text-app-text-primary">{t("connectHeading")}</h2>
+        <p className="text-sm text-app-text-secondary">{t("connectIntro")}</p>
+        {accountsError ? <p className="text-sm text-app-text-secondary">{t("accountsError", { error: accountsError })}</p> : null}
         <ConnectForm
           accounts={accounts}
           manualAccount={accounts.length === 0}

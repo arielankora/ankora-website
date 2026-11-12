@@ -1,6 +1,7 @@
 import "server-only";
 import { Prisma, type CommsChannel, type User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { DomainError } from "@/lib/domain-error";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { maskPhone } from "@/lib/whatsapp-poc/access";
@@ -217,13 +218,20 @@ async function purge(channelId: string, target: { kind: "PHONE" | "CHAT"; value:
   return count;
 }
 
-export class BlockError extends Error {}
+/// A refusal on the block list. The message stays as it was; the code is
+/// for the screen (ADR 0006, domainErrors.comms.block.*).
+export class BlockError extends DomainError {
+  constructor(code: string, message: string) {
+    super(code, message);
+    this.name = "BlockError";
+  }
+}
 
 type Actor = Pick<User, "id" | "role">;
 
 async function channelOrThrow(channelId: string) {
   const channel = await prisma.commsChannel.findUnique({ where: { id: channelId } });
-  if (!channel) throw new BlockError("המספר המחובר לא נמצא.");
+  if (!channel) throw new BlockError("comms.block.channelNotFound", "המספר המחובר לא נמצא.");
   return channel;
 }
 
@@ -236,7 +244,7 @@ export async function requestBlock(
 ) {
   const channel = await channelOrThrow(input.channelId);
   const manager = canManageClients(actor.role);
-  if (!manager && channel.ownerUserId !== actor.id) throw new BlockError("אפשר לחסום רק מספרים בשיחות של המספר שלך.");
+  if (!manager && channel.ownerUserId !== actor.id) throw new BlockError("comms.block.notYourNumber", "אפשר לחסום רק מספרים בשיחות של המספר שלך.");
 
   const status = manager ? "APPROVED" : "PENDING";
   const block = await prisma.commsBlock.upsert({
@@ -283,9 +291,9 @@ async function setHeld(channelId: string, target: { kind: "PHONE" | "CHAT"; valu
 
 /// A manager answers an employee's request.
 export async function decideBlock(actor: Actor, blockId: string, approve: boolean) {
-  if (!canManageClients(actor.role)) throw new BlockError("רק מנהל מחליט על חסימה.");
+  if (!canManageClients(actor.role)) throw new BlockError("comms.block.managerDecides", "רק מנהל מחליט על חסימה.");
   const block = await prisma.commsBlock.findUnique({ where: { id: blockId } });
-  if (!block || block.status !== "PENDING") throw new BlockError("הבקשה כבר טופלה.");
+  if (!block || block.status !== "PENDING") throw new BlockError("comms.block.alreadyHandled", "הבקשה כבר טופלה.");
   await prisma.commsBlock.update({
     where: { id: blockId },
     data: { status: approve ? "APPROVED" : "REJECTED", decidedById: actor.id, decidedAt: new Date() },
@@ -303,9 +311,9 @@ export async function decideBlock(actor: Actor, blockId: string, approve: boolea
 
 /// Only a manager lifts a block. What was deleted stays deleted.
 export async function revokeBlock(actor: Actor, blockId: string) {
-  if (!canManageClients(actor.role)) throw new BlockError("רק מנהל מבטל חסימה.");
+  if (!canManageClients(actor.role)) throw new BlockError("comms.block.managerRevokes", "רק מנהל מבטל חסימה.");
   const block = await prisma.commsBlock.findUnique({ where: { id: blockId } });
-  if (!block || block.status !== "APPROVED") throw new BlockError("החסימה לא פעילה.");
+  if (!block || block.status !== "APPROVED") throw new BlockError("comms.block.notActive", "החסימה לא פעילה.");
   await prisma.commsBlock.update({ where: { id: blockId }, data: { status: "REVOKED", decidedById: actor.id, decidedAt: new Date() } });
   await recordAudit({ actorId: actor.id, action: "comms_block.revoked", entityType: "CommsBlock", entityId: blockId });
 }
@@ -313,7 +321,7 @@ export async function revokeBlock(actor: Actor, blockId: string) {
 /// The setup screen's "התחל לשמור". Only the number's owner, or a manager.
 export async function startStoring(actor: Actor, channelId: string) {
   const channel = await channelOrThrow(channelId);
-  if (channel.ownerUserId !== actor.id && !canManageClients(actor.role)) throw new BlockError("אין הרשאה.");
+  if (channel.ownerUserId !== actor.id && !canManageClients(actor.role)) throw new BlockError("comms.block.forbidden", "אין הרשאה.");
   await prisma.commsChannel.update({ where: { id: channelId }, data: { storeEnabled: true, storeStartedAt: new Date() } });
   await recordAudit({ actorId: actor.id, action: "comms_channel.store_started", entityType: "CommsChannel", entityId: channelId });
 }

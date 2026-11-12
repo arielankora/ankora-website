@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError, type DomainErrorValues } from "@/lib/domain-error";
 
 // WhatsApp POC, stage 2: Hebrew transcription of a call recording with
 // OpenAI (Ariel's choice, 31.10.2026; model per TRANSCRIBE_MODELS below).
@@ -13,14 +14,24 @@ const ENDPOINT = "https://api.openai.com/v1/audio/transcriptions";
 export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 const TIMEOUT_MS = 120_000;
 
-export class TranscriptionError extends Error {
+/// What a transcript says when OpenAI heard no speech. It is stored as the
+/// transcript's text and read as the transcript, so it is content and stays
+/// in Hebrew (ADR 0006).
+export const NO_SPEECH_TRANSCRIPT = "(לא זוהה דיבור)";
+
+/// The message keeps the Hebrew sentence it always had (it is stored as a
+/// transcript's lastError); the code lets a screen word it (ADR 0006,
+/// domainErrors.comms.transcription.*).
+export class TranscriptionError extends DomainError {
   /// OpenAI's status when it answered (429 = the cap or a rate limit), or
   /// null when it did not, or nothing was sent.
   constructor(
     message: string,
     readonly status: number | null = null,
+    code = "comms.transcription.failed",
+    values: DomainErrorValues = {},
   ) {
-    super(message);
+    super(code, message, values);
     this.name = "TranscriptionError";
   }
 }
@@ -37,8 +48,8 @@ export async function transcribeHebrew(audio: {
   contentType: string;
 }): Promise<{ text: string; model: string }> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) throw new TranscriptionError("התמלול לא מוגדר בסביבה הזו.");
-  if (audio.bytes.byteLength > MAX_AUDIO_BYTES) throw new TranscriptionError("ההקלטה גדולה מ-25MB, מעל המגבלה של OpenAI.");
+  if (!apiKey) throw new TranscriptionError("התמלול לא מוגדר בסביבה הזו.", null, "comms.transcription.notConfigured");
+  if (audio.bytes.byteLength > MAX_AUDIO_BYTES) throw new TranscriptionError("ההקלטה גדולה מ-25MB, מעל המגבלה של OpenAI.", null, "comms.transcription.tooLarge");
 
   // OpenAI reads the format from the file name: WhatsApp voice messages
   // are Ogg Opus, Aloha's recordings are MP3.
@@ -62,7 +73,7 @@ export async function transcribeHebrew(audio: {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
     } catch {
-      throw new TranscriptionError("OpenAI לא ענה.");
+      throw new TranscriptionError("OpenAI לא ענה.", null, "comms.transcription.noAnswer");
     }
     if (response.ok) return { text: (await response.text()).trim(), model };
     lastStatus = response.status;
@@ -70,7 +81,7 @@ export async function transcribeHebrew(audio: {
     // cap, a bad key or an overload is the same for every model.
     if (response.status !== 400 && response.status !== 404) break;
   }
-  if (lastStatus === 429) throw new TranscriptionError("OpenAI מגביל את הבקשות, או שהגענו לתקרת ההוצאה החודשית.", 429);
-  if (lastStatus === 401 || lastStatus === 403) throw new TranscriptionError("OpenAI דחה את המפתח.", lastStatus);
-  throw new TranscriptionError(`OpenAI החזיר שגיאה ${lastStatus}.`, lastStatus);
+  if (lastStatus === 429) throw new TranscriptionError("OpenAI מגביל את הבקשות, או שהגענו לתקרת ההוצאה החודשית.", 429, "comms.transcription.rateLimited");
+  if (lastStatus === 401 || lastStatus === 403) throw new TranscriptionError("OpenAI דחה את המפתח.", lastStatus, "comms.transcription.keyRejected");
+  throw new TranscriptionError(`OpenAI החזיר שגיאה ${lastStatus}.`, lastStatus, "comms.transcription.status", { status: String(lastStatus) });
 }

@@ -1,5 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
+import { domainErrorText, domainText } from "@/lib/i18n/domain-errors";
+import { whatsappImageTitle } from "@/lib/comms/content-text";
 import { requireUser } from "@/lib/app-auth/session";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
@@ -9,7 +12,7 @@ import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { MAX_COMMENT_LENGTH, addTaskComment, createTask, listTasks } from "@/lib/app-domain/tasks";
 import { addClientDocument, DriveNotConfiguredError } from "@/lib/app-domain/client-documents";
 import { addTaskPortalNote } from "@/lib/app-domain/task-portal-notes";
-import { checkPortalNote } from "@/lib/task-portal-note-text";
+import { MAX_PORTAL_NOTE_LENGTH, checkPortalNote } from "@/lib/task-portal-note-text";
 import { fetchMessageAttachment } from "@/lib/whatsapp-poc/voice-notes";
 import {
   MAX_FILED_IMAGES,
@@ -74,12 +77,16 @@ function fileExtension(contentType: string): string {
 }
 
 export async function attachSelectedMessagesAction(_prev: AttachState | undefined, formData: FormData): Promise<AttachState> {
+  const t = await getTranslations("comms.errors");
+  const tw = await getTranslations("comms.selectWarnings");
+  // A fault from the domain, in the reader's language when it has a code.
+  const faultText = async (err: unknown) => (await domainErrorText(err)) ?? (err instanceof Error ? err.message : tw("error"));
   const user = await requireUser();
   const access = await commsAccess(user);
-  if (!access.allowed) return { error: "אין הרשאה." };
+  if (!access.allowed) return { error: t("forbidden") };
 
   const messages = parseSelectedMessages(formData.get("messages"));
-  if (messages.length === 0) return { error: "לא נבחרו הודעות." };
+  if (messages.length === 0) return { error: t("noMessages") };
 
   const chatId = String(formData.get("chatId") || "");
   const numberKey = String(formData.get("numberKey") || "") || null;
@@ -88,9 +95,18 @@ export async function attachSelectedMessagesAction(_prev: AttachState | undefine
   const mode = formData.get("mode") === "new" ? "new" : "existing";
   const wantPortalLine = formData.get("portalLineOn") === "on";
   const portalLine = wantPortalLine ? checkPortalNote(formData.get("portalLine")) : null;
-  if (portalLine && !portalLine.ok) return { error: portalLine.error };
+  if (portalLine && !portalLine.ok) {
+    // checkPortalNote refuses only an empty line or a long one; the words are
+    // the portal notes' own (domainErrors.taskPortalNotes).
+    const empty = !String(formData.get("portalLine") ?? "").trim();
+    return {
+      error: empty
+        ? await domainText("domainErrors.taskPortalNotes.empty")
+        : await domainText("domainErrors.taskPortalNotes.tooLong", { max: MAX_PORTAL_NOTE_LENGTH }),
+    };
+  }
   const steps = parseStepLines(formData.get("steps"));
-  if (steps.length > MAX_STEPS_FROM_MESSAGES) return { error: `עד ${MAX_STEPS_FROM_MESSAGES} שלבים בפעם אחת.` };
+  if (steps.length > MAX_STEPS_FROM_MESSAGES) return { error: t("maxSteps", { max: MAX_STEPS_FROM_MESSAGES }) };
   const keepComment = steps.length === 0 || formData.get("keepComment") === "on";
 
   // The task: checked against the person's own clients before anything is
@@ -101,29 +117,29 @@ export async function attachSelectedMessagesAction(_prev: AttachState | undefine
   try {
     if (mode === "new") {
       const clientId = String(formData.get("clientId") || "");
-      if (!accessible.some((c) => c.id === clientId)) return { error: "יש לבחור לקוח." };
+      if (!accessible.some((c) => c.id === clientId)) return { error: t("pickClient") };
       const title = String(formData.get("title") || "").trim().slice(0, 200) || proposeSelectedTitle(contactName, phone);
-      const t = await createTask(user, {
+      const createdTask = await createTask(user, {
         clientId,
         title,
         clientVisible: formData.get("clientVisible") === "on",
         description: null,
       });
-      task = { id: t.id, clientId: t.clientId, title: t.title, clientVisible: t.clientVisible };
+      task = { id: createdTask.id, clientId: createdTask.clientId, title: createdTask.title, clientVisible: createdTask.clientVisible };
       created = true;
     } else {
       const taskId = String(formData.get("taskId") || "");
-      if (!taskId) return { error: "יש לבחור משימה." };
-      const t = await prisma.task.findFirst({
+      if (!taskId) return { error: t("pickTask") };
+      const found = await prisma.task.findFirst({
         where: { id: taskId, deletedAt: null, status: { in: ["OPEN", "IN_PROGRESS"] } },
         select: { id: true, clientId: true, title: true, clientVisible: true },
       });
-      if (!t || !accessible.some((c) => c.id === t.clientId)) return { error: "המשימה לא נמצאה או שאינה פתוחה." };
-      task = t;
+      if (!found || !accessible.some((c) => c.id === found.clientId)) return { error: t("taskNotOpen") };
+      task = found;
     }
   } catch (err) {
-    if (err instanceof ForbiddenError) return { error: "אין הרשאה ללקוח הזה." };
-    return { error: err instanceof Error ? err.message : "שמירת המשימה נכשלה." };
+    if (err instanceof ForbiddenError) return { error: t("noClientPermission") };
+    return { error: (await domainErrorText(err)) ?? (err instanceof Error ? err.message : t("taskSaveFailed")) };
   }
 
   const warnings: string[] = [];
@@ -134,25 +150,25 @@ export async function attachSelectedMessagesAction(_prev: AttachState | undefine
   const filed = new Set<string>();
   const images = messages.flatMap((m) => m.files.filter(isImageFile).map((f) => ({ m, f })));
   if (images.length > MAX_FILED_IMAGES) {
-    warnings.push(`תויקו רק ${MAX_FILED_IMAGES} התמונות הראשונות מתוך ${images.length}.`);
+    warnings.push(tw("imagesCapped", { max: MAX_FILED_IMAGES, count: images.length }));
   }
   if (images.length > 0) {
     const config = chatId ? await accountForChatFile(user, numberKey, chatId) : null;
     if (!config) {
-      warnings.push("התמונות לא תויקו: אין גישה לקבצים של השיחה הזו.");
+      warnings.push(tw("noImageAccess"));
     } else {
       for (const { m, f } of images.slice(0, MAX_FILED_IMAGES)) {
         try {
           const file = await fetchMessageAttachment(config, chatId, m.id, f.id);
           if (!file || !file.contentType.startsWith("image/")) {
-            warnings.push("תמונה אחת לא נמצאה ב-WhatsApp ולא תויקה.");
+            warnings.push(tw("imageMissing"));
             continue;
           }
-          const when = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", dateStyle: "short", timeStyle: "short" }).format(new Date(m.at));
           await addClientDocument(user, {
             clientId: task.clientId,
             taskId: task.id,
-            title: `תמונה מוואטסאפ: ${contactName || phone || "איש קשר"}, ${when}`,
+            // The document's title is content: Hebrew (lib/comms/content-text.ts).
+            title: whatsappImageTitle(contactName || phone, new Date(m.at)),
             kind: "OTHER",
             fileName: `whatsapp-${m.id.slice(-8)}.${fileExtension(file.contentType)}`,
             mimeType: file.contentType,
@@ -162,11 +178,7 @@ export async function attachSelectedMessagesAction(_prev: AttachState | undefine
           });
           filed.add(`${m.id}:${f.id}`);
         } catch (err) {
-          warnings.push(
-            err instanceof DriveNotConfiguredError
-              ? "התמונות לא תויקו: תיקיית המסמכים לא מוגדרת בסביבה הזו."
-              : `תמונה אחת לא תויקה: ${err instanceof Error ? err.message : "שגיאה"}`,
-          );
+          warnings.push(err instanceof DriveNotConfiguredError ? tw("driveNotConfigured") : tw("imageFailed", { error: await faultText(err) }));
           if (err instanceof DriveNotConfiguredError) break;
         }
       }
@@ -181,9 +193,7 @@ export async function attachSelectedMessagesAction(_prev: AttachState | undefine
       await createTask(user, { clientId: task.clientId, title, parentId: task.id });
       stepsAdded++;
     } catch (err) {
-      warnings.push(
-        `נוספו ${stepsAdded} מתוך ${steps.length} שלבים. השאר לא נוספו: ${err instanceof Error ? err.message : "שגיאה"}`,
-      );
+      warnings.push(tw("stepsPartial", { added: stepsAdded, total: steps.length, error: await faultText(err) }));
       break;
     }
   }
@@ -196,20 +206,20 @@ export async function attachSelectedMessagesAction(_prev: AttachState | undefine
     try {
       await addTaskComment(user, task.id, body);
     } catch (err) {
-      return { error: `ההערה לא נשמרה: ${err instanceof Error ? err.message : "שגיאה"}` };
+      return { error: tw("commentFailed", { error: await faultText(err) }) };
     }
   }
 
   let portalAdded = false;
   if (portalLine?.ok) {
     if (!task.clientVisible) {
-      warnings.push("השורה ללקוח לא נוספה: המשימה לא מוצגת ללקוח בפורטל.");
+      warnings.push(tw("portalNotVisible"));
     } else {
       try {
         await addTaskPortalNote(user, task.id, portalLine.text);
         portalAdded = true;
       } catch (err) {
-        warnings.push(`השורה ללקוח לא נוספה: ${err instanceof Error ? err.message : "שגיאה"}`);
+        warnings.push(tw("portalFailed", { error: await faultText(err) }));
       }
     }
   }

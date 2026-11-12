@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getFormatter, getTranslations } from "next-intl/server";
 import {
   Timer,
   Clock,
@@ -32,7 +33,6 @@ import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 import { formatClockMinutes } from "@/lib/hours-format";
 import { taskHref } from "./tasks/list-query";
 import { listMyRoutines } from "@/lib/app-domain/process-checks";
-import { CHECK_STATE_LABELS } from "@/lib/process-checks";
 import { Drawer } from "@/components/app/Drawer";
 import { ProcessCheckForm } from "./clients/[clientId]/ProcessCheckForm";
 
@@ -164,8 +164,9 @@ const PACKAGE_ENDING_SOON_DAYS = 14;
 
 /// Whole hours for the card: "55 מתוך 100 שעות". A bank is sold in
 /// hours, and minutes on a summary card are precision nobody asked for.
-function wholeHours(minutes: number): string {
-  return Math.round(minutes / 60).toLocaleString("he-IL");
+/// Formatted in the reader's locale by the caller (ADR 0006).
+function wholeHours(minutes: number): number {
+  return Math.round(minutes / 60);
 }
 
 function formatMinutes(minutes: number): string {
@@ -209,20 +210,12 @@ async function loadActiveTimerRows(): Promise<ActiveTimerRow[]> {
 /// A card line, not a rule definition: "הגיע ל-80% מהבנק" reads at a
 /// glance where the Alerts screen's "אחוז ניצול: 80 או יותר" describes
 /// the rule. Also keeps the word "ניצול" off this card, which the bank
-/// card next to it is found by.
-function shortAlertLabel(type: string, value: number): string {
-  switch (type) {
-    case "UTILIZATION_PCT":
-      return `הגיע ל-${value}% מהבנק`;
-    case "REMAINING_MINUTES":
-      return `נותרו ${value} דקות או פחות`;
-    case "CONSUMED_MINUTES":
-      return `${value} דקות נוצלו`;
-    case "OVERAGE":
-      return "חריגה מהבנק";
-    default:
-      return type;
-  }
+/// card next to it is found by. Said in the reader's language from
+/// home.kpi.alerts.type (ADR 0006); an unknown type shows as itself.
+const SHORT_ALERT_TYPES = ["UTILIZATION_PCT", "REMAINING_MINUTES", "CONSUMED_MINUTES", "OVERAGE"] as const;
+type ShortAlertType = (typeof SHORT_ALERT_TYPES)[number];
+function isShortAlertType(type: string): type is ShortAlertType {
+  return (SHORT_ALERT_TYPES as readonly string[]).includes(type);
 }
 
 /// 9.10.2026: the alerts card says what the number is counting. The two
@@ -236,7 +229,8 @@ async function loadAlertSummary() {
     top: open.slice(0, 2).map((e) => ({
       id: e.id,
       clientName: e.rule.client.name,
-      description: shortAlertLabel(e.rule.type, e.rule.thresholdValue),
+      type: e.rule.type as string,
+      value: e.rule.thresholdValue,
     })),
     ...coverage,
   };
@@ -251,6 +245,16 @@ export default async function AppHomePage() {
   // CLIENT_USER to /app/portal/*, but redirecting here too closes the
   // gap for the "Ankora" logo link and anyone who bookmarks /app itself.
   if (user.role === "CLIENT_USER") redirect("/app/portal");
+
+  const t = await getTranslations("home");
+  const format = await getFormatter();
+  const percent = (pct: number) => format.number(pct / 100, { style: "percent" });
+  /// A `YYYY-MM-DD` key as day and month ("5.11" in Hebrew), formatted at
+  /// UTC so the calendar day never moves with the reader's time zone.
+  const dayMonthOfKey = (dateKey: string) => {
+    const [y, m, d] = dateKey.split("-").map(Number);
+    return format.dateTime(new Date(Date.UTC(y, m - 1, d)), { day: "numeric", month: "numeric", timeZone: "UTC" });
+  };
 
   const canSeeAudit = can(user.role, "audit.view");
   const canSeeReports = can(user.role, "report.internal.view");
@@ -322,7 +326,12 @@ export default async function AppHomePage() {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-app-text-primary">שלום, {user.name.split(" ")[0]}</h1>
+          <h1 className="text-xl font-medium text-app-text-primary">
+            {t.rich("greeting", {
+              name: user.name.split(" ")[0],
+              who: (chunks) => <span dir="auto">{chunks}</span>,
+            })}
+          </h1>
         </div>
 
         {/* Team adoption, mechanism two: the work this person is holding.
@@ -341,20 +350,20 @@ export default async function AppHomePage() {
             <div className="flex items-center justify-between gap-2.5 border-b border-app-border px-[18px] py-3.5">
               <span className="flex items-center gap-2 text-[13.5px] font-medium text-app-text-primary">
                 <ListChecks size={15} strokeWidth={2} className="text-app-text-tertiary" />
-                המשימות שלי
+                {t("myTasks.title")}
               </span>
               <Link href="/app/tasks?mine=1" className="text-[11.5px] text-app-text-accent hover:underline">
-                לכל המשימות שלי
+                {t("myTasks.allMine")}
               </Link>
             </div>
             <div className="divide-y divide-app-border">
-              {myTasks.map((t) => (
+              {myTasks.map((task) => (
                 // Each row opens its own task. It used to open the list,
                 // and Ariel had to find the task again (15.10.2026). The
                 // way back from the task still leads to "my tasks".
                 <Link
-                  key={t.id}
-                  href={taskHref(t.id, "mine=1")}
+                  key={task.id}
+                  href={taskHref(task.id, "mine=1")}
                   className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-[18px] py-3 transition-colors hover:bg-app-surface-sunken"
                 >
                   <span className="flex min-w-0 items-baseline gap-2">
@@ -362,25 +371,21 @@ export default async function AppHomePage() {
                         can see that has not moved in a day. It is on the
                         row rather than in a separate list, because the
                         person who can fix it is looking at the row. */}
-                    {t.stale && (
+                    {task.stale && (
                       <span
-                        title={`לא זזה מעל ${STALE_PROMISE_HOURS} שעות, והלקוח רואה אותה`}
+                        title={t("myTasks.staleHint", { hours: STALE_PROMISE_HOURS })}
                         className="shrink-0 text-app-warning"
                       >
                         <TriangleAlert size={13} strokeWidth={2.25} />
                       </span>
                     )}
-                    <span className="truncate text-[13.5px] text-app-text-primary">{t.title}</span>
+                    <span dir="auto" className="truncate text-[13.5px] text-app-text-primary">{task.title}</span>
                   </span>
                   <span className="flex items-center gap-2.5 text-[11.5px] text-app-text-tertiary">
-                    <span className="truncate">{t.clientName}</span>
-                    {t.dueDate && (
+                    <span dir="auto" className="truncate">{task.clientName}</span>
+                    {task.dueDate && (
                       <span dir="ltr" className="font-jbmono">
-                        {new Intl.DateTimeFormat("he-IL", {
-                          day: "numeric",
-                          month: "short",
-                          timeZone: TIMEZONE,
-                        }).format(t.dueDate)}
+                        {format.dateTime(task.dueDate, { day: "numeric", month: "short" })}
                       </span>
                     )}
                   </span>
@@ -399,31 +404,40 @@ export default async function AppHomePage() {
           <div className="overflow-hidden rounded-2xl border border-app-border bg-white">
             <div className="flex items-center gap-2 border-b border-app-border px-[18px] py-3.5 text-[13.5px] font-medium text-app-text-primary">
               <Repeat size={15} strokeWidth={2} className="text-app-text-tertiary" />
-              שגרה שוטפת
+              {t("routines.title")}
             </div>
             <ul className="divide-y divide-app-border">
               {routines.map((r) => (
                 <li key={r.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-[18px] py-3">
                   <span className="min-w-0">
                     <Link href={`/app/clients/${r.clientId}?tab=file#processes`} className="text-[13.5px] text-app-text-primary hover:text-app-text-accent">
-                      <span className="font-mono text-[11.5px] text-app-text-tertiary">{r.code}</span> {r.title}
+                      <span className="font-mono text-[11.5px] text-app-text-tertiary">{r.code}</span> <bdi>{r.title}</bdi>
                     </Link>
                     <span className="block text-[11.5px] text-app-text-tertiary">
-                      {[r.clientName, r.checkEvery && `בדיקה ${r.checkEvery}${r.checkText ? `: ${r.checkText}` : ""}`, r.asBackup && "כמחליף"].filter(Boolean).join(" · ")}
+                      {[
+                        r.clientName,
+                        r.checkEveryDays &&
+                          (r.checkText
+                            ? t("routines.checkEveryWithText", { every: t("routines.every", { days: r.checkEveryDays }), text: r.checkText })
+                            : t("routines.checkEvery", { every: t("routines.every", { days: r.checkEveryDays }) })),
+                        r.asBackup && t("routines.asBackup"),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </span>
                   </span>
                   <span className="flex items-center gap-3 text-[11.5px]">
                     {r.state && r.dueKey && (
                       <span className={r.state === "LATER" ? "text-app-text-tertiary" : "font-medium text-app-warning"}>
                         {r.state === "LATER"
-                          ? `הבאה ב-${r.dueKey.split("-").reverse().slice(0, 2).join(".")}`
+                          ? t("routines.nextOn", { date: dayMonthOfKey(r.dueKey) })
                           : r.lastCheckedAt
-                            ? CHECK_STATE_LABELS[r.state]
-                            : "עוד לא נבדק"}
+                            ? t(`routines.state.${r.state}`)
+                            : t("routines.notCheckedYet")}
                       </span>
                     )}
                     {r.checkEveryDays && (
-                      <Drawer triggerLabel="רישום בדיקה" title={`בדיקה: ${r.code} ${r.title}`} variant="link">
+                      <Drawer triggerLabel={t("routines.logCheck")} title={t("routines.drawerTitle", { code: r.code, title: r.title })} variant="link">
                         <ProcessCheckForm clientId={r.clientId} processId={r.id} checkText={r.checkText} steps={r.steps} from="home" />
                       </Drawer>
                     )}
@@ -443,19 +457,22 @@ export default async function AppHomePage() {
             <KpiCard
               href="/app/reports?type=active_timers"
               icon={Timer}
-              label="טיימרים פעילים כרגע"
+              label={t("kpi.activeTimers.label")}
               value={metrics.activeTimersCount}
               footer={
                 (metrics.parallelTimerPeopleCount > 0 || metrics.longRunningCount > 0 || metrics.activeTimersCount > 0) && (
                   <>
                     {metrics.parallelTimerPeopleCount > 0 && (
                       <p className="mt-1.5 text-[11.5px] text-app-text-secondary">
-                        {metrics.activeTimerPeopleCount} אנשי צוות, מתוכם {metrics.parallelTimerPeopleCount} עם שני טיימרים במקביל
+                        {t("kpi.activeTimers.people", {
+                          people: metrics.activeTimerPeopleCount,
+                          parallel: metrics.parallelTimerPeopleCount,
+                        })}
                       </p>
                     )}
                     {metrics.longRunningCount > 0 && (
                       <p className="mt-1.5 text-[11.5px] font-medium text-app-error">
-                        {metrics.longRunningCount} מהם רצים מעל {LONG_TIMER_HOURS} שעות ברצף (חריגה)
+                        {t("kpi.activeTimers.longRunning", { count: metrics.longRunningCount, hours: LONG_TIMER_HOURS })}
                       </p>
                     )}
                     {/* Longest running first: loadActiveTimerRows sorts by
@@ -477,14 +494,14 @@ export default async function AppHomePage() {
             <KpiCard
               href={`/app/reports?type=employee_client_matrix&from=${todayKey}&to=${todayKey}`}
               icon={Clock}
-              label="שעות דווחו היום (כל הלקוחות)"
+              label={t("kpi.today.label")}
               value={formatMinutes(metrics.todayMinutes)}
               footer={
                 metrics.todayTopClients.length > 0 && (
                   <div className="mt-2.5 border-t border-app-border pt-1.5">
                     {metrics.todayTopClients.map((c) => (
                       <div key={c.clientId} className="flex items-center justify-between gap-3 py-1.5">
-                        <span className="truncate text-[12.5px] text-app-text-primary">{c.name}</span>
+                        <span dir="auto" className="truncate text-[12.5px] text-app-text-primary">{c.name}</span>
                         <span dir="ltr" className="shrink-0 font-jbmono text-[12.5px] text-app-text-secondary">
                           {formatMinutes(c.minutes)}
                         </span>
@@ -492,10 +509,11 @@ export default async function AppHomePage() {
                     ))}
                     {metrics.todayClientCount > metrics.todayTopClients.length && (
                       <p className="mt-1 text-[11.5px] text-app-text-accent">
-                        {metrics.todayClientCount - metrics.todayTopClients.length === 1
-                          ? "ועוד לקוח אחד"
-                          : `ועוד ${metrics.todayClientCount - metrics.todayTopClients.length} לקוחות`}{" "}
-                        ←
+                        {t("kpi.today.more", { count: metrics.todayClientCount - metrics.todayTopClients.length })}{" "}
+                        {/* Points the reading direction: turned around left to right (ADR 0006). */}
+                        <span aria-hidden="true" className="inline-block ltr:rotate-180">
+                          ←
+                        </span>
                       </p>
                     )}
                   </div>
@@ -505,14 +523,17 @@ export default async function AppHomePage() {
             <KpiCard
               href="/app/reports?type=hours_by_client"
               icon={Wallet}
-              label="ניצול ממוצע בבנקי שעות"
-              value={metrics.avgUtilizationPct !== null ? `${metrics.avgUtilizationPct}%` : "-"}
+              label={t("kpi.bank.label")}
+              value={metrics.avgUtilizationPct !== null ? percent(metrics.avgUtilizationPct) : "-"}
               footer={
                 metrics.avgUtilizationPct !== null && (
                   <div className="mt-2.5">
                     <p className="-mt-1.5 mb-2.5 text-[12px] text-app-text-secondary">
-                      <span className="font-jbmono">{wholeHours(metrics.bankConsumedMinutes)}</span> מתוך{" "}
-                      <span className="font-jbmono">{wholeHours(metrics.bankTotalMinutes)}</span> שעות
+                      {t.rich("kpi.bank.hoursOf", {
+                        used: format.number(wholeHours(metrics.bankConsumedMinutes)),
+                        total: format.number(wholeHours(metrics.bankTotalMinutes)),
+                        num: (chunks) => <span className="font-jbmono">{chunks}</span>,
+                      })}
                     </p>
                     <ProgressBar
                       percent={metrics.avgUtilizationPct}
@@ -521,29 +542,29 @@ export default async function AppHomePage() {
                     />
                     {metrics.expectedUtilizationPct !== null && (
                       <p className="mt-1.5 text-[11.5px] text-app-text-secondary">
-                        צפי להיום: <span className="font-jbmono">{metrics.expectedUtilizationPct}%</span>
+                        {t.rich("kpi.bank.expected", {
+                          pct: percent(metrics.expectedUtilizationPct),
+                          num: (chunks) => <span className="font-jbmono">{chunks}</span>,
+                        })}
                         {/* Said in words, not only by colour: ahead of the
                             pace is where a bank runs out before its cycle
                             does. Five points either way is "on pace". */}
+                        {" · "}
                         {metrics.avgUtilizationPct > metrics.expectedUtilizationPct + 5
-                          ? " · מעל הקצב"
+                          ? t("kpi.bank.pace.above")
                           : metrics.avgUtilizationPct < metrics.expectedUtilizationPct - 5
-                            ? " · מתחת לקצב"
-                            : " · בקצב"}
+                            ? t("kpi.bank.pace.below")
+                            : t("kpi.bank.pace.on")}
                       </p>
                     )}
                     {metrics.packagesEndingSoon > 0 && (
                       <p className="mt-1.5 text-[11.5px] font-medium text-app-warning">
-                        {metrics.packagesEndingSoon === 1
-                          ? `חבילת שעות אחת צפויה להיגמר בתוך ${PACKAGE_ENDING_SOON_DAYS} יום`
-                          : `${metrics.packagesEndingSoon} חבילות שעות צפויות להיגמר בתוך ${PACKAGE_ENDING_SOON_DAYS} יום`}
+                        {t("kpi.bank.packagesEnding", { count: metrics.packagesEndingSoon, days: PACKAGE_ENDING_SOON_DAYS })}
                       </p>
                     )}
                     {metrics.clientsNearLimitCount > 0 && (
                       <p className="mt-1.5 text-[11.5px] font-medium text-app-error">
-                        {metrics.clientsNearLimitCount === 1
-                          ? "לקוח אחד מעל 90% ניצול"
-                          : `${metrics.clientsNearLimitCount} לקוחות מעל 90% ניצול`}
+                        {t("kpi.bank.nearLimit", { count: metrics.clientsNearLimitCount, pct: percent(90) })}
                       </p>
                     )}
                   </div>
@@ -554,7 +575,7 @@ export default async function AppHomePage() {
               <KpiCard
                 href="/app/alerts"
                 icon={Bell}
-                label="התראות פתוחות"
+                label={t("kpi.alerts.label")}
                 value={alerts?.count ?? 0}
                 footer={
                   alerts && (
@@ -563,16 +584,20 @@ export default async function AppHomePage() {
                         <>
                           {alerts.top.map((a) => (
                             <div key={a.id} className="py-1.5">
-                              <p className="truncate text-[12.5px] text-app-text-primary">{a.clientName}</p>
-                              <p className="truncate text-[11.5px] text-app-error">{a.description}</p>
+                              <p dir="auto" className="truncate text-[12.5px] text-app-text-primary">{a.clientName}</p>
+                              <p className="truncate text-[11.5px] text-app-error">
+                                {/* String values: the Hebrew never had a thousands separator. */}
+                                {isShortAlertType(a.type) ? t(`kpi.alerts.type.${a.type}`, { value: String(a.value) }) : a.type}
+                              </p>
                             </div>
                           ))}
                           {alerts.count > alerts.top.length && (
                             <p className="mt-1 text-[11.5px] text-app-text-accent">
-                              {alerts.count - alerts.top.length === 1
-                                ? "ועוד התראה אחת"
-                                : `ועוד ${alerts.count - alerts.top.length} התראות`}{" "}
-                              ←
+                              {t("kpi.alerts.more", { count: alerts.count - alerts.top.length })}{" "}
+                              {/* Points the reading direction: turned around left to right (ADR 0006). */}
+                              <span aria-hidden="true" className="inline-block ltr:rotate-180">
+                                ←
+                              </span>
                             </p>
                           )}
                         </>
@@ -583,11 +608,14 @@ export default async function AppHomePage() {
                               the threshold (RIMED at 107% on the day this shipped),
                               so zero open alerts is a fact about alerts, not a
                               verdict on the clients. */}
-                          אין התראות פתוחות · <span className="font-jbmono">{alerts.ruleCount}</span> כללים על{" "}
-                          <span className="font-jbmono">{alerts.clientCount}</span> לקוחות
+                          {t.rich("kpi.alerts.noneOpen", {
+                            rules: alerts.ruleCount,
+                            clients: alerts.clientCount,
+                            num: (chunks) => <span className="font-jbmono">{chunks}</span>,
+                          })}
                         </p>
                       ) : (
-                        <p className="py-1.5 text-[12px] font-medium text-app-warning">לא הוגדרו כללי התראה</p>
+                        <p className="py-1.5 text-[12px] font-medium text-app-warning">{t("kpi.alerts.noRules")}</p>
                       )}
                     </div>
                   )
@@ -597,7 +625,7 @@ export default async function AppHomePage() {
               <KpiCard
                 href="/app/reports"
                 icon={BarChart3}
-                label="לכל הדוחות הפנימיים"
+                label={t("kpi.reports.label")}
                 value={<ArrowLeft size={20} strokeWidth={1.75} className="ltr:rotate-180" />}
               />
             )}
@@ -626,7 +654,7 @@ export default async function AppHomePage() {
         {stalled && (
           <div className="rounded-2xl border border-app-border bg-white p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-              <h2 className="text-sm font-medium text-app-text-secondary">הבטחות שלא זזו היום</h2>
+              <h2 className="text-sm font-medium text-app-text-secondary">{t("stalled.title")}</h2>
               <span
                 className={`font-jbmono text-[22px] font-medium ${stalledTotal > 0 ? "text-app-warning" : "text-app-success"}`}
               >
@@ -635,22 +663,22 @@ export default async function AppHomePage() {
             </div>
             {stalledTotal === 0 ? (
               <p className="mt-1.5 text-[12.5px] text-app-text-secondary">
-                כל ההבטחות שהלקוחות רואים זזו היום. זה מה שהפורטל אמור להראות.
-                {stalledWaiting > 0 && ` ${stalledWaiting} ממתינות ללקוחות עצמם.`}
+                {t("stalled.allMoved")}
+                {stalledWaiting > 0 && ` ${t("stalled.allMovedWaiting", { count: stalledWaiting })}`}
               </p>
             ) : (
               <>
                 <p className="mt-1.5 text-[12.5px] text-app-text-secondary">
-                  הלקוחות האלה רואים אצלם משימה פתוחה שלא נגענו בה היום.
+                  {t("stalled.intro")}
                   {stalledOverdue > 0 && (
                     <>
                       {" "}
                       <span className="text-app-warning">
-                        {stalledOverdue} מהן כבר עברו את תאריך היעד.
+                        {t("stalled.overdue", { count: stalledOverdue })}
                       </span>
                     </>
                   )}
-                  {stalledWaiting > 0 && ` ועוד ${stalledWaiting} ממתינות ללקוחות עצמם, ולא לנו.`}
+                  {stalledWaiting > 0 && ` ${t("stalled.waitingToo", { count: stalledWaiting })}`}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {stalled.slice(0, 8).map((row) => (
@@ -659,9 +687,13 @@ export default async function AppHomePage() {
                       href={`/app/tasks?clientId=${row.clientId}`}
                       className="rounded-full border border-app-border bg-white px-2.5 py-1 text-[11.5px] text-app-text-secondary transition-colors hover:border-gold"
                     >
-                      {row.clientName} · {row.count}
-                      {row.overdue > 0 && <span className="text-app-warning"> · {row.overdue} באיחור</span>}
-                      {row.waiting > 0 && <span className="text-app-text-tertiary"> · {row.waiting} ממתינות להם</span>}
+                      <bdi>{row.clientName}</bdi> · {row.count}
+                      {row.overdue > 0 && (
+                        <span className="text-app-warning"> · {t("stalled.chipOverdue", { count: row.overdue })}</span>
+                      )}
+                      {row.waiting > 0 && (
+                        <span className="text-app-text-tertiary"> · {t("stalled.chipWaiting", { count: row.waiting })}</span>
+                      )}
                     </Link>
                   ))}
                 </div>
@@ -678,9 +710,9 @@ export default async function AppHomePage() {
             {upcomingDates && upcomingDates.length > 0 && (
               <div className="flex flex-col rounded-2xl border border-app-border bg-white p-5">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-medium text-app-text-secondary">מועדים חשובים קרובים</h2>
+                  <h2 className="text-sm font-medium text-app-text-secondary">{t("dates.title")}</h2>
                   <Link href="/app/important-dates" className="-my-2 py-2 text-xs text-app-text-accent hover:text-app-text-primary">
-                    לכל המועדים
+                    {t("dates.all")}
                   </Link>
                 </div>
                 <div className="mt-3 flex-1 divide-y divide-app-border">
@@ -699,20 +731,20 @@ export default async function AppHomePage() {
                         >
                           {d.nextOccurrenceAt ? (
                             <>
-                              <span className="font-jbmono text-sm font-semibold">{d.nextOccurrenceAt.getDate()}</span>
+                              <span className="font-jbmono text-sm font-semibold">
+                                {format.dateTime(d.nextOccurrenceAt, { day: "numeric" })}
+                              </span>
                               <span className="mt-0.5 text-[9px] uppercase">
-                                {new Intl.DateTimeFormat("he-IL", { month: "short", timeZone: "Asia/Jerusalem" }).format(
-                                  d.nextOccurrenceAt
-                                )}
+                                {format.dateTime(d.nextOccurrenceAt, { month: "short" })}
                               </span>
                             </>
                           ) : (
-                            "—"
+                            "-"
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-app-text-primary">{d.title}</p>
-                          <p className="truncate text-xs text-app-text-tertiary">{d.client.name}</p>
+                          <p dir="auto" className="truncate text-sm font-medium text-app-text-primary">{d.title}</p>
+                          <p dir="auto" className="truncate text-xs text-app-text-tertiary">{d.client.name}</p>
                         </div>
                       </Link>
                     );
@@ -726,14 +758,14 @@ export default async function AppHomePage() {
         {!hasAnyContent && (
           <EmptyState
             icon={LayoutGrid}
-            title="אין עדיין נתונים להצגה"
-            description="בהתאם לתפקיד שלך, אין כרגע מדדים או ספירות להציג כאן."
+            title={t("empty.title")}
+            description={t("empty.description")}
           />
         )}
 
         {canSeeAudit && (
           <Link href="/app/audit-log" className="inline-block text-sm text-app-text-accent hover:text-app-text-primary">
-            צפייה ביומן הפעולות
+            {t("auditLog")}
           </Link>
         )}
       </div>

@@ -89,7 +89,7 @@ describe("שיחות חדשות לבדיקה", () => {
   it("לשמור takes a chat off the list, and ביטול puts it back", async () => {
     const { owner, channel, fresh } = await setup();
     session.user = owner;
-    expect(await reviewNewChatAction(undefined, form({ conversationId: fresh.id, decision: "keep" }))).toEqual({ ok: "נשמרת." });
+    expect(await reviewNewChatAction(undefined, form({ conversationId: fresh.id, decision: "keep" }))).toEqual({ ok: "נשמרת.", kept: true });
     expect(await countChatsToReview(channel)).toBe(1);
     await reviewNewChatAction(undefined, form({ conversationId: fresh.id, decision: "undo" }));
     expect(await countChatsToReview(channel)).toBe(2);
