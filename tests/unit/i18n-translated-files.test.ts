@@ -109,6 +109,12 @@ const TRANSLATED_FILES = [
   // Not listed on purpose: tasks/[id]/TaskShare.tsx builds the Hebrew
   // message sent to a colleague (content, not interface); list-query.ts and
   // mine-scope.ts keep Hebrew fallbacks for the calendar, translated later.
+  "app/(product)/app/(authenticated)/guide/page.tsx",
+  "app/(product)/app/(authenticated)/guide/GuideBrowser.tsx",
+  "app/(product)/app/(authenticated)/guide/search.ts",
+  "app/(product)/app/(authenticated)/guide/content.en.ts",
+  // guide/content.ts is the Hebrew guide itself; content.en.ts is its English twin
+  // (tests/unit/guide-content-parity.test.ts keeps the two in step).
 ];
 
 describe("translated screens (ADR 0006)", () => {

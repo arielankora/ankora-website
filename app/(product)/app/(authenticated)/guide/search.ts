@@ -7,8 +7,11 @@ import type { GuideGroup, GuideSection } from "./content";
 // forty-odd sections long and the only way in was the table of contents,
 // which only works if you already know what the screen is called.
 
-/// The words of a query, lowercased. Hebrew has no case, but the guide is
-/// full of English names (Claude, KPI, CSV) that people type either way.
+/// The words of a query, lowercased. Hebrew has no case, but the Hebrew
+/// guide is full of English names (Claude, KPI, CSV) that people type
+/// either way, and the English guide (content.en.ts, ADR 0006) is all
+/// Latin text. Nothing here is specific to one language: lowercasing and
+/// splitting on whitespace work the same for both.
 export function queryWords(query: string): string[] {
   return query
     .toLowerCase()
