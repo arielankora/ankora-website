@@ -10,7 +10,7 @@ import {
   parseSendMode,
   MAX_MESSAGE_LENGTH,
 } from "@/lib/whatsapp-poc/access";
-import { UnipileError, loadMergedChats, resetChatListCache, CHAT_LIST_FRESH_MS, CHAT_LIST_MAX_AGE_MS, mergeChats, type PocChat, parseOffset, isHiddenChat, toPocChat, toPocMessage, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
+import { UnipileError, parseVcard, loadMergedChats, resetChatListCache, CHAT_LIST_FRESH_MS, CHAT_LIST_MAX_AGE_MS, mergeChats, type PocChat, parseOffset, isHiddenChat, toPocChat, toPocMessage, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
 
 describe("WhatsApp POC: who may see the screen", () => {
   const viewers = parseEmailList("Ariel@Ankora.co.il, hadas@ankora.co.il");
@@ -137,6 +137,47 @@ describe("WhatsApp POC: reading Unipile's shapes", () => {
       attachments: [{ type: "audio", voice_note: true }],
     });
     expect(m).toMatchObject({ id: "m", isSender: true, attachments: [{ type: "audio", voiceNote: true }] });
+  });
+});
+
+describe("WhatsApp POC: replies, forwards and contact cards (13.11.2026)", () => {
+  it("keeps the quoted message and the forwarded mark", () => {
+    const m = toPocMessage({
+      id: "r",
+      timestamp: "2026-11-13T10:45:00Z",
+      text: "ממיה",
+      quoted: { text: "המליצו לי עליו", sender: { display_name: "ANKORA" }, attachments: [] },
+    });
+    expect(m?.quoted).toEqual({ text: "המליצו לי עליו", senderName: "ANKORA", attachmentTypes: [] });
+    expect(m?.forwarded).toBeUndefined();
+    const f = toPocMessage({ id: "f", timestamp: "2026-11-13T10:45:00Z", text: "x", forwarded: { attachments: [] } });
+    expect(f?.forwarded).toBe(true);
+  });
+
+  it("takes a wrapped forward's text when the message has none", () => {
+    const f = toPocMessage({ id: "f", timestamp: "2026-11-13T10:45:00Z", text: "", forwarded: { text: "בפנים", attachments: [] } });
+    expect(f?.text).toBe("בפנים");
+  });
+
+  it("reads a contact card from its fields", () => {
+    const m = toPocMessage({
+      id: "c",
+      timestamp: "2026-11-13T10:45:00Z",
+      attachments: [{ id: "a", type: "contact_card", display_name: "שלום", phones: [{ number: "+972 52-000-0000" }] }],
+    });
+    expect(m?.attachments[0].contact).toEqual({ name: "שלום", phones: ["+972 52-000-0000"] });
+  });
+
+  it("parses a WhatsApp vCard", () => {
+    const card = ["BEGIN:VCARD", "VERSION:3.0", "N:;שלום❤;;;", "FN:שלום❤", "item1.TEL;waid=972520000000:+972 52-000-0000", "item1.X-ABLabel:נייד", "END:VCARD"].join("\r\n");
+    expect(parseVcard(card)).toEqual({ name: "שלום❤", phones: ["+972 52-000-0000"] });
+    expect(parseVcard("hello")).toBeNull();
+    const inline = toPocMessage({
+      id: "v",
+      timestamp: "2026-11-13T10:45:00Z",
+      attachments: [{ id: "a", type: "file", mimetype: "text/vcard", content: Buffer.from(card).toString("base64") }],
+    });
+    expect(inline?.attachments[0].contact?.name).toBe("שלום❤");
   });
 });
 

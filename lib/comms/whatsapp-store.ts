@@ -8,6 +8,7 @@ import { maskPhone } from "@/lib/whatsapp-poc/access";
 import { removeDriveFile, uploadLargeFileToDriveFolder } from "@/lib/google-drive";
 import { chatPhone } from "@/lib/whatsapp-poc/inbox";
 import {
+  CONTACT_ID_PREFIX,
   UnipileError,
   getChat,
   isHiddenChat,
@@ -116,14 +117,19 @@ export async function storeMessage(
         senderName: m.senderName,
         text: m.text,
         isDeleted: m.isDeleted,
+        quoted: m.quoted ?? undefined,
+        forwarded: m.forwarded === true,
         held,
         attachments: {
           create: m.attachments
-            .filter((a) => a.id)
-            .map((a) => ({
-              externalId: a.id!,
+            .map((a, i) => ({ a, externalId: a.id ?? (a.contact ? `${CONTACT_ID_PREFIX}${i}` : null) }))
+            .filter((x): x is { a: (typeof m.attachments)[number]; externalId: string } => x.externalId !== null)
+            .map(({ a, externalId }) => ({
+              externalId,
               type: a.type,
               mimetype: a.mimetype,
+              contactName: a.contact?.name ?? null,
+              contactPhones: a.contact?.phones ?? [],
               voiceNote: a.voiceNote,
               durationSec: a.duration ? Math.round(a.duration) : null,
               transcript: a.type === "audio" ? { create: { status: skipTranscript ? "SKIPPED" : "PENDING" } } : undefined,
@@ -184,6 +190,32 @@ export async function updateStoredMessage(channel: CommsChannel, chatId: string,
     data: { text: m.text, isDeleted: m.isDeleted, isEdited: true },
   });
   return count > 0;
+}
+
+/// A message stored before quotes, forwards and contact cards were kept
+/// (13.11.2026), filled in from a fresh read of it. Only adds: a quote or a
+/// contact already there is left as it is.
+export async function enrichStoredMessage(channelId: string, chatId: string, m: PocMessage): Promise<void> {
+  const row = await prisma.commsMessage.findFirst({
+    where: { externalId: m.id, conversation: { channelId, externalChatId: chatId } },
+    select: { id: true, quoted: true, forwarded: true, attachments: { select: { id: true, externalId: true, contactName: true, contactPhones: true } } },
+  });
+  if (!row) return;
+  if ((m.quoted && !row.quoted) || (m.forwarded && !row.forwarded)) {
+    await prisma.commsMessage.update({
+      where: { id: row.id },
+      data: { ...(m.quoted && !row.quoted ? { quoted: m.quoted } : {}), ...(m.forwarded ? { forwarded: true } : {}) },
+    });
+  }
+  for (const a of m.attachments) {
+    if (!a.id || !a.contact) continue;
+    const stored = row.attachments.find((s) => s.externalId === a.id);
+    if (!stored || stored.contactName || stored.contactPhones.length > 0) continue;
+    await prisma.commsAttachment.update({
+      where: { id: stored.id },
+      data: { contactName: a.contact.name, contactPhones: a.contact.phones },
+    });
+  }
 }
 
 /// message.delete. The text is cleared, not only flagged: what was deleted

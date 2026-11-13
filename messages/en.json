@@ -6316,8 +6316,11 @@
         "video": "Video",
         "voice": "Voice message",
         "file": "File",
-        "sticker": "Sticker"
-      }
+        "sticker": "Sticker",
+        "contact": "Contact"
+      },
+      "forwarded": "Forwarded",
+      "openContact": "Open chat"
     },
     "calls": {
       "intro": "Recordings arrive automatically from Aloha. A contact's name opens their timeline.",

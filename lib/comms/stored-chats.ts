@@ -2,7 +2,7 @@ import "server-only";
 import type { CommsChannel, TranscriptStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { matchPhones } from "@/lib/whatsapp-poc/clients-by-phone";
-import type { PocChat, PocMessage } from "@/lib/whatsapp-poc/unipile";
+import { CONTACT_ID_PREFIX, type PocChat, type PocMessage, type PocQuote } from "@/lib/whatsapp-poc/unipile";
 import { blockStateFor, canSeeConversation, isExcludedViewer } from "./visibility";
 import { fullViewerEmails } from "./grants";
 import { chatPhone } from "@/lib/whatsapp-poc/inbox";
@@ -114,12 +114,15 @@ export async function listStoredMessages(
       senderName: r.senderName,
       isDeleted: r.isDeleted,
       attachments: r.attachments.map((a) => ({
-        id: a.externalId,
+        id: a.externalId.startsWith(CONTACT_ID_PREFIX) ? null : a.externalId,
         type: a.type,
         mimetype: a.mimetype,
         voiceNote: a.voiceNote,
         duration: a.durationSec,
+        ...(a.contactName || a.contactPhones.length > 0 ? { contact: { name: a.contactName, phones: a.contactPhones } } : {}),
       })),
+      ...(storedQuote(r.quoted) ? { quoted: storedQuote(r.quoted) } : {}),
+      ...(r.forwarded ? { forwarded: true } : {}),
     };
   });
   return { messages, transcripts, hasOlder };
@@ -205,3 +208,12 @@ export async function searchStoredMessages(
   }));
 }
 
+/// A stored quote (CommsMessage.quoted), checked: it is JSON in the row.
+function storedQuote(v: unknown): PocQuote | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const q = v as Record<string, unknown>;
+  const text = typeof q.text === "string" ? q.text : "";
+  const attachmentTypes = Array.isArray(q.attachmentTypes) ? q.attachmentTypes.filter((t): t is string => typeof t === "string") : [];
+  if (!text && attachmentTypes.length === 0) return null;
+  return { text, senderName: typeof q.senderName === "string" && q.senderName ? q.senderName : null, attachmentTypes };
+}

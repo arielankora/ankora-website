@@ -44,11 +44,25 @@ const CONTENT_FILE_LABEL: Record<string, string> = {
   audio: "הודעה קולית",
   file: "קובץ",
   sticker: "מדבקה",
+  contact_card: "איש קשר",
 };
 
 export function contentFileLabel(a: { type: string; voiceNote?: boolean }): string {
   if (a.voiceNote) return "הודעה קולית";
   return CONTENT_FILE_LABEL[a.type] ?? "קובץ";
+}
+
+/// A message's text as it goes into a task (13.11.2026): what it replies
+/// to above it, and each contact card it carries as a name and numbers.
+/// Content, so in Hebrew (ADR 0006).
+export function contentText(m: {
+  text: string;
+  quoted?: { text: string } | null;
+  attachments: Array<{ contact?: { name: string | null; phones: string[] } | null }>;
+}): string {
+  const quote = m.quoted?.text ? `בתגובה ל: "${m.quoted.text.slice(0, 200)}"` : null;
+  const cards = m.attachments.flatMap((a) => (a.contact ? [`איש קשר: ${[a.contact.name, ...a.contact.phones].filter(Boolean).join(", ")}`] : []));
+  return [quote, m.text, ...cards].filter(Boolean).join("\n");
 }
 
 /// Per message. The comment as a whole is capped by MAX_COMMENT_LENGTH.

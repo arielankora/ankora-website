@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { engagementDeletesOn } from "./engagement";
 import type { CommsExport, ExportMessage } from "./export-render";
 
-const ATTACHMENT_LABEL: Record<string, string> = { img: "תמונה", image: "תמונה", video: "וידאו", audio: "הקלטה", file: "קובץ", sticker: "מדבקה" };
+const ATTACHMENT_LABEL: Record<string, string> = { img: "תמונה", image: "תמונה", video: "וידאו", audio: "הקלטה", file: "קובץ", sticker: "מדבקה", contact_card: "איש קשר" };
 
 /// What was kept of one client's people: the same numbers and groups the
 /// engagement-end sweep removes 30 days after archiving, so the export
