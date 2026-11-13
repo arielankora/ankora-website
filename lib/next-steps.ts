@@ -18,7 +18,7 @@
 // data, and the screens only show.
 
 import { taskCoveredBy, contentWords, sameForm } from "@/lib/process-task-overlap";
-import { runBlockerKey, SCHEDULED_NO_DATE_BLOCKER } from "@/lib/process-readiness";
+import { CONTINUOUS_NO_CHECK_BLOCKER, runBlockerKey, SCHEDULED_NO_DATE_BLOCKER } from "@/lib/process-readiness";
 
 /// An action the server carries out in one click.
 export type StepOp =
@@ -142,22 +142,45 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
   const saidBelow = blocker === SCHEDULED_NO_DATE_BLOCKER || (!!p.draft && !!blocker && /נוהל/.test(blocker));
   if (blocker && !saidBelow) {
     const noOwnerOrTrigger = /אחראי|מפעיל/.test(blocker);
-    const noProcedure = /נוהל/.test(blocker);
+    // 13.11.2026: an ongoing process with no check every N days was told
+    // to "decide whether to resume it", the paused process's step. It
+    // needs the check's frequency, in the form.
+    const noCheck = blocker === CONTINUOUS_NO_CHECK_BLOCKER;
+    const noProcedure = !noCheck && /נוהל/.test(blocker);
+    const editsForm = noOwnerOrTrigger || noCheck;
     out.push({
       kind: "not_ready",
       title: blocker,
-      recommend: noOwnerOrTrigger ? (/אחראי/.test(blocker) ? "לקבוע מי אחראי" : "לכתוב מה מפעיל את התהליך") : noProcedure ? "לכתוב את הנוהל ולשלוח לאישור" : "להחליט אם לחדש אותו",
-      why: "עד אז התהליך לא פותח ריצות לבד.",
-      fix: noOwnerOrTrigger ? { kind: "edit", label: "להשלים" } : noProcedure ? { kind: "procedure", label: "לכתוב נוהל" } : { kind: "open", label: "לתהליך" },
+      recommend: noCheck
+        ? "להגדיר כל כמה ימים בודקים"
+        : noOwnerOrTrigger
+          ? /אחראי/.test(blocker)
+            ? "לקבוע מי אחראי"
+            : "לכתוב מה מפעיל את התהליך"
+          : noProcedure
+            ? "לכתוב את הנוהל ולשלוח לאישור"
+            : "להחליט אם לחדש אותו",
+      why: noCheck ? "עד אז הבדיקה לא מגיעה לשגרה של אף אחד, ואף אחד לא מקבל תזכורת." : "עד אז התהליך לא פותח ריצות לבד.",
+      fix: editsForm ? { kind: "edit", label: "להשלים" } : noProcedure ? { kind: "procedure", label: "לכתוב נוהל" } : { kind: "open", label: "לתהליך" },
       blocking: true,
       text: {
         title: (() => {
           const key = runBlockerKey(blocker);
           return key ? { key: `readiness.blockers.${key}` } : { raw: blocker };
         })(),
-        recommend: k(noOwnerOrTrigger ? (/אחראי/.test(blocker) ? "notReady.recommendOwner" : "notReady.recommendTrigger") : noProcedure ? "notReady.recommendProcedure" : "notReady.recommendRenew"),
-        why: k("notReady.why"),
-        fix: fixKey(noOwnerOrTrigger ? "complete" : noProcedure ? "writeProcedure" : "toProcess"),
+        recommend: k(
+          noCheck
+            ? "notReady.recommendCheck"
+            : noOwnerOrTrigger
+              ? /אחראי/.test(blocker)
+                ? "notReady.recommendOwner"
+                : "notReady.recommendTrigger"
+              : noProcedure
+                ? "notReady.recommendProcedure"
+                : "notReady.recommendRenew"
+        ),
+        why: k(noCheck ? "notReady.whyCheck" : "notReady.why"),
+        fix: fixKey(editsForm ? "complete" : noProcedure ? "writeProcedure" : "toProcess"),
       },
     });
   }

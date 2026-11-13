@@ -164,6 +164,8 @@ export type PanelProcess = {
   suggestions?: { systems: { id: string; name: string }[]; contacts: { id: string; name: string }[] };
   gaps: string[];
   nextDate: string | null;
+  /// 13.11.2026: the day the next run opens, when it is before the date.
+  nextOpensAt?: string | null;
   dateIds: string[];
   latestVersion: number;
   /// Built as a flow: edited in the flow editor, not here.
@@ -526,6 +528,9 @@ function ProcessForm({
 
       <FormGroup
         title={t("form.groupTiming")}
+        // 13.11.2026: an ongoing process with no check frequency opens on
+        // the field it is missing.
+        open={!!e && e.status === "ACTIVE" && e.triggerKinds.length === 1 && e.triggerKinds[0] === "CONTINUOUS" && !e.checkEveryDays}
         filled={filled(e?.businessCalendar, e?.reviewEveryDays, e?.checkEveryDays, e?.checkText)}
         more={
           <>
@@ -888,7 +893,9 @@ function NewProcessDateForm({ clientId, process }: { clientId: string; process: 
   const t = useTx();
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(addProcessDateAction, close);
-  const [recurrence, setRecurrence] = useState("BUSINESS_DAILY");
+  // 13.11.2026: no default. "Every business day" was preselected, and a
+  // monthly process saved with it opened a run every day.
+  const [recurrence, setRecurrence] = useState("");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5" data-testid="process-date-new">
       <input type="hidden" name="clientId" value={clientId} />
@@ -896,7 +903,10 @@ function NewProcessDateForm({ clientId, process }: { clientId: string; process: 
       <p className="text-sm font-medium text-app-text-primary">{t("dates.newTitle")}</p>
       <p className="text-xs text-app-text-secondary">{t("dates.newHelp")}</p>
       <Field label={t("dates.howOften")}>
-        <select name="recurrence" value={recurrence} onChange={(e) => setRecurrence(e.target.value)} className={INPUT}>
+        <select name="recurrence" value={recurrence} onChange={(e) => setRecurrence(e.target.value)} required className={INPUT}>
+          <option value="" disabled>
+            {t("dates.pickHowOften")}
+          </option>
           <option value="BUSINESS_DAILY">{t("dates.BUSINESS_DAILY")}</option>
           <option value="WEEKLY">{t("dates.WEEKLY")}</option>
           <option value="MONTHLY">{t("dates.MONTHLY")}</option>
@@ -925,7 +935,7 @@ function NewProcessDateForm({ clientId, process }: { clientId: string; process: 
         </Field>
       )}
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending || !recurrence} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("dates.creating") : t("dates.create")}
       </button>
     </form>
@@ -1226,6 +1236,11 @@ function ProcessCard({
               .filter(Boolean)
               .join(" · ")}
           </p>
+          {p.nextDate && p.nextOpensAt && day(p.nextOpensAt) !== day(p.nextDate) && (
+            <p className="text-xs text-app-text-tertiary" data-testid="process-next-opens">
+              {t("panel.nextOpens", { date: day(p.nextOpensAt) })}
+            </p>
+          )}
 
           {p.stranger && <StrangerBlock stranger={p.stranger} />}
 

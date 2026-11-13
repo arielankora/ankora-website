@@ -830,7 +830,9 @@
         "title": "Hours on this task",
         "empty": "No time reported on this task yet.",
         "running": "{count, plural, one {One timer is running on this task now, and its time will count when it stops.} other {# timers are running on this task now, and their time will count when they stop.}}"
-      }
+      },
+      "runOf": "Run of {code} {title}",
+      "runOfVersion": "Run of {code} {title}, version {version}"
     },
     "list": {
       "title": "Tasks",
@@ -3210,7 +3212,9 @@
           "recommendTrigger": "write what starts the process",
           "recommendProcedure": "write the procedure and send it for approval",
           "recommendRenew": "decide whether to resume it",
-          "why": "Until then the process opens no runs on its own."
+          "why": "Until then the process opens no runs on its own.",
+          "recommendCheck": "set how often it is checked",
+          "whyCheck": "Until then the check is on no one's routine, and no one is reminded."
         },
         "noNextDate": {
           "title": "A date-based process with no dates",
@@ -3349,7 +3353,8 @@
         "checkNext": "next on {date}",
         "checkOverdue": "Overdue, since {date}",
         "taskLink": "The task",
-        "draftLine": "Draft, version {version}"
+        "draftLine": "Draft, version {version}",
+        "nextOpens": "The run opens on {date}"
       },
       "lessons": {
         "open": "{count, plural, one {One remark from runs, for the next version} other {# remarks from runs, for the next version}}",
@@ -3486,7 +3491,8 @@
         "dayOfMonth": "Day of the month",
         "date": "Date",
         "creating": "Creating...",
-        "create": "Create the date and link it"
+        "create": "Create the date and link it",
+        "pickHowOften": "Choose how often"
       },
       "run": {
         "opens": "A task opens with the {count} steps of procedure version {version}, each on its business day.",
@@ -3618,7 +3624,7 @@
           "unreachable": "{node} cannot be reached from the start.",
           "tooLong": "One path has more than {max} actions. A procedure longer than that is several processes."
         },
-        "backToClient": "Back to the client file"
+        "backToProcess": "Back to the process"
       },
       "document": {
         "version": "Version:",
