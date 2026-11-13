@@ -140,7 +140,7 @@ export function ProcessList({ clientId, userId, processes, form }: { clientId: s
       </div>
 
       <div className="overflow-x-auto rounded-[14px] border border-app-border bg-white">
-        <table className="w-full min-w-[920px] text-start text-[15px]">
+        <table className="w-full min-w-[720px] text-start text-[15px]">
           <thead>
             <tr className="bg-app-surface-sunken text-[13px] font-bold text-app-text-secondary">
               <th className="w-[70px] px-5 py-3.5 text-start">{t("cols.code")}</th>
