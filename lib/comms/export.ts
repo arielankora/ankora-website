@@ -53,7 +53,8 @@ export async function gatherCommsExport(
     orderBy: { lastMessageAt: "desc" },
     include: {
       messages: {
-        where: { held: false, isDeleted: false },
+        // Deleted in WhatsApp: kept, and exported with a mark (13.11.2026).
+        where: { held: false },
         orderBy: { at: "asc" },
         include: { attachments: { select: { type: true, voiceNote: true, transcript: { select: { status: true, text: true } } } } },
       },
@@ -84,6 +85,7 @@ export async function gatherCommsExport(
           text: [
             // A call or a change in a group (13.11.2026), named in the export.
             m.eventType !== null ? (EVENT_LABEL[m.eventType] ?? "הודעת מערכת") : null,
+            m.isDeleted ? "[נמחקה בוואטסאפ]" : null,
             m.text,
             ...m.attachments
               .filter((a) => a.voiceNote && a.transcript?.status === "DONE" && a.transcript.text)

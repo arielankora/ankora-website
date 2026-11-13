@@ -206,7 +206,7 @@ export async function searchStoredMessages(
   const rows = await prisma.commsMessage.findMany({
     where: {
       held: false,
-      isDeleted: false,
+      // A message deleted in WhatsApp is kept, and found (13.11.2026).
       text: { contains: q, mode: "insensitive" },
       OR: scopes.map(([channelId, chatIds]) => ({ conversation: { channelId, externalChatId: { in: chatIds } } })),
     },

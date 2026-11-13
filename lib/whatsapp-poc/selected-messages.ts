@@ -56,6 +56,7 @@ export function contentFileLabel(a: { type: string; voiceNote?: boolean }): stri
 /// it carries as a name and numbers. Content, so in Hebrew (ADR 0006).
 export function contentText(m: {
   text: string;
+  isDeleted?: boolean;
   attachments: Array<{ contact?: { name: string | null; phones: string[]; emails?: string[]; organization?: string | null } | null }>;
 }): string {
   const cards = m.attachments.flatMap((a) =>
@@ -63,7 +64,8 @@ export function contentText(m: {
       ? [`איש קשר: ${[a.contact.name, a.contact.organization, ...a.contact.phones, ...(a.contact.emails ?? [])].filter(Boolean).join(", ")}`]
       : [],
   );
-  return [m.text, ...cards].filter(Boolean).join("\n");
+  // Deleted in WhatsApp, kept here: the task says so (13.11.2026).
+  return [m.isDeleted ? "[נמחקה בוואטסאפ]" : null, m.text, ...cards].filter(Boolean).join("\n");
 }
 
 /// Per message. The comment as a whole is capped by MAX_COMMENT_LENGTH.

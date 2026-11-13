@@ -85,9 +85,19 @@ describe("WhatsApp store", () => {
     await storeMessage(channel, "dana@lid", { ...msg("r2", "כן"), quoted: { id: "orig", text: "נעלנו", senderName: null, kind: null } });
     expect((await prisma.commsMessage.findFirstOrThrow({ where: { externalId: "r2" } })).quotedExternalId).toBe("orig");
 
+    // 13.11.2026 (Ariel): a deletion in WhatsApp marks, and erases nothing.
+    await storeMessage(channel, "dana@lid", msg("orig", "נעלנו לעזור לקבלנים שלנו"));
     expect(await deleteStoredMessage(channel, "dana@lid", "orig")).toBe(true);
-    const after = await prisma.commsMessage.findMany({ where: { quotedExternalId: "orig" } });
-    expect(after.map((m) => m.quotedText)).toEqual(["", ""]);
+    expect(await prisma.commsMessage.findFirstOrThrow({ where: { externalId: "orig" } })).toMatchObject({
+      isDeleted: true,
+      text: "נעלנו לעזור לקבלנים שלנו",
+    });
+    const after = await prisma.commsMessage.findMany({ where: { quotedExternalId: "orig" }, orderBy: { externalId: "asc" } });
+    expect(after.map((m) => m.quotedText)).toEqual(["נעלנו לעזור לקבלנים שלנו", "נעלנו"]);
+
+    // The same when the deletion comes as an update with the text emptied.
+    await updateStoredMessage(channel, "dana@lid", { ...msg("r1", ""), isDeleted: true });
+    expect(await prisma.commsMessage.findFirstOrThrow({ where: { externalId: "r1" } })).toMatchObject({ isDeleted: true, text: ".", isEdited: false });
   });
 
   it("a manager's block deletes what was kept and drops what comes next", async () => {

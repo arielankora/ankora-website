@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { useFormatter, useTranslations } from "next-intl";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
-import { ArrowRight, ChevronDown, Eye, Forward, MessageCircle, MoreHorizontal, Phone, PhoneMissed, Search, Timer, UserRound, Users } from "lucide-react";
+import { ArrowRight, ChevronDown, Eye, Forward, MessageCircle, MoreHorizontal, Phone, PhoneMissed, Search, Timer, Trash2, UserRound, Users } from "lucide-react";
 import { parseWhatsappText, phoneDigits, type RichNode } from "@/lib/whatsapp-poc/rich-text";
 import { CALL_EVENTS } from "@/lib/whatsapp-poc/unipile";
 import { ContactRail, ReadToggle, RememberFilters, RowPending, TimelineScroller } from "./CommsControls";
@@ -266,9 +266,11 @@ function messageAnchor(id: string) {
 function QuoteBlock({ quote, original, mine, chat }: { quote: PocQuote; original: PageMessage | undefined; mine: boolean; chat: PocChat }) {
   const t = useTranslations("comms");
   const name = original ? (original.isSender ? t("message.quote.us") : (original.senderName ?? quote.senderName ?? chat.name)) : (quote.senderName ?? chat.name);
-  const deleted = original?.isDeleted === true;
-  const text = deleted ? "" : original ? original.text || quote.text : quote.text;
-  const kind = original && !deleted ? (original.attachments[0] ? (original.attachments[0].voiceNote ? "voice" : original.attachments[0].type) : quote.kind) : quote.kind;
+  // Deleted in WhatsApp, kept here (13.11.2026): the quote still shows it.
+  // A message deleted before then has no text left, only the mark.
+  const text = original ? original.text || quote.text : quote.text;
+  const kind = original ? (original.attachments[0] ? (original.attachments[0].voiceNote ? "voice" : original.attachments[0].type) : quote.kind) : quote.kind;
+  const deleted = original?.isDeleted === true && !text && !kind;
   const preview = deleted
     ? t("message.quote.deleted")
     : text
@@ -365,35 +367,39 @@ function MessageBubble({
       data-hit={hit ? "" : undefined}
       className={`flex scroll-mt-4 items-center gap-1 rounded-2xl target:ring-2 target:ring-gold target:ring-offset-4 ${mine ? "justify-end" : "justify-start"} ${hit ? "ring-2 ring-gold ring-offset-4" : ""}`}
     >
-      {m.isDeleted ? null : <SelectToggle message={selectable(m, transcript)} />}
+      <SelectToggle message={selectable(m, transcript)} />
       <div
         className={`max-w-[85%] space-y-1 px-3.5 py-2.5 text-[15px] sm:max-w-[65%] ${
           mine ? "rounded-2xl rounded-ee-md bg-navy text-white" : "rounded-2xl rounded-es-md border border-app-border bg-white text-app-text-primary"
         }`}
       >
         {!mine && chat.type === "group" && m.senderName ? <p dir="auto" className="text-xs font-medium text-app-text-secondary">{m.senderName}</p> : null}
-        {m.forwarded && !m.isDeleted ? (
+        {m.isDeleted ? (
+          <p className={`flex items-center gap-1 text-xs font-medium ${mine ? "text-white/85" : "text-app-error"}`}>
+            <Trash2 aria-hidden="true" className="size-3.5" />
+            {m.text || m.attachments.length > 0 ? (mine ? t("message.deletedByUs") : t("message.deletedByThem")) : t("message.deleted")}
+          </p>
+        ) : null}
+        {m.forwarded ? (
           <p className={`flex items-center gap-1 text-xs italic ${mine ? "text-white/75" : "text-app-text-secondary"}`}>
             <Forward aria-hidden="true" className="size-3.5 rtl:-scale-x-100" />
             {t("message.forwarded")}
           </p>
         ) : null}
-        {m.viewOnce && !m.isDeleted ? (
+        {m.viewOnce ? (
           <p className={`flex items-center gap-1 text-xs ${muted}`}>
             <Eye aria-hidden="true" className="size-3.5" />
             {t("message.viewOnce")}
           </p>
         ) : null}
-        {m.disappearing && !m.isDeleted ? (
+        {m.disappearing ? (
           <p className={`flex items-center gap-1 text-xs ${muted}`}>
             <Timer aria-hidden="true" className="size-3.5" />
             {t("message.disappearing")}
           </p>
         ) : null}
-        {m.quoted && !m.isDeleted ? <QuoteBlock quote={m.quoted} original={quoted} mine={mine} chat={chat} /> : null}
-        {m.isDeleted ? (
-          <p className={`italic ${mine ? "text-white/70" : "text-app-text-secondary"}`}>{t("message.deleted")}</p>
-        ) : !m.text && m.attachments.length === 0 ? (
+        {m.quoted ? <QuoteBlock quote={m.quoted} original={quoted} mine={mine} chat={chat} /> : null}
+        {m.isDeleted && !m.text && m.attachments.length === 0 ? null : !m.text && m.attachments.length === 0 ? (
           // Unipile returns some WhatsApp kinds (a poll, a location, a
           // contact card, some stickers) with neither text nor attachment.
           <p className={`italic ${mine ? "text-white/70" : "text-app-text-secondary"}`}>{t("message.unsupported")}</p>
@@ -402,7 +408,7 @@ function MessageBubble({
             <RichText nodes={parseWhatsappText(m.text, m.mentions)} mine={mine} names={names} />
           </p>
         ) : null}
-        {m.isDeleted ? null : m.attachments.map((a, i) =>
+        {m.attachments.map((a, i) =>
           a.unavailable ? (
             <p key={i} className={`text-xs italic ${muted}`}>
               {t("message.unavailable", { label: attachmentLabel(t, a) })}
@@ -452,7 +458,7 @@ function MessageBubble({
             </p>
           ),
         )}
-        {m.buttons?.length && !m.isDeleted ? (
+        {m.buttons?.length ? (
           <ul className="flex flex-wrap gap-1.5">
             {m.buttons.map((b) => (
               <li key={b} dir="auto" className={`rounded-full border px-2.5 py-1 text-xs ${mine ? "border-white/40" : "border-app-border"}`}>
@@ -461,7 +467,7 @@ function MessageBubble({
             ))}
           </ul>
         ) : null}
-        {m.reactions?.length && !m.isDeleted ? (
+        {m.reactions?.length ? (
           <p className="flex flex-wrap gap-1" aria-label={t("message.reactions")}>
             {m.reactions.map((r) => (
               <span key={r.reaction} className={`rounded-full px-2 py-0.5 text-xs ${mine ? "bg-white/15" : "bg-app-surface-sunken"}`}>
@@ -473,7 +479,7 @@ function MessageBubble({
         ) : null}
         <p className={`text-[11px] ${muted}`}>
           {formatTime(format, m.timestamp)}
-          {m.isEdited && !m.isDeleted ? ` · ${t("message.edited")}` : ""}
+          {m.isEdited ? ` · ${t("message.edited")}` : ""}
           {mine ? ` · ${t("message.sent")}` : ""}
         </p>
       </div>

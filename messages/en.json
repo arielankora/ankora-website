@@ -6356,7 +6356,9 @@
         "scheduledCancelled": "A scheduled call was cancelled",
         "scheduledStarted": "A scheduled call started",
         "announcement": "System message"
-      }
+      },
+      "deletedByThem": "Deleted in WhatsApp by the other side. Kept here",
+      "deletedByUs": "Deleted in WhatsApp by us. Kept here"
     },
     "calls": {
       "intro": "Recordings arrive automatically from Aloha. A contact's name opens their timeline.",

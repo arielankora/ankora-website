@@ -279,7 +279,9 @@ export async function copyVoiceToDrive(channel: CommsChannel, chatId: string, me
   }
 }
 
-/// message.update: the text changed, or it was deleted for everyone.
+/// message.update: the text changed, or it was deleted for everyone. A
+/// deletion only marks the message (13.11.2026, Ariel): what the other side
+/// deletes in WhatsApp stays here, text, files and voice alike.
 export async function updateStoredMessage(channel: CommsChannel, chatId: string, m: PocMessage): Promise<boolean> {
   const conversation = await prisma.commsConversation.findUnique({
     where: { channelId_externalChatId: { channelId: channel.id, externalChatId: chatId } },
@@ -296,8 +298,8 @@ export async function updateStoredMessage(channel: CommsChannel, chatId: string,
   const { count } = await prisma.commsMessage.updateMany({
     where: { conversationId: conversation.id, externalId: m.id },
     data: {
-      text: m.text,
-      isDeleted: m.isDeleted,
+      // A deletion arrives with the text emptied; the kept text stays.
+      ...(m.isDeleted ? { isDeleted: true } : { text: m.text }),
       // 13.11.2026: an update may carry WhatsApp's count of reactions.
       ...(m.reactions?.length ? { reactions: m.reactions as Prisma.InputJsonArray } : {}),
     },
@@ -338,8 +340,10 @@ export async function enrichStoredMessage(channelId: string, chatId: string, m: 
   }
 }
 
-/// message.delete. The text is cleared, not only flagged: what was deleted
-/// in WhatsApp is not kept here.
+/// message.delete. Marked, not erased (13.11.2026, Ariel): the text, the
+/// files, a voice message's audio and transcript, and the quote of it in
+/// replies all stay, and the screen says the message was deleted in
+/// WhatsApp. Until then the text was cleared here too.
 export async function deleteStoredMessage(channel: CommsChannel, chatId: string, messageId: string): Promise<boolean> {
   const conversation = await prisma.commsConversation.findUnique({
     where: { channelId_externalChatId: { channelId: channel.id, externalChatId: chatId } },
@@ -347,12 +351,7 @@ export async function deleteStoredMessage(channel: CommsChannel, chatId: string,
   if (!conversation) return false;
   const { count } = await prisma.commsMessage.updateMany({
     where: { conversationId: conversation.id, externalId: messageId },
-    data: { text: "", isDeleted: true },
-  });
-  // Replies to it keep that they were replies, not the deleted text.
-  await prisma.commsMessage.updateMany({
-    where: { conversationId: conversation.id, quotedExternalId: messageId },
-    data: { quotedText: "", quotedKind: null },
+    data: { isDeleted: true },
   });
   return count > 0;
 }
