@@ -100,7 +100,7 @@ export function ProcessList({ clientId, userId, processes, form }: { clientId: s
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Link href={`/app/clients/${clientId}/procedures`} className="inline-flex min-h-[44px] items-center rounded-[10px] border border-app-border-strong bg-white px-4 text-sm font-medium text-app-text-primary">
+          <Link href={`/app/clients/${clientId}/procedures`} className="inline-flex min-h-[44px] items-center rounded-[10px] border border-app-border-strong bg-white px-4 text-sm font-medium text-app-text-primary" data-testid="procedures-index-link">
             {t("documents")}
           </Link>
           <CenterDialog triggerLabel={t("new")} triggerVariant="primary" title={t("newTitle")}>

@@ -433,8 +433,11 @@ export function ProcessForm({
   const t = useTx();
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(existing ? updateProcessAction : addProcessAction, (r: { ok?: boolean; error?: string; id?: string }) => {
+    // A new process opens on its own page: the window goes with the page it
+    // was on. Closing it first would refresh that page, and the refresh
+    // would win over the move.
+    if (r.id && onCreated) return onCreated(r.id);
     close();
-    if (r.id) onCreated?.(r.id);
   });
   const [status, setStatus] = useState<KnowledgeStatusLike>(existing?.knowledgeStatus ?? "CONFIRMED");
   const e = existing;

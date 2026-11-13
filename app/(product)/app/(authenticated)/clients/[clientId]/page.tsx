@@ -590,6 +590,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         canApprove={can(user.role, "client.manage")}
         openRhythm={sp.rhythm === "open"}
         userId={user.id}
+        back={viaApprovals ? { href: viaApprovals.href, label: viaApprovals.label } : null}
       />
     );
   }

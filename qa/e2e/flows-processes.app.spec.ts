@@ -1,62 +1,15 @@
 import { test, expect } from "./fixtures";
 import { fillRhythm, onceInThePast, ongoing, whenSomethingHappens } from "./rhythm";
+import { CLIENT, newProcess, submit, tag } from "./process-page";
 
 // Org brain, phase 1 (16.10.2026): a process and its procedure on the
 // client screen, submitted for real, as the seeded admin. Same prose rule
 // as flows-admin: modules are named in words here, never by path.
 //
 // @covers action:(product)/app/(authenticated)/clients/process-actions
+// @covers screen:/app/clients/[clientId]/processes/[processId]
 
 test.describe.configure({ timeout: 120_000 });
-
-const CLIENT = "demo-client-b";
-
-function tag(prefix: string) {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-async function addSource(page: import("@playwright/test").Page): Promise<string> {
-  const title = tag("[E2E] מקור");
-  await page.getByRole("button", { name: "+ מקור", exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await dialog.locator('input[name="title"]').fill(title);
-  const written = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-  await dialog.getByRole("button", { name: "הוספה למרשם" }).click();
-  await written;
-  await page.reload();
-  const row = page.locator("li", { hasText: title });
-  await expect(row.first(), "the source was not added").toBeVisible({ timeout: 15_000 });
-  return (await row.first().locator("span.font-mono").innerText()).trim();
-}
-
-/// 13.11.2026 (processes redesign, stage 2): a new process is added from the
-/// list in a small window (name, purpose, owner), and opens on its own page
-/// with the rhythm editor open. Returns the page's address.
-async function newProcess(page: import("@playwright/test").Page, title: string, opts: { owner?: boolean } = {}): Promise<string> {
-  await page.goto(`/app/clients/${CLIENT}?tab=file&section=all`);
-  const code = await addSource(page);
-  await page.getByTestId("process-list").getByRole("button", { name: "+ תהליך חדש", exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await dialog.locator('input[name="title"]').fill(title);
-  if (opts.owner !== false) {
-    const owner = dialog.locator('select[name="ownerId"] option', { hasText: "מנהל Ankora" }).first();
-    await dialog.locator('select[name="ownerId"]').selectOption((await owner.getAttribute("value"))!);
-  }
-  await dialog.locator('input[name="sources"]').fill(code);
-  await dialog.getByRole("button", { name: "הוספה לתיק" }).click();
-  await expect(page).toHaveURL(/\/processes\/[^/?]+/, { timeout: 15_000 });
-  await expect(page.getByTestId("process-page")).toContainText(title);
-  return new URL(page.url()).pathname;
-}
-
-async function submit(page: import("@playwright/test").Page, button: string) {
-  const written = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-  await page.getByRole("dialog").getByRole("button", { name: button }).click();
-  await written;
-  await page.reload();
-}
 
 test.describe("clients/process-actions", () => {
   // 31.10.2026: the file shows one part at a time, and the part last

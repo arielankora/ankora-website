@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { CenterDialog } from "@/components/app/Drawer";
+import { PageBack } from "@/components/app/BackSlot";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { describeRhythm } from "@/lib/process-rhythm";
 import { runBlockerKey } from "@/lib/process-readiness";
@@ -48,7 +49,10 @@ export function ProcessPage({
   canApprove,
   openRhythm,
   userId,
+  back = null,
 }: {
+  /// From the approvals screen: the way back to it (22.10.2026).
+  back?: { href: string; label: string } | null;
   userId: string;
   clientId: string;
   clientName: string;
@@ -118,6 +122,11 @@ export function ProcessPage({
 
   return (
     <div className="flex flex-col" data-testid="process-page">
+      {back && (
+        <div className="mb-3">
+          <PageBack href={back.href} label={back.label} testId="process-back" />
+        </div>
+      )}
       <nav className="flex flex-wrap items-center gap-2 text-sm text-app-text-secondary" aria-label={t("breadcrumb")}>
         <Link href={`/app/clients/${clientId}?tab=file`} className="hover:underline">
           {clientName}
@@ -423,7 +432,7 @@ export function ProcessPage({
         {tab === "document" && (
           <div className="flex max-w-3xl flex-col gap-5" data-testid="process-document">
             {p.latestVersion > 0 && (
-              <Link href={`/app/clients/${clientId}/processes/${p.id}/document`} className="self-start text-sm font-bold text-app-text-accent hover:underline">
+              <Link href={`/app/clients/${clientId}/processes/${p.id}/document`} className="self-start text-sm font-bold text-app-text-accent hover:underline" data-testid="procedure-document-link">
                 {t("openDocument")}
               </Link>
             )}

@@ -1,5 +1,6 @@
 import { test, expect } from "./fixtures";
-import { setRhythm, whenSomethingHappens } from "./rhythm";
+import { fillRhythm, whenSomethingHappens } from "./rhythm";
+import { newProcess, writeStep } from "./process-page";
 
 // "אישורים" (20.10.2026): every manual approval on one screen, a tab per
 // kind. The Preview seed always leaves demo proposals pending on the
@@ -28,35 +29,17 @@ async function submit(page: import("@playwright/test").Page, button: string) {
   await page.reload();
 }
 
-/// A process with a draft procedure on the demo client, written on the
-/// client's page the way flows-processes does. Its title.
+/// A process with a draft procedure on the demo client, added from the
+/// processes list the way flows-processes does. Its title.
 async function draftProcedure(page: import("@playwright/test").Page, step: string): Promise<string> {
   const title = tag("[E2E] נוהל לאישור");
-  await page.goto(`/app/clients/${CLIENT}?tab=file`);
-  await page.getByRole("button", { name: "+ מקור", exact: true }).click();
-  const source = page.getByRole("dialog");
-  const sourceTitle = tag("[E2E] מקור");
-  await source.locator('input[name="title"]').fill(sourceTitle);
-  await submit(page, "הוספה למרשם");
-  const code = (await page.locator("li", { hasText: sourceTitle }).first().locator("span.font-mono").innerText()).trim();
-
-  await page.getByRole("button", { name: "+ תהליך", exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.locator('input[name="title"]').fill(title);
   // 25.10.2026: with an owner, the only thing between it and running is
   // the procedure waiting for approval.
-  const owner = dialog.locator('select[name="ownerId"] option', { hasText: "מנהל Ankora" }).first();
-  await dialog.locator('select[name="ownerId"]').selectOption((await owner.getAttribute("value"))!);
-  await dialog.locator('input[name="sources"]').fill(code);
-  await submit(page, "הוספה לתיק");
-  const card = page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
-  await expect(card, "the process was not added").toBeVisible({ timeout: 15_000 });
-  // 13.11.2026: what starts it is set in the rhythm editor.
-  await setRhythm(page, card, whenSomethingHappens("בקשת עובד"));
-  await card.getByRole("button", { name: "כתיבת נוהל" }).click();
-  await page.getByRole("dialog").getByLabel("שלב 1: מה עושים").fill(step);
-  await submit(page, "שמירת טיוטה");
-  await expect(card).toContainText("טיוטה, גרסה 1", { timeout: 15_000 });
+  await newProcess(page, title);
+  // 13.11.2026: what starts it is set in the rhythm editor, open on arrival.
+  await fillRhythm(page, whenSomethingHappens("בקשת עובד"));
+  await writeStep(page, step);
+  await expect(page.getByTestId("process-draft")).toContainText("טיוטה 1 מחכה לאישור", { timeout: 15_000 });
   return title;
 }
 
@@ -161,23 +144,26 @@ test.describe("approvals", () => {
     await removed;
   });
 
-  test("a process card says its next step, with the details closed once nothing waits on its draft", async ({ page }) => {
+  // 13.11.2026 (stage 2): the card's "next step" became the list's "צריך
+  // טיפול" and the draft's box on the process page.
+  test("a draft waiting for approval is on the list's attention band, and approved on the process page", async ({ page }) => {
     const step = tag("אוספים טופס");
     const title = await draftProcedure(page, step);
-    const card = page.locator('[data-testid="process-card"]', { hasText: title }).first();
-    // A draft waits: approving it is the next step, and the details are open.
-    await expect(card.getByTestId("process-next-step")).toHaveAttribute("data-step", "procedure_draft");
-    await expect(card.getByTestId("process-details")).toHaveAttribute("open", "");
+    const href = new URL(page.url()).pathname;
+    await page.goto(`/app/clients/${CLIENT}?tab=file&section=processes`);
+    const line = page.getByTestId("process-attention").locator("div", { hasText: title }).last();
+    await expect(line).toContainText("טיוטה 1 של הנוהל מחכה לאישור", { timeout: 15_000 });
+    await line.getByRole("link", { name: "לאישור" }).click();
+    await expect(page).toHaveURL(new RegExp(`${href}$`), { timeout: 15_000 });
     const approved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-    await card.getByTestId("process-next-step").getByRole("button", { name: "אישור הנוהל" }).click();
+    await page.getByTestId("process-draft").getByRole("button", { name: "אישור הנוהל" }).click();
     await approved;
-    await page.goto(`/app/clients/${CLIENT}?tab=file`);
-    const after = page.locator('[data-testid="process-card"]', { hasText: title }).first();
-    await expect(after.getByTestId("process-next-step")).not.toHaveAttribute("data-step", "procedure_draft", { timeout: 15_000 });
-    await expect(after.getByTestId("process-details")).not.toHaveAttribute("open", "");
-    // The procedure is under "פרטים".
-    await after.getByTestId("process-details").locator("summary").click();
-    await expect(after.getByTestId("process-details")).toContainText(step);
+    await page.reload();
+    await expect(page.getByTestId("process-draft")).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.getByText(step).first()).toBeVisible();
+    await page.goto(`/app/clients/${CLIENT}?tab=file&section=processes`);
+    await expect(page.getByTestId("process-list")).toContainText(title);
+    await expect(page.locator('[data-testid="process-attention"]', { hasText: title })).toHaveCount(0);
   });
 
   test("the client's page leads to its approvals", async ({ page }) => {
@@ -203,11 +189,10 @@ test.describe("approvals", () => {
     await row.getByTestId("approval-preview-toggle").click();
     await expect(row.getByTestId("approval-preview")).toContainText(step);
 
-    // The link lands on the process, scrolled to it.
+    // The link lands on the process's own page (13.11.2026, stage 2).
     await row.getByRole("link", { name: title }).click();
-    await expect(page).toHaveURL(/fromApprovals=.*#item-/, { timeout: 30_000 });
-    const target = page.locator(`[id^="item-"]`, { hasText: title }).first();
-    await expect(target).toBeInViewport({ timeout: 20_000 });
+    await expect(page).toHaveURL(/\/processes\/[^/?]+\?fromApprovals=/, { timeout: 30_000 });
+    await expect(page.getByTestId("process-page")).toContainText(title, { timeout: 20_000 });
 
     // And back to the same tab.
     const back = page.getByRole("link", { name: "אישורים · נהלים" }).first();

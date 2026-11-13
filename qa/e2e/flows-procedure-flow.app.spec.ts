@@ -1,5 +1,6 @@
 import { test, expect } from "./fixtures";
-import { setRhythm, whenSomethingHappens } from "./rhythm";
+import { fillRhythm, whenSomethingHappens } from "./rhythm";
+import { newProcess, tag } from "./process-page";
 
 // 4.11.2026 (task cmvtivumj000pjs08q9qj4t67): the procedure flow editor,
 // as the seeded admin. A process gets a flow with a condition whose
@@ -11,41 +12,14 @@ import { setRhythm, whenSomethingHappens } from "./rhythm";
 
 test.describe.configure({ timeout: 180_000 });
 
-const CLIENT = "demo-client-b";
-
-function tag(prefix: string) {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-async function submit(page: import("@playwright/test").Page, button: string) {
-  const written = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-  await page.getByRole("dialog").getByRole("button", { name: button }).click();
-  await written;
-  await page.reload();
-}
-
 test("a flow with a condition goes live with one click; an automatic mail waits for a second pair of eyes", async ({ page }) => {
   const title = tag("[E2E] זרימה");
-  await page.goto(`/app/clients/${CLIENT}?tab=file`);
-
-  // A source, then the process.
-  const src = tag("[E2E] מקור");
-  await page.getByRole("button", { name: "+ מקור", exact: true }).click();
-  await page.getByRole("dialog").locator('input[name="title"]').fill(src);
-  await submit(page, "הוספה למרשם");
-  const code = (await page.locator("li", { hasText: src }).first().locator("span.font-mono").innerText()).trim();
-
-  await page.getByRole("button", { name: "+ תהליך", exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.locator('input[name="title"]').fill(title);
-  await dialog.locator('input[name="sources"]').fill(code);
-  await submit(page, "הוספה לתיק");
-
-  const card = page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
-  await expect(card).toBeVisible({ timeout: 15_000 });
-  // 13.11.2026: what starts it is set in the rhythm editor.
-  await setRhythm(page, card, whenSomethingHappens("בקשת לקוח"));
-  await card.getByTestId("procedure-flow-link").click();
+  // 13.11.2026 (stage 2): the process is added from the list and opens on
+  // its page; what starts it is set in the rhythm editor, open on arrival.
+  // Until stage 3 joins the two editors, the flow editor is at its address.
+  const href = await newProcess(page, title, { owner: false });
+  await fillRhythm(page, whenSomethingHappens("בקשת לקוח"));
+  await page.goto(`${href}/flow`);
   await expect(page.getByTestId("flow-editor")).toBeVisible({ timeout: 15_000 });
 
   const side = page.locator("aside");

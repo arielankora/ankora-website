@@ -2280,8 +2280,16 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-13",
       "riskReason": "What starts a process and the dates generated from its schedule rule: a changed rule replaces its dates, dates linked before are unlinked and never deleted, the business calendar is saved with it, and the process's trigger kinds and sentence follow on every save so the daily job and readiness read them as before"
+    },
+    "screen:/app/clients/[clientId]/processes/[processId]": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-13",
+      "riskReason": "A process's own page (processes redesign, stage 2): its rhythm, owner and open run, the draft approved in place, a run opened by hand, pause, retire and remove; the approvals screen and the daily runs link here"
     }
   },
   "waivers": {},
-  "lastScan": "2026-11-12"
+  "lastScan": "2026-11-13"
 }
