@@ -1,4 +1,5 @@
 import "server-only";
+import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { batchUrl, fileItemUrl, proposalUrl } from "@/lib/approval-links";
 import { aiExcludedClientIds, isDocumentAiExcluded, isTaskAiExcluded } from "@/lib/app-domain/ai-exclusion-db";
 import { AI_EXCLUDED_TOOL_MESSAGE } from "@/lib/ai-exclusion";
@@ -748,7 +749,7 @@ export function registerClientFileTools(server: McpServer): void {
             client: r.clientName,
             process: `${r.code} ${r.title}`,
             check: r.checkEvery ? `${r.checkEvery}${r.checkText ? `: ${r.checkText}` : ""}` : null,
-            lastChecked: r.lastCheckedAt ? r.lastCheckedAt.toISOString().slice(0, 10) : null,
+            lastChecked: r.lastCheckedAt ? localDateKey(r.lastCheckedAt, TIMEZONE) : null,
             nextCheck: r.dueKey,
             state: r.state,
             asBackup: r.asBackup,

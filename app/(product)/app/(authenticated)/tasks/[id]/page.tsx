@@ -222,6 +222,12 @@ export default async function TaskDetailPage(props: {
   // procedure.
   // P8 (3.11.2026): an unanswered "is this a new vendor?" on this task.
   const vendorCheck = !isStep && !isClosed ? await pendingVendorCheck(task.id) : null;
+  // 13.11.2026 (processes redesign, stage 0): a run says which process it
+  // runs, with a way back to it. The run page had none.
+  const runOf = task.processId
+    ? await prisma.process.findUnique({ where: { id: task.processId }, select: { id: true, code: true, title: true, clientId: true, deletedAt: true } })
+    : null;
+  const runVersion = runOf && task.processVersionId ? await prisma.processVersion.findUnique({ where: { id: task.processVersionId }, select: { version: true } }) : null;
   const lessonProcess =
     task.processId && asksForLesson(task, !!(await runLesson(task.id)))
       ? await prisma.process.findUnique({ where: { id: task.processId }, select: { code: true, title: true } })
@@ -284,6 +290,15 @@ export default async function TaskDetailPage(props: {
         <ChevronLeft size={14} className="text-app-text-tertiary md:hidden ltr:rotate-180" />
         <span dir="auto" className="truncate text-app-text-secondary">{task.client.name}</span>
       </nav>
+      {runOf && !runOf.deletedAt && (
+        <p className="text-[13px] text-app-text-secondary" data-testid="task-run-of">
+          <a href={`/app/clients/${runOf.clientId}?tab=file#item-${runOf.id}`} className="font-medium text-app-text-accent hover:underline">
+            {runVersion
+              ? t("runOfVersion", { code: runOf.code, title: runOf.title, version: runVersion.version })
+              : t("runOf", { code: runOf.code, title: runOf.title })}
+          </a>
+        </p>
+      )}
 
       <TaskDetail
         task={{

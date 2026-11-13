@@ -10,6 +10,7 @@ import {
   approveProcessVersion,
   linkProcessDates,
   removeProcess,
+  discardProcessVersion,
   saveAndActivateProcessVersion,
   saveProcessVersion,
   type SaveAndActivateResult,
@@ -269,6 +270,11 @@ export async function approveProcessVersionAction(processId: string, version: nu
 export async function setProcessStatusAction(processId: string, status: "ACTIVE" | "PAUSED" | "RETIRED", clientId: string): Promise<FormState> {
   const user = await requireUser();
   return run(clientId, () => setProcessStatus(user, processId, status));
+}
+
+export async function discardProcessVersionAction(processId: string, version: number, clientId: string): Promise<FormState> {
+  const user = await requireUser();
+  return run(clientId, () => discardProcessVersion(user, processId, version));
 }
 
 export async function removeProcessAction(processId: string, clientId: string): Promise<FormState> {

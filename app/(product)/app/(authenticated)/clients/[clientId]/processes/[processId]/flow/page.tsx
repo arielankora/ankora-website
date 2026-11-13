@@ -27,7 +27,7 @@ export default async function ProcessFlowPage(props: { params: Promise<{ clientI
   const t = await getTranslations("clients.processes.flow");
   return (
     <div className="mx-auto w-full max-w-appContent px-4 py-6">
-      <PageBack href={`/app/clients/${clientId}`} label={t("backToClient")} />
+      <PageBack href={`/app/clients/${clientId}?tab=file#item-${processId}`} label={t("backToProcess")} />
       <FlowEditor
         clientId={clientId}
         processId={processId}

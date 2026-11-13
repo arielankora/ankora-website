@@ -74,6 +74,20 @@ describe("list_processes and get_process", () => {
     expect((await call(hadas, "get_process", { client: "NUX", process: "פרט רפואי" })).text).toContain("No process");
   });
 
+  // 13.11.2026: a date at midnight in Israel is the evening before in UTC,
+  // and Claude was told "הבא: שבת" for a Sunday run.
+  it("gives the next date as the day in Israel, not the UTC day before", async () => {
+    const { client, hadas, p1 } = await setup();
+    // Sunday 15.11.2026, 00:00 in Israel = Saturday 14.11.2026, 22:00 UTC.
+    const sunday = new Date("2026-11-14T22:00:00Z");
+    const date = await prisma.importantDate.create({
+      data: { clientId: client.id, title: "מעבר מייל", type: "custom", category: "BUSINESS_FINANCE", month: 1, day: 1, recurrence: "BUSINESS_DAILY", responsibleUserId: hadas.id, nextOccurrenceAt: sunday, processId: p1.id },
+    });
+    expect(date.id).toBeTruthy();
+    const [listed] = await mcpListProcesses(hadas, client.id);
+    expect(listed.nextDate).toBe("2026-11-15");
+  });
+
   it("says which of the client's rules the procedure fails today", async () => {
     const { client, hadas, p1 } = await setup();
     await addClientPolicy(hadas, { clientId: client.id, kind: "FORBIDDEN", title: "בלי תשלומים", statement: "לא משלמים עד סוף השנה", params: { appliesToTags: ["PAYMENT"] }, sources: S1 });

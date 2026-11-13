@@ -28,6 +28,7 @@ import {
   linkProcessDatesAction,
   addProcessDateAction,
   removeProcessAction,
+  discardProcessVersionAction,
   resolveLessonAction,
   runProcessStepAction,
   restoreProcessFieldAction,
@@ -164,13 +165,15 @@ export type PanelProcess = {
   suggestions?: { systems: { id: string; name: string }[]; contacts: { id: string; name: string }[] };
   gaps: string[];
   nextDate: string | null;
+  /// 13.11.2026: the day the next run opens, when it is before the date.
+  nextOpensAt?: string | null;
   dateIds: string[];
   latestVersion: number;
   /// Built as a flow: edited in the flow editor, not here.
   isFlow?: boolean;
   current: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; approvedByName: string | null; checks: PanelCheck[]; approvedAt?: string | null; atApproval?: PanelCheck[] | null } | null;
   /// `mayApprove`: whether the viewer may approve it (lib/procedure-approval.ts).
-  draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: PanelCheck[]; mayApprove?: boolean } | null;
+  draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: PanelCheck[]; mayApprove?: boolean; mayDiscard?: boolean } | null;
   runs: { id: string; title: string; status: string; dueDate: string | null }[];
   /// An ongoing process: its check, when the next one is due, and the last ones.
   checkEveryDays: number | null;
@@ -526,6 +529,9 @@ function ProcessForm({
 
       <FormGroup
         title={t("form.groupTiming")}
+        // 13.11.2026: an ongoing process with no check frequency opens on
+        // the field it is missing.
+        open={!!e && e.status === "ACTIVE" && e.triggerKinds.length === 1 && e.triggerKinds[0] === "CONTINUOUS" && !e.checkEveryDays}
         filled={filled(e?.businessCalendar, e?.reviewEveryDays, e?.checkEveryDays, e?.checkText)}
         more={
           <>
@@ -888,7 +894,9 @@ function NewProcessDateForm({ clientId, process }: { clientId: string; process: 
   const t = useTx();
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(addProcessDateAction, close);
-  const [recurrence, setRecurrence] = useState("BUSINESS_DAILY");
+  // 13.11.2026: no default. "Every business day" was preselected, and a
+  // monthly process saved with it opened a run every day.
+  const [recurrence, setRecurrence] = useState("");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5" data-testid="process-date-new">
       <input type="hidden" name="clientId" value={clientId} />
@@ -896,7 +904,10 @@ function NewProcessDateForm({ clientId, process }: { clientId: string; process: 
       <p className="text-sm font-medium text-app-text-primary">{t("dates.newTitle")}</p>
       <p className="text-xs text-app-text-secondary">{t("dates.newHelp")}</p>
       <Field label={t("dates.howOften")}>
-        <select name="recurrence" value={recurrence} onChange={(e) => setRecurrence(e.target.value)} className={INPUT}>
+        <select name="recurrence" value={recurrence} onChange={(e) => setRecurrence(e.target.value)} required className={INPUT}>
+          <option value="" disabled>
+            {t("dates.pickHowOften")}
+          </option>
           <option value="BUSINESS_DAILY">{t("dates.BUSINESS_DAILY")}</option>
           <option value="WEEKLY">{t("dates.WEEKLY")}</option>
           <option value="MONTHLY">{t("dates.MONTHLY")}</option>
@@ -925,7 +936,7 @@ function NewProcessDateForm({ clientId, process }: { clientId: string; process: 
         </Field>
       )}
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending || !recurrence} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("dates.creating") : t("dates.create")}
       </button>
     </form>
@@ -1226,6 +1237,11 @@ function ProcessCard({
               .filter(Boolean)
               .join(" · ")}
           </p>
+          {p.nextDate && p.nextOpensAt && day(p.nextOpensAt) !== day(p.nextDate) && (
+            <p className="text-xs text-app-text-tertiary" data-testid="process-next-opens">
+              {t("panel.nextOpens", { date: day(p.nextOpensAt) })}
+            </p>
+          )}
 
           {p.stranger && <StrangerBlock stranger={p.stranger} />}
 
@@ -1381,7 +1397,7 @@ function ProcessCard({
               {t("panel.document")}
             </Link>
           )}
-          {((canApprove && (p.status === "ACTIVE" || p.status === "PAUSED")) || p.status === "DRAFT") && (
+          {((canApprove && (p.status === "ACTIVE" || p.status === "PAUSED")) || p.status === "DRAFT" || !!p.draft?.mayDiscard) && (
             <details className="relative" data-testid="process-more">
               <summary className="cursor-pointer list-none text-app-text-tertiary hover:text-app-text-primary">{t("panel.more")}</summary>
               <div className="absolute end-0 z-10 mt-1 flex min-w-[7rem] flex-col items-start gap-2 rounded-lg border border-app-border bg-app-surface-card p-2.5 shadow-md">
@@ -1393,6 +1409,32 @@ function ProcessCard({
                 {canApprove && p.status === "PAUSED" && (
                   <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "ACTIVE", clientId), t("panel.resumed"))} className="text-app-text-secondary hover:text-app-text-primary">
                     {t("panel.resume")}
+                  </button>
+                )}
+                {p.draft?.mayDiscard && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const draft = p.draft!;
+                      const ask = p.current ? t("panel.discardDraftConfirmRuns", { version: draft.version, current: p.current.version }) : t("panel.discardDraftConfirm", { version: draft.version });
+                      if (window.confirm(ask)) act(() => discardProcessVersionAction(p.id, draft.version, clientId), t("panel.draftDiscarded"));
+                    }}
+                    className="text-app-text-secondary hover:text-app-error"
+                    data-testid="process-discard-draft"
+                  >
+                    {t("panel.discardDraft")}
+                  </button>
+                )}
+                {canApprove && (p.status === "ACTIVE" || p.status === "PAUSED") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(t("panel.retireConfirm", { code: p.code, title: p.title }))) act(() => setProcessStatusAction(p.id, "RETIRED", clientId), t("panel.retired"));
+                    }}
+                    className="text-app-text-secondary hover:text-app-error"
+                    data-testid="process-retire"
+                  >
+                    {t("panel.retire")}
                   </button>
                 )}
                 {p.status === "DRAFT" && (

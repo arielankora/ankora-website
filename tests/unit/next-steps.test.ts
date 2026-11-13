@@ -146,6 +146,20 @@ describe("runs, documentation and what its words name (25.10.2026)", () => {
     expect(nextSteps(facts({ status: "DRAFT", ownerId: null, draft: { version: 1, blocked: false }, readiness: { ready: false, blocker: "לא ירוץ: אין אחראי" } }), true).map((s) => s.kind)).toEqual(["not_ready", "procedure_draft"]);
   });
 
+  // 13.11.2026: it was told to "decide whether to resume it", the step of a
+  // paused process, and its button only unfolded the details.
+  it("asks an ongoing process with no check frequency for the frequency, in the form", () => {
+    const [step] = nextSteps(facts({ triggerKinds: ["CONTINUOUS"], hasNextDate: false, readiness: { ready: false, blocker: "לא ירוץ: תהליך שוטף בלי תדירות בדיקה" } }), true);
+    expect(step).toMatchObject({
+      kind: "not_ready",
+      recommend: "להגדיר כל כמה ימים בודקים",
+      fix: { kind: "edit", label: "להשלים" },
+      text: { recommend: { key: "nextSteps.notReady.recommendCheck" }, why: { key: "nextSteps.notReady.whyCheck" }, fix: { key: "nextSteps.fix.complete" } },
+    });
+    // A paused process is still asked whether to resume it.
+    expect(nextSteps(facts({ status: "PAUSED", readiness: { ready: false, blocker: "לא ירוץ: התהליך מושהה" } }), true)[0]).toMatchObject({ recommend: "להחליט אם לחדש אותו", fix: { kind: "open" } });
+  });
+
   it("lists each documentation field quietly, with \"לא רלוונטי\" for who may mark it", () => {
     const doc = [
       { field: "sla", label: "SLA" },

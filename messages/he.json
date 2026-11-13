@@ -830,7 +830,9 @@
         "title": "שעות על המשימה",
         "empty": "עדיין לא דווח זמן על המשימה הזו.",
         "running": "{count, plural, one {טיימר אחד רץ על המשימה הזו כרגע, והזמן שלו ייספר בעצירה.} other {# טיימרים רצים על המשימה הזו כרגע, והזמן שלהם ייספר בעצירה.}}"
-      }
+      },
+      "runOf": "ריצה של {code} {title}",
+      "runOfVersion": "ריצה של {code} {title}, גרסה {version}"
     },
     "list": {
       "title": "משימות",
@@ -1428,7 +1430,9 @@
       "alreadyApproved": "הגרסה הזו כבר מאושרת.",
       "failsChecks": "הנוהל לא עובר את הבדיקות: {checks}",
       "notApplicableNotAllowed": "רק מנהל או הבעלים של התהליך מסמנים שדה כלא רלוונטי.",
-      "notApplicableField": "את השדה הזה אי אפשר לסמן כלא רלוונטי."
+      "notApplicableField": "את השדה הזה אי אפשר לסמן כלא רלוונטי.",
+      "discardNotDraft": "אפשר לוותר רק על הטיוטה האחרונה, לפני שאושרה.",
+      "discardNotAuthor": "רק מי שכתב את הטיוטה, או מנהל, מוותר עליה."
     },
     "processRuns": {
       "sameDay": "כבר יש ריצה פתוחה של {code} ליום הזה: \"{title}\" ({id}). אפשר לעבוד עליה, או לסגור אותה ואז לפתוח חדשה.",
@@ -2062,7 +2066,8 @@
       "commsEngagementEndSweep": "מחיקת שיחות והקלטות של לקוח שההתקשרות איתו הסתיימה",
       "commsExportDownloaded": "ייצוא שיחות והקלטות של לקוח",
       "userCommsAccess": "שינוי הגישה למסך התקשורת",
-      "clientCommunicationLocale": "שינוי שפת התקשורת עם הלקוח"
+      "clientCommunicationLocale": "שינוי שפת התקשורת עם הלקוח",
+      "processVersionDiscard": "ויתור על טיוטה של נוהל"
     },
     "kinds": {
       "failure": "כשלון",
@@ -3210,7 +3215,9 @@
           "recommendTrigger": "לכתוב מה מפעיל את התהליך",
           "recommendProcedure": "לכתוב את הנוהל ולשלוח לאישור",
           "recommendRenew": "להחליט אם לחדש אותו",
-          "why": "עד אז התהליך לא פותח ריצות לבד."
+          "why": "עד אז התהליך לא פותח ריצות לבד.",
+          "recommendCheck": "להגדיר כל כמה ימים בודקים",
+          "whyCheck": "עד אז הבדיקה לא מגיעה לשגרה של אף אחד, ואף אחד לא מקבל תזכורת."
         },
         "noNextDate": {
           "title": "תהליך לפי מועד בלי מועדים",
@@ -3349,7 +3356,15 @@
         "checkNext": "הבאה ב-{date}",
         "checkOverdue": "באיחור, מ-{date}",
         "taskLink": "המשימה",
-        "draftLine": "טיוטה, גרסה {version}"
+        "draftLine": "טיוטה, גרסה {version}",
+        "nextOpens": "הריצה נפתחת ב-{date}",
+        "retire": "ביטול התהליך",
+        "retireConfirm": "לבטל את {code} {title}? הוא יירד מרשימת התהליכים, לא ייפתחו לו ריצות, וההיסטוריה שלו תישמר.",
+        "retired": "התהליך בוטל",
+        "discardDraft": "ויתור על הטיוטה",
+        "discardDraftConfirm": "לוותר על טיוטה {version} של הנוהל? היא תימחק.",
+        "discardDraftConfirmRuns": "לוותר על טיוטה {version} של הנוהל? היא תימחק, וגרסה {current} המאושרת תמשיך לרוץ.",
+        "draftDiscarded": "הטיוטה נמחקה"
       },
       "lessons": {
         "open": "{count, plural, =1 {הערה אחת מריצות, לגרסה הבאה} other {# הערות מריצות, לגרסה הבאה}}",
@@ -3486,7 +3501,8 @@
         "dayOfMonth": "יום בחודש",
         "date": "תאריך",
         "creating": "יוצר...",
-        "create": "יצירת המועד וקישור"
+        "create": "יצירת המועד וקישור",
+        "pickHowOften": "לבחור כל כמה זמן"
       },
       "run": {
         "opens": "נפתחת משימה עם {count} השלבים של נוהל גרסה {version}, כל אחד ביום העסקים שלו.",
@@ -3618,7 +3634,7 @@
           "unreachable": "אי אפשר להגיע ל{node} מההתחלה.",
           "tooLong": "במסלול אחד יש יותר מ-{max} פעולות. נוהל ארוך מזה הוא כמה תהליכים."
         },
-        "backToClient": "חזרה לתיק הלקוח"
+        "backToProcess": "חזרה לתהליך"
       },
       "document": {
         "version": "גרסה:",

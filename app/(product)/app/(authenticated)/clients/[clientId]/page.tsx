@@ -698,6 +698,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 suggestions: p.suggestions,
                 gaps: p.gaps,
                 nextDate: p.nextDate ? p.nextDate.toISOString() : null,
+                nextOpensAt: p.nextOpensAt ? p.nextOpensAt.toISOString() : null,
                 dateIds: p.dates.map((d) => d.id),
                 covered: covered.filter((c) => c.process.id === p.id).map((c) => ({ taskId: c.task.id, title: c.task.title, assignee: c.task.assignee })),
                 missing: p.completeness.missing.filter((k) => k !== "permissions" && k !== "next").map((k) => FIELD_LABELS[k]),
@@ -741,6 +742,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 draft: p.draft
                   ? {
                       version: p.draft.version,
+                      // 13.11.2026: whoever wrote it, or a manager.
+                      mayDiscard: p.draft.createdById === user.id || canManageClients(user.role),
                       steps: p.draft.steps,
                       highlights: p.draft.highlights,
                       outputs: p.draft.outputs,

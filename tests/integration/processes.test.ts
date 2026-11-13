@@ -9,6 +9,7 @@ import { approveException, requestException } from "@/lib/app-domain/policy-exce
 import {
   addProcess,
   approveProcessVersion,
+  discardProcessVersion,
   linkProcessDates,
   listProcesses,
   removeProcess,
@@ -233,9 +234,64 @@ describe("procedures", () => {
     await expect(setProcessStatus(hadas, p.id, "PAUSED")).rejects.toThrow("רק מנהל");
     expect((await setProcessStatus(ariel, p.id, "PAUSED")).status).toBe("PAUSED");
   });
+
+  // 13.11.2026 (processes redesign, stage 0).
+  it("a manager retires a process; it leaves the list and opens nothing", async () => {
+    const { client, hadas, ariel } = await setup();
+    const p = await addProcess(hadas, { clientId: client.id, title: "בדיקה למחיקה", sources: S1 });
+    await saveProcessVersion(hadas, p.id, { steps: [{ title: "א" }], baseVersion: 0 });
+    await approveProcessVersion(ariel, p.id, 1);
+    await expect(setProcessStatus(hadas, p.id, "RETIRED")).rejects.toThrow("רק מנהל");
+    await setProcessStatus(ariel, p.id, "RETIRED");
+    expect(await listProcesses(ariel, client.id)).toEqual([]);
+    expect((await listProcesses(ariel, client.id, { includeRetired: true })).map((x) => x.status)).toEqual(["RETIRED"]);
+  });
+
+  it("a draft is given up by whoever wrote it or a manager; the approved version keeps running", async () => {
+    const { client, hadas, ariel } = await setup();
+    const { user: guy } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await prisma.userClientAccess.create({ data: { userId: guy.id, clientId: client.id } });
+    const p = await addProcess(hadas, { clientId: client.id, title: "P", sources: S1 });
+    await saveProcessVersion(hadas, p.id, { steps: [{ title: "א" }], baseVersion: 0 });
+    await approveProcessVersion(ariel, p.id, 1);
+    // The approved version is not a draft.
+    await expect(discardProcessVersion(ariel, p.id, 1)).rejects.toThrow("רק על הטיוטה האחרונה");
+    await saveProcessVersion(hadas, p.id, { steps: [{ title: "ב" }], baseVersion: 1 });
+    await expect(discardProcessVersion(guy, p.id, 2)).rejects.toThrow("מי שכתב");
+    await discardProcessVersion(hadas, p.id, 2);
+    const [listed] = await listProcesses(hadas, client.id);
+    expect(listed.draft).toBeNull();
+    expect(listed.current?.version).toBe(1);
+    expect(listed.status).toBe("ACTIVE");
+    // A manager gives up someone else's draft, and the next save is version 2 again.
+    await saveProcessVersion(guy, p.id, { steps: [{ title: "ג" }], baseVersion: 1 });
+    await discardProcessVersion(ariel, p.id, 2);
+    expect((await saveProcessVersion(hadas, p.id, { steps: [{ title: "ד" }], baseVersion: 1 })).version).toBe(2);
+    const audit = await prisma.auditEvent.findMany({ where: { entityId: p.id, action: "process.version_discard" } });
+    expect(audit).toHaveLength(2);
+  });
 });
 
 describe("dates and the file", () => {
+  // 13.11.2026 (processes redesign, stage 0): "הבא" is the date itself,
+  // and the card says when the run opens, as the daily job counts it.
+  it("says when the next run opens: the business days its earliest step needs", async () => {
+    const { client, hadas, ariel } = await setup();
+    const p = await addProcess(hadas, { clientId: client.id, title: "תשלומי ספקים", triggerKinds: ["SCHEDULED"], triggerText: "ב-25", ownerId: hadas.id, sources: S1 });
+    await saveProcessVersion(hadas, p.id, { steps: [{ title: "שליחת הקובץ", offsetBusinessDays: -2 }, { title: "אישור בבנק" }], baseVersion: 0 });
+    await approveProcessVersion(ariel, p.id, 1);
+    // Wednesday 25.11.2026 in Israel. A step at -2 opens the run 3 business
+    // days before: Sunday 22.11.
+    const occurrence = new Date("2026-11-24T22:00:00Z");
+    const date = await prisma.importantDate.create({
+      data: { clientId: client.id, title: "תשלום 25", type: "custom", category: "BUSINESS_FINANCE", month: 1, day: 25, recurrence: "MONTHLY", responsibleUserId: hadas.id, nextOccurrenceAt: occurrence },
+    });
+    await linkProcessDates(hadas, p.id, [date.id]);
+    const [listed] = await listProcesses(hadas, client.id);
+    expect(listed.nextDate?.toISOString()).toBe(occurrence.toISOString());
+    expect(listed.nextOpensAt?.toISOString()).toBe("2026-11-21T22:00:00.000Z");
+  });
+
   it("links the client's own dates, gives the next one, and reads in section 7.4", async () => {
     const { client, hadas, ariel } = await setup();
     const p = await addProcess(hadas, {

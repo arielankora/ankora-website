@@ -830,7 +830,9 @@
         "title": "Hours on this task",
         "empty": "No time reported on this task yet.",
         "running": "{count, plural, one {One timer is running on this task now, and its time will count when it stops.} other {# timers are running on this task now, and their time will count when they stop.}}"
-      }
+      },
+      "runOf": "Run of {code} {title}",
+      "runOfVersion": "Run of {code} {title}, version {version}"
     },
     "list": {
       "title": "Tasks",
@@ -1428,7 +1430,9 @@
       "alreadyApproved": "This version is already approved.",
       "failsChecks": "The procedure fails the checks: {checks}",
       "notApplicableNotAllowed": "Only a manager or the process owner marks a field not relevant.",
-      "notApplicableField": "This field cannot be marked not relevant."
+      "notApplicableField": "This field cannot be marked not relevant.",
+      "discardNotDraft": "Only the latest draft can be discarded, before it is approved.",
+      "discardNotAuthor": "Only whoever wrote the draft, or a manager, can discard it."
     },
     "processRuns": {
       "sameDay": "There is already an open run of {code} for this day: \"{title}\" ({id}). Work on it, or close it and then open a new one.",
@@ -2062,7 +2066,8 @@
       "commsEngagementEndSweep": "Conversations and recordings of a client whose engagement ended deleted",
       "commsExportDownloaded": "Client conversations and recordings exported",
       "userCommsAccess": "Changed access to the communications screen",
-      "clientCommunicationLocale": "Client communication language changed"
+      "clientCommunicationLocale": "Client communication language changed",
+      "processVersionDiscard": "Discard a draft of a procedure"
     },
     "kinds": {
       "failure": "Failure",
@@ -3210,7 +3215,9 @@
           "recommendTrigger": "write what starts the process",
           "recommendProcedure": "write the procedure and send it for approval",
           "recommendRenew": "decide whether to resume it",
-          "why": "Until then the process opens no runs on its own."
+          "why": "Until then the process opens no runs on its own.",
+          "recommendCheck": "set how often it is checked",
+          "whyCheck": "Until then the check is on no one's routine, and no one is reminded."
         },
         "noNextDate": {
           "title": "A date-based process with no dates",
@@ -3349,7 +3356,15 @@
         "checkNext": "next on {date}",
         "checkOverdue": "Overdue, since {date}",
         "taskLink": "The task",
-        "draftLine": "Draft, version {version}"
+        "draftLine": "Draft, version {version}",
+        "nextOpens": "The run opens on {date}",
+        "retire": "Retire the process",
+        "retireConfirm": "Retire {code} {title}? It leaves the list of processes, no runs open for it, and its history is kept.",
+        "retired": "The process was retired",
+        "discardDraft": "Discard the draft",
+        "discardDraftConfirm": "Discard draft {version} of the procedure? It will be deleted.",
+        "discardDraftConfirmRuns": "Discard draft {version} of the procedure? It will be deleted, and approved version {current} keeps running.",
+        "draftDiscarded": "The draft was deleted"
       },
       "lessons": {
         "open": "{count, plural, one {One remark from runs, for the next version} other {# remarks from runs, for the next version}}",
@@ -3486,7 +3501,8 @@
         "dayOfMonth": "Day of the month",
         "date": "Date",
         "creating": "Creating...",
-        "create": "Create the date and link it"
+        "create": "Create the date and link it",
+        "pickHowOften": "Choose how often"
       },
       "run": {
         "opens": "A task opens with the {count} steps of procedure version {version}, each on its business day.",
@@ -3618,7 +3634,7 @@
           "unreachable": "{node} cannot be reached from the start.",
           "tooLong": "One path has more than {max} actions. A procedure longer than that is several processes."
         },
-        "backToClient": "Back to the client file"
+        "backToProcess": "Back to the process"
       },
       "document": {
         "version": "Version:",

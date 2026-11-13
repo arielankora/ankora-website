@@ -1,6 +1,6 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
-import type { KnowledgeAudience, ProcedureClassification, ProcessStatus, ProcessTransition, ProcessTrigger, User } from "@prisma/client";
+import type { KnowledgeAudience, LeadUnit, ProcedureClassification, ProcessStatus, ProcessTransition, ProcessTrigger, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/domain-error";
 import { approvesProceduresOf, NOT_APPROVER, procedureApprovalBlocker, SEPARATION_REQUIRED } from "@/lib/procedure-approval";
@@ -34,6 +34,8 @@ import { isBusinessCalendarKey } from "@/lib/business-calendar";
 import { readControlRefs } from "@/lib/procedure-document";
 import { buildSnapshot } from "@/lib/app-domain/procedure-documents";
 import { runReadiness } from "@/lib/process-readiness";
+import { runLeadBusinessDays } from "@/lib/process-runs";
+import { computeLeadDate } from "@/lib/app-domain/important-dates-recurrence";
 import { mentionedIn, processTexts, type Named } from "@/lib/process-mentions";
 import { flowFromSteps, flowIssues, flowSteps, readFlow, secondEyeNodes, type ProcessFlow } from "@/lib/process-flow";
 
@@ -300,6 +302,32 @@ export async function removeProcess(actor: User, id: string) {
   const removed = await prisma.process.update({ where: { id }, data: { deletedAt: new Date() } });
   await recordAudit({ actorId: actor.id, action: "process.remove", entityType: "Process", entityId: id, clientId: row.clientId, before: row });
   return removed;
+}
+
+/// 13.11.2026 (processes redesign, stage 0): a draft of the procedure
+/// nobody will approve is given up. Only the newest version, only while it
+/// is a draft, and only by whoever wrote it or a manager (Ariel). The
+/// approved procedure, when there is one, keeps running as before.
+export async function discardProcessVersion(actor: User, processId: string, version: number) {
+  assertCan(actor.role, "time_entry.create_self");
+  const process = await findProcess(actor, processId);
+  const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" } });
+  if (!latest || latest.version !== version || latest.status !== "DRAFT") {
+    throw new DomainError("processes.discardNotDraft", "אפשר לוותר רק על הטיוטה האחרונה, לפני שאושרה.");
+  }
+  if (latest.createdById !== actor.id && !canManageClients(actor.role)) {
+    throw new DomainError("processes.discardNotAuthor", "רק מי שכתב את הטיוטה, או מנהל, מוותר עליה.");
+  }
+  await prisma.processVersion.delete({ where: { id: latest.id } });
+  await recordAudit({
+    actorId: actor.id,
+    action: "process.version_discard",
+    entityType: "Process",
+    entityId: processId,
+    clientId: process.clientId,
+    before: { version: latest.version, steps: latest.steps, highlights: latest.highlights, outputs: latest.outputs, changeNote: latest.changeNote },
+  });
+  return { version: latest.version };
 }
 
 /// The dates that start this process (spec 3.10): this client's dates
@@ -714,6 +742,18 @@ export async function linkProcessMention(actor: User, id: string, kind: "system"
   return updateProcess(actor, id, { externalPartyContactIds: [...before.externalPartyContactIds, itemId] });
 }
 
+/// When the run for this occurrence opens: the date's own lead, or earlier
+/// when the earliest step needs it. The same rule as the daily job.
+function runOpensAt(
+  d: { nextOccurrenceAt: Date | null; autoTaskLeadDays: number | null; leadUnit: LeadUnit; businessCalendar: string; timezone: string },
+  steps: ProcessStep[]
+): Date | null {
+  if (!d.nextOccurrenceAt) return null;
+  const byDate = computeLeadDate(d.nextOccurrenceAt, d.autoTaskLeadDays ?? 0, d.leadUnit, d.businessCalendar, d.timezone);
+  const bySteps = computeLeadDate(d.nextOccurrenceAt, runLeadBusinessDays(steps), "BUSINESS_DAYS", d.businessCalendar, d.timezone);
+  return bySteps.getTime() < byDate.getTime() ? bySteps : byDate;
+}
+
 /// Every process of the client this person may see, with its current and
 /// draft procedure, its dates, its completeness and its gaps.
 export async function listProcesses(actor: User, clientId: string, options: { includeRetired?: boolean } = {}) {
@@ -727,7 +767,10 @@ export async function listProcesses(actor: User, clientId: string, options: { in
       orderBy: { seq: "asc" },
       include: {
         versions: { orderBy: { version: "desc" } },
-        dates: { where: { deletedAt: null }, select: { id: true, title: true, nextOccurrenceAt: true, status: true } },
+        dates: {
+          where: { deletedAt: null },
+          select: { id: true, title: true, nextOccurrenceAt: true, status: true, autoTaskLeadDays: true, leadUnit: true, businessCalendar: true, timezone: true },
+        },
       },
     }),
     prisma.systemAccess.findMany({ where: { clientId, deletedAt: null }, select: { id: true, systemName: true, accessStatus: true } }),
@@ -741,11 +784,15 @@ export async function listProcesses(actor: User, clientId: string, options: { in
       const current = r.versions.find((v) => v.status === "APPROVED") ?? null;
       const latest = r.versions[0] ?? null;
       const draft = latest && latest.status === "DRAFT" ? latest : null;
-      const nextDate =
+      const nextOf =
         r.dates
           .filter((d) => d.status !== "ARCHIVED" && d.nextOccurrenceAt)
-          .map((d) => d.nextOccurrenceAt!)
-          .sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
+          .sort((a, b) => a.nextOccurrenceAt!.getTime() - b.nextOccurrenceAt!.getTime())[0] ?? null;
+      const nextDate = nextOf?.nextOccurrenceAt ?? null;
+      // 13.11.2026 (processes redesign, stage 0): the day the next run
+      // opens, counted as the daily job counts it (createDueAutoTasks), so
+      // "הבא" is the date itself and this says when the work starts.
+      const nextOpensAt = nextOf && current ? runOpensAt(nextOf, readSteps(current.steps)) : null;
       const stepSystems = [...new Set((current ? readSteps(current.steps) : []).flatMap((s) => s.systemIds))];
       const needed = [...new Set([...r.requiredSystemIds, ...stepSystems])];
       const steps = (v: typeof current): ProcessStep[] => (v ? readSteps(v.steps) : []);
@@ -777,6 +824,7 @@ export async function listProcesses(actor: User, clientId: string, options: { in
         /// editor only (FLOW_ONLY_MESSAGE).
         isFlow: !!(latest && readFlow(latest.flow)),
         nextDate,
+        nextOpensAt,
         completeness: completeness(input),
         documentation: documentation(input),
         readiness: runReadiness({ ...r, nextDate }),
