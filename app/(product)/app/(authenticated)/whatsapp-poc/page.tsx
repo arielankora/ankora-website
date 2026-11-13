@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { useFormatter, useTranslations } from "next-intl";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
-import { ArrowRight, ChevronDown, MessageCircle, MoreHorizontal, Phone, Search } from "lucide-react";
+import { ArrowRight, ChevronDown, Forward, MessageCircle, MoreHorizontal, Phone, Search, UserRound } from "lucide-react";
 import { ContactRail, ReadToggle, RememberFilters, RowPending, TimelineScroller } from "./CommsControls";
 import { ScrollToActive } from "./ScrollToActive";
 import { BlockButton } from "./setup/SetupForms";
@@ -69,7 +69,7 @@ import { SendForm } from "./SendForm";
 import { AddNumberForm, AssignToClientForm, GroupClientForm } from "./ContactForms";
 import { TaskFromConversation } from "./TaskFromConversation";
 import { HideWhileSelecting, MessageSelectionProvider, SelectModeButton, SelectToggle } from "./MessageSelection";
-import { contentFileLabel, proposeSelectedTitle, type SelectedMessage } from "@/lib/whatsapp-poc/selected-messages";
+import { contentFileLabel, contentText, proposeSelectedTitle, type SelectedMessage } from "@/lib/whatsapp-poc/selected-messages";
 import { RecordingPlayer } from "./calls/RecordingPlayer";
 import { TranscribeButton, TranscriptText } from "./calls/TranscribeButton";
 import { prisma } from "@/lib/prisma";
@@ -172,7 +172,8 @@ function formatSize(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
-const ATTACHMENT_KEY: Record<string, "image" | "video" | "voice" | "file" | "sticker"> = {
+const ATTACHMENT_KEY: Record<string, "image" | "video" | "voice" | "file" | "sticker" | "contact"> = {
+  contact_card: "contact",
   img: "image",
   image: "image",
   video: "video",
@@ -239,11 +240,12 @@ function selectable(m: PageMessage, transcript?: StoredTranscript): SelectedMess
   return {
     id: m.id,
     at: m.timestamp,
-    text: m.text,
+    // With its contact cards as names and numbers (13.11.2026).
+    text: contentText(m),
     mine: m.isSender,
     senderName: m.senderName,
     // The label is written into the task's comment: content, in Hebrew.
-    files: m.attachments.flatMap((a) => (a.id ? [{ id: a.id, type: a.type, label: contentFileLabel(a) }] : [])),
+    files: m.attachments.flatMap((a) => (a.id && !a.contact ? [{ id: a.id, type: a.type, label: contentFileLabel(a) }] : [])),
     // 4.11.2026 (Ariel): a voice message goes into the task with its
     // transcript, when there is one.
     transcript: transcript?.status === "DONE" && transcript.text ? transcript.text : null,
@@ -295,6 +297,32 @@ function QuoteBlock({ quote, original, mine, chat }: { quote: PocQuote; original
   );
 }
 
+/// A shared contact: its name and numbers, each opening the chat with it.
+function ContactCard({ contact }: { contact: NonNullable<PageMessage["attachments"][number]["contact"]> }) {
+  const t = useTranslations("comms");
+  return (
+    <div className="min-w-56 space-y-1 rounded-xl bg-white p-2.5 text-app-text-primary ring-1 ring-app-border">
+      <p className="flex items-center gap-2 text-xs text-app-text-secondary">
+        <UserRound aria-hidden="true" className="size-4" />
+        {t("message.attachment.contact")}
+      </p>
+      {contact.name ? (
+        <p dir="auto" className="font-medium">
+          {contact.name}
+        </p>
+      ) : null}
+      {contact.phones.map((phone) => (
+        <p key={phone} className="flex flex-wrap items-center gap-x-3">
+          <span dir="ltr">{phone}</span>
+          <Link href={`?phone=${encodeURIComponent(phone)}`} className="inline-flex min-h-11 items-center text-xs underline">
+            {t("message.openContact")}
+          </Link>
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function MessageBubble({
   m,
   chat,
@@ -325,6 +353,12 @@ function MessageBubble({
         }`}
       >
         {!mine && chat.type === "group" && m.senderName ? <p dir="auto" className="text-xs font-medium text-app-text-secondary">{m.senderName}</p> : null}
+        {m.forwarded && !m.isDeleted ? (
+          <p className={`flex items-center gap-1 text-xs italic ${mine ? "text-white/75" : "text-app-text-secondary"}`}>
+            <Forward aria-hidden="true" className="size-3.5 rtl:-scale-x-100" />
+            {t("message.forwarded")}
+          </p>
+        ) : null}
         {m.quoted && !m.isDeleted ? <QuoteBlock quote={m.quoted} original={quoted} mine={mine} chat={chat} /> : null}
         {m.isDeleted ? (
           <p className={`italic ${mine ? "text-white/70" : "text-app-text-secondary"}`}>{t("message.deleted")}</p>
@@ -336,7 +370,9 @@ function MessageBubble({
           <p dir="auto" className="whitespace-pre-wrap break-words leading-relaxed">{m.text}</p>
         ) : null}
         {m.attachments.map((a, i) =>
-          a.type === "audio" && a.id ? (
+          a.contact ? (
+            <ContactCard key={i} contact={a.contact} />
+          ) : a.type === "audio" && a.id ? (
             <div key={i} className="min-w-64 space-y-2 rounded-xl bg-white p-2 text-app-text-primary">
               <p className="text-xs text-app-text-secondary">
                 {attachmentLabel(t, a)}

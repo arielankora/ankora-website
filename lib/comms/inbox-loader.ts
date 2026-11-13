@@ -6,6 +6,9 @@ import {
   UnipileError,
   findChatByPhone,
   getChat,
+  getMessage,
+  isContactAttachment,
+  parseVcard,
   isHiddenChat,
   listMessages,
   loadMergedChats,
@@ -15,6 +18,8 @@ import {
 } from "@/lib/whatsapp-poc/unipile";
 import type { CommsAccess } from "./access";
 import { isExcludedViewer } from "./visibility";
+import { enrichStoredMessage } from "./whatsapp-store";
+import { fetchMessageAttachment, isSafeChatId, isSafeMessageId } from "@/lib/whatsapp-poc/voice-notes";
 import { listStoredChats, listStoredMessages, withLiveChats, type StoredTranscript } from "./stored-chats";
 
 // The communications screen with several WhatsApp numbers (1.11.2026). Each
@@ -225,7 +230,47 @@ export async function loadMessages(
     }
   }
   messages.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+  await fillContactCards(sources, messages);
   return { messages, transcripts, error, hasOlder };
+}
+
+/// Contact cards read per page load, at most. Each costs one to three
+/// Unipile requests, and the account has a daily quota (PR #375).
+const MAX_CARDS_FILLED = 3;
+
+/// 13.11.2026 (Ariel: a contact sent in WhatsApp showed as "הורדת קובץ"):
+/// a contact card without its name and numbers is read again from Unipile,
+/// and, if it is still only a vCard file, the file is read and parsed. A
+/// stored message keeps what was found, so this happens once per card.
+async function fillContactCards(sources: WhatsappSources, messages: PageMessage[]) {
+  let budget = MAX_CARDS_FILLED;
+  for (const m of messages) {
+    if (budget <= 0) return;
+    if (m.isDeleted || !m.attachments.some((a) => a.id && !a.contact && isContactAttachment(a))) continue;
+    if (!isSafeChatId(m.chatId) || !isSafeMessageId(m.id)) continue;
+    const info = sources.numbers.get(m.numberKey);
+    const live = info ? unipile(info.accountId) : null;
+    if (!info || !live) continue;
+    budget -= 1;
+    try {
+      const fresh = await getMessage(live, m.chatId, m.id);
+      if (!fresh) continue;
+      for (const a of fresh.attachments) {
+        if (a.contact || !a.id || !isContactAttachment(a)) continue;
+        const file = await fetchMessageAttachment(live, m.chatId, m.id, a.id);
+        const card = file ? parseVcard(new TextDecoder().decode(file.bytes)) : null;
+        if (card) a.contact = card;
+      }
+      m.attachments = fresh.attachments;
+      if (fresh.quoted && !m.quoted) m.quoted = fresh.quoted;
+      if (fresh.forwarded) m.forwarded = true;
+      if (info.id && isStored(sources, { id: m.chatId, numberKey: m.numberKey })) await enrichStoredMessage(info.id, m.chatId, fresh);
+    } catch (err) {
+      // The card stays a download; the screen is not failed for it.
+      if (!(err instanceof UnipileError)) throw err;
+      return;
+    }
+  }
 }
 
 export function chatsWithPhone(sources: WhatsappSources, phone: string): WaChat[] {

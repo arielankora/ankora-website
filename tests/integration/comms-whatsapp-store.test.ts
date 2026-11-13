@@ -32,7 +32,8 @@ vi.mock("@/lib/whatsapp-poc/voice-notes", async (importOriginal) => {
   return { ...real, fetchVoiceNote: async () => ({ bytes: new ArrayBuffer(8), contentType: "audio/ogg" }) };
 });
 
-import { decideBlock, deleteStoredMessage, requestBlock, storeMessage } from "@/lib/comms/whatsapp-store";
+import { decideBlock, deleteStoredMessage, enrichStoredMessage, requestBlock, storeMessage } from "@/lib/comms/whatsapp-store";
+import { listStoredMessages } from "@/lib/comms/stored-chats";
 
 function msg(id: string, text = "שלום") {
   return { id, text, timestamp: "2026-11-01T08:00:00.000Z", isSender: false, senderName: null, isDeleted: false, attachments: [], quoted: null };
@@ -111,5 +112,35 @@ describe("WhatsApp store", () => {
     await expect(decideBlock(anna, again.block.id, true)).rejects.toThrow("רק מנהל");
     await decideBlock(ariel, again.block.id, true);
     expect(await prisma.commsMessage.count()).toBe(0);
+  });
+
+  it("keeps the forwarded mark and a contact card (13.11.2026)", async () => {
+    const { channel } = await setup();
+    await storeMessage(channel, "dana@lid", {
+      ...msg("f1", ""),
+      forwarded: true,
+      attachments: [
+        { id: null, type: "contact_card", mimetype: null, voiceNote: false, duration: null, contact: { name: "שלום", phones: ["+972 52-000-0000"] } },
+      ],
+    });
+    const { messages } = await listStoredMessages(channel, "dana@lid");
+    expect(messages[0]).toMatchObject({
+      forwarded: true,
+      attachments: [{ id: null, type: "contact_card", contact: { name: "שלום", phones: ["+972 52-000-0000"] } }],
+    });
+  });
+
+  it("fills in a card kept before cards were stored", async () => {
+    const { channel } = await setup();
+    const card = { id: "att1", type: "contact_card", mimetype: null, voiceNote: false, duration: null };
+    await storeMessage(channel, "dana@lid", { ...msg("c1", ""), attachments: [card] });
+    await enrichStoredMessage(channel.id, "dana@lid", {
+      ...msg("c1", ""),
+      forwarded: true,
+      attachments: [{ ...card, contact: { name: "שלום", phones: ["+972520000000"] } }],
+    });
+    const { messages } = await listStoredMessages(channel, "dana@lid");
+    expect(messages[0].forwarded).toBe(true);
+    expect(messages[0].attachments[0]).toMatchObject({ id: "att1", contact: { name: "שלום", phones: ["+972520000000"] } });
   });
 });

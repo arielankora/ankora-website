@@ -6316,7 +6316,8 @@
         "video": "Video",
         "voice": "Voice message",
         "file": "File",
-        "sticker": "Sticker"
+        "sticker": "Sticker",
+        "contact": "Contact"
       },
       "quote": {
         "label": "Reply to {name}",
@@ -6325,7 +6326,9 @@
         "notLoaded": "The original message is older and isn't loaded here",
         "deleted": "The original message was deleted",
         "empty": "[Message]"
-      }
+      },
+      "forwarded": "Forwarded",
+      "openContact": "Open chat"
     },
     "calls": {
       "intro": "Recordings arrive automatically from Aloha. A contact's name opens their timeline.",
