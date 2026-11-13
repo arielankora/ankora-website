@@ -308,7 +308,7 @@ export function RhythmEditor({ clientId, processId, starts, dates }: RhythmEdito
               )}
 
               {rule && (
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid max-w-md gap-4">
                   {rule.frequency !== "BUSINESS_DAILY" && rule.frequency !== "DAILY" && (
                     <Field label={t("rollLabel")}>
                       <select value={rule.roll} onChange={(e) => setRule({ roll: e.target.value as ScheduleRule["roll"] })} className={INPUT}>
