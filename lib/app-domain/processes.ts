@@ -304,6 +304,32 @@ export async function removeProcess(actor: User, id: string) {
   return removed;
 }
 
+/// 13.11.2026 (processes redesign, stage 0): a draft of the procedure
+/// nobody will approve is given up. Only the newest version, only while it
+/// is a draft, and only by whoever wrote it or a manager (Ariel). The
+/// approved procedure, when there is one, keeps running as before.
+export async function discardProcessVersion(actor: User, processId: string, version: number) {
+  assertCan(actor.role, "time_entry.create_self");
+  const process = await findProcess(actor, processId);
+  const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" } });
+  if (!latest || latest.version !== version || latest.status !== "DRAFT") {
+    throw new DomainError("processes.discardNotDraft", "אפשר לוותר רק על הטיוטה האחרונה, לפני שאושרה.");
+  }
+  if (latest.createdById !== actor.id && !canManageClients(actor.role)) {
+    throw new DomainError("processes.discardNotAuthor", "רק מי שכתב את הטיוטה, או מנהל, מוותר עליה.");
+  }
+  await prisma.processVersion.delete({ where: { id: latest.id } });
+  await recordAudit({
+    actorId: actor.id,
+    action: "process.version_discard",
+    entityType: "Process",
+    entityId: processId,
+    clientId: process.clientId,
+    before: { version: latest.version, steps: latest.steps, highlights: latest.highlights, outputs: latest.outputs, changeNote: latest.changeNote },
+  });
+  return { version: latest.version };
+}
+
 /// The dates that start this process (spec 3.10): this client's dates
 /// only. Replaces the set.
 export async function linkProcessDates(actor: User, processId: string, dateIds: string[]) {

@@ -28,6 +28,7 @@ import {
   linkProcessDatesAction,
   addProcessDateAction,
   removeProcessAction,
+  discardProcessVersionAction,
   resolveLessonAction,
   runProcessStepAction,
   restoreProcessFieldAction,
@@ -172,7 +173,7 @@ export type PanelProcess = {
   isFlow?: boolean;
   current: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; approvedByName: string | null; checks: PanelCheck[]; approvedAt?: string | null; atApproval?: PanelCheck[] | null } | null;
   /// `mayApprove`: whether the viewer may approve it (lib/procedure-approval.ts).
-  draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: PanelCheck[]; mayApprove?: boolean } | null;
+  draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: PanelCheck[]; mayApprove?: boolean; mayDiscard?: boolean } | null;
   runs: { id: string; title: string; status: string; dueDate: string | null }[];
   /// An ongoing process: its check, when the next one is due, and the last ones.
   checkEveryDays: number | null;
@@ -1396,7 +1397,7 @@ function ProcessCard({
               {t("panel.document")}
             </Link>
           )}
-          {((canApprove && (p.status === "ACTIVE" || p.status === "PAUSED")) || p.status === "DRAFT") && (
+          {((canApprove && (p.status === "ACTIVE" || p.status === "PAUSED")) || p.status === "DRAFT" || !!p.draft?.mayDiscard) && (
             <details className="relative" data-testid="process-more">
               <summary className="cursor-pointer list-none text-app-text-tertiary hover:text-app-text-primary">{t("panel.more")}</summary>
               <div className="absolute end-0 z-10 mt-1 flex min-w-[7rem] flex-col items-start gap-2 rounded-lg border border-app-border bg-app-surface-card p-2.5 shadow-md">
@@ -1408,6 +1409,32 @@ function ProcessCard({
                 {canApprove && p.status === "PAUSED" && (
                   <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "ACTIVE", clientId), t("panel.resumed"))} className="text-app-text-secondary hover:text-app-text-primary">
                     {t("panel.resume")}
+                  </button>
+                )}
+                {p.draft?.mayDiscard && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const draft = p.draft!;
+                      const ask = p.current ? t("panel.discardDraftConfirmRuns", { version: draft.version, current: p.current.version }) : t("panel.discardDraftConfirm", { version: draft.version });
+                      if (window.confirm(ask)) act(() => discardProcessVersionAction(p.id, draft.version, clientId), t("panel.draftDiscarded"));
+                    }}
+                    className="text-app-text-secondary hover:text-app-error"
+                    data-testid="process-discard-draft"
+                  >
+                    {t("panel.discardDraft")}
+                  </button>
+                )}
+                {canApprove && (p.status === "ACTIVE" || p.status === "PAUSED") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(t("panel.retireConfirm", { code: p.code, title: p.title }))) act(() => setProcessStatusAction(p.id, "RETIRED", clientId), t("panel.retired"));
+                    }}
+                    className="text-app-text-secondary hover:text-app-error"
+                    data-testid="process-retire"
+                  >
+                    {t("panel.retire")}
                   </button>
                 )}
                 {p.status === "DRAFT" && (

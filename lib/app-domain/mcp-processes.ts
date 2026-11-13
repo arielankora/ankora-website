@@ -3,6 +3,7 @@ import { readinessLabel, runBlockers } from "@/lib/process-readiness";
 import { checkEveryText } from "@/lib/process-checks";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { appBaseUrl } from "@/lib/email-templates";
 import { processUrl } from "@/lib/approval-links";
 import { canSendToAi } from "@/lib/knowledge";
@@ -29,7 +30,10 @@ import { STRANGER_ASK_WHO_LABELS, STRANGER_SEVERITY_LABELS, strangerLine } from 
 // sensitive, and nothing restricted unless the person asking is named on
 // it.
 
-const day = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : null);
+// 13.11.2026: the day in Israel. A date at midnight in Israel is the
+// evening before in UTC, so toISOString() named the day before ("הבא:
+// שבת" for a Sunday run).
+const day = (d: Date | null | undefined) => (d ? localDateKey(d, TIMEZONE) : null);
 
 type Processes = Awaited<ReturnType<typeof listProcesses>>;
 

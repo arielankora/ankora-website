@@ -742,6 +742,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 draft: p.draft
                   ? {
                       version: p.draft.version,
+                      // 13.11.2026: whoever wrote it, or a manager.
+                      mayDiscard: p.draft.createdById === user.id || canManageClients(user.role),
                       steps: p.draft.steps,
                       highlights: p.draft.highlights,
                       outputs: p.draft.outputs,

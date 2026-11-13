@@ -184,6 +184,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "process.remove": "הסרת תהליך מתיק הלקוח",
   "process.dates": "קישור מועדים לתהליך",
   "process.version_save": "שמירת טיוטה של נוהל",
+  "process.version_discard": "ויתור על טיוטה של נוהל",
   "process.version_approve": "אישור נוהל",
   "process.translation_save": "שמירת תרגום של נוהל לאנגלית",
   "process.translation_approve": "אישור תרגום של נוהל",

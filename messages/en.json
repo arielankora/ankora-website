@@ -1430,7 +1430,9 @@
       "alreadyApproved": "This version is already approved.",
       "failsChecks": "The procedure fails the checks: {checks}",
       "notApplicableNotAllowed": "Only a manager or the process owner marks a field not relevant.",
-      "notApplicableField": "This field cannot be marked not relevant."
+      "notApplicableField": "This field cannot be marked not relevant.",
+      "discardNotDraft": "Only the latest draft can be discarded, before it is approved.",
+      "discardNotAuthor": "Only whoever wrote the draft, or a manager, can discard it."
     },
     "processRuns": {
       "sameDay": "There is already an open run of {code} for this day: \"{title}\" ({id}). Work on it, or close it and then open a new one.",
@@ -2064,7 +2066,8 @@
       "commsEngagementEndSweep": "Conversations and recordings of a client whose engagement ended deleted",
       "commsExportDownloaded": "Client conversations and recordings exported",
       "userCommsAccess": "Changed access to the communications screen",
-      "clientCommunicationLocale": "Client communication language changed"
+      "clientCommunicationLocale": "Client communication language changed",
+      "processVersionDiscard": "Discard a draft of a procedure"
     },
     "kinds": {
       "failure": "Failure",
@@ -3354,7 +3357,14 @@
         "checkOverdue": "Overdue, since {date}",
         "taskLink": "The task",
         "draftLine": "Draft, version {version}",
-        "nextOpens": "The run opens on {date}"
+        "nextOpens": "The run opens on {date}",
+        "retire": "Retire the process",
+        "retireConfirm": "Retire {code} {title}? It leaves the list of processes, no runs open for it, and its history is kept.",
+        "retired": "The process was retired",
+        "discardDraft": "Discard the draft",
+        "discardDraftConfirm": "Discard draft {version} of the procedure? It will be deleted.",
+        "discardDraftConfirmRuns": "Discard draft {version} of the procedure? It will be deleted, and approved version {current} keeps running.",
+        "draftDiscarded": "The draft was deleted"
       },
       "lessons": {
         "open": "{count, plural, one {One remark from runs, for the next version} other {# remarks from runs, for the next version}}",
