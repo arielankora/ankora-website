@@ -76,6 +76,16 @@ describe("the sentence", () => {
     expect(describeLegacyDates([])).toBe("לפי מועד, בלי מועד מקושר.");
   });
 
+  // 13.11.2026: Ankora's P23 closes a VAT period every two months, and was
+  // said to run once a month.
+  it("says a date every few months, with its months", () => {
+    const every2 = { recurrence: "MONTHLY", month: 1, day: 5, weekday: null, intervalMonths: 2, onceDate: null, rollConvention: "NEXT_BUSINESS_DAY" };
+    expect(describeLegacyDates([every2])).toBe("כל חודשיים, ב-5 (ינואר, מרץ, מאי, יולי, ספטמבר, נובמבר). בסוף שבוע או חג: יום העסקים שאחרי.");
+    expect(describeLegacyDates([every2], "en")).toBe("Every 2 months, on the 5th (January, March, May, July, September, November). On a weekend or holiday: the next business day.");
+    expect(describeLegacyDates([{ ...every2, month: 2, intervalMonths: 6, rollConvention: "NONE" }])).toBe("כל 6 חודשים, ב-5 (פברואר, אוגוסט).");
+    expect(describeLegacyDates([{ ...every2, intervalMonths: 1, rollConvention: "NONE" }])).toBe("פעם בחודש, ב-5.");
+  });
+
   it("says an external process and an ongoing one", () => {
     expect(describeRhythm([stored({ kind: "EXTERNAL", externalWhere: "משימה מתוזמנת של Claude", externalWhen: "כל יום ב-07:40", externalRecipient: "אריאל" })])).toBe(
       "רץ אוטומטית מחוץ לאפליקציה: משימה מתוזמנת של Claude, כל יום ב-07:40. התוצאה אל אריאל."
