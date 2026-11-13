@@ -4569,6 +4569,8 @@ model CommsMessage {
   quotedText       String?
   quotedSenderName String?
   quotedKind       String?
+  /// It was forwarded from another chat (13.11.2026).
+  forwarded        Boolean  @default(false)
   /// A block on its number is waiting for a manager: kept, shown to nobody,
   /// not transcribed, not extracted.
   held           Boolean  @default(false)
@@ -4592,6 +4594,10 @@ model CommsAttachment {
   voiceNote   Boolean  @default(false)
   durationSec Int?
   fileName    String?
+  /// A shared contact card (13.11.2026): its name and numbers. Shown as a
+  /// card, not as a file to download.
+  contactName   String?
+  contactPhones String[] @default([])
   /// Voice messages only: the audio is copied to Drive. Other files are
   /// read from Unipile when opened.
   driveFileId String?

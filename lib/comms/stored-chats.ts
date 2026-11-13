@@ -2,7 +2,7 @@ import "server-only";
 import type { CommsChannel, TranscriptStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { matchPhones } from "@/lib/whatsapp-poc/clients-by-phone";
-import type { PocChat, PocMessage } from "@/lib/whatsapp-poc/unipile";
+import { CONTACT_ID_PREFIX, type PocChat, type PocMessage } from "@/lib/whatsapp-poc/unipile";
 import { blockStateFor, canSeeConversation, isExcludedViewer } from "./visibility";
 import { fullViewerEmails } from "./grants";
 import { chatPhone } from "@/lib/whatsapp-poc/inbox";
@@ -117,12 +117,14 @@ export async function listStoredMessages(
         ? { id: r.quotedExternalId, text: r.quotedText ?? "", senderName: r.quotedSenderName, kind: r.quotedKind }
         : null,
       attachments: r.attachments.map((a) => ({
-        id: a.externalId,
+        id: a.externalId.startsWith(CONTACT_ID_PREFIX) ? null : a.externalId,
         type: a.type,
         mimetype: a.mimetype,
         voiceNote: a.voiceNote,
         duration: a.durationSec,
+        ...(a.contactName || a.contactPhones.length > 0 ? { contact: { name: a.contactName, phones: a.contactPhones } } : {}),
       })),
+      ...(r.forwarded ? { forwarded: true } : {}),
     };
   });
   return { messages, transcripts, hasOlder };

@@ -87,7 +87,16 @@ export type PocAttachment = {
   voiceNote: boolean;
   /// Seconds, for audio.
   duration: number | null;
+  /// A shared contact (13.11.2026): its name and numbers, shown as a card
+  /// in the chat, as WhatsApp does, and not as a file to download.
+  contact?: PocContact | null;
 };
+
+/// The stored id of a contact card that came without one of its own (inside
+/// a forwarded message): never sent to Unipile, never offered as a file.
+export const CONTACT_ID_PREFIX = "contact-";
+
+export type PocContact = { name: string | null; phones: string[] };
 
 export type PocMessage = {
   id: string;
@@ -99,6 +108,8 @@ export type PocMessage = {
   isDeleted: boolean;
   /// The message this one answers (WhatsApp's reply), when it is one.
   quoted: PocQuote | null;
+  /// It was forwarded from another chat (13.11.2026).
+  forwarded?: boolean;
 };
 
 /// What WhatsApp shows of the message a reply answers (13.11.2026, Ariel):
@@ -230,6 +241,17 @@ export function toPocChat(raw: RawChat): PocChat | null {
   };
 }
 
+type RawAttachment = {
+  id?: unknown;
+  type?: unknown;
+  mimetype?: unknown;
+  voice_note?: unknown;
+  duration?: unknown;
+  content?: unknown;
+  display_name?: unknown;
+  phones?: unknown;
+};
+
 type RawMessage = {
   id?: unknown;
   text?: unknown;
@@ -238,14 +260,84 @@ type RawMessage = {
   is_deleted?: unknown;
   is_event?: unknown;
   sender?: { display_name?: unknown } | null;
-  attachments?: Array<{ id?: unknown; type?: unknown; mimetype?: unknown; voice_note?: unknown; duration?: unknown }> | null;
+  attachments?: RawAttachment[] | null;
   quoted?: {
     id?: unknown;
     text?: unknown;
     sender?: { display_name?: unknown } | null;
     attachments?: Array<{ type?: unknown; voice_note?: unknown }> | null;
   } | null;
+  forwarded?: { text?: unknown; attachments?: RawAttachment[] | null } | null;
 };
+
+/// A contact card: Unipile's own "contact_card", or a vCard file.
+export function isContactAttachment(a: { type: string; mimetype: string | null }): boolean {
+  if (a.type === "contact_card") return true;
+  return (a.mimetype ?? "").toLowerCase().includes("vcard");
+}
+
+/// The name and numbers of a vCard (RFC 6350 / 2426), enough to show it.
+export function parseVcard(text: string): PocContact | null {
+  if (!/BEGIN:VCARD/i.test(text)) return null;
+  // Folded lines: a line starting with a space continues the one before.
+  const lines = text.replace(/\r\n/g, "\n").replace(/\n[ \t]/g, "").split("\n");
+  let name: string | null = null;
+  let structured: string | null = null;
+  const phones: string[] = [];
+  for (const line of lines) {
+    const colon = line.indexOf(":");
+    if (colon < 0) continue;
+    // "item1.TEL;waid=972...": the group and the parameters are dropped.
+    const key = line.slice(0, colon).split(";")[0].split(".").pop()!.toUpperCase();
+    const value = line.slice(colon + 1).trim();
+    if (!value) continue;
+    if (key === "FN") name = value;
+    else if (key === "N") structured = value.split(";").filter(Boolean).reverse().join(" ").trim() || null;
+    else if (key === "TEL") {
+      const phone = value.replace(/^tel:/i, "");
+      if (!phones.includes(phone)) phones.push(phone);
+    }
+  }
+  const finalName = name ?? structured;
+  if (!finalName && phones.length === 0) return null;
+  return { name: finalName, phones };
+}
+
+function contactOf(a: RawAttachment, type: string, mimetype: string | null): PocContact | null {
+  if (!isContactAttachment({ type, mimetype })) return null;
+  const phones = Array.isArray(a.phones)
+    ? a.phones.flatMap((p) => {
+        const n = str((p as { number?: unknown } | null)?.number);
+        return n ? [n] : [];
+      })
+    : [];
+  const name = str(a.display_name);
+  if (name || phones.length > 0) return { name, phones };
+  // Some cards come as a vCard file with its content inline.
+  const content = str(a.content);
+  if (!content) return null;
+  try {
+    return parseVcard(Buffer.from(content, "base64").toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function toPocAttachments(raw: RawAttachment[] | null | undefined): PocAttachment[] {
+  return (Array.isArray(raw) ? raw : []).map((a) => {
+    const type = str(a.type) ?? "file";
+    const mimetype = str(a.mimetype);
+    const contact = contactOf(a, type, mimetype);
+    return {
+      id: str(a.id),
+      type,
+      mimetype,
+      voiceNote: a.voice_note === true,
+      duration: typeof a.duration === "number" ? a.duration : null,
+      ...(contact ? { contact } : {}),
+    };
+  });
+}
 
 const QUOTE_MAX = 500;
 
@@ -265,21 +357,25 @@ export function toPocMessage(raw: RawMessage): PocMessage | null {
   const id = str(raw.id);
   const timestamp = str(raw.timestamp);
   if (!id || !timestamp || raw.is_event === true) return null;
+  const forwarded = raw.forwarded && typeof raw.forwarded === "object" ? raw.forwarded : null;
+  let text = typeof raw.text === "string" ? raw.text : "";
+  let attachments = toPocAttachments(raw.attachments);
+  // A provider that wraps the forwarded message keeps its content inside.
+  if (forwarded && !text && attachments.length === 0) {
+    text = typeof forwarded.text === "string" ? forwarded.text : "";
+    // Only cards: a file inside the wrapper has no id this message can serve.
+    attachments = toPocAttachments(forwarded.attachments).filter((a) => a.contact).map((a) => ({ ...a, id: null }));
+  }
   return {
     id,
-    text: typeof raw.text === "string" ? raw.text : "",
+    text,
     timestamp,
     isSender: raw.is_sender === true,
     senderName: str(raw.sender?.display_name),
     isDeleted: raw.is_deleted === true,
     quoted: toPocQuote(raw.quoted),
-    attachments: (raw.attachments ?? []).map((a) => ({
-      id: str(a.id),
-      type: str(a.type) ?? "file",
-      mimetype: str(a.mimetype),
-      voiceNote: a.voice_note === true,
-      duration: typeof a.duration === "number" ? a.duration : null,
-    })),
+    attachments,
+    ...(forwarded ? { forwarded: true } : {}),
   };
 }
 
@@ -481,6 +577,13 @@ export async function listMessages(
     .map((m) => toPocMessage(m as RawMessage))
     .filter((m): m is PocMessage => m !== null)
     .reverse();
+}
+
+/// One message, read again (13.11.2026: a contact card stored before cards
+/// were kept, filled in when its chat is opened).
+export async function getMessage(config: { apiKey: string; accountId: string }, chatId: string, messageId: string): Promise<PocMessage | null> {
+  const body = await call(config, `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}`);
+  return toPocMessage(body as RawMessage);
 }
 
 export async function sendText(config: { apiKey: string; accountId: string }, chatId: string, text: string): Promise<void> {
