@@ -23,7 +23,7 @@ export interface ExistingImportantDate {
   month: number;
   day: number;
   originYear: number | null;
-  recurrence: "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL" | "WEEKLY" | "BUSINESS_DAILY";
+  recurrence: "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL" | "WEEKLY" | "BUSINESS_DAILY" | "DAILY";
   customIntervalDays: number | null;
   onceDate: Date | null;
   responsibleUserId: string;
@@ -225,7 +225,7 @@ export function ImportantDateForm({
             onChange={(e) => setRecurrence(e.target.value as typeof recurrence)}
             className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
-            {(["ANNUAL", "MONTHLY", "ONCE", "WEEKLY", "BUSINESS_DAILY", "CUSTOM_INTERVAL"] as const).map((value) => (
+            {(["ANNUAL", "MONTHLY", "ONCE", "WEEKLY", "BUSINESS_DAILY", "DAILY", "CUSTOM_INTERVAL"] as const).map((value) => (
               <option key={value} value={value}>
                 {t(`form.recurrenceOptions.${value}`)}
               </option>
@@ -260,12 +260,12 @@ export function ImportantDateForm({
           <input type="hidden" name="day" value={existing?.day ?? 1} />
           {t("form.unknownHint")}
         </div>
-      ) : recurrence === "BUSINESS_DAILY" ? (
+      ) : recurrence === "BUSINESS_DAILY" || recurrence === "DAILY" ? (
         <div className="rounded-lg border border-dashed border-app-border px-3 py-2 text-xs text-app-text-secondary">
           {/* month/day are NOT NULL and ignored for a daily date, like WEEKLY. */}
           <input type="hidden" name="month" value="1" />
           <input type="hidden" name="day" value="1" />
-          {t("form.businessDailyHint")}
+          {t(recurrence === "DAILY" ? "form.dailyHint" : "form.businessDailyHint")}
           {calendarType === "HEBREW" && <span className="mt-1 block text-[11px] text-app-error">{t("form.businessDailyGregorian")}</span>}
         </div>
       ) : recurrence === "WEEKLY" ? (

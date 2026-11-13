@@ -172,7 +172,7 @@ model User {
   /// ADR 0006: the language the app speaks to this person, and with it the
   /// page direction. Only the interface: what people write (client files,
   /// tasks, notes) stays in the language it was written in.
-  locale       AppLocale  @default(he)
+  locale           AppLocale        @default(he)
   /// The communications screen (see enum CommsAccessLevel).
   commsAccessLevel CommsAccessLevel @default(NONE)
 
@@ -266,16 +266,16 @@ model User {
   notifications       Notification[]
 
   // Phase 10: Important Dates (מועדים חשובים).
-  assignedTasks              Task[]                        @relation("TaskAssignee")
-  supervisedTasks            Task[]                        @relation("TaskSupervisor")
-  taskComments               TaskComment[]                 @relation("TaskCommentAuthor")
-  taskPlansWritten           TaskPlan[]                    @relation("TaskPlanAuthor")
-  taskPlansApproved          TaskPlan[]                    @relation("TaskPlanApprover")
-  vendorDetectionsDecided    VendorDetection[]             @relation("VendorDetectionDecider")
-  approvedTasks              Task[]                        @relation("TaskApprover")
-  importantDatesResponsible  ImportantDate[]                @relation("ImportantDateResponsible")
-  importantDatesCreated      ImportantDate[]                @relation("ImportantDateCreator")
-  holidaySubscriptionsOwned  HolidayCalendarSubscription[]  @relation("HolidaySubscriptionResponsible")
+  assignedTasks             Task[]                        @relation("TaskAssignee")
+  supervisedTasks           Task[]                        @relation("TaskSupervisor")
+  taskComments              TaskComment[]                 @relation("TaskCommentAuthor")
+  taskPlansWritten          TaskPlan[]                    @relation("TaskPlanAuthor")
+  taskPlansApproved         TaskPlan[]                    @relation("TaskPlanApprover")
+  vendorDetectionsDecided   VendorDetection[]             @relation("VendorDetectionDecider")
+  approvedTasks             Task[]                        @relation("TaskApprover")
+  importantDatesResponsible ImportantDate[]               @relation("ImportantDateResponsible")
+  importantDatesCreated     ImportantDate[]               @relation("ImportantDateCreator")
+  holidaySubscriptionsOwned HolidayCalendarSubscription[] @relation("HolidaySubscriptionResponsible")
 
   // Phase 13: MCP server (docs/adr/0005).
   mcpAccessTokens McpAccessToken[]
@@ -290,29 +290,29 @@ model User {
   decisionResponses DecisionResponse[] @relation("DecisionResponder")
 
   // Portal phase 3.
-  preferencesTouched  Client[]         @relation("ClientPreferencesEditor")
-  subprocessorNoticesChecked Client[] @relation("ClientSubprocessorNoticeChecker")
-  documentsUploaded   ClientDocument[] @relation("ClientDocumentUploader")
-  summariesApproved   PortalSummary[]  @relation("PortalSummaryApprover")
-  credentialsCreated  ClientCredential[] @relation("CredentialCreator")
-  credentialsUpdated  ClientCredential[] @relation("CredentialUpdater")
-  credentialsRevealed ClientCredential[] @relation("CredentialLastRevealer")
-  stepUpGrants        StepUpGrant[]
-  passkeys            Passkey[]
-  webauthnChallenges  WebAuthnChallenge[]
-  pendingLogins       PendingLogin[]
-  deviceLinkCode      DeviceLinkCode?
+  preferencesTouched         Client[]            @relation("ClientPreferencesEditor")
+  subprocessorNoticesChecked Client[]            @relation("ClientSubprocessorNoticeChecker")
+  documentsUploaded          ClientDocument[]    @relation("ClientDocumentUploader")
+  summariesApproved          PortalSummary[]     @relation("PortalSummaryApprover")
+  credentialsCreated         ClientCredential[]  @relation("CredentialCreator")
+  credentialsUpdated         ClientCredential[]  @relation("CredentialUpdater")
+  credentialsRevealed        ClientCredential[]  @relation("CredentialLastRevealer")
+  stepUpGrants               StepUpGrant[]
+  passkeys                   Passkey[]
+  webauthnChallenges         WebAuthnChallenge[]
+  pendingLogins              PendingLogin[]
+  deviceLinkCode             DeviceLinkCode?
 
   // Employee agreements.
   employeeAgreements EmployeeAgreement[]
   // Employee lifecycle: onboarding and offboarding tasks about this person.
   lifecycleTasks     Task[]              @relation("TaskSubject")
   agreementSignLinks AgreementSignLink[]
+  commsChannels      CommsChannel[]      @relation("CommsChannelOwner")
+  commsLines         CommsLineOwner[]    @relation("CommsLineOwner")
 
   @@index([role, status])
   @@map("users")
-  commsChannels CommsChannel[] @relation("CommsChannelOwner")
-  commsLines    CommsLineOwner[] @relation("CommsLineOwner")
 }
 
 /// Spec 4.2: "Forgot password באמצעות link חד-פעמי עם expiry." Only the
@@ -374,20 +374,20 @@ model PortalLoginToken {
 /// independent paths: `revokedAt` on this row, and User.tokenVersion - see
 /// lib/mcp/auth.ts for why the second one matters.
 model McpAccessToken {
-  id         String    @id @default(cuid())
-  userId     String
+  id           String    @id @default(cuid())
+  userId       String
   /// Human-readable label so a user can tell two of their own tokens apart
   /// when revoking one ("MacBook Air", "old laptop").
-  label      String
-  tokenHash  String    @unique
+  label        String
+  tokenHash    String    @unique
   /// Snapshot of User.tokenVersion when the token was issued. A later
   /// "logout all sessions" bumps the user's counter past this value and
   /// the token stops resolving - see lib/mcp/auth.ts.
-  tokenVersion Int     @default(0)
-  lastUsedAt DateTime?
-  expiresAt  DateTime
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
+  tokenVersion Int       @default(0)
+  lastUsedAt   DateTime?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -618,9 +618,9 @@ model Client {
   /// Both sides edit them. When the client edits, their account manager
   /// is told, which is why the last editor is recorded rather than only
   /// the time.
-  preferenceContact String?
-  preferenceMatters String?
-  preferenceNever   String?
+  preferenceContact      String?
+  preferenceMatters      String?
+  preferenceNever        String?
   preferencesUpdatedAt   DateTime?
   preferencesUpdatedById String?
 
@@ -632,12 +632,12 @@ model Client {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  portalUsers  ClientUser[]
-  employeeAccess UserClientAccess[]
-  categories   Category[]
-  auditEvents  AuditEvent[] @relation("AuditClient")
-  tasks        Task[]
-  timeEntries  TimeEntry[]
+  portalUsers         ClientUser[]
+  employeeAccess      UserClientAccess[]
+  categories          Category[]
+  auditEvents         AuditEvent[]         @relation("AuditClient")
+  tasks               Task[]
+  timeEntries         TimeEntry[]
   billingPolicy       BillingPolicy?
   hourBanks           HourBank[]
   hourBankAdjustments HourBankAdjustment[]
@@ -653,24 +653,24 @@ model Client {
   decisions      Decision[]
 
   // Portal phase 3.
-  preferencesUpdatedBy User?            @relation("ClientPreferencesEditor", fields: [preferencesUpdatedById], references: [id], onDelete: SetNull)
+  preferencesUpdatedBy User? @relation("ClientPreferencesEditor", fields: [preferencesUpdatedById], references: [id], onDelete: SetNull)
 
   // Sub-processor notice (3.11.2026).
-  subprocessorNoticeDocument  ClientDocument? @relation("ClientSubprocessorNoticeDocument", fields: [subprocessorNoticeDocumentId], references: [id], onDelete: SetNull)
-  subprocessorNoticeCheckedBy User?           @relation("ClientSubprocessorNoticeChecker", fields: [subprocessorNoticeCheckedById], references: [id], onDelete: SetNull)
-  documents            ClientDocument[]
-  credentials          ClientCredential[]
-  connections          ClientConnection[]
-  portalSummaries      PortalSummary[]
+  subprocessorNoticeDocument  ClientDocument?    @relation("ClientSubprocessorNoticeDocument", fields: [subprocessorNoticeDocumentId], references: [id], onDelete: SetNull)
+  subprocessorNoticeCheckedBy User?              @relation("ClientSubprocessorNoticeChecker", fields: [subprocessorNoticeCheckedById], references: [id], onDelete: SetNull)
+  documents                   ClientDocument[]
+  credentials                 ClientCredential[]
+  connections                 ClientConnection[]
+  portalSummaries             PortalSummary[]
 
   // Org brain, phase 2 (spec 3.5).
-  contacts      ClientContact[]
-  organizations ClientOrganization[]
-  sources       ClientSource[]
-  domains       ClientDomain[]
-  systems       SystemAccess[]
-  facts         ClientFact[]
-  entities      ClientEntity[]
+  contacts         ClientContact[]
+  organizations    ClientOrganization[]
+  sources          ClientSource[]
+  domains          ClientDomain[]
+  systems          SystemAccess[]
+  facts            ClientFact[]
+  entities         ClientEntity[]
   knowledgeBatches KnowledgeBatch[]
   requestTypes     RequestType[]
   narratives       ClientNarrative[]
@@ -736,9 +736,9 @@ model Category {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  client Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  tasks       Task[]
-  timeEntries TimeEntry[]
+  client                         Client?         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tasks                          Task[]
+  timeEntries                    TimeEntry[]
   // Phase 10: Important Dates (מועדים חשובים) - category an auto-created
   // task should use when ImportantDate.createAutoTask = true.
   importantDatesAutoTaskCategory ImportantDate[]
@@ -845,12 +845,12 @@ enum TaskBlocker {
 }
 
 model Task {
-  id          String    @id @default(cuid())
+  id          String     @id @default(cuid())
   clientId    String
   categoryId  String?
   title       String
   status      TaskStatus @default(OPEN)
-  source      String    @default("local")
+  source      String     @default("local")
   externalRef String?
 
   // Phase 10 (Important Dates, "מועדים חשובים"): the spec asks to extend
@@ -885,7 +885,7 @@ model Task {
   /// A field rather than a line in the description, which was how it was
   /// first detected: a reworded description silently turned the check off.
   /// Existing tasks were marked from that line by the migration.
-  mappingTask      Boolean          @default(false)
+  mappingTask Boolean @default(false)
 
   /// 28.10.2026: the client asked that this task stay away from AI. A
   /// person handles it, and nothing AI-facing reads it: the "קדם עם קלוד"
@@ -894,7 +894,7 @@ model Task {
   /// Client.aiExcluded covers everything of that client
   /// (lib/ai-exclusion.ts). Any staff member may set it, only a manager
   /// may clear it: clearing is the direction that sends material to AI.
-  aiExcluded       Boolean          @default(false)
+  aiExcluded Boolean @default(false)
 
   // Portal phase 1 ("הבטחות"). Three fields, and deliberately not a
   // second status column.
@@ -917,14 +917,14 @@ model Task {
   // sync by hand on every change, which is the kind of dual write that
   // silently drifts and then shows a client a task marked "בטיפול"
   // that closed last week.
-  clientVisible        Boolean   @default(false)
-  clientTitle          String?
+  clientVisible Boolean @default(false)
+  clientTitle   String?
   /// What we are asking the client to do, in one sentence addressed to
   /// them, shown under "מחכה לך" while the task waits on the client.
   /// Separate from `blockedReason` on purpose: that one is our internal
   /// note ("לא עונה לטלפון") and must never reach the client
   /// (tests/integration/task-blocking.test.ts). NUX handover, 3.10.2026.
-  clientRequest        String?
+  clientRequest String?
 
   // Portal phase 3 ("ספקים וגורמים"), and deliberately not a Supplier
   // table.
@@ -1015,7 +1015,7 @@ model Task {
   // was given.
   supervisorId     String?
   /// Tasks phase 5. Null means this is a task in its own right.
-  parentId     String?
+  parentId         String?
   requiresApproval Boolean   @default(false)
   approvedById     String?
   approvedAt       DateTime?
@@ -1075,15 +1075,15 @@ model Task {
   subjectUserId String?
   lifecycleKind EmployeeLifecycleKind?
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  category      Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  assignedTo    User?          @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  supervisor    User?          @relation("TaskSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull)
-  approvedBy    User?          @relation("TaskApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  client     Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  assignedTo User?     @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  supervisor User?     @relation("TaskSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull)
+  approvedBy User?     @relation("TaskApprover", fields: [approvedById], references: [id], onDelete: SetNull)
 
   /// Tasks phase 5: the task this one is a step of.
   ///
@@ -1096,18 +1096,18 @@ model Task {
   /// Cascade on delete, unlike every other relation here: a step has no
   /// meaning without the thing it is a step of. Deletes in this product
   /// are soft, so this fires only if a row is ever truly removed.
-  parent        Task?          @relation("TaskParent", fields: [parentId], references: [id], onDelete: Cascade)
-  subtasks      Task[]         @relation("TaskParent")
-  importantDate ImportantDate? @relation(fields: [importantDateId], references: [id], onDelete: SetNull)
-  subjectUser   User?          @relation("TaskSubject", fields: [subjectUserId], references: [id], onDelete: SetNull)
-  timeEntries   TimeEntry[]
-  decisions     Decision[]
-  documents     ClientDocument[]
-  comments      TaskComment[]
-  portalNotes   TaskPortalNote[]
-  plans         TaskPlan[]
+  parent              Task?             @relation("TaskParent", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks            Task[]            @relation("TaskParent")
+  importantDate       ImportantDate?    @relation(fields: [importantDateId], references: [id], onDelete: SetNull)
+  subjectUser         User?             @relation("TaskSubject", fields: [subjectUserId], references: [id], onDelete: SetNull)
+  timeEntries         TimeEntry[]
+  decisions           Decision[]
+  documents           ClientDocument[]
+  comments            TaskComment[]
+  portalNotes         TaskPortalNote[]
+  plans               TaskPlan[]
   /// P8, 3.11.2026: a new vendor noticed in this task (lib/app-domain/vendor-detections.ts).
-  vendorDetection   VendorDetection?  @relation("VendorDetectionSource")
+  vendorDetection     VendorDetection?  @relation("VendorDetectionSource")
   /// The detections that opened this P8 run, or were noted on it.
   vendorDetectionRuns VendorDetection[] @relation("VendorDetectionRun")
 
@@ -1246,15 +1246,15 @@ model TaskPlan {
   /// plan proposes none. Copied into real steps only on request.
   steps String[] @default([])
 
-  status TaskPlanStatus @default(APPROVED)
+  status     TaskPlanStatus @default(APPROVED)
   /// Where it was written: through Claude (MCP) or on the task screen.
-  origin EntryOrigin    @default(APP)
+  origin     EntryOrigin    @default(APP)
   /// What changed from the previous version, in one line. Optional.
   changeNote String?
 
-  createdById  String?
-  approvedById String?
-  approvedAt   DateTime?
+  createdById    String?
+  approvedById   String?
+  approvedAt     DateTime?
   /// Set when this version's steps were copied into the task's steps.
   stepsAppliedAt DateTime?
 
@@ -1291,11 +1291,11 @@ model VendorDetection {
   /// What set it off, for the person asked: "לחבר + Pipedrive".
   matched    String
 
-  status VendorDetectionStatus @default(PENDING)
+  status     VendorDetectionStatus @default(PENDING)
   /// The P8 run it opened, or the vendor's existing run it was noted on.
-  runTaskId String?
+  runTaskId  String?
   /// True when the daily job opened the run because nobody answered.
-  autoOpened Boolean @default(false)
+  autoOpened Boolean               @default(false)
 
   decidedById String?
   decidedAt   DateTime?
@@ -1347,18 +1347,18 @@ model TimeEntry {
 
   /// Server-computed only (spec 18.1: "server end time + compute actual"),
   /// never trusted from the client. Null while a timer is actively running.
-  actualSeconds Int?
+  actualSeconds   Int?
   /// Defaults to actualSeconds once BillingPolicy exists in Phase 3 to
   /// diverge them (spec section 7).
   billableSeconds Int?
 
   note String?
 
-  source   TimeEntrySource @default(MANUAL)
-  isManual Boolean         @default(false)
+  source             TimeEntrySource @default(MANUAL)
+  isManual           Boolean         @default(false)
   /// True once any post-creation edit has produced a TimeEntryRevision.
   /// Spec 6.4: "כל עריכה ידנית מסומנת באייקון פנימי 'Edited'."
-  isEdited Boolean         @default(false)
+  isEdited           Boolean         @default(false)
   /// Spec "אישור דיווח שעות חופף בין לקוחות שונים" (Phase 12): true when
   /// this entry was only saved because an overlap with another entry for
   /// the same user was explicitly confirmed past a warning - either the
@@ -1367,7 +1367,7 @@ model TimeEntry {
   /// existing "אפשר חפיפה (override)" checkbox (edit_others, any client -
   /// same-client included). Same-client overlap for a non-privileged actor
   /// stays a hard, unconfirmable block exactly as before this feature.
-  isOverlapConfirmed Boolean @default(false)
+  isOverlapConfirmed Boolean         @default(false)
 
   /// Phase 14: APP for anything created through the web app, MCP for
   /// anything created through /api/mcp. See the EntryOrigin enum above.
@@ -1379,10 +1379,10 @@ model TimeEntry {
   /// schema-header convention - never a hard DELETE via the app.
   deletedAt DateTime?
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  client   Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  category Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  task     Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  task     Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
   revisions TimeEntryRevision[]
 
@@ -1530,7 +1530,7 @@ model HourBank {
   cycleEnd   DateTime
 
   purchasedMinutes   Int
-  rolloverInMinutes  Int @default(0)
+  rolloverInMinutes  Int          @default(0)
   rolloverMode       RolloverMode @default(NONE)
   /// Only meaningful when rolloverMode = CAPPED.
   rolloverCapMinutes Int?
@@ -1649,15 +1649,15 @@ model AlertRule {
 /// 11.3 - null means "still above threshold since it fired", set once
 /// utilization drops back below the threshold.
 model AlertEvent {
-  id         String   @id @default(cuid())
-  ruleId     String
-  hourBankId String
-  triggeredAt DateTime @default(now())
+  id          String    @id @default(cuid())
+  ruleId      String
+  hourBankId  String
+  triggeredAt DateTime  @default(now())
   /// The raw metric value (minutes or percentage points, matching the
   /// rule's own `type`) at the moment this event fired - spec 5's "value"
   /// field, verbatim.
-  value      Int
-  resolvedAt DateTime?
+  value       Int
+  resolvedAt  DateTime?
 
   /// 4.11.2026: how a closed event was closed, and why, in words the
   /// Alerts screen's event history shows as they are. Null while open, and
@@ -1669,7 +1669,7 @@ model AlertEvent {
   closeKind   AlertCloseKind?
   closeReason String?
 
-  rule           AlertRule       @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  rule            AlertRule       @relation(fields: [ruleId], references: [id], onDelete: Cascade)
   emailDeliveries EmailDelivery[]
 
   @@index([ruleId, hourBankId])
@@ -1697,28 +1697,28 @@ enum AlertCloseKind {
 /// send action (Ankora recipients / client recipients are two separate
 /// rows when a rule has both) - see ADR 11.3.
 model EmailDelivery {
-  id               String              @id @default(cuid())
-  alertEventId     String?
+  id                String              @id @default(cuid())
+  alertEventId      String?
   /// Phase 6 addition: set when this send is a scheduled client/internal
   /// report (spec 15) rather than a Phase 4 alert. A row has exactly one
   /// of alertEventId/reportRunId set in practice - not enforced as a DB
   /// CHECK constraint (Prisma has no portable way to express XOR across
   /// nullable FKs), but every write path only ever sets one of the two.
-  reportRunId      String?
-  template         String
-  recipients       String[]
+  reportRunId       String?
+  template          String
+  recipients        String[]
   /// 7.10.2026: the exact subject and text that were sent, so a retry
   /// resends the real message instead of a stub. Null on rows written
   /// before that date, and on the nightly backup (its attachments are not
   /// stored, so it is never retried; the next night produces a new one).
-  subject          String?
-  body             String?
+  subject           String?
+  body              String?
   providerMessageId String?
-  status           EmailDeliveryStatus
-  attempts         Int                 @default(1)
-  lastAttemptAt    DateTime            @default(now())
-  error            String?
-  createdAt        DateTime            @default(now())
+  status            EmailDeliveryStatus
+  attempts          Int                 @default(1)
+  lastAttemptAt     DateTime            @default(now())
+  error             String?
+  createdAt         DateTime            @default(now())
 
   alertEvent AlertEvent? @relation(fields: [alertEventId], references: [id], onDelete: SetNull)
   reportRun  ReportRun?  @relation(fields: [reportRunId], references: [id], onDelete: SetNull)
@@ -1726,6 +1726,7 @@ model EmailDelivery {
   @@index([status, attempts])
   @@map("email_deliveries")
 }
+
 // --- Phase 6: Client portal + scheduled reports ---------------------------
 //
 // Scope discipline (spec section 23 / docs/adr/0001 addendum "Phase 6"):
@@ -1770,8 +1771,8 @@ enum ClientReportType {
 /// isScheduleDue for the actual due-calculation, kept as a pure,
 /// independently unit-tested function.
 model ReportSchedule {
-  id       String           @id @default(cuid())
-  clientId String
+  id         String           @id @default(cuid())
+  clientId   String
   reportType ClientReportType
   frequency  ReportFrequency
 
@@ -1803,12 +1804,12 @@ model ReportSchedule {
 /// or a RECALCULATED cycle (spec 8.2's own "אין לשנות silently דוח שכבר
 /// הופק ללא log" principle, applied to scheduled reports too).
 model ReportRun {
-  id          String   @id @default(cuid())
-  scheduleId  String
-  periodStart DateTime
-  periodEnd   DateTime
+  id           String   @id @default(cuid())
+  scheduleId   String
+  periodStart  DateTime
+  periodEnd    DateTime
   snapshotJson Json
-  createdAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
 
   schedule        ReportSchedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   emailDeliveries EmailDelivery[]
@@ -1841,11 +1842,11 @@ model ReportRun {
 /// secret name), and nothing in this phase writes a real value into it,
 /// since no OAuth flow exists yet (spec 17.3).
 model IntegrationConnection {
-  id            String               @id @default(cuid())
-  provider      String               @unique
-  status        IntegrationStatus    @default(NOT_CONNECTED)
+  id             String            @id @default(cuid())
+  provider       String            @unique
+  status         IntegrationStatus @default(NOT_CONNECTED)
   credentialsRef String?
-  config        Json?
+  config         Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1876,7 +1877,7 @@ enum IntegrationStatus {
 /// ("לא להשתמש בשם המשימה כמפתח סנכרון") implies the internal id, not any
 /// mutable field, is the stable half of the mapping.
 model ExternalMapping {
-  id                 String   @id @default(cuid())
+  id                 String @id @default(cuid())
   provider           String
   internalEntityType String
   internalEntityId   String
@@ -1903,14 +1904,14 @@ model ExternalMapping {
 /// AuditEvent.action's own precedent (docs/adr/0001) - new notification
 /// kinds can be added without a schema migration.
 model Notification {
-  id       String  @id @default(cuid())
-  userId   String
-  type     String
-  title    String
-  body     String
+  id         String    @id @default(cuid())
+  userId     String
+  type       String
+  title      String
+  body       String
   entityType String?
   entityId   String?
-  readAt   DateTime?
+  readAt     DateTime?
 
   createdAt DateTime @default(now())
 
@@ -2006,6 +2007,10 @@ enum RecurrenceType {
   /// Thursday in Israel, without its holidays). A daily process ("every
   /// working day at 9:00") is one date, not five weekly ones.
   BUSINESS_DAILY
+  /// 13.11.2026 (processes redesign, stage 1): every day, weekends and
+  /// holidays included. A process that runs outside business days (a
+  /// nightly agent) was "BUSINESS_DAILY" or nothing.
+  DAILY
 }
 
 /// 13.10.2026 (org-brain spec 3.10). How well we know when a date falls.
@@ -2091,66 +2096,66 @@ model ImportantDate {
   /// number (1-13, Adar I/II both representable)/day (1-30). See
   /// lib/app-domain/important-dates-recurrence.ts for the conversion and
   /// every edge case (Feb 29, Adar I/II, variable Hebrew month lengths).
-  month Int
-  day   Int
+  month        Int
+  day          Int
   /// Optional origin year - spec: "שנה אופציונלית בימי הולדת וימי
   /// נישואים" / "הצגת גיל... רק אם שנת ההתחלה ידועה." Interpreted as a
   /// Gregorian year even when calendarType = HEBREW (the common case:
   /// someone knows they were born in 1990, not that they were born in
   /// 5750) - age/anniversary-years display always does a Gregorian-year
   /// subtraction from this field, never a Hebrew-year one.
-  originYear Int?
+  originYear   Int?
 
-  recurrence RecurrenceType @default(ANNUAL)
+  recurrence         RecurrenceType @default(ANNUAL)
   /// Only meaningful when recurrence = CUSTOM_INTERVAL.
   customIntervalDays Int?
   /// Only meaningful when recurrence = WEEKLY: 0 = Sunday ... 6 = Saturday.
-  weekday Int?
+  weekday            Int?
   /// Gregorian MONTHLY only: every N months, N in {1, 2, 3, 4, 6}, counted
   /// from `month`. Null is every month. Divisors of 12 only, so the cycle
   /// never needs an anchor year (lib/app-domain/important-dates-recurrence.ts).
-  intervalMonths Int?
+  intervalMonths     Int?
   /// How autoTaskLeadDays is counted. Default keeps every existing date's
   /// meaning.
-  leadUnit LeadUnit @default(CALENDAR_DAYS)
+  leadUnit           LeadUnit       @default(CALENDAR_DAYS)
   /// Where an occurrence on a non-business day moves. Applied to the
   /// occurrence itself, so reminders, the auto-task and the list all see
   /// the moved day.
-  rollConvention RollConvention @default(NONE)
+  rollConvention     RollConvention @default(NONE)
   /// Which business days: "IL" (Sunday to Thursday, Israeli rest days) or
   /// "US" (Monday to Friday, federal holidays). A free string, like `type`:
   /// a new calendar is an entry in lib/business-calendar.ts, never a
   /// migration. A date that starts a process follows the process's
   /// calendar, or its entity's country (lib/app-domain/date-calendars.ts);
   /// otherwise a person picks it.
-  businessCalendar String @default("IL")
+  businessCalendar   String         @default("IL")
   /// How well the day is known. EXACT keeps every existing date's meaning.
-  precision DatePrecision @default(EXACT)
+  precision          DatePrecision  @default(EXACT)
   /// APPROXIMATE only: the possible days of the month ("8 or 9"). `day`
   /// holds the earliest, so scheduling errs early.
-  dayAlternatives Int[] @default([])
+  dayAlternatives    Int[]          @default([])
   /// A date that applies only if something is true ("quarterly, only if
   /// the vulnerability SLA was missed"). Such a date never opens a task:
   /// the responsible person is asked whether the condition holds, because
   /// a task for work that may not exist is noise somebody learns to ignore.
-  conditionText String?
+  conditionText      String?
   /// A recurrence that only runs inside a period (a SOC 2 cycle, 1.9.2026
   /// to 31.8.2027). Both optional; no occurrence falls outside them.
-  rangeStart DateTime?
-  rangeEnd   DateTime?
+  rangeStart         DateTime?
+  rangeEnd           DateTime?
   /// Spec 3.10, "ממתין לקבלה": on this date something is due to reach us
   /// from outside (a supplier's monthly report). The person responsible
   /// checks that it arrived; the reminder and the task say so.
-  expectsReceipt Boolean @default(false)
+  expectsReceipt     Boolean        @default(false)
   /// Who sends it, in words: "איילה, Nextage".
-  expectedFrom   String?
+  expectedFrom       String?
   /// Only meaningful when recurrence = ONCE - the exact one-time date;
   /// month/day/calendarType above are ignored for ONCE dates.
-  onceDate DateTime?
+  onceDate           DateTime?
 
   /// Feb 29 in a non-leap year: false (default, per spec) = Feb 28, true
   /// = Mar 1.
-  leapDayUseMarchFirst Boolean @default(false)
+  leapDayUseMarchFirst    Boolean @default(false)
   /// A Hebrew date recorded in Adar, observed during a 13-month Hebrew
   /// leap year: true (default, per spec) = Adar II, false = Adar I. Only
   /// consulted when calendarType = HEBREW and the recorded month is Adar.
@@ -2158,15 +2163,15 @@ model ImportantDate {
 
   timezone String @default("Asia/Jerusalem")
 
-  responsibleUserId String
+  responsibleUserId    String
   /// Additional users who should see/be notified - a plain id list, same
   /// storage precedent as AlertRule.recipientsAnkora (String[], no join
   /// table, for what's just a short per-date list).
-  additionalUserIds String[]
+  additionalUserIds    String[]
   extraEmailRecipients String[]
 
-  status      ImportantDateStatus       @default(ACTIVE)
-  sensitivity ImportantDateSensitivity  @default(NORMAL)
+  status      ImportantDateStatus      @default(ACTIVE)
+  sensitivity ImportantDateSensitivity @default(NORMAL)
   notes       String?
 
   /// Portal phase 3. Opt-in per row, exactly like a task: a date Ankora
@@ -2184,13 +2189,16 @@ model ImportantDate {
 
   /// Org brain, phase 1 (spec 3.10): the process this date starts. A
   /// process may have several dates (the 10th and the 25th).
-  processId String?
+  processId      String?
+  /// 13.11.2026 (stage 1): the start of the process this date was
+  /// generated for. Such a date is edited from the process's rhythm only.
+  processStartId String?
 
   /// Cached, recomputed on every write and by the daily job - the next
   /// Gregorian date this important date falls on. Powers list/calendar
   /// sort and the dashboard/KPI cards without recomputing recurrence on
   /// every read.
-  nextOccurrenceAt DateTime?
+  nextOccurrenceAt    DateTime?
   /// The Gregorian anchor date of the CURRENT occurrence being tracked -
   /// once "today" passes this date, the daily job promotes the date to
   /// its next occurrence and resets status from HANDLED_CURRENT back to
@@ -2198,7 +2206,7 @@ model ImportantDate {
   currentOccurrenceAt DateTime?
   /// Snooze postpones reminders/handling without moving the event's own
   /// date (spec: "Snooze... לא לשנות את תאריך האירוע המקורי").
-  snoozedUntil DateTime?
+  snoozedUntil        DateTime?
 
   source     ImportantDateSource @default(MANUAL)
   /// Set when source = HOLIDAY - which holiday-catalog key this row was
@@ -2214,11 +2222,12 @@ model ImportantDate {
   archivedAt  DateTime?
   deletedAt   DateTime?
 
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  responsibleUser  User              @relation("ImportantDateResponsible", fields: [responsibleUserId], references: [id])
-  createdBy        User?             @relation("ImportantDateCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  autoTaskCategory Category?         @relation(fields: [autoTaskCategoryId], references: [id], onDelete: SetNull)
-  process          Process?          @relation(fields: [processId], references: [id], onDelete: SetNull)
+  client           Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  responsibleUser  User                 @relation("ImportantDateResponsible", fields: [responsibleUserId], references: [id])
+  createdBy        User?                @relation("ImportantDateCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  autoTaskCategory Category?            @relation(fields: [autoTaskCategoryId], references: [id], onDelete: SetNull)
+  process          Process?             @relation(fields: [processId], references: [id], onDelete: SetNull)
+  processStart     ProcessStart?        @relation(fields: [processStartId], references: [id], onDelete: SetNull)
   reminderRules    ReminderRule[]
   occurrences      ReminderOccurrence[]
   tasks            Task[]
@@ -2251,7 +2260,7 @@ model ReminderRule {
   /// write path sends to these yet in this MVP (client portal editing of
   /// dates is explicitly out of scope - see the spec's "לא לפתח עכשיו"
   /// list); keeping the column now avoids a migration if that changes.
-  clientRecipients String[]
+  clientRecipients      String[]
 
   enabled    Boolean @default(true)
   createTask Boolean @default(false)
@@ -2335,7 +2344,7 @@ model HolidayCalendarSubscription {
 
   defaultReminderDaysBefore Int[]   @default([30, 7])
   responsibleUserId         String?
-  createTasks                Boolean @default(false)
+  createTasks               Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2360,25 +2369,25 @@ model HolidayCalendarSubscription {
 /// snapshot rather than a pointer: what the client agreed to must stay
 /// readable even if the option text is later edited.
 model Decision {
-  id         String  @id @default(cuid())
-  clientId   String
+  id                     String         @id @default(cuid())
+  clientId               String
   /// The promise this decision blocks, when there is one. Optional: some
   /// decisions arrive before any task exists ("which of these three?").
-  taskId     String?
-  question   String
-  background String?
+  taskId                 String?
+  question               String
+  background             String?
   /// Agorot. The amount at stake, when the decision is about money. Null
   /// for decisions that are not (a date, a supplier, a preference).
-  amountMinor Int?
+  amountMinor            Int?
   /// Copied from the client at creation, so a later change to the agreed
   /// ceiling never rewrites what an old approval said it was.
   ceilingMinorAtCreation Int?
-  dueAt      DateTime?
-  status     DecisionStatus @default(OPEN)
-  createdById String
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  cancelledAt DateTime?
+  dueAt                  DateTime?
+  status                 DecisionStatus @default(OPEN)
+  createdById            String
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  cancelledAt            DateTime?
 
   client    Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
   task      Task?             @relation(fields: [taskId], references: [id], onDelete: SetNull)
@@ -2449,7 +2458,6 @@ model DecisionResponse {
   @@index([respondedById])
   @@map("decision_responses")
 }
-
 
 // ---------------------------------------------------------------------------
 // Portal phase 3: the client's file, and the monthly summary.
@@ -2558,14 +2566,14 @@ model ClientDocument {
 /// client in those 15 minutes is refused then. Rows are short-lived and
 /// harmless once used or expired.
 model McpFileTicket {
-  id        String @id @default(cuid())
+  id           String @id @default(cuid())
   /// SHA-256 of the raw ticket. The raw value exists only in the tool result.
-  tokenHash String @unique
+  tokenHash    String @unique
   /// "upload" or "download".
-  purpose   String
-  userId    String
+  purpose      String
+  userId       String
   /// User.tokenVersion when issued. "Log out everywhere" kills the address.
-  tokenVersion Int @default(0)
+  tokenVersion Int    @default(0)
 
   clientId   String
   /// Download: the document. Upload: the document it created, once used.
@@ -2749,21 +2757,21 @@ model Passkey {
 /// the only provider Auth.js has accepts a pending login and nothing else.
 /// Five minutes, single use, stored hashed (lib/app-auth/second-factor.ts).
 model PendingLogin {
-  id         String    @id @default(cuid())
-  userId     String
-  tokenHash  String    @unique
+  id             String    @id @default(cuid())
+  userId         String
+  tokenHash      String    @unique
   /// "password" or "link": how the first factor was given.
-  method     String
+  method         String
   /// Set when the sign-in may complete: at once when no second step was
   /// needed, or when the passkey answered (or a first one was enrolled).
-  verifiedAt   DateTime?
+  verifiedAt     DateTime?
   /// "none" or "passkey": which of the two set verifiedAt.
-  secondFactor String?
+  secondFactor   String?
   /// Set when a code from an already signed-in device was typed here:
   /// this sign-in may then enrol one more passkey (a new phone).
   deviceLinkedAt DateTime?
-  expiresAt  DateTime
-  createdAt  DateTime  @default(now())
+  expiresAt      DateTime
+  createdAt      DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -2990,17 +2998,17 @@ model ClientContact {
   clientId String
   personId String
 
-  role            String?
-  relationship    ContactRelationship @default(CLIENT_STAFF)
+  role              String?
+  relationship      ContactRelationship @default(CLIENT_STAFF)
   /// Which of the client's legal entities this person works with (Shani:
   /// Inc). Same client only.
-  entityId        String?
+  entityId          String?
   /// What you need to know to work with them. "פונים אליה בכל ספק של Inc."
-  context         String?
+  context           String?
   /// Channels in order of preference: ["WhatsApp", "Slack", "מייל"].
-  channelOrder    String[] @default([])
-  isPrimary       Boolean  @default(false)
-  isDecisionMaker Boolean  @default(false)
+  channelOrder      String[]            @default([])
+  isPrimary         Boolean             @default(false)
+  isDecisionMaker   Boolean             @default(false)
   /// Ankora people only: the user, and the address they use on the
   /// client's side (Hadas, office@nux.ai).
   userId            String?
@@ -3035,8 +3043,8 @@ model ClientContact {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  person Person @relation(fields: [personId], references: [id], onDelete: Restrict)
+  client Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  person Person        @relation(fields: [personId], references: [id], onDelete: Restrict)
   entity ClientEntity? @relation(fields: [entityId], references: [id], onDelete: SetNull)
 
   @@unique([clientId, personId])
@@ -3314,7 +3322,7 @@ enum FactTopic {
 /// (spec 3.4). A changed fact is never edited in place: the new one is
 /// added and the old one is marked SUPERSEDED, pointing at it.
 model ClientFact {
-  id       String   @id @default(cuid())
+  id       String     @id @default(cuid())
   clientId String
   kind     FactKind
   topic    FactTopic?
@@ -3532,49 +3540,49 @@ model KnowledgeBatch {
 /// One proposed item (spec 5.2). Nothing reaches the file until a person
 /// approves it on the screen (decision 1): there is no tool that approves.
 model KnowledgeProposal {
-  id       String         @id @default(cuid())
-  batchId  String
-  clientId String
-  target   ProposalTarget
-  action   ProposalAction @default(CREATE)
+  id         String         @id @default(cuid())
+  batchId    String
+  clientId   String
+  target     ProposalTarget
+  action     ProposalAction @default(CREATE)
   /// For SUPERSEDE and CONTRADICT: the fact it is about.
-  targetId String?
+  targetId   String?
   /// The item as it would be written: the same fields the screens send.
-  payload  Json
+  payload    Json
   /// Why Claude thinks so, in a sentence.
-  reason   String?
+  reason     String?
   /// A short quote from the source, when the source allows quotes.
-  quote    String?
+  quote      String?
   /// How sure Claude is, by its own account: HIGH, MEDIUM or LOW. The
   /// review screen lowers it for what it can see (lib/knowledge-proposals.ts,
   /// reviewConfidence) and orders the card by it.
   confidence String?
   /// Rule flags found when the proposal arrived: [{ code, message }].
-  flags    Json           @default("[]")
+  flags      Json           @default("[]")
 
-  state        ProposalState @default(PENDING)
-  decidedById  String?
-  decidedAt    DateTime?
-  rejectReason String?
+  state            ProposalState @default(PENDING)
+  decidedById      String?
+  decidedAt        DateTime?
+  rejectReason     String?
   /// Whether the person changed it before approving (decision 1 measures
   /// this: under 10% after a month opens approval in conversation).
-  edited       Boolean       @default(false)
+  edited           Boolean       @default(false)
   /// 3.11.2026: which payload fields the person changed before approving
   /// (lib/proposal-edits.ts), names only. The values before and after are
   /// in the audit row of the approval, not here.
-  editedFields String[]      @default([])
+  editedFields     String[]      @default([])
   /// "כבר בתיק": it was already in the file, so approving it added its
   /// sources to the item there (`resultId`) and created nothing.
-  attached     Boolean       @default(false)
+  attached         Boolean       @default(false)
   /// The item approving it created or changed.
-  resultId     String?
+  resultId         String?
   /// 3.11.2026: approved by the server on arrival, with no person, under
   /// the approval tiers (lib/knowledge-proposals.ts, approvalTier).
-  autoApplied  Boolean       @default(false)
+  autoApplied      Boolean       @default(false)
   /// When the item it created was taken out of the file again ("ביטול"),
   /// and by whom (revertProposal). The proposal stays APPROVED.
-  revertedAt   DateTime?
-  revertedById String?
+  revertedAt       DateTime?
+  revertedById     String?
   /// An auto-applied item a person looked at after the fact and found
   /// right ("תקין" on "נכנס אוטומטית"), and who (lib/auto-apply.ts).
   autoReviewedAt   DateTime?
@@ -3637,20 +3645,20 @@ model RequestType {
   id       String @id @default(cuid())
   clientId String
 
-  title      String
+  title             String
   /// Supplier, employee, Nextage, a system.
-  fromWho    String?
+  fromWho           String?
   /// billing-us, WhatsApp, Slack, office@.
-  arrivesVia String?
+  arrivesVia        String?
   /// How it is answered and where it goes.
-  handling   String
+  handling          String
   /// Who it is routed to: contacts in this client's file.
   routeToContactIds String[] @default([])
   /// When it belongs to one entity (an Inc invoice).
-  entityId   String?
+  entityId          String?
   /// The process this kind of request sets off (spec 3.7): "an employee's
   /// trip" starts P6. Same client only.
-  processId  String?
+  processId         String?
 
   // Knowledge fields (spec 3.1).
   knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
@@ -3675,9 +3683,9 @@ model RequestType {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  client Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  entity ClientEntity? @relation(fields: [entityId], references: [id], onDelete: SetNull)
-  process Process?     @relation(fields: [processId], references: [id], onDelete: SetNull)
+  client  Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  entity  ClientEntity? @relation(fields: [entityId], references: [id], onDelete: SetNull)
+  process Process?      @relation(fields: [processId], references: [id], onDelete: SetNull)
 
   @@index([clientId, deletedAt])
   @@map("request_types")
@@ -3802,10 +3810,10 @@ model ClientPolicy {
   /// What the server checks, when the rule says something it can check
   /// (lib/policy-params.ts): a threshold's amount, the tags it is about,
   /// the allowed channels. Empty: read by people and by Claude only.
-  params           Json    @default("{}")
+  params           Json      @default("{}")
   /// The same for the interim rule, while proposed. Empty with an interim
   /// statement: a proposed threshold is read as zero.
-  interimParams    Json    @default("{}")
+  interimParams    Json      @default("{}")
   /// Spec 3.11: the day it starts to bind ("from 1.1.2027"). Before it, it
   /// is read and checked against nothing. Moving it is a change to what
   /// the rule says, and goes back to a manager.
@@ -3905,6 +3913,23 @@ enum ProcessTrigger {
   ON_DEMAND
   /// Ongoing: no task per run, a periodic check instead.
   CONTINUOUS
+  /// 13.11.2026 (stage 1): runs by itself outside the app (a scheduled
+  /// task of Claude). Opens no runs, and is never "will not run".
+  EXTERNAL
+}
+
+/// 13.11.2026 (processes redesign, stage 1; ops-runbooks/processes-
+/// redesign-spec-2026-11-13.md, 4.2): what starts a process. One row per
+/// start: a process can run on the 10th and 25th and also when a new
+/// supplier comes in. `Process.triggerKinds` and `Process.triggerText` are
+/// derived from these rows on every save (lib/process-rhythm.ts), so every
+/// reader of them keeps working.
+enum ProcessStartKind {
+  SCHEDULE
+  EVENT
+  ON_DEMAND
+  CONTINUOUS
+  EXTERNAL
 }
 
 enum ProcessStatus {
@@ -3962,7 +3987,12 @@ model Process {
 
   triggerKinds ProcessTrigger[] @default([])
   /// The trigger in words, always: "twice a month, on the 10th and 25th".
+  /// 13.11.2026 (stage 1): derived from `starts` on every save.
   triggerText  String?
+  /// 13.11.2026 (stage 1): notes on the rhythm that do not schedule
+  /// anything ("the file goes to Nextage two business days before"). Holds
+  /// what triggerText said before it was derived.
+  triggerNotes String?
 
   ownerId       String?
   backupOwnerId String?
@@ -3976,10 +4006,10 @@ model Process {
   externalPartyText       String?
 
   /// SystemAccess rows of this client the process needs.
-  requiredSystemIds String[] @default([])
+  requiredSystemIds         String[] @default([])
   /// Spec 3.9: the permission each of them needs, by system id:
   /// { "<systemAccessId>": "העלאת חשבוניות וצפייה בתשלומים" }.
-  requiredSystemPermissions Json @default("{}")
+  requiredSystemPermissions Json     @default("{}")
 
   /// Who approves: in words, and the contact when known.
   approverText      String?
@@ -4000,7 +4030,7 @@ model Process {
   /// systems, approvals, external, exceptions). Not counted, never a gap.
   notApplicableFields String[] @default([])
 
-  entityId String?
+  entityId         String?
   /// Org-brain decision 6: the business calendar its runs and its dates
   /// use ("IL", "US"). Null: its entity's country decides, and with no
   /// country each date keeps its own (lib/business-calendar.ts,
@@ -4008,24 +4038,24 @@ model Process {
   businessCalendar String?
 
   /// Who runs it today, in words ("Guy", "Nextage").
-  executorText     String?
+  executorText      String?
   /// Spec 3.9: who does it today, when it is someone in the file: a
   /// person at Ankora, or a contact of the client. executorText stays for
   /// what has no one to link to.
   executorUserId    String?
   executorContactId String?
-  transitionStatus ProcessTransition @default(WITH_CLIENT)
+  transitionStatus  ProcessTransition @default(WITH_CLIENT)
 
-  status         ProcessStatus @default(DRAFT)
-  categoryId     String?
+  status          ProcessStatus @default(DRAFT)
+  categoryId      String?
   reviewEveryDays Int?
-  lastReviewedAt DateTime?
-  lastRunAt      DateTime?
-  needsReview    Boolean       @default(false)
+  lastReviewedAt  DateTime?
+  lastRunAt       DateTime?
+  needsReview     Boolean       @default(false)
   /// Why it needs review (spec 7.3, 5.4): "RULES" when the approved
   /// procedure no longer passes the client's rules, "PERIODIC" when its
   /// review every `reviewEveryDays` fell due. Null when it does not.
-  reviewReason   String?
+  reviewReason    String?
 
   /// An ongoing process (CONTINUOUS) opens no tasks. It can have a check
   /// every N days instead ("once a week: no invoice is stuck"), which is
@@ -4073,18 +4103,49 @@ model Process {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  client   Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  versions ProcessVersion[]
-  lessons  ProcessLesson[]
-  requestTypes RequestType[]
-  dates    ImportantDate[]
-  checks   ProcessCheck[]
+  client        Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  versions      ProcessVersion[]
+  lessons       ProcessLesson[]
+  requestTypes  RequestType[]
+  dates         ImportantDate[]
+  starts        ProcessStart[]
+  checks        ProcessCheck[]
   strangerTests ProcessStrangerTest[]
 
   @@unique([clientId, seq])
   @@unique([clientId, code])
   @@index([clientId, deletedAt])
   @@map("processes")
+}
+
+model ProcessStart {
+  id                String           @id @default(cuid())
+  processId         String
+  clientId          String
+  kind              ProcessStartKind
+  /// SCHEDULE: the rule the rhythm editor wrote (lib/process-rhythm.ts,
+  /// ScheduleRule). Its dates are generated from it and linked by
+  /// ImportantDate.processStartId. `{"legacy": true}` for dates that were
+  /// linked before 13.11.2026: they stay as they are until edited here.
+  schedule          Json?
+  /// EVENT: what happens, in words.
+  description       String?
+  /// CONTINUOUS: how often it is checked, and what is checked.
+  checkEveryDays    Int?
+  checkText         String?
+  /// EXTERNAL: where it runs, when, and who gets the result. In words.
+  externalWhere     String?
+  externalWhen      String?
+  externalRecipient String?
+  sortOrder         Int              @default(0)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  process Process         @relation(fields: [processId], references: [id], onDelete: Cascade)
+  dates   ImportantDate[]
+
+  @@index([processId])
+  @@map("process_starts")
 }
 
 /// One version of a process's procedure (spec 3.9). Never edited in
@@ -4241,7 +4302,7 @@ model ProcessVersion {
   /// [{ title, mode: MANUAL | ASSISTED | AUTOMATED, offsetBusinessDays,
   ///    actionTags: [], systemIds: [], output, verification,
   ///    requiresApproval }], at most 15 (lib/process-rules.ts).
-  steps      Json   @default("[]")
+  steps      Json    @default("[]")
   /// 4.11.2026 (task cmvtivumj000pjs08q9qj4t67): the procedure as a flow,
   /// with conditions and branches (lib/process-flow.ts, ProcessFlow). When
   /// set, `steps` is derived from it (flowSteps) on every save, so every
@@ -4253,10 +4314,10 @@ model ProcessVersion {
   outputs    String?
   changeNote String?
 
-  createdById  String?
-  createdAt    DateTime  @default(now())
-  approvedById String?
-  approvedAt   DateTime?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  approvedById   String?
+  approvedAt     DateTime?
   /// Spec 3.9: the checks against the client's rules at the moment it was
   /// approved, as they were: [{ code, message, severity, policyId?,
   /// excepted? }]. The live checks may say otherwise later; this says what
@@ -4268,13 +4329,13 @@ model ProcessVersion {
   /// approval. An auditor asking for version 2 gets version 2, not version
   /// 2's steps under today's owner. Null for versions approved before
   /// 23.10.2026, which are drawn from the live process and say so.
-  document Json?
+  document                  Json?
   /// The same document in English, for an auditor or a client who reads
   /// English (ProcedureTranslation). Claude drafts it through MCP; a
   /// manager approves it. Only an approved translation is exported.
-  translationEn           Json?
-  translationEnById       String?
-  translationEnAt         DateTime?
+  translationEn             Json?
+  translationEnById         String?
+  translationEnAt           DateTime?
   translationEnApprovedById String?
   translationEnApprovedAt   DateTime?
 
@@ -4326,17 +4387,17 @@ model EmployeeAgreement {
   version String
   channel AgreementChannel
 
-  signedAt   DateTime
+  signedAt     DateTime
   /// The full name as the signer typed it, not as the users table has it.
-  signedName String
-  ip         String?
-  userAgent  String?
+  signedName   String
+  ip           String?
+  userAgent    String?
   /// SHA-256 hex of the exact file text that was shown.
-  contentHash String
+  contentHash  String
   /// The signed PDF in Drive. Null when Drive was unavailable: the
   /// signature still counts, and the PDF can be produced again from this
   /// row and the versioned text.
-  driveFileId String?
+  driveFileId  String?
   /// Who recorded an EMAIL_PDF signature. Null for APP, where the signer
   /// recorded it themselves.
   recordedById String?
@@ -4366,24 +4427,24 @@ enum AgreementLinkPurpose {
 /// Hash-only storage, exactly like PortalLoginToken: the raw token exists
 /// only in the emailed link.
 model AgreementSignLink {
-  id          String               @id @default(cuid())
-  userId      String
-  kind        AgreementKind
-  version     String
-  purpose     AgreementLinkPurpose @default(APP_SIGN)
-  tokenHash   String               @unique
-  expiresAt   DateTime
-  usedAt      DateTime?
+  id           String               @id @default(cuid())
+  userId       String
+  kind         AgreementKind
+  version      String
+  purpose      AgreementLinkPurpose @default(APP_SIGN)
+  tokenHash    String               @unique
+  expiresAt    DateTime
+  usedAt       DateTime?
   /// PDF_UPLOAD: the ClientDocument the upload was filed as.
-  documentId  String?
+  documentId   String?
   /// PDF_UPLOAD: when the uploaded document was dealt with, either
   /// recorded as a signature (record_pdf_signature, also when that version
   /// was already recorded) or dismissed with a reason (dismiss_pdf_upload).
   /// An upload with a document and no review is what is still waiting.
   reviewedAt   DateTime?
   reviewedById String?
-  createdById String
-  createdAt   DateTime             @default(now())
+  createdById  String
+  createdAt    DateTime             @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -4418,25 +4479,25 @@ enum TranscriptStatus {
 }
 
 model CallRecording {
-  id            String        @id @default(cuid())
+  id             String        @id @default(cuid())
   /// Unipile's id of the Aloha email. Stable, unlike its attachment ids.
-  emailId       String        @unique
-  mailAccountId String
-  fromPhone     String
-  toPhone       String
+  emailId        String        @unique
+  mailAccountId  String
+  fromPhone      String
+  toPhone        String
   /// The number on the other side of our line, E.164.
-  otherPhone    String
-  direction     CallDirection
-  callAt        DateTime
-  durationSec   Int?
-  sizeBytes     Int?
-  mimeType      String        @default("audio/mpeg")
+  otherPhone     String
+  direction      CallDirection
+  callAt         DateTime
+  durationSec    Int?
+  sizeBytes      Int?
+  mimeType       String        @default("audio/mpeg")
   /// The copy in Drive. Null until copied, or once removed after 12 months
   /// (audioDeletedAt), when only the transcript is left.
   driveFileId    String?
   audioDeletedAt DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   transcript Transcript?
 
@@ -4448,18 +4509,18 @@ model CallRecording {
 /// A transcript of one piece of audio. Stage 2: call recordings. Stage 3
 /// adds WhatsApp voice messages as a second owner.
 model Transcript {
-  id          String           @id @default(cuid())
-  recordingId String?          @unique
+  id           String           @id @default(cuid())
+  recordingId  String?          @unique
   /// Stage 3: a WhatsApp voice message instead of a call recording.
-  attachmentId String?         @unique
-  status      TranscriptStatus @default(PENDING)
-  text        String?
-  model       String?
-  attempts    Int              @default(0)
-  lastError   String?
-  doneAt      DateTime?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  attachmentId String?          @unique
+  status       TranscriptStatus @default(PENDING)
+  text         String?
+  model        String?
+  attempts     Int              @default(0)
+  lastError    String?
+  doneAt       DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   recording  CallRecording?   @relation(fields: [recordingId], references: [id], onDelete: Cascade)
   attachment CommsAttachment? @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
@@ -4553,15 +4614,15 @@ model CommsConversation {
 }
 
 model CommsMessage {
-  id             String   @id @default(cuid())
-  conversationId String
-  externalId     String
-  at             DateTime
-  isSender       Boolean  @default(false)
-  senderName     String?
-  text           String   @default("")
-  isDeleted      Boolean  @default(false)
-  isEdited       Boolean  @default(false)
+  id               String   @id @default(cuid())
+  conversationId   String
+  externalId       String
+  at               DateTime
+  isSender         Boolean  @default(false)
+  senderName       String?
+  text             String   @default("")
+  isDeleted        Boolean  @default(false)
+  isEdited         Boolean  @default(false)
   /// WhatsApp's reply: the message this one answers (13.11.2026). The id is
   /// the quoted message's externalId; the text is what WhatsApp quoted, and
   /// is cleared when that message is deleted.
@@ -4589,9 +4650,9 @@ model CommsMessage {
   buttons          String[] @default([])
   /// A block on its number is waiting for a manager: kept, shown to nobody,
   /// not transcribed, not extracted.
-  held           Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  held             Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   conversation CommsConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   attachments  CommsAttachment[]
@@ -4602,14 +4663,14 @@ model CommsMessage {
 }
 
 model CommsAttachment {
-  id          String   @id @default(cuid())
-  messageId   String
-  externalId  String
-  type        String
-  mimetype    String?
-  voiceNote   Boolean  @default(false)
-  durationSec Int?
-  fileName    String?
+  id            String   @id @default(cuid())
+  messageId     String
+  externalId    String
+  type          String
+  mimetype      String?
+  voiceNote     Boolean  @default(false)
+  durationSec   Int?
+  fileName      String?
   /// A shared contact card (13.11.2026): its name and numbers. Shown as a
   /// card, not as a file to download.
   contactName   String?
@@ -4622,8 +4683,8 @@ model CommsAttachment {
   gif           Boolean  @default(false)
   /// Voice messages only: the audio is copied to Drive. Other files are
   /// read from Unipile when opened.
-  driveFileId String?
-  createdAt   DateTime @default(now())
+  driveFileId   String?
+  createdAt     DateTime @default(now())
 
   message    CommsMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
   transcript Transcript?
@@ -4676,22 +4737,22 @@ model CommsBlock {
 /// ClientCredential, so key rotation, backup and the reveal audit cover it;
 /// this row holds only what a screen may show.
 model ClientConnection {
-  id       String         @id @default(cuid())
-  clientId String
-  kind     ConnectionKind
+  id            String         @id @default(cuid())
+  clientId      String
+  kind          ConnectionKind
   /// The address connected ("nadav@client.com").
-  account  String
+  account       String
   /// What the connection may do, as granted (OAuth scopes, or "imap").
-  scopes   String[]       @default([])
+  scopes        String[]       @default([])
   /// The vault row that holds the secret. Null once disconnected.
-  credentialId String?    @unique
+  credentialId  String?        @unique
   /// MANAGER_SEND: whose mailbox it is.
-  ownerUserId  String?
+  ownerUserId   String?
   /// Who at the client approved the connection, in words, and when: the
   /// Google consent screen, or the access the client handed over.
-  consentText  String?
+  consentText   String?
   connectedById String
-  connectedAt   DateTime  @default(now())
+  connectedAt   DateTime       @default(now())
   lastUsedAt    DateTime?
   revokedAt     DateTime?
   revokedById   String?

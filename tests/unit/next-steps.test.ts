@@ -148,12 +148,12 @@ describe("runs, documentation and what its words name (25.10.2026)", () => {
 
   // 13.11.2026: it was told to "decide whether to resume it", the step of a
   // paused process, and its button only unfolded the details.
-  it("asks an ongoing process with no check frequency for the frequency, in the form", () => {
+  it("asks an ongoing process with no check frequency for the frequency, in the rhythm editor", () => {
     const [step] = nextSteps(facts({ triggerKinds: ["CONTINUOUS"], hasNextDate: false, readiness: { ready: false, blocker: "לא ירוץ: תהליך שוטף בלי תדירות בדיקה" } }), true);
     expect(step).toMatchObject({
       kind: "not_ready",
       recommend: "להגדיר כל כמה ימים בודקים",
-      fix: { kind: "edit", label: "להשלים" },
+      fix: { kind: "dates", label: "להשלים" },
       text: { recommend: { key: "nextSteps.notReady.recommendCheck" }, why: { key: "nextSteps.notReady.whyCheck" }, fix: { key: "nextSteps.fix.complete" } },
     });
     // A paused process is still asked whether to resume it.

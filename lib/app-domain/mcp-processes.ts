@@ -57,6 +57,11 @@ function summary(p: Processes[number], user: Map<string, string>, stranger: Stra
     status: p.status,
     triggers: p.triggerKinds.map((t) => TRIGGER_LABELS[t]),
     trigger: p.triggerText,
+    // 13.11.2026 (processes redesign, stage 1): when it runs, in one sentence
+    // built from its starts and dates, and notes on it that schedule nothing.
+    rhythm: p.rhythm,
+    rhythmNotes: p.triggerNotes,
+    nextRunOpens: day(p.nextOpensAt),
     // 3.11.2026: an ongoing process's check, or null. Without one it is in
     // nobody's routine (notRunningBecause says so).
     check: p.checkEveryDays ? `${checkEveryText(p.checkEveryDays)}${p.checkText ? `: ${p.checkText}` : ""}` : null,

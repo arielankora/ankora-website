@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -46,6 +46,8 @@ import { FIELD_LABELS } from "@/lib/process-rules";
 import { type StrangerAskWhoLike, type StrangerSeverityLike, type StrangerState } from "@/lib/stranger-test";
 import { type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
+import { RhythmEditor, type RhythmEditorProps } from "./RhythmEditor";
+import { describeRhythm, type LegacyDate } from "@/lib/process-rhythm";
 import { ProcessVisual, ViewSwitch, useProcessView } from "./ProcessVisual";
 import { type LessonStatusLike } from "@/lib/process-lessons";
 import { EntitySelect, Field, INPUT, LABEL, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
@@ -127,6 +129,10 @@ export type PanelProcess = {
   status: "DRAFT" | "ACTIVE" | "PAUSED" | "RETIRED";
   triggerKinds: TriggerLike[];
   triggerText: string | null;
+  /// 13.11.2026 (stage 1): the rhythm, its starts and its dates.
+  triggerNotes?: string | null;
+  rhythmStarts?: RhythmEditorProps["starts"];
+  rhythmDates?: LegacyDate[];
   ownerId: string | null;
   backupOwnerId: string | null;
   slaText: string | null;
@@ -430,19 +436,11 @@ function ProcessForm({
             <input name="purpose" defaultValue={e?.purpose ?? ""} className={INPUT} />
           </Field>
         </div>
-        <fieldset>
-          <legend className={LABEL}>{t("form.triggers")}</legend>
-          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
-            {(Object.keys(TRIGGER_LABELS) as TriggerLike[]).map((k) => (
-              <label key={k} className="flex items-center gap-1.5 text-sm text-app-text-primary">
-                <input type="checkbox" name="triggerKinds" value={k} defaultChecked={e?.triggerKinds.includes(k)} className="h-4 w-4 accent-gold" />
-                {t(`labels.triggers.${k}`)}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <Field label={t("form.triggerText")}>
-          <input name="triggerText" defaultValue={e?.triggerText ?? ""} placeholder={t("form.triggerPlaceholder")} className={INPUT} />
+        {/* 13.11.2026 (stage 1): what starts it is the rhythm, edited from the
+            card ("מתי התהליך רץ?"). The form keeps only notes on it. */}
+        <Field label={t("form.triggerNotes")}>
+          <input name="triggerNotes" defaultValue={e?.triggerNotes ?? ""} className={INPUT} />
+          <span className="mt-1 block text-xs text-app-text-tertiary">{t("form.triggerNotesHint")}</span>
         </Field>
       </FormGroup>
 
@@ -529,10 +527,7 @@ function ProcessForm({
 
       <FormGroup
         title={t("form.groupTiming")}
-        // 13.11.2026: an ongoing process with no check frequency opens on
-        // the field it is missing.
-        open={!!e && e.status === "ACTIVE" && e.triggerKinds.length === 1 && e.triggerKinds[0] === "CONTINUOUS" && !e.checkEveryDays}
-        filled={filled(e?.businessCalendar, e?.reviewEveryDays, e?.checkEveryDays, e?.checkText)}
+        filled={filled(e?.businessCalendar, e?.reviewEveryDays)}
         more={
           <>
             <div className="grid gap-3.5 lg:grid-cols-2">
@@ -549,14 +544,6 @@ function ProcessForm({
               </Field>
               <Field label={t("form.reviewEvery")}>
                 <input name="reviewEveryDays" inputMode="numeric" defaultValue={e?.reviewEveryDays ?? ""} placeholder="90" className={INPUT} />
-              </Field>
-            </div>
-            <div className="grid grid-cols-[7rem_1fr] gap-3">
-              <Field label={t("form.checkEvery")}>
-                <input name="checkEveryDays" inputMode="numeric" defaultValue={e?.checkEveryDays ?? ""} placeholder="7" className={INPUT} />
-              </Field>
-              <Field label={t("form.checkText")}>
-                <input name="checkText" defaultValue={e?.checkText ?? ""} placeholder={t("form.checkTextPlaceholder")} className={INPUT} />
               </Field>
             </div>
           </>
@@ -862,87 +849,6 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
   );
 }
 
-const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
-
-function DatesForm({ clientId, process, dates }: { clientId: string; process: PanelProcess; dates: Option[] }) {
-  const t = useTx();
-  const close = useDrawerClose();
-  const { onSubmit, pending, error } = useActionForm(linkProcessDatesAction, close);
-  return (
-    <div className="flex flex-col gap-6">
-      <NewProcessDateForm clientId={clientId} process={process} />
-      {dates.length > 0 && (
-        <form onSubmit={onSubmit} className="flex flex-col gap-3.5 border-t border-app-border pt-5" data-testid="process-dates-link">
-          <input type="hidden" name="clientId" value={clientId} />
-          <input type="hidden" name="processId" value={process.id} />
-          <p className="text-sm font-medium text-app-text-primary">{t("dates.orLink")}</p>
-          <p className="text-xs text-app-text-secondary">{t("dates.linkHelp")}</p>
-          <Checks name="dateIds" options={dates} selected={process.dateIds} />
-          {error && <p className="text-sm text-app-error">{error}</p>}
-          <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border-strong px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-            {pending ? t("common.saving") : t("dates.saveLinks")}
-          </button>
-        </form>
-      )}
-    </div>
-  );
-}
-
-/// 3.11.2026: a new date for the process, created and linked in one step,
-/// so a process with no fitting date in the file is not a dead end.
-function NewProcessDateForm({ clientId, process }: { clientId: string; process: PanelProcess }) {
-  const t = useTx();
-  const close = useDrawerClose();
-  const { onSubmit, pending, error } = useActionForm(addProcessDateAction, close);
-  // 13.11.2026: no default. "Every business day" was preselected, and a
-  // monthly process saved with it opened a run every day.
-  const [recurrence, setRecurrence] = useState("");
-  return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-3.5" data-testid="process-date-new">
-      <input type="hidden" name="clientId" value={clientId} />
-      <input type="hidden" name="processId" value={process.id} />
-      <p className="text-sm font-medium text-app-text-primary">{t("dates.newTitle")}</p>
-      <p className="text-xs text-app-text-secondary">{t("dates.newHelp")}</p>
-      <Field label={t("dates.howOften")}>
-        <select name="recurrence" value={recurrence} onChange={(e) => setRecurrence(e.target.value)} required className={INPUT}>
-          <option value="" disabled>
-            {t("dates.pickHowOften")}
-          </option>
-          <option value="BUSINESS_DAILY">{t("dates.BUSINESS_DAILY")}</option>
-          <option value="WEEKLY">{t("dates.WEEKLY")}</option>
-          <option value="MONTHLY">{t("dates.MONTHLY")}</option>
-          <option value="ONCE">{t("dates.ONCE")}</option>
-        </select>
-      </Field>
-      {recurrence === "WEEKLY" && (
-        <Field label={t("dates.weekday")}>
-          <select name="weekday" defaultValue="0" className={INPUT}>
-            {WEEKDAYS.map((i) => (
-              <option key={i} value={i}>
-                {t(`labels.weekdays.d${i}`)}
-              </option>
-            ))}
-          </select>
-        </Field>
-      )}
-      {recurrence === "MONTHLY" && (
-        <Field label={t("dates.dayOfMonth")}>
-          <input name="dayOfMonth" type="number" min={1} max={31} required className={INPUT} />
-        </Field>
-      )}
-      {recurrence === "ONCE" && (
-        <Field label={t("dates.date")}>
-          <input name="onceDate" type="date" required className={INPUT} />
-        </Field>
-      )}
-      {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending || !recurrence} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? t("dates.creating") : t("dates.create")}
-      </button>
-    </form>
-  );
-}
-
 function StartRunForm({ clientId, process }: { clientId: string; process: PanelProcess }) {
   const t = useTx();
   const close = useDrawerClose();
@@ -1126,6 +1032,7 @@ function ProcessCard({
   const t = useTx();
   const tPanel = useTranslations("clients.processes.panel");
   const day = useDay();
+  const rhythmLang = useLocale().startsWith("en") ? "en" : "he";
   const [open, setOpen] = useState(!!p.draft);
   const [view, setView] = useProcessView();
   useEffect(() => {
@@ -1171,8 +1078,8 @@ function ProcessCard({
     }
     if (f.kind === "dates") {
       return (
-        <Drawer triggerLabel={label} title={t("panel.datesTitle", { code: p.code, title: p.title })} variant="link">
-          <DatesForm clientId={clientId} process={p} dates={dates} />
+        <Drawer triggerLabel={label} title={`${p.code} ${p.title}: ${t("rhythm.title")}`} variant="link">
+          <RhythmEditor clientId={clientId} processId={p.id} starts={p.rhythmStarts ?? []} dates={p.rhythmDates ?? []} />
         </Drawer>
       );
     }
@@ -1228,7 +1135,6 @@ function ProcessCard({
           </div>
           <p className="mt-1 text-xs text-app-text-secondary">
             {[
-              p.triggerKinds.map((k) => t(`labels.triggers.${k}`)).join(", ") || null,
               p.ownerId ? t("panel.owner", { name: staffName.get(p.ownerId) ?? "" }) : null,
               p.backupOwnerId ? t("panel.backup", { name: staffName.get(p.backupOwnerId) ?? "" }) : null,
               p.nextDate ? t("panel.next", { date: day(p.nextDate) }) : null,
@@ -1236,6 +1142,12 @@ function ProcessCard({
             ]
               .filter(Boolean)
               .join(" · ")}
+          </p>
+          <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-app-text-primary" data-testid="process-rhythm">
+            <span>{p.rhythmStarts?.length ? describeRhythm(p.rhythmStarts, p.rhythmDates ?? [], rhythmLang) : <span className="text-app-text-secondary">{t("rhythm.notSet")}</span>}</span>
+            <Drawer triggerLabel={p.rhythmStarts?.length ? t("rhythm.change") : t("rhythm.set")} title={`${p.code} ${p.title}: ${t("rhythm.title")}`} variant="link">
+              <RhythmEditor clientId={clientId} processId={p.id} starts={p.rhythmStarts ?? []} dates={p.rhythmDates ?? []} />
+            </Drawer>
           </p>
           {p.nextDate && p.nextOpensAt && day(p.nextOpensAt) !== day(p.nextDate) && (
             <p className="text-xs text-app-text-tertiary" data-testid="process-next-opens">
@@ -1351,7 +1263,7 @@ function ProcessCard({
           </details>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2 text-xs" data-testid="process-actions">
-          {p.status === "ACTIVE" && p.triggerKinds.some((t) => t !== "CONTINUOUS") && (
+          {p.status === "ACTIVE" && p.triggerKinds.some((t) => t !== "CONTINUOUS" && t !== "EXTERNAL") && (
             <Drawer
               triggerLabel={t("panel.startRun")}
               title={t("panel.runTitle", { code: p.code, title: p.title })}
@@ -1387,11 +1299,6 @@ function ProcessCard({
           <Link href={`/app/clients/${clientId}/processes/${p.id}/flow`} className="font-medium text-app-text-accent hover:underline" data-testid="procedure-flow-link">
             {t("panel.flowEditor")}
           </Link>
-          {p.triggerKinds.includes("SCHEDULED") && (
-            <Drawer triggerLabel={t("panel.dates")} title={t("panel.datesTitle", { code: p.code, title: p.title })} variant="link">
-              <DatesForm clientId={clientId} process={p} dates={dates} />
-            </Drawer>
-          )}
           {p.latestVersion > 0 && (
             <Link href={`/app/clients/${clientId}/processes/${p.id}/document`} className="font-medium text-app-text-accent hover:underline" data-testid="procedure-document-link">
               {t("panel.document")}
