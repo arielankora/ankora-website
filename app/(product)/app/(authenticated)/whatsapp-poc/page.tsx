@@ -3,7 +3,9 @@ import { cookies } from "next/headers";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { useFormatter, useTranslations } from "next-intl";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
-import { ArrowRight, ChevronDown, Forward, MessageCircle, MoreHorizontal, Phone, Search, UserRound } from "lucide-react";
+import { ArrowRight, ChevronDown, Eye, Forward, MessageCircle, MoreHorizontal, Phone, PhoneMissed, Search, Timer, UserRound, Users } from "lucide-react";
+import { parseWhatsappText, phoneDigits, type RichNode } from "@/lib/whatsapp-poc/rich-text";
+import { CALL_EVENTS } from "@/lib/whatsapp-poc/unipile";
 import { ContactRail, ReadToggle, RememberFilters, RowPending, TimelineScroller } from "./CommsControls";
 import { ScrollToActive } from "./ScrollToActive";
 import { BlockButton } from "./setup/SetupForms";
@@ -311,6 +313,18 @@ function ContactCard({ contact }: { contact: NonNullable<PageMessage["attachment
           {contact.name}
         </p>
       ) : null}
+      {contact.organization ? (
+        <p dir="auto" className="text-xs text-app-text-secondary">
+          {contact.organization}
+        </p>
+      ) : null}
+      {contact.emails?.map((email) => (
+        <p key={email} dir="ltr" className="text-xs">
+          <a href={`mailto:${email}`} className="underline">
+            {email}
+          </a>
+        </p>
+      ))}
       {contact.phones.map((phone) => (
         <p key={phone} className="flex flex-wrap items-center gap-x-3">
           <span dir="ltr">{phone}</span>
@@ -329,6 +343,7 @@ function MessageBubble({
   transcript,
   hit,
   quoted,
+  names,
 }: {
   m: PageMessage;
   chat: PocChat;
@@ -336,10 +351,14 @@ function MessageBubble({
   hit?: boolean;
   /// The message m answers, when it is in the timeline.
   quoted?: PageMessage;
+  /// Names for mentions, by phone digits (the chats we know).
+  names?: Map<string, string>;
 }) {
   const t = useTranslations("comms");
   const format = useFormatter();
   const mine = m.isSender;
+  if (m.event) return <EventLine m={m} chat={chat} />;
+  const muted = mine ? "text-white/75" : "text-app-text-secondary";
   return (
     <li
       id={messageAnchor(m.id)}
@@ -359,6 +378,18 @@ function MessageBubble({
             {t("message.forwarded")}
           </p>
         ) : null}
+        {m.viewOnce && !m.isDeleted ? (
+          <p className={`flex items-center gap-1 text-xs ${muted}`}>
+            <Eye aria-hidden="true" className="size-3.5" />
+            {t("message.viewOnce")}
+          </p>
+        ) : null}
+        {m.disappearing && !m.isDeleted ? (
+          <p className={`flex items-center gap-1 text-xs ${muted}`}>
+            <Timer aria-hidden="true" className="size-3.5" />
+            {t("message.disappearing")}
+          </p>
+        ) : null}
         {m.quoted && !m.isDeleted ? <QuoteBlock quote={m.quoted} original={quoted} mine={mine} chat={chat} /> : null}
         {m.isDeleted ? (
           <p className={`italic ${mine ? "text-white/70" : "text-app-text-secondary"}`}>{t("message.deleted")}</p>
@@ -367,10 +398,16 @@ function MessageBubble({
           // contact card, some stickers) with neither text nor attachment.
           <p className={`italic ${mine ? "text-white/70" : "text-app-text-secondary"}`}>{t("message.unsupported")}</p>
         ) : m.text ? (
-          <p dir="auto" className="whitespace-pre-wrap break-words leading-relaxed">{m.text}</p>
+          <p dir="auto" className="whitespace-pre-wrap break-words leading-relaxed">
+            <RichText nodes={parseWhatsappText(m.text, m.mentions)} mine={mine} names={names} />
+          </p>
         ) : null}
-        {m.attachments.map((a, i) =>
-          a.contact ? (
+        {m.isDeleted ? null : m.attachments.map((a, i) =>
+          a.unavailable ? (
+            <p key={i} className={`text-xs italic ${muted}`}>
+              {t("message.unavailable", { label: attachmentLabel(t, a) })}
+            </p>
+          ) : a.contact ? (
             <ContactCard key={i} contact={a.contact} />
           ) : a.type === "audio" && a.id ? (
             <div key={i} className="min-w-64 space-y-2 rounded-xl bg-white p-2 text-app-text-primary">
@@ -389,16 +426,25 @@ function MessageBubble({
                 <TranscribeButton kind="voice" chatId={m.chatId} messageId={m.id} numberKey={m.numberKey} />
               )}
             </div>
+          ) : a.id && a.sticker ? (
+            // eslint-disable-next-line @next/next/no-img-element -- a private, per-request file; next/image would cache it
+            <img key={i} src={mediaHref(m.chatId, m.id, a.id, m.numberKey)} alt={attachmentLabel(t, a)} loading="lazy" className="size-32 object-contain" />
           ) : a.id && (a.type === "img" || a.type === "image") ? (
             <a key={i} href={mediaHref(m.chatId, m.id, a.id, m.numberKey)} target="_blank" rel="noopener noreferrer" className="block">
               {/* eslint-disable-next-line @next/next/no-img-element -- a private, per-request file; next/image would cache it */}
               <img src={mediaHref(m.chatId, m.id, a.id, m.numberKey)} alt={attachmentLabel(t, a)} loading="lazy" className="max-h-72 max-w-full rounded-lg" />
             </a>
+          ) : a.id && a.type === "video" && a.gif ? (
+            <video key={i} autoPlay loop muted playsInline preload="metadata" aria-label="GIF" className="max-h-72 max-w-full rounded-lg" src={mediaHref(m.chatId, m.id, a.id, m.numberKey)} />
           ) : a.id && a.type === "video" ? (
             <video key={i} controls preload="none" className="max-h-72 max-w-full rounded-lg" src={mediaHref(m.chatId, m.id, a.id, m.numberKey)} />
           ) : a.id ? (
             <a key={i} href={mediaHref(m.chatId, m.id, a.id, m.numberKey)} className="inline-flex min-h-11 items-center text-xs underline">
-              {t("message.download", { label: attachmentLabel(t, a) })}
+              {a.fileName ? (
+                <span dir="auto">{t("message.downloadNamed", { name: a.fileName })}</span>
+              ) : (
+                t("message.download", { label: attachmentLabel(t, a) })
+              )}
             </a>
           ) : (
             <p key={i} className="text-xs opacity-80">
@@ -406,11 +452,155 @@ function MessageBubble({
             </p>
           ),
         )}
-        <p className={`text-[11px] ${mine ? "text-white/75" : "text-app-text-secondary"}`}>
+        {m.buttons?.length && !m.isDeleted ? (
+          <ul className="flex flex-wrap gap-1.5">
+            {m.buttons.map((b) => (
+              <li key={b} dir="auto" className={`rounded-full border px-2.5 py-1 text-xs ${mine ? "border-white/40" : "border-app-border"}`}>
+                {b}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {m.reactions?.length && !m.isDeleted ? (
+          <p className="flex flex-wrap gap-1" aria-label={t("message.reactions")}>
+            {m.reactions.map((r) => (
+              <span key={r.reaction} className={`rounded-full px-2 py-0.5 text-xs ${mine ? "bg-white/15" : "bg-app-surface-sunken"}`}>
+                {r.reaction}
+                {r.count > 1 ? ` ${r.count}` : ""}
+              </span>
+            ))}
+          </p>
+        ) : null}
+        <p className={`text-[11px] ${muted}`}>
           {formatTime(format, m.timestamp)}
+          {m.isEdited && !m.isDeleted ? ` · ${t("message.edited")}` : ""}
           {mine ? ` · ${t("message.sent")}` : ""}
         </p>
       </div>
+    </li>
+  );
+}
+
+/// WhatsApp's formatting, links and mentions (lib/whatsapp-poc/rich-text.ts).
+function RichText({ nodes, mine, names }: { nodes: RichNode[]; mine: boolean; names?: Map<string, string> }) {
+  return (
+    <>
+      {nodes.map((n, i) =>
+        n.t === "text" ? (
+          n.v
+        ) : n.t === "link" ? (
+          <a key={i} href={n.href} target="_blank" rel="noopener noreferrer nofollow" className="break-all underline">
+            {n.v}
+          </a>
+        ) : n.t === "mention" ? (
+          <span key={i} className={`font-medium ${mine ? "text-white" : "text-app-text-accent"}`}>
+            {mentionLabel(n, names)}
+          </span>
+        ) : n.t === "code" ? (
+          <code key={i} className="rounded bg-black/10 px-1 font-mono text-[13px]">
+            {n.v}
+          </code>
+        ) : n.t === "b" ? (
+          <strong key={i}>
+            <RichText nodes={n.children} mine={mine} names={names} />
+          </strong>
+        ) : n.t === "i" ? (
+          <em key={i}>
+            <RichText nodes={n.children} mine={mine} names={names} />
+          </em>
+        ) : (
+          <s key={i}>
+            <RichText nodes={n.children} mine={mine} names={names} />
+          </s>
+        ),
+      )}
+    </>
+  );
+}
+
+/// "@972523494293" as the name we know for that number, or the number as
+/// people write it.
+function mentionLabel(n: Extract<RichNode, { t: "mention" }>, names?: Map<string, string>): string {
+  const digits = phoneDigits(n.userId) ?? phoneDigits(n.v);
+  if (!digits) return n.v;
+  return `@${names?.get(digits) ?? displayPhone(`+${digits}`)}`;
+}
+
+/// A call or a change in a group, as a line in the timeline (13.11.2026).
+function EventLine({ m, chat }: { m: PageMessage; chat: PocChat }) {
+  const t = useTranslations("comms");
+  const format = useFormatter();
+  const event = m.event!;
+  const d = event.data;
+  const isCall = (CALL_EVENTS as readonly number[]).includes(event.type);
+  const video = d.is_video === true;
+  const who = m.senderName ?? (m.isSender ? t("message.quote.us") : chat.name);
+  const str = (k: string) => (typeof d[k] === "string" ? (d[k] as string) : "");
+  let label: string;
+  switch (event.type) {
+    case 1:
+      label = t("message.event.chatName", { title: str("title") });
+      break;
+    case 2:
+      label = t("message.event.description");
+      break;
+    case 3:
+      label = t("message.event.joined");
+      break;
+    case 4:
+      label = /remov|kick/i.test(str("reason"))
+        ? t("message.event.removed", { name: str("user_name") || t("message.event.someone") })
+        : t("message.event.left", { name: str("user_name") || t("message.event.someone") });
+      break;
+    case 5:
+      label = d.is_pin === false ? t("message.event.unpinned", { who }) : t("message.event.pinned", { who });
+      break;
+    case 6:
+      label = t("message.event.permissions");
+      break;
+    case 7:
+      label = t("message.event.role");
+      break;
+    case 9:
+      label = m.isSender ? t("message.event.callMissedOut", { video: String(video) }) : t("message.event.callMissed", { video: String(video) });
+      break;
+    case 10:
+      label = t("message.event.callStarted", { video: String(video) });
+      break;
+    case 11:
+      label =
+        typeof d.duration === "number" && d.duration > 0
+          ? t("message.event.callEndedFor", { video: String(video), duration: formatDuration(d.duration) })
+          : t("message.event.callEnded", { video: String(video) });
+      break;
+    case 12:
+      label = t("message.event.callRejected", { video: String(video) });
+      break;
+    case 13:
+      label = t("message.event.scheduled");
+      break;
+    case 14:
+      label = t("message.event.scheduledCancelled");
+      break;
+    case 15:
+      label = t("message.event.scheduledStarted");
+      break;
+    default:
+      label = m.text || t("message.event.announcement");
+  }
+  const Icon = event.type === 9 ? PhoneMissed : isCall ? Phone : Users;
+  return (
+    <li id={messageAnchor(m.id)} className="flex justify-center">
+      <span
+        className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs ${
+          event.type === 9 && !m.isSender ? "bg-app-error-soft text-app-error" : "bg-app-surface-sunken text-app-text-secondary"
+        }`}
+      >
+        <Icon aria-hidden="true" className="size-3.5" />
+        <span dir="auto">{label}</span>
+        <span aria-hidden="true">·</span>
+        <span>{formatTime(format, m.timestamp)}</span>
+      </span>
     </li>
   );
 }
@@ -767,6 +957,13 @@ export default async function CommunicationsPage(props: {
   }
   const timeline = buildTimeline(messages, contactCalls);
   const messageById = new Map(messages.map((m) => [m.id, m]));
+  // A mention shows the name we know for its number (13.11.2026).
+  const mentionNames = new Map(
+    chats.flatMap((c) => {
+      const digits = c.type === "1to1" ? phoneDigits(c.phone) : null;
+      return digits && c.name ? [[digits, c.name] as const] : [];
+    }),
+  );
   const callById = new Map(contactCalls.map((c) => [c.emailId, c]));
   const contactName = owner?.personName ?? openRow?.name ?? chat?.name ?? selectedPhone ?? "";
   // A reply goes out only from the person's own number (or, for the full
@@ -1313,6 +1510,7 @@ export default async function CommunicationsPage(props: {
                             transcript={voiceTranscripts.get(m.id)}
                             hit={m.id === hitId}
                             quoted={m.quoted ? messageById.get(m.quoted.id) : undefined}
+                            names={mentionNames}
                           />] : day;
                     }
                     const call = callById.get(item.id);

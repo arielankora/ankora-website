@@ -11,6 +11,10 @@ vi.mock("@/lib/whatsapp-poc/unipile", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/whatsapp-poc/unipile")>();
   return {
     ...real,
+    // A reaction's fresh count is not read here: the count goes by one.
+    getMessage: async () => {
+      throw new real.UnipileError("quota", 429);
+    },
     getChat: async (_c: unknown, chatId: string) => ({
       id: chatId,
       name: chatId === "family@lid" ? "אמא" : "דנה",
@@ -32,7 +36,7 @@ vi.mock("@/lib/whatsapp-poc/voice-notes", async (importOriginal) => {
   return { ...real, fetchVoiceNote: async () => ({ bytes: new ArrayBuffer(8), contentType: "audio/ogg" }) };
 });
 
-import { decideBlock, deleteStoredMessage, enrichStoredMessage, requestBlock, storeMessage } from "@/lib/comms/whatsapp-store";
+import { decideBlock, deleteStoredMessage, enrichStoredMessage, requestBlock, storeMessage, updateStoredMessage } from "@/lib/comms/whatsapp-store";
 import { listStoredMessages } from "@/lib/comms/stored-chats";
 
 function msg(id: string, text = "שלום") {
@@ -142,5 +146,36 @@ describe("WhatsApp store", () => {
     const { messages } = await listStoredMessages(channel, "dana@lid");
     expect(messages[0].forwarded).toBe(true);
     expect(messages[0].attachments[0]).toMatchObject({ id: "att1", contact: { name: "שלום", phones: ["+972520000000"] } });
+  });
+
+  it("keeps a call as a line, applies a reaction to its message, and marks a real edit only (13.11.2026)", async () => {
+    const { channel } = await setup();
+    await storeMessage(channel, "dana@lid", msg("m1", "נפגש מחר?"));
+    await storeMessage(channel, "dana@lid", { ...msg("call1", ""), event: { type: 9, data: { is_video: false } } });
+    const reaction = (removed: boolean) => ({ ...msg("r1", ""), reactionTo: { messageId: "m1", reaction: "👍", removed } });
+    expect(await storeMessage(channel, "dana@lid", reaction(false))).toBe("skipped");
+    expect(await storeMessage(channel, "dana@lid", { ...reaction(false), id: "r2" })).toBe("skipped");
+
+    let { messages } = await listStoredMessages(channel, "dana@lid");
+    expect(messages.map((m) => m.id)).toEqual(["m1", "call1"]);
+    expect(messages[0].reactions).toEqual([{ reaction: "👍", count: 2 }]);
+    expect(messages[1].event).toEqual({ type: 9, data: { is_video: false } });
+
+    await storeMessage(channel, "dana@lid", { ...reaction(true), id: "r3" });
+    await storeMessage(channel, "dana@lid", { ...reaction(true), id: "r4" });
+    ({ messages } = await listStoredMessages(channel, "dana@lid"));
+    expect(messages[0].reactions).toBeUndefined();
+
+    await updateStoredMessage(channel, "dana@lid", msg("m1", "נפגש מחר?"));
+    expect((await listStoredMessages(channel, "dana@lid")).messages[0].isEdited).toBeUndefined();
+    await updateStoredMessage(channel, "dana@lid", msg("m1", "נפגש מחרתיים?"));
+    expect((await listStoredMessages(channel, "dana@lid")).messages[0].isEdited).toBe(true);
+  });
+
+  it("does not list a chat that has only group changes", async () => {
+    const { channel, anna } = await setup();
+    await storeMessage(channel, "g@g.us", { ...msg("e1", ""), event: { type: 3, data: {} } });
+    const { listStoredChats } = await import("@/lib/comms/stored-chats");
+    expect(await listStoredChats(channel, { id: anna.id, email: anna.email })).toEqual([]);
   });
 });

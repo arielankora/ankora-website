@@ -79,7 +79,7 @@ export async function fetchMessageAttachment(
   chatId: string,
   messageId: string,
   attachmentId: string,
-): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
+): Promise<{ bytes: ArrayBuffer; contentType: string; fileName: string | null } | null> {
   if (!isSafeChatId(chatId) || !isSafeMessageId(messageId) || !isSafeMessageId(attachmentId)) return null;
   const messageUrl = `${BASE_URL}/${config.accountId}/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}`;
   const message = toPocMessage(await (await get(config.apiKey, messageUrl, "application/json")).json());
@@ -89,5 +89,6 @@ export async function fetchMessageAttachment(
   const bytes = await file.arrayBuffer();
   if (bytes.byteLength > MAX_BYTES) return null;
   const contentType = file.headers.get("content-type") || attachment.mimetype || "application/octet-stream";
-  return { bytes, contentType };
+  // 13.11.2026: the file's own name, so a document downloads as itself.
+  return { bytes, contentType, fileName: attachment.fileName ?? null };
 }

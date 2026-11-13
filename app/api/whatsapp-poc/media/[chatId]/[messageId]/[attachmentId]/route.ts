@@ -45,7 +45,9 @@ export async function GET(
       "content-security-policy": "sandbox; default-src 'none'",
     };
     // Inline is the default; anything else is forced to a download.
-    if (!inline) headers["content-disposition"] = attachmentDisposition("whatsapp-attachment");
+    // The sender's file name when WhatsApp has one (13.11.2026: a document
+    // came down as "whatsapp-attachment", with no extension to open it by).
+    if (!inline) headers["content-disposition"] = attachmentDisposition(file.fileName ?? "whatsapp-attachment");
     return new NextResponse(file.bytes, { headers });
   } catch (err) {
     if (err instanceof UnipileError) {

@@ -6308,7 +6308,7 @@
     },
     "message": {
       "deleted": "ההודעה נמחקה",
-      "unsupported": "[הודעה שאינה טקסט, לא מוצגת כאן]",
+      "unsupported": "[סקר, מיקום או הודעה מסוג אחר שהספק לא מעביר. אפשר לראות אותה בוואטסאפ]",
       "download": "הורדת {label}",
       "sent": "נשלח",
       "attachment": {
@@ -6328,7 +6328,35 @@
         "empty": "[הודעה]"
       },
       "forwarded": "הועברה",
-      "openContact": "פתיחת שיחה"
+      "openContact": "פתיחת שיחה",
+      "downloadNamed": "הורדת {name}",
+      "unavailable": "[{label}, כבר לא זמין בוואטסאפ]",
+      "viewOnce": "נשלחה לצפייה חד פעמית",
+      "disappearing": "הודעה נעלמת בוואטסאפ, נשמרה כאן",
+      "edited": "נערכה",
+      "reactions": "תגובות",
+      "event": {
+        "chatName": "שם הקבוצה שונה ל{title}",
+        "description": "תיאור הקבוצה עודכן",
+        "joined": "משתתף חדש הצטרף לקבוצה",
+        "left": "{name} יצא מהקבוצה",
+        "removed": "{name} הוסר מהקבוצה",
+        "someone": "משתתף",
+        "pinned": "{who} הצמיד הודעה",
+        "unpinned": "{who} ביטל הצמדה של הודעה",
+        "permissions": "הרשאות הקבוצה עודכנו",
+        "role": "תפקיד של משתתף בקבוצה עודכן",
+        "callMissed": "{video, select, true {שיחת וידאו שלא נענתה} other {שיחה שלא נענתה}}",
+        "callMissedOut": "{video, select, true {שיחת וידאו יוצאת שלא נענתה} other {שיחה יוצאת שלא נענתה}}",
+        "callStarted": "{video, select, true {שיחת וידאו התחילה} other {שיחה התחילה}}",
+        "callEnded": "{video, select, true {שיחת וידאו הסתיימה} other {שיחה הסתיימה}}",
+        "callEndedFor": "{video, select, true {שיחת וידאו} other {שיחה}} של {duration}",
+        "callRejected": "{video, select, true {שיחת וידאו נדחתה} other {שיחה נדחתה}}",
+        "scheduled": "נקבעה שיחה",
+        "scheduledCancelled": "שיחה שנקבעה בוטלה",
+        "scheduledStarted": "שיחה שנקבעה התחילה",
+        "announcement": "הודעת מערכת"
+      }
     },
     "calls": {
       "intro": "ההקלטות מגיעות אוטומטית מ-Aloha. שם איש הקשר פותח את ציר הזמן שלו.",

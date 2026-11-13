@@ -6308,7 +6308,7 @@
     },
     "message": {
       "deleted": "This message was deleted",
-      "unsupported": "[A message that isn't text, not shown here]",
+      "unsupported": "[A poll, a location or another kind the provider does not pass on. It can be seen in WhatsApp]",
       "download": "Download: {label}",
       "sent": "Sent",
       "attachment": {
@@ -6328,7 +6328,35 @@
         "empty": "[Message]"
       },
       "forwarded": "Forwarded",
-      "openContact": "Open chat"
+      "openContact": "Open chat",
+      "downloadNamed": "Download {name}",
+      "unavailable": "[{label}, no longer available in WhatsApp]",
+      "viewOnce": "Sent as view once",
+      "disappearing": "Disappearing in WhatsApp, kept here",
+      "edited": "Edited",
+      "reactions": "Reactions",
+      "event": {
+        "chatName": "Group name changed to {title}",
+        "description": "Group description updated",
+        "joined": "A new participant joined the group",
+        "left": "{name} left the group",
+        "removed": "{name} was removed from the group",
+        "someone": "A participant",
+        "pinned": "{who} pinned a message",
+        "unpinned": "{who} unpinned a message",
+        "permissions": "Group permissions updated",
+        "role": "A participant's role was updated",
+        "callMissed": "{video, select, true {Missed video call} other {Missed call}}",
+        "callMissedOut": "{video, select, true {Outgoing video call not answered} other {Outgoing call not answered}}",
+        "callStarted": "{video, select, true {Video call started} other {Call started}}",
+        "callEnded": "{video, select, true {Video call ended} other {Call ended}}",
+        "callEndedFor": "{video, select, true {Video call} other {Voice call}}, {duration}",
+        "callRejected": "{video, select, true {Video call declined} other {Call declined}}",
+        "scheduled": "A call was scheduled",
+        "scheduledCancelled": "A scheduled call was cancelled",
+        "scheduledStarted": "A scheduled call started",
+        "announcement": "System message"
+      }
     },
     "calls": {
       "intro": "Recordings arrive automatically from Aloha. A contact's name opens their timeline.",

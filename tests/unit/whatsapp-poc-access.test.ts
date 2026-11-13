@@ -196,6 +196,64 @@ describe("WhatsApp POC: forwards and contact cards (13.11.2026)", () => {
   });
 });
 
+describe("WhatsApp POC: the rest of what WhatsApp shows (13.11.2026)", () => {
+  const at = "2026-11-13T10:45:00Z";
+  it("keeps calls and group changes as events, and a reaction as a change to another message", () => {
+    expect(toPocMessage({ id: "c", timestamp: at, is_event: true, event_type: 9, event_metadata: { call_id: "x", is_video: true } })?.event).toEqual({
+      type: 9,
+      data: { call_id: "x", is_video: true },
+    });
+    expect(toPocMessage({ id: "r", timestamp: at, is_event: true, event_type: 8, event_metadata: { reaction: "👍", reason: "added", message_id: "m1" } })?.reactionTo).toEqual({
+      messageId: "m1",
+      reaction: "👍",
+      removed: false,
+    });
+    expect(toPocMessage({ id: "u", timestamp: at, is_event: true, event_type: 0 })).toBeNull();
+    expect(toPocMessage({ id: "u", timestamp: at, is_event: true, event_type: 17 })).toBeNull();
+  });
+
+  it("reads reactions, edits, mentions, view once, disappearing and buttons", () => {
+    const m = toPocMessage({
+      id: "m",
+      timestamp: at,
+      text: "hi @97250",
+      is_edited: true,
+      reactions_counter: [{ reaction: "❤️", count: 2 }, { reaction: "x", count: 0 }],
+      mentions: [{ start: 3, length: 6, user_id: "97250@s.whatsapp.net" }],
+      view_mode: "once",
+      is_disappearing: true,
+      specifics: { interactive: { buttons: [{ type: "reply", text: "כן" }, { type: "url" }] } },
+    });
+    expect(m).toMatchObject({
+      isEdited: true,
+      reactions: [{ reaction: "❤️", count: 2 }],
+      mentions: [{ start: 3, length: 6, userId: "97250@s.whatsapp.net" }],
+      viewOnce: true,
+      disappearing: true,
+      buttons: ["כן"],
+    });
+  });
+
+  it("reads a file's name, stickers, GIFs, a file gone from WhatsApp, and a card's emails", () => {
+    const m = toPocMessage({
+      id: "m",
+      timestamp: at,
+      attachments: [
+        { id: "a", type: "file", filename: "דוח.pdf", is_unavailable: true },
+        { id: "b", type: "img", sticker: true },
+        { id: "c", type: "video", gif: true },
+        { id: "d", type: "contact_card", display_name: "x", phones: [], emails: [{ address: "a@b.co" }], organization: "Org" },
+      ],
+    });
+    expect(m?.attachments).toMatchObject([
+      { fileName: "דוח.pdf", unavailable: true },
+      { sticker: true },
+      { gif: true },
+      { contact: { name: "x", phones: [], emails: ["a@b.co"], organization: "Org" } },
+    ]);
+  });
+});
+
 describe("WhatsApp POC: the chat list", () => {
   it("hides WhatsApp's status feed", () => {
     const status = toPocChat({ id: "status@broadcast", name: "status", type: "1to1" });

@@ -206,7 +206,8 @@ export async function loadMessages(
   // same messages: each is shown once, from the first number.
   const seen = new Set<string>();
   const add = (m: PocMessage, chatId: string, info: ChannelInfo) => {
-    if (seen.has(m.id)) return;
+    // A reaction read live is already in its message's count.
+    if (m.reactionTo || seen.has(m.id)) return;
     seen.add(m.id);
     messages.push({ ...m, chatId, channelLabel: info.label, numberKey: numberKeyOf(info) });
   };

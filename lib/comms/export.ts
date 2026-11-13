@@ -4,6 +4,22 @@ import { prisma } from "@/lib/prisma";
 import { engagementDeletesOn } from "./engagement";
 import type { CommsExport, ExportMessage } from "./export-render";
 
+const EVENT_LABEL: Record<number, string> = {
+  1: "שם הקבוצה שונה",
+  2: "תיאור הקבוצה עודכן",
+  3: "משתתף הצטרף לקבוצה",
+  4: "משתתף יצא מהקבוצה",
+  5: "הודעה הוצמדה",
+  6: "הרשאות הקבוצה עודכנו",
+  7: "תפקיד של משתתף עודכן",
+  9: "שיחת וואטסאפ שלא נענתה",
+  10: "שיחת וואטסאפ התחילה",
+  11: "שיחת וואטסאפ הסתיימה",
+  12: "שיחת וואטסאפ נדחתה",
+  13: "נקבעה שיחה",
+  14: "שיחה שנקבעה בוטלה",
+  15: "שיחה שנקבעה התחילה",
+};
 const ATTACHMENT_LABEL: Record<string, string> = { img: "תמונה", image: "תמונה", video: "וידאו", audio: "הקלטה", file: "קובץ", sticker: "מדבקה", contact_card: "איש קשר" };
 
 /// What was kept of one client's people: the same numbers and groups the
@@ -66,6 +82,8 @@ export async function gatherCommsExport(
           fromUs: m.isSender,
           sender: m.senderName,
           text: [
+            // A call or a change in a group (13.11.2026), named in the export.
+            m.eventType !== null ? (EVENT_LABEL[m.eventType] ?? "הודעת מערכת") : null,
             m.text,
             ...m.attachments
               .filter((a) => a.voiceNote && a.transcript?.status === "DONE" && a.transcript.text)
