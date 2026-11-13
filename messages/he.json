@@ -3872,14 +3872,17 @@
           "external": "אוטומטי",
           "continuous": "שוטף",
           "event": "לפי אירוע",
-          "onDemand": "לפי בקשה"
+          "onDemand": "לפי בקשה",
+          "check": "בדיקה {date}"
         },
         "last": {
           "never": "עוד לא רץ",
           "done": "הושלמה {date}",
           "doneNoDate": "הושלמה",
           "open": "פתוחה, {done} מתוך {total}",
-          "openPlain": "פתוחה"
+          "openPlain": "פתוחה",
+          "checkedOk": "נבדק {date}, תקין",
+          "checkedIssue": "נבדק {date}, נמצאה בעיה"
         },
         "empty": "אין תהליכים בסינון הזה.",
         "guides": "הוראות עבודה",

@@ -64,12 +64,16 @@ export function ProcessList({ clientId, userId, processes, form }: { clientId: s
     if (p.status === "PAUSED") return t("paused");
     const k = p.triggerKinds;
     if (k.includes("EXTERNAL")) return t("next.external");
-    if (k.includes("CONTINUOUS")) return t("next.continuous");
+    // The board: an ongoing process's next is its check, "בדיקה ראשון 15.11".
+    if (k.includes("CONTINUOUS")) return p.checkDue ? t("next.check", { date: day(`${p.checkDue.key}T12:00:00Z`) }) : t("next.continuous");
     if (k.includes("EVENT")) return t("next.event");
     if (k.includes("ON_DEMAND")) return t("next.onDemand");
     return "";
   };
   const lastOf = (p: PanelProcess) => {
+    // The board: an ongoing process's last is its check, "נבדק 8.11, תקין".
+    const c = p.triggerKinds.includes("CONTINUOUS") ? p.checks[0] : undefined;
+    if (c) return t(c.outcome === "OK" ? "last.checkedOk" : "last.checkedIssue", { date: short(c.createdAt) });
     const r = p.runs[0];
     if (!r) return t("last.never");
     if (r.status === "DONE" || r.status === "ARCHIVED") return r.dueDate ? t("last.done", { date: short(r.dueDate) }) : t("last.doneNoDate");

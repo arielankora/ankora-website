@@ -3872,14 +3872,17 @@
           "external": "Automatic",
           "continuous": "Ongoing",
           "event": "By event",
-          "onDemand": "On request"
+          "onDemand": "On request",
+          "check": "Check {date}"
         },
         "last": {
           "never": "Never ran",
           "done": "Done {date}",
           "doneNoDate": "Done",
           "open": "Open, {done} of {total}",
-          "openPlain": "Open"
+          "openPlain": "Open",
+          "checkedOk": "Checked {date}, fine",
+          "checkedIssue": "Checked {date}, issue found"
         },
         "empty": "No processes in this filter.",
         "guides": "Work instructions",

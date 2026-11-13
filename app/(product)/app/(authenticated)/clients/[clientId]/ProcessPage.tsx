@@ -7,7 +7,7 @@
 // from the field, details for the work and the procedure document in tabs.
 // Only what stops a run is said on top, in one line.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
@@ -66,6 +66,14 @@ export function ProcessPage({
   const router = useRouter();
   const { showToast } = useToast();
   const [tab, setTab] = useState<Tab>("steps");
+  // "?rhythm=open" opens the rhythm editor once, after a new process is
+  // added; taken off the address so a reload does not open it again.
+  useEffect(() => {
+    if (!openRhythm) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("rhythm");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }, [openRhythm]);
   const guide = p.kind === "GUIDE";
   const staffName = new Map(form.staff.map((s) => [s.id, s.name]));
   const contactName = new Map(form.contacts.map((c) => [c.id, c.name]));
