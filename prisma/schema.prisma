@@ -4562,6 +4562,13 @@ model CommsMessage {
   text           String   @default("")
   isDeleted      Boolean  @default(false)
   isEdited       Boolean  @default(false)
+  /// WhatsApp's reply: the message this one answers (13.11.2026). The id is
+  /// the quoted message's externalId; the text is what WhatsApp quoted, and
+  /// is cleared when that message is deleted.
+  quotedExternalId String?
+  quotedText       String?
+  quotedSenderName String?
+  quotedKind       String?
   /// A block on its number is waiting for a manager: kept, shown to nobody,
   /// not transcribed, not extracted.
   held           Boolean  @default(false)

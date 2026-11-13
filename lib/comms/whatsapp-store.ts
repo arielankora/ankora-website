@@ -100,9 +100,16 @@ export async function storeMessage(
 
   const exists = await prisma.commsMessage.findUnique({
     where: { conversationId_externalId: { conversationId: conversation.id, externalId: m.id } },
-    select: { id: true },
+    select: { id: true, quotedExternalId: true },
   });
-  if (exists) return "exists";
+  if (exists) {
+    // A message kept before replies were kept (13.11.2026) gets its quote
+    // when Unipile sends it again.
+    if (m.quoted && !exists.quotedExternalId) {
+      await prisma.commsMessage.update({ where: { id: exists.id }, data: quoteColumns(m) });
+    }
+    return "exists";
+  }
 
   const skipTranscript = !conversation.otherPhone ? false : await isAiExcludedNumber(conversation.otherPhone);
   let created;
@@ -116,6 +123,7 @@ export async function storeMessage(
         senderName: m.senderName,
         text: m.text,
         isDeleted: m.isDeleted,
+        ...quoteColumns(m),
         held,
         attachments: {
           create: m.attachments
@@ -148,6 +156,15 @@ export async function storeMessage(
     if (!held && a.transcript?.status === "PENDING" && options.transcribe) await options.transcribe(a.transcript.id);
   }
   return "stored";
+}
+
+function quoteColumns(m: PocMessage) {
+  return {
+    quotedExternalId: m.quoted?.id ?? null,
+    quotedText: m.quoted?.text ?? null,
+    quotedSenderName: m.quoted?.senderName ?? null,
+    quotedKind: m.quoted?.kind ?? null,
+  };
 }
 
 export async function copyVoiceToDrive(channel: CommsChannel, chatId: string, messageId: string, attachmentId: string) {
@@ -196,6 +213,11 @@ export async function deleteStoredMessage(channel: CommsChannel, chatId: string,
   const { count } = await prisma.commsMessage.updateMany({
     where: { conversationId: conversation.id, externalId: messageId },
     data: { text: "", isDeleted: true },
+  });
+  // Replies to it keep that they were replies, not the deleted text.
+  await prisma.commsMessage.updateMany({
+    where: { conversationId: conversation.id, quotedExternalId: messageId },
+    data: { quotedText: "", quotedKind: null },
   });
   return count > 0;
 }

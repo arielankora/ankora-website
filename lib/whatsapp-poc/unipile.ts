@@ -97,6 +97,20 @@ export type PocMessage = {
   senderName: string | null;
   attachments: PocAttachment[];
   isDeleted: boolean;
+  /// The message this one answers (WhatsApp's reply), when it is one.
+  quoted: PocQuote | null;
+};
+
+/// What WhatsApp shows of the message a reply answers (13.11.2026, Ariel):
+/// a reply of "." meant nothing on the screen without it.
+export type PocQuote = {
+  /// The quoted message's id: the same id a message has in this chat.
+  id: string;
+  text: string;
+  senderName: string | null;
+  /// The quoted message's first attachment, when it has no text to show:
+  /// "voice" for a voice message, otherwise the attachment type.
+  kind: string | null;
 };
 
 /// What to tell a person when Unipile answers 429.
@@ -225,7 +239,27 @@ type RawMessage = {
   is_event?: unknown;
   sender?: { display_name?: unknown } | null;
   attachments?: Array<{ id?: unknown; type?: unknown; mimetype?: unknown; voice_note?: unknown; duration?: unknown }> | null;
+  quoted?: {
+    id?: unknown;
+    text?: unknown;
+    sender?: { display_name?: unknown } | null;
+    attachments?: Array<{ type?: unknown; voice_note?: unknown }> | null;
+  } | null;
 };
+
+const QUOTE_MAX = 500;
+
+export function toPocQuote(raw: RawMessage["quoted"]): PocQuote | null {
+  const id = str(raw?.id);
+  if (!raw || !id) return null;
+  const first = Array.isArray(raw.attachments) ? raw.attachments[0] : undefined;
+  return {
+    id,
+    text: typeof raw.text === "string" ? raw.text.slice(0, QUOTE_MAX) : "",
+    senderName: str(raw.sender?.display_name),
+    kind: first ? (first.voice_note === true ? "voice" : (str(first.type) ?? "file")) : null,
+  };
+}
 
 export function toPocMessage(raw: RawMessage): PocMessage | null {
   const id = str(raw.id);
@@ -238,6 +272,7 @@ export function toPocMessage(raw: RawMessage): PocMessage | null {
     isSender: raw.is_sender === true,
     senderName: str(raw.sender?.display_name),
     isDeleted: raw.is_deleted === true,
+    quoted: toPocQuote(raw.quoted),
     attachments: (raw.attachments ?? []).map((a) => ({
       id: str(a.id),
       type: str(a.type) ?? "file",

@@ -6317,6 +6317,14 @@
         "voice": "Voice message",
         "file": "File",
         "sticker": "Sticker"
+      },
+      "quote": {
+        "label": "Reply to {name}",
+        "us": "Us",
+        "jump": "Go to the original message",
+        "notLoaded": "The original message is older and isn't loaded here",
+        "deleted": "The original message was deleted",
+        "empty": "[Message]"
       }
     },
     "calls": {

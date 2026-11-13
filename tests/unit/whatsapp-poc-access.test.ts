@@ -10,7 +10,7 @@ import {
   parseSendMode,
   MAX_MESSAGE_LENGTH,
 } from "@/lib/whatsapp-poc/access";
-import { UnipileError, loadMergedChats, resetChatListCache, CHAT_LIST_FRESH_MS, CHAT_LIST_MAX_AGE_MS, mergeChats, type PocChat, parseOffset, isHiddenChat, toPocChat, toPocMessage, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
+import { UnipileError, loadMergedChats, resetChatListCache, CHAT_LIST_FRESH_MS, CHAT_LIST_MAX_AGE_MS, mergeChats, type PocChat, parseOffset, isHiddenChat, toPocChat, toPocMessage, toPocQuote, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
 
 describe("WhatsApp POC: who may see the screen", () => {
   const viewers = parseEmailList("Ariel@Ankora.co.il, hadas@ankora.co.il");
@@ -137,6 +137,28 @@ describe("WhatsApp POC: reading Unipile's shapes", () => {
       attachments: [{ type: "audio", voice_note: true }],
     });
     expect(m).toMatchObject({ id: "m", isSender: true, attachments: [{ type: "audio", voiceNote: true }] });
+  });
+
+  it("keeps the message a reply answers", () => {
+    const reply = toPocMessage({
+      id: "r",
+      timestamp: "2026-11-13T18:05:00Z",
+      text: ".",
+      quoted: { id: "orig", text: "נעלנו לעזור לקבלנים שלנו", sender: { display_name: "Michal" }, attachments: [] },
+    });
+    expect(reply?.quoted).toEqual({ id: "orig", text: "נעלנו לעזור לקבלנים שלנו", senderName: "Michal", kind: null });
+
+    const toVoice = toPocMessage({
+      id: "r2",
+      timestamp: "2026-11-13T18:06:00Z",
+      text: "כן",
+      quoted: { id: "v", text: "", attachments: [{ type: "audio", voice_note: true }] },
+    });
+    expect(toVoice?.quoted).toMatchObject({ id: "v", kind: "voice", senderName: null });
+
+    expect(toPocMessage({ id: "p", timestamp: "2026-11-13T18:07:00Z", text: "x" })?.quoted).toBeNull();
+    expect(toPocMessage({ id: "q", timestamp: "2026-11-13T18:07:00Z", text: "x", quoted: { text: "no id" } })?.quoted).toBeNull();
+    expect(toPocQuote({ id: "long", text: "א".repeat(900) })?.text).toHaveLength(500);
   });
 });
 
