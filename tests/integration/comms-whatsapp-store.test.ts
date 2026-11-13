@@ -32,10 +32,10 @@ vi.mock("@/lib/whatsapp-poc/voice-notes", async (importOriginal) => {
   return { ...real, fetchVoiceNote: async () => ({ bytes: new ArrayBuffer(8), contentType: "audio/ogg" }) };
 });
 
-import { decideBlock, requestBlock, storeMessage } from "@/lib/comms/whatsapp-store";
+import { decideBlock, deleteStoredMessage, requestBlock, storeMessage } from "@/lib/comms/whatsapp-store";
 
 function msg(id: string, text = "שלום") {
-  return { id, text, timestamp: "2026-11-01T08:00:00.000Z", isSender: false, senderName: null, isDeleted: false, attachments: [] };
+  return { id, text, timestamp: "2026-11-01T08:00:00.000Z", isSender: false, senderName: null, isDeleted: false, attachments: [], quoted: null };
 }
 
 beforeEach(() => {
@@ -62,6 +62,27 @@ describe("WhatsApp store", () => {
     expect(await storeMessage(channel, "dana@lid", msg("m1"))).toBe("exists");
     const conv = await prisma.commsConversation.findFirstOrThrow();
     expect(conv).toMatchObject({ otherPhone: "+972542222222", name: "דנה" });
+  });
+
+  it("keeps the message a reply answers, and drops its text when that one is deleted", async () => {
+    const { channel } = await setup();
+    await storeMessage(channel, "dana@lid", msg("orig", "נעלנו לעזור לקבלנים שלנו"));
+    const reply = { ...msg("r1", "."), quoted: { id: "orig", text: "נעלנו לעזור לקבלנים שלנו", senderName: "דנה", kind: null } };
+    expect(await storeMessage(channel, "dana@lid", reply)).toBe("stored");
+    expect(await prisma.commsMessage.findFirstOrThrow({ where: { externalId: "r1" } })).toMatchObject({
+      quotedExternalId: "orig",
+      quotedText: "נעלנו לעזור לקבלנים שלנו",
+      quotedSenderName: "דנה",
+    });
+
+    // A reply kept before quotes were kept gets its quote when it comes again.
+    await storeMessage(channel, "dana@lid", msg("r2", "כן"));
+    await storeMessage(channel, "dana@lid", { ...msg("r2", "כן"), quoted: { id: "orig", text: "נעלנו", senderName: null, kind: null } });
+    expect((await prisma.commsMessage.findFirstOrThrow({ where: { externalId: "r2" } })).quotedExternalId).toBe("orig");
+
+    expect(await deleteStoredMessage(channel, "dana@lid", "orig")).toBe(true);
+    const after = await prisma.commsMessage.findMany({ where: { quotedExternalId: "orig" } });
+    expect(after.map((m) => m.quotedText)).toEqual(["", ""]);
   });
 
   it("a manager's block deletes what was kept and drops what comes next", async () => {

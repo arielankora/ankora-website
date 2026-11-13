@@ -63,6 +63,7 @@ import {
   readPocConfig,
   type PocChat,
   type PocMessage,
+  type PocQuote,
 } from "@/lib/whatsapp-poc/unipile";
 import { SendForm } from "./SendForm";
 import { AddNumberForm, AssignToClientForm, GroupClientForm } from "./ContactForms";
@@ -249,12 +250,74 @@ function selectable(m: PageMessage, transcript?: StoredTranscript): SelectedMess
   };
 }
 
-function MessageBubble({ m, chat, transcript, hit }: { m: PageMessage; chat: PocChat; transcript?: StoredTranscript; hit?: boolean }) {
+/// The anchor a reply's quote jumps to (13.11.2026, Ariel: as in WhatsApp,
+/// a click on the quote goes back to the original message). Plain HTML: the
+/// browser scrolls the timeline to it, and :target marks it.
+function messageAnchor(id: string) {
+  return `wa-${id}`;
+}
+
+/// The quote at the top of a reply: who wrote the original and what it
+/// said. When the original is in the timeline, the quote links to it.
+function QuoteBlock({ quote, original, mine, chat }: { quote: PocQuote; original: PageMessage | undefined; mine: boolean; chat: PocChat }) {
+  const t = useTranslations("comms");
+  const name = original ? (original.isSender ? t("message.quote.us") : (original.senderName ?? quote.senderName ?? chat.name)) : (quote.senderName ?? chat.name);
+  const deleted = original?.isDeleted === true;
+  const text = deleted ? "" : original ? original.text || quote.text : quote.text;
+  const kind = original && !deleted ? (original.attachments[0] ? (original.attachments[0].voiceNote ? "voice" : original.attachments[0].type) : quote.kind) : quote.kind;
+  const preview = deleted
+    ? t("message.quote.deleted")
+    : text
+      ? text
+      : kind
+        ? t(`message.attachment.${kind === "voice" ? "voice" : (ATTACHMENT_KEY[kind] ?? "file")}`)
+        : t("message.quote.empty");
+  const cls = `block rounded-lg border-s-4 px-2.5 py-1.5 text-start text-[13px] ${
+    mine ? "border-gold bg-white/10 text-white/90" : "border-gold bg-app-surface-sunken text-app-text-secondary"
+  }`;
+  const body = (
+    <>
+      <span className={`block text-xs font-medium ${mine ? "text-white" : "text-app-text-accent"}`}>{t("message.quote.label", { name })}</span>
+      <span dir="auto" className={`line-clamp-2 whitespace-pre-wrap break-words ${deleted || !text ? "italic" : ""}`}>
+        {preview}
+      </span>
+    </>
+  );
+  return original ? (
+    <a href={`#${messageAnchor(original.id)}`} aria-label={`${t("message.quote.jump")}: ${preview}`} className={`${cls} min-h-11 hover:opacity-90`}>
+      {body}
+    </a>
+  ) : (
+    <div className={cls} title={t("message.quote.notLoaded")}>
+      {body}
+      <span className={`mt-0.5 block text-[11px] ${mine ? "text-white/70" : "text-app-text-secondary"}`}>{t("message.quote.notLoaded")}</span>
+    </div>
+  );
+}
+
+function MessageBubble({
+  m,
+  chat,
+  transcript,
+  hit,
+  quoted,
+}: {
+  m: PageMessage;
+  chat: PocChat;
+  transcript?: StoredTranscript;
+  hit?: boolean;
+  /// The message m answers, when it is in the timeline.
+  quoted?: PageMessage;
+}) {
   const t = useTranslations("comms");
   const format = useFormatter();
   const mine = m.isSender;
   return (
-    <li data-hit={hit ? "" : undefined} className={`flex items-center gap-1 ${mine ? "justify-end" : "justify-start"} ${hit ? "rounded-2xl ring-2 ring-gold ring-offset-4" : ""}`}>
+    <li
+      id={messageAnchor(m.id)}
+      data-hit={hit ? "" : undefined}
+      className={`flex scroll-mt-4 items-center gap-1 rounded-2xl target:ring-2 target:ring-gold target:ring-offset-4 ${mine ? "justify-end" : "justify-start"} ${hit ? "ring-2 ring-gold ring-offset-4" : ""}`}
+    >
       {m.isDeleted ? null : <SelectToggle message={selectable(m, transcript)} />}
       <div
         className={`max-w-[85%] space-y-1 px-3.5 py-2.5 text-[15px] sm:max-w-[65%] ${
@@ -262,6 +325,7 @@ function MessageBubble({ m, chat, transcript, hit }: { m: PageMessage; chat: Poc
         }`}
       >
         {!mine && chat.type === "group" && m.senderName ? <p dir="auto" className="text-xs font-medium text-app-text-secondary">{m.senderName}</p> : null}
+        {m.quoted && !m.isDeleted ? <QuoteBlock quote={m.quoted} original={quoted} mine={mine} chat={chat} /> : null}
         {m.isDeleted ? (
           <p className={`italic ${mine ? "text-white/70" : "text-app-text-secondary"}`}>{t("message.deleted")}</p>
         ) : !m.text && m.attachments.length === 0 ? (
@@ -1206,7 +1270,14 @@ export default async function CommunicationsPage(props: {
                     ) : null;
                     if (item.kind === "message") {
                       const m = messageById.get(item.id);
-                      return m && chat ? [day, <MessageBubble key={`m-${m.id}`} m={m} chat={chat} transcript={voiceTranscripts.get(m.id)} hit={m.id === hitId} />] : day;
+                      return m && chat ? [day, <MessageBubble
+                            key={`m-${m.id}`}
+                            m={m}
+                            chat={chat}
+                            transcript={voiceTranscripts.get(m.id)}
+                            hit={m.id === hitId}
+                            quoted={m.quoted ? messageById.get(m.quoted.id) : undefined}
+                          />] : day;
                     }
                     const call = callById.get(item.id);
                     return call ? [day, <CallCard

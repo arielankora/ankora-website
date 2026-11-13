@@ -113,6 +113,9 @@ export async function listStoredMessages(
       isSender: r.isSender,
       senderName: r.senderName,
       isDeleted: r.isDeleted,
+      quoted: r.quotedExternalId
+        ? { id: r.quotedExternalId, text: r.quotedText ?? "", senderName: r.quotedSenderName, kind: r.quotedKind }
+        : null,
       attachments: r.attachments.map((a) => ({
         id: a.externalId,
         type: a.type,
