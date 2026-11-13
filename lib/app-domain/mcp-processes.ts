@@ -71,7 +71,7 @@ function summary(p: Processes[number], user: Map<string, string>, stranger: Stra
     // 25.10.2026: whether it runs, and how well it is written down.
     runs: readinessLabel(p.readiness),
     // 2.11.2026: every reason, not only the first the screen shows.
-    notRunningBecause: runBlockers({ status: p.status, ownerId: p.ownerId, triggerKinds: p.triggerKinds, triggerText: p.triggerText, nextDate: p.nextDate, checkEveryDays: p.checkEveryDays }),
+    notRunningBecause: runBlockers({ kind: p.kind, status: p.status, ownerId: p.ownerId, triggerKinds: p.triggerKinds, triggerText: p.triggerText, nextDate: p.nextDate, checkEveryDays: p.checkEveryDays }),
     documentation: `${p.documentation.score}/${p.documentation.of}`,
     // 31.10.2026: could a stranger run it? What is still open.
     strangerTest: strangerLine(stranger.get(p.id) ?? null),

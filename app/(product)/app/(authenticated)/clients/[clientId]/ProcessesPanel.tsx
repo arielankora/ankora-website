@@ -70,7 +70,7 @@ type Option = { id: string; name: string };
 /// tests/unit/process-screen-text.test.ts holds them to the dictionary.
 type Tx = (key: string, values?: Record<string, string | number>) => string;
 
-function useTx(): Tx {
+export function useTx(): Tx {
   return useTranslations("clients.processes") as unknown as Tx;
 }
 
@@ -98,7 +98,7 @@ function checkText(t: Tx, c: { message: string; keyed?: KeyedCheck }): string {
 
 /// A day, as the card has always shown one (12.11.2026), in the reader's
 /// language and time zone.
-function useDay(): (iso: string) => string {
+export function useDay(): (iso: string) => string {
   const format = useFormatter();
   return (iso: string) => format.dateTime(new Date(iso), { day: "numeric", month: "numeric", year: "numeric" });
 }
@@ -180,7 +180,9 @@ export type PanelProcess = {
   current: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; approvedByName: string | null; checks: PanelCheck[]; approvedAt?: string | null; atApproval?: PanelCheck[] | null } | null;
   /// `mayApprove`: whether the viewer may approve it (lib/procedure-approval.ts).
   draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: PanelCheck[]; mayApprove?: boolean; mayDiscard?: boolean } | null;
-  runs: { id: string; title: string; status: string; dueDate: string | null }[];
+  runs: { id: string; title: string; status: string; dueDate: string | null; stepsDone?: number; stepsTotal?: number; waitingOn?: string | null }[];
+  /// 13.11.2026 (stage 2): a process that runs, or a work instruction.
+  kind?: "PROCESS" | "GUIDE";
   /// An ongoing process: its check, when the next one is due, and the last ones.
   checkEveryDays: number | null;
   /// Spec 7.3, 5.4: why it needs review, if it does, and the review period.
@@ -248,7 +250,7 @@ function ResolveLessonForm({ clientId, lesson }: { clientId: string; lesson: Pan
   );
 }
 
-function Lessons({ clientId, lessons, canResolve }: { clientId: string; lessons: PanelLesson[]; canResolve: boolean }) {
+export function Lessons({ clientId, lessons, canResolve }: { clientId: string; lessons: PanelLesson[]; canResolve: boolean }) {
   const t = useTx();
   const day = useDay();
   const open = lessons.filter((l) => l.status === "OPEN");
@@ -305,7 +307,7 @@ function Lessons({ clientId, lessons, canResolve }: { clientId: string; lessons:
 /// never passes; EXCEPTION passes while the rule has an approved exception.
 export type PanelCheck = { code: string; message: string; severity: "BLOCK" | "EXCEPTION"; excepted?: boolean; step?: number; keyed?: KeyedCheck };
 
-function CheckLines({ checks }: { checks: PanelCheck[] }) {
+export function CheckLines({ checks }: { checks: PanelCheck[] }) {
   const t = useTx();
   return (
     <>
@@ -397,7 +399,11 @@ function FormGroup({ title, children, more, open = false, filled = 0 }: { title:
   );
 }
 
-function ProcessForm({
+/// 13.11.2026 (processes redesign, stage 2): the form in parts, each edited
+/// on its own from the process page. Without `only`, the whole form.
+export type FormPart = "what" | "who" | "work" | "knowledge" | "document";
+
+export function ProcessForm({
   clientId,
   existing,
   staff,
@@ -406,9 +412,17 @@ function ProcessForm({
   rules,
   entities,
   sourceOptions,
+  only,
+  withSources,
+  onCreated,
 }: {
   clientId: string;
   existing?: PanelProcess;
+  only?: FormPart[];
+  /// A new process from the "what" and "who" parts still needs its source.
+  withSources?: boolean;
+  /// After a new process is added: its id.
+  onCreated?: (id: string) => void;
   staff: Option[];
   contacts: Option[];
   systems: Option[];
@@ -418,15 +432,23 @@ function ProcessForm({
 }) {
   const t = useTx();
   const close = useDrawerClose();
-  const { onSubmit, pending, error } = useActionForm(existing ? updateProcessAction : addProcessAction, close);
+  const { onSubmit, pending, error } = useActionForm(existing ? updateProcessAction : addProcessAction, (r: { ok?: boolean; error?: string; id?: string }) => {
+    close();
+    if (r.id) onCreated?.(r.id);
+  });
   const [status, setStatus] = useState<KnowledgeStatusLike>(existing?.knowledgeStatus ?? "CONFIRMED");
   const e = existing;
   const gap = (k: keyof typeof FIELD_LABELS) => !!e?.missing?.includes(FIELD_LABELS[k]);
   const filled = (...values: unknown[]) => values.filter((v) => (Array.isArray(v) ? v.length > 0 : v !== null && v !== undefined && v !== "")).length;
+  const shows = (part: FormPart) => !only || only.includes(part);
+  // A part opened on its own is the thing being edited: nothing folded.
+  const unfold = !!only;
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6">
       <input type="hidden" name="clientId" value={clientId} />
       {e && <input type="hidden" name="id" value={e.id} />}
+      {only && <input type="hidden" name="_parts" value={[...only, ...(withSources ? ["sources"] : [])].join(",")} />}
+      {shows("what") && (
       <FormGroup title={t("form.groupWhat")}>
         <div className="grid gap-3.5 lg:grid-cols-2">
           <Field label={t("form.name")}>
@@ -439,7 +461,9 @@ function ProcessForm({
         {/* 13.11.2026 (stage 1): what starts it is the rhythm, edited from the
             card ("מתי התהליך רץ?"). */}
       </FormGroup>
+      )}
 
+      {shows("who") && (
       <FormGroup
         title={t("form.groupWho")}
         open={gap("approvals")}
@@ -521,19 +545,25 @@ function ProcessForm({
         </div>
       </FormGroup>
 
+      )}
+
+      {shows("work") && (
+      <>
       <FormGroup
         title={t("form.groupTiming")}
         filled={filled(e?.reviewEveryDays)}
         more={
-          <>
-            {/* 13.11.2026 (stage 1): the business calendar is the rhythm's,
-                set in the rhythm editor next to the dates it moves. */}
-            <div className="grid gap-3.5 lg:grid-cols-2">
-              <Field label={t("form.reviewEvery")}>
-                <input name="reviewEveryDays" inputMode="numeric" defaultValue={e?.reviewEveryDays ?? ""} placeholder="90" className={INPUT} />
-              </Field>
-            </div>
-          </>
+          only ? undefined : (
+            <>
+              {/* 13.11.2026 (stage 1): the business calendar is the rhythm's,
+                  set in the rhythm editor next to the dates it moves. */}
+              <div className="grid gap-3.5 lg:grid-cols-2">
+                <Field label={t("form.reviewEvery")}>
+                  <input name="reviewEveryDays" inputMode="numeric" defaultValue={e?.reviewEveryDays ?? ""} placeholder="90" className={INPUT} />
+                </Field>
+              </div>
+            </>
+          )
         }
       >
         <div className="grid grid-cols-[1fr_7rem] gap-3">
@@ -548,7 +578,7 @@ function ProcessForm({
 
       <FormGroup
         title={t("form.groupSystems")}
-        open={gap("external") || gap("approvals")}
+        open={unfold || gap("external") || gap("approvals")}
         filled={filled(e?.externalPartyContactIds, e?.externalPartyText, e?.approvalPolicyIds, e?.approvalText)}
         more={
           <>
@@ -570,7 +600,17 @@ function ProcessForm({
           <SystemChecks options={systems} selected={e?.requiredSystemIds ?? []} permissions={e?.requiredSystemPermissions ?? {}} />
         </div>
       </FormGroup>
+      </>
+      )}
+      {only?.includes("work") && (
+        <Field label={t("form.exceptionPlaybook")}>
+          <textarea name="exceptionPlaybook" rows={3} defaultValue={e?.exceptionPlaybook ?? ""} placeholder={t("form.exceptionPlaceholder")} className={INPUT} />
+        </Field>
+      )}
 
+      {withSources && <SourcesField options={sourceOptions} defaultValue={e?.sources.join(", ")} status={status} confirmedBefore={e?.knowledgeStatus === "CONFIRMED"} />}
+
+      {shows("knowledge") && (
       <FormGroup title={t("form.groupState")}>
         <div className="grid gap-3.5 lg:grid-cols-2">
           <Field label={t("form.handover")}>
@@ -599,16 +639,25 @@ function ProcessForm({
         <SourcesField options={sourceOptions} defaultValue={e?.sources.join(", ")} status={status} confirmedBefore={e?.knowledgeStatus === "CONFIRMED"} />
         <ItemExtras existing={e} owner={false} disclose audience />
       </FormGroup>
+      )}
 
+      {only?.includes("document") && (
+        <Field label={t("form.reviewEvery")}>
+          <input name="reviewEveryDays" inputMode="numeric" defaultValue={e?.reviewEveryDays ?? ""} placeholder="90" className={INPUT} />
+        </Field>
+      )}
+      {(!only || only.includes("document")) && (
       <FormGroup
-        title={t("form.groupExceptions")}
-        open={gap("exceptions")}
+        title={only ? t("form.groupDocument") : t("form.groupExceptions")}
+        open={unfold || gap("exceptions")}
         filled={filled(e?.exceptionPlaybook, e?.scope, e?.definitions, e?.controlRefs, e?.relatedDocs)}
         more={
           <>
-            <Field label={t("form.exceptionPlaybook")}>
-              <textarea name="exceptionPlaybook" rows={3} defaultValue={e?.exceptionPlaybook ?? ""} placeholder={t("form.exceptionPlaceholder")} className={INPUT} />
-            </Field>
+            {!only && (
+              <Field label={t("form.exceptionPlaybook")}>
+                <textarea name="exceptionPlaybook" rows={3} defaultValue={e?.exceptionPlaybook ?? ""} placeholder={t("form.exceptionPlaceholder")} className={INPUT} />
+              </Field>
+            )}
             <p className="text-[11px] text-app-text-tertiary">{t("form.docHelp")}</p>
             <div className="grid gap-3.5 lg:grid-cols-2">
               <Field label={t("form.scope")}>
@@ -636,6 +685,7 @@ function ProcessForm({
           </>
         }
       />
+      )}
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("common.saving") : existing ? t("common.save") : t("form.addToFile")}
@@ -646,7 +696,7 @@ function ProcessForm({
 
 const EMPTY_STEP: ProcessStep = { title: "", mode: "MANUAL", offsetBusinessDays: null, actionTags: [], systemIds: [], output: null, verification: null, requiresApproval: false, amountMaxMinor: null, currency: null, channel: null };
 
-function ProcedureEditor({ clientId, process, systems }: { clientId: string; process: PanelProcess; systems: Option[] }) {
+export function ProcedureEditor({ clientId, process, systems }: { clientId: string; process: PanelProcess; systems: Option[] }) {
   const t = useTx();
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(saveProcessVersionAction, close);
@@ -836,7 +886,7 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
   );
 }
 
-function StartRunForm({ clientId, process }: { clientId: string; process: PanelProcess }) {
+export function StartRunForm({ clientId, process }: { clientId: string; process: PanelProcess }) {
   const t = useTx();
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(startProcessRunAction, close);
@@ -961,7 +1011,7 @@ export function ProcessesPanel({
   );
 }
 
-type FormOptions = { staff: Option[]; contacts: Option[]; systems: Option[]; rules: Option[]; entities: EntityOption[]; sourceOptions: SourceOption[] };
+export type FormOptions = { staff: Option[]; contacts: Option[]; systems: Option[]; rules: Option[]; entities: EntityOption[]; sourceOptions: SourceOption[] };
 
 /// The facts next steps read, from what the card already has.
 function factsOf(p: PanelProcess, canMark = false): ProcessFacts {
@@ -1475,7 +1525,7 @@ function StrangerLine({ state }: { state: StrangerState | null }) {
   return <>{t("stranger.open", { parts, date })}</>;
 }
 
-function StrangerBlock({ stranger }: { stranger: NonNullable<PanelProcess["stranger"]> }) {
+export function StrangerBlock({ stranger }: { stranger: NonNullable<PanelProcess["stranger"]> }) {
   const t = useTx();
   const [copied, setCopied] = useState(false);
   const [all, setAll] = useState(false);

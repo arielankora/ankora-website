@@ -24,7 +24,8 @@ describe("approval links", () => {
 
   it("points a proposal, a process and a decision at their element", () => {
     expect(proposalUrl(BASE, "c1", "pr1")).toBe(`https://www.ankora.co.il/app/approvals?tab=knowledge&clientId=c1#${proposalAnchor("pr1")}`);
-    expect(processUrl(BASE, "c1", "p1")).toBe("https://www.ankora.co.il/app/clients/c1?tab=file#item-p1");
+    // 13.11.2026 (processes redesign, stage 2): a process has its own page.
+    expect(processUrl(BASE, "c1", "p1")).toBe("https://www.ankora.co.il/app/clients/c1/processes/p1");
     expect(clientDecisionUrl(BASE, "c1", "d1")).toBe("https://www.ankora.co.il/app/clients/c1#decision-d1");
   });
 });

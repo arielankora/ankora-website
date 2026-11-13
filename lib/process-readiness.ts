@@ -12,6 +12,8 @@
 
 export type ReadinessInput = {
   status: string;
+  /// "GUIDE": a work instruction, never judged. Left out: a process.
+  kind?: string;
   ownerId: string | null;
   triggerKinds: readonly string[];
   triggerText: string | null;
@@ -51,6 +53,9 @@ export function scheduledWithoutDate(p: { status: string; triggerKinds?: readonl
 /// read as missing one thing, while "אישורים" listed two. A process that is
 /// retired or paused has that reason alone: the rest is moot until then.
 export function runBlockers(p: ReadinessInput): string[] {
+  // 13.11.2026 (stage 2): a work instruction does not run, so it is never
+  // "will not run".
+  if (p.kind === "GUIDE") return [];
   if (p.status === "RETIRED") return ["לא ירוץ: התהליך בוטל"];
   if (p.status === "PAUSED") return ["לא ירוץ: התהליך מושהה"];
   const out: string[] = [];

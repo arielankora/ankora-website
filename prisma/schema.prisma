@@ -3932,6 +3932,14 @@ enum ProcessStartKind {
   EXTERNAL
 }
 
+/// 13.11.2026 (processes redesign, stage 2): a process that runs, or a work
+/// instruction: how to do something right, with no rhythm, no runs and
+/// never "will not run" (Ariel, 13.11.2026).
+enum ProcessKind {
+  PROCESS
+  GUIDE
+}
+
 enum ProcessStatus {
   /// Being written: no approved procedure yet.
   DRAFT
@@ -3984,6 +3992,7 @@ model Process {
   title   String
   /// Why it exists, in a sentence.
   purpose String?
+  kind    ProcessKind @default(PROCESS)
 
   triggerKinds ProcessTrigger[] @default([])
   /// The trigger in words, always: "twice a month, on the 10th and 25th".

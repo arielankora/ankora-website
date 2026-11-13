@@ -10,6 +10,7 @@ import {
   approveProcessVersion,
   linkProcessDates,
   removeProcess,
+  setProcessKind,
   discardProcessVersion,
   saveAndActivateProcessVersion,
   saveProcessVersion,
@@ -119,6 +120,27 @@ async function parseProcess(f: FormData, selfId?: string): Promise<{ error?: str
   };
 }
 
+/// 13.11.2026 (processes redesign, stage 2): the fields each part of the
+/// form holds. A form sent with `_parts` changes only those, so editing
+/// "who" on the process page leaves the rest of the process as it was.
+const PART_FIELDS: Record<string, string[]> = {
+  what: ["title", "purpose"],
+  who: ["ownerId", "backupOwnerId", "executorText", "executorUserId", "executorContactId", "approverText", "approverUserId", "approverContactId"],
+  work: ["slaText", "slaBusinessDays", "requiredSystemIds", "requiredSystemPermissions", "externalPartyContactIds", "externalPartyText", "approvalPolicyIds", "approvalText", "exceptionPlaybook"],
+  knowledge: ["transitionStatus", "knowledgeStatus", "toResolve", "entityId", "sources", "manualConfirm"],
+  document: ["scope", "definitions", "controlRefs", "classification", "relatedDocs", "reviewEveryDays"],
+  sources: ["sources", "manualConfirm", "knowledgeStatus", "toResolve"],
+};
+
+function onlyParts<T extends Record<string, unknown>>(f: FormData, value: T, selfId?: string): Partial<T> {
+  const parts = String(f.get("_parts") ?? "").split(",").filter(Boolean);
+  if (!parts.length) return value;
+  const keep = new Set(parts.flatMap((p) => PART_FIELDS[p] ?? []));
+  // The knowledge part is also everything ItemExtras sends.
+  if (parts.includes("knowledge")) for (const k of Object.keys(itemExtrasFrom(f, selfId))) keep.add(k);
+  return Object.fromEntries(Object.entries(value).filter(([k]) => keep.has(k))) as Partial<T>;
+}
+
 async function run(clientId: string, fn: () => Promise<unknown>): Promise<FormState> {
   try {
     await fn();
@@ -129,12 +151,18 @@ async function run(clientId: string, fn: () => Promise<unknown>): Promise<FormSt
   return { ok: true };
 }
 
-export async function addProcessAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+export async function addProcessAction(_prev: FormState | undefined, f: FormData): Promise<FormState & { id?: string }> {
   const user = await requireUser();
   const clientId = String(f.get("clientId") ?? "");
   const parsed = await parseProcess(f, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
-  return run(clientId, () => addProcess(user, { ...parsed.value!, clientId }));
+  // 13.11.2026 (stage 2): the new process's id, so the screen can open its
+  // page and its rhythm right after.
+  const created: { id?: string } = {};
+  const r = await run(clientId, async () => {
+    created.id = (await addProcess(user, { ...parsed.value!, clientId })).id;
+  });
+  return created.id ? { ...r, id: created.id } : r;
 }
 
 export async function updateProcessAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
@@ -145,7 +173,7 @@ export async function updateProcessAction(_prev: FormState | undefined, f: FormD
   // The entity and the external parties are what separation rules read:
   // a change to them is a change to what the rules say about the process.
   return run(clientId, async () => {
-    const p = await updateProcess(user, String(f.get("id") ?? ""), parsed.value!);
+    const p = await updateProcess(user, String(f.get("id") ?? ""), onlyParts(f, parsed.value!, user.id));
     await rescanAfterRuleChange(clientId, `התהליך ${p.code} עודכן`);
   });
 }
@@ -272,6 +300,11 @@ export async function setProcessStatusAction(processId: string, status: "ACTIVE"
 export async function discardProcessVersionAction(processId: string, version: number, clientId: string): Promise<FormState> {
   const user = await requireUser();
   return run(clientId, () => discardProcessVersion(user, processId, version));
+}
+
+export async function setProcessKindAction(processId: string, kind: "PROCESS" | "GUIDE", clientId: string): Promise<FormState> {
+  const user = await requireUser();
+  return run(clientId, () => setProcessKind(user, processId, kind));
 }
 
 export async function removeProcessAction(processId: string, clientId: string): Promise<FormState> {

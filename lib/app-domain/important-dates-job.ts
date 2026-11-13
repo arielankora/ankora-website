@@ -470,7 +470,7 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
       status: { notIn: ["ARCHIVED", "PAUSED"] },
       nextOccurrenceAt: { not: null },
     },
-    include: { process: { select: { id: true, status: true, versions: { where: { status: "APPROVED" }, take: 1, select: { steps: true } } } } },
+    include: { process: { select: { id: true, status: true, kind: true, versions: { where: { status: "APPROVED" }, take: 1, select: { steps: true } } } } },
   });
 
   let created = 0;
@@ -484,7 +484,7 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
     // paused one opens nothing at all, not even the plain task: pausing a
     // process is how a manager stops its work.
     const approvedSteps = date.process?.status === "ACTIVE" && date.process.versions[0] ? readSteps(date.process.versions[0].steps) : null;
-    if (date.process?.status === "PAUSED" || date.process?.status === "RETIRED") continue;
+    if (date.process?.status === "PAUSED" || date.process?.status === "RETIRED" || date.process?.kind === "GUIDE") continue;
     if (date.processId && !approvedSteps && !date.createAutoTask) continue;
 
     let dueAt = computeLeadDate(

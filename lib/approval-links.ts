@@ -76,7 +76,8 @@ export function proposalUrl(baseUrl: string, clientId: string, proposalId: strin
 
 /// A process, in the client's file.
 export function processUrl(baseUrl: string, clientId: string, processId: string): string {
-  return join(baseUrl, `/app/clients/${encodeURIComponent(clientId)}?tab=file#item-${safe(processId)}`);
+  // 13.11.2026 (processes redesign, stage 2): a process has its own page.
+  return join(baseUrl, `/app/clients/${encodeURIComponent(clientId)}/processes/${safe(processId)}`);
 }
 
 /// A decision asked of the client, in the client's decisions panel.
