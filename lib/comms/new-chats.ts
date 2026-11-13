@@ -3,6 +3,7 @@ import type { CommsChannel, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { matchPhones } from "@/lib/whatsapp-poc/clients-by-phone";
 import { blockStateFor } from "./visibility";
+import { LISTED_MESSAGE } from "./stored-chats";
 
 // "שיחות חדשות לבדיקה" (Ariel, 5.11.2026). The "לא לשמור" list is chosen once,
 // before "התחל לשמור", from the chats that existed then. A chat that began
@@ -29,7 +30,7 @@ function toReviewWhere(channel: Pick<CommsChannel, "id" | "storeStartedAt">): Pr
     reviewedAt: null,
     // Began after storing started: nothing older was stored. A chat from
     // before carries its older messages once its history is loaded.
-    messages: { some: { held: false }, none: { at: { lt: channel.storeStartedAt } } },
+    messages: { some: { held: false, ...LISTED_MESSAGE }, none: { at: { lt: channel.storeStartedAt } } },
   };
 }
 

@@ -2,7 +2,8 @@ import "server-only";
 import type { CommsChannel, TranscriptStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { matchPhones } from "@/lib/whatsapp-poc/clients-by-phone";
-import { CONTACT_ID_PREFIX, type PocChat, type PocMessage } from "@/lib/whatsapp-poc/unipile";
+import { CALL_EVENTS, CONTACT_ID_PREFIX, type PocChat, type PocMention, type PocMessage } from "@/lib/whatsapp-poc/unipile";
+import { readReactions } from "./whatsapp-store";
 import { blockStateFor, canSeeConversation, isExcludedViewer } from "./visibility";
 import { fullViewerEmails } from "./grants";
 import { chatPhone } from "@/lib/whatsapp-poc/inbox";
@@ -20,11 +21,11 @@ export async function storedChannelFor(accountId: string | null): Promise<CommsC
 
 export async function listStoredChats(channel: CommsChannel, viewer: { id: string; email: string }, take = 300): Promise<PocChat[]> {
   const conversations = await prisma.commsConversation.findMany({
-    where: { channelId: channel.id, messages: { some: { held: false } } },
+    where: { channelId: channel.id, messages: { some: { held: false, ...LISTED_MESSAGE } } },
     orderBy: { lastMessageAt: "desc" },
     take,
     include: {
-      messages: { where: { held: false }, orderBy: { at: "desc" }, take: 1, select: { text: true, attachments: { select: { type: true } } } },
+      messages: { where: { held: false, ...LISTED_MESSAGE }, orderBy: { at: "desc" }, take: 1, select: { text: true, attachments: { select: { type: true } } } },
     },
   });
   const groupClientNames = new Map(
@@ -122,9 +123,29 @@ export async function listStoredMessages(
         mimetype: a.mimetype,
         voiceNote: a.voiceNote,
         duration: a.durationSec,
-        ...(a.contactName || a.contactPhones.length > 0 ? { contact: { name: a.contactName, phones: a.contactPhones } } : {}),
+        ...(a.contactName || a.contactPhones.length > 0
+          ? {
+              contact: {
+                name: a.contactName,
+                phones: a.contactPhones,
+                ...(a.contactEmails.length ? { emails: a.contactEmails } : {}),
+                ...(a.contactOrg ? { organization: a.contactOrg } : {}),
+              },
+            }
+          : {}),
+        ...(a.fileName ? { fileName: a.fileName } : {}),
+        ...(a.unavailable ? { unavailable: true } : {}),
+        ...(a.sticker ? { sticker: true } : {}),
+        ...(a.gif ? { gif: true } : {}),
       })),
       ...(r.forwarded ? { forwarded: true } : {}),
+      ...(r.isEdited ? { isEdited: true } : {}),
+      ...(r.eventType !== null ? { event: { type: r.eventType, data: storedEventData(r.eventData) } } : {}),
+      ...(readReactions(r.reactions).length ? { reactions: readReactions(r.reactions) } : {}),
+      ...(readMentions(r.mentions).length ? { mentions: readMentions(r.mentions) } : {}),
+      ...(r.viewOnce ? { viewOnce: true } : {}),
+      ...(r.disappearing ? { disappearing: true } : {}),
+      ...(r.buttons.length ? { buttons: r.buttons } : {}),
     };
   });
   return { messages, transcripts, hasOlder };
@@ -185,7 +206,7 @@ export async function searchStoredMessages(
   const rows = await prisma.commsMessage.findMany({
     where: {
       held: false,
-      isDeleted: false,
+      // A message deleted in WhatsApp is kept, and found (13.11.2026).
       text: { contains: q, mode: "insensitive" },
       OR: scopes.map(([channelId, chatIds]) => ({ conversation: { channelId, externalChatId: { in: chatIds } } })),
     },
@@ -210,3 +231,25 @@ export async function searchStoredMessages(
   }));
 }
 
+/// A message that makes a chat show in the list (13.11.2026): an ordinary
+/// one or a call, not a change in a group.
+export const LISTED_MESSAGE = { OR: [{ eventType: null }, { eventType: { in: [...CALL_EVENTS] } }] };
+
+function storedEventData(v: unknown): Record<string, string | number | boolean> {
+  const out: Record<string, string | number | boolean> = {};
+  if (!v || typeof v !== "object" || Array.isArray(v)) return out;
+  for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof x === "string" || typeof x === "number" || typeof x === "boolean") out[k] = x;
+  }
+  return out;
+}
+
+function readMentions(v: unknown): PocMention[] {
+  if (!Array.isArray(v)) return [];
+  return v.flatMap((x) => {
+    const m = (x ?? {}) as { start?: unknown; length?: unknown; userId?: unknown };
+    return typeof m.start === "number" && typeof m.length === "number"
+      ? [{ start: m.start, length: m.length, userId: typeof m.userId === "string" ? m.userId : null }]
+      : [];
+  });
+}

@@ -11,6 +11,8 @@ import {
   CONTACT_ID_PREFIX,
   UnipileError,
   getChat,
+  getMessage,
+  type PocReaction,
   isHiddenChat,
   listMessages,
   loadMergedChats,
@@ -99,6 +101,12 @@ export async function storeMessage(
   if (state === "blocked") return "blocked";
   const held = state === "pending";
 
+  // A reaction is not a message: it changes the one it is on (13.11.2026).
+  if (m.reactionTo) {
+    await applyReaction(channel, conversation.id, chatId, m.reactionTo);
+    return "skipped";
+  }
+
   const exists = await prisma.commsMessage.findUnique({
     where: { conversationId_externalId: { conversationId: conversation.id, externalId: m.id } },
     select: { id: true, quotedExternalId: true },
@@ -108,6 +116,10 @@ export async function storeMessage(
     // when Unipile sends it again.
     if (m.quoted && !exists.quotedExternalId) {
       await prisma.commsMessage.update({ where: { id: exists.id }, data: quoteColumns(m) });
+    }
+    // Reactions read again (a history load) are WhatsApp's own count.
+    if (m.reactions?.length) {
+      await prisma.commsMessage.update({ where: { id: exists.id }, data: { reactions: m.reactions as Prisma.InputJsonArray } });
     }
     return "exists";
   }
@@ -125,6 +137,7 @@ export async function storeMessage(
         text: m.text,
         isDeleted: m.isDeleted,
         ...quoteColumns(m),
+        ...detailColumns(m),
         forwarded: m.forwarded === true,
         held,
         attachments: {
@@ -137,6 +150,12 @@ export async function storeMessage(
               mimetype: a.mimetype,
               contactName: a.contact?.name ?? null,
               contactPhones: a.contact?.phones ?? [],
+              contactEmails: a.contact?.emails ?? [],
+              contactOrg: a.contact?.organization ?? null,
+              fileName: a.fileName ?? null,
+              unavailable: a.unavailable === true,
+              sticker: a.sticker === true,
+              gif: a.gif === true,
               voiceNote: a.voiceNote,
               durationSec: a.duration ? Math.round(a.duration) : null,
               transcript: a.type === "audio" ? { create: { status: skipTranscript ? "SKIPPED" : "PENDING" } } : undefined,
@@ -161,6 +180,71 @@ export async function storeMessage(
     if (!held && a.transcript?.status === "PENDING" && options.transcribe) await options.transcribe(a.transcript.id);
   }
   return "stored";
+}
+
+/// The columns added 13.11.2026 for the rest of what WhatsApp shows.
+function detailColumns(m: PocMessage) {
+  return {
+    isEdited: m.isEdited === true,
+    eventType: m.event?.type ?? null,
+    eventData: m.event ? (m.event.data as Prisma.InputJsonObject) : Prisma.DbNull,
+    reactions: m.reactions?.length ? (m.reactions as Prisma.InputJsonArray) : Prisma.DbNull,
+    mentions: m.mentions?.length ? (m.mentions as Prisma.InputJsonArray) : Prisma.DbNull,
+    viewOnce: m.viewOnce === true,
+    disappearing: m.disappearing === true,
+    buttons: m.buttons ?? [],
+  };
+}
+
+/// A reaction on a stored message. WhatsApp's own count is read again
+/// when Unipile answers (so a reaction changed or taken back is right);
+/// otherwise the reaction is added or taken off by one.
+async function applyReaction(
+  channel: CommsChannel,
+  conversationId: string,
+  chatId: string,
+  r: NonNullable<PocMessage["reactionTo"]>,
+) {
+  const target = await prisma.commsMessage.findUnique({
+    where: { conversationId_externalId: { conversationId, externalId: r.messageId } },
+    select: { id: true, reactions: true },
+  });
+  if (!target) return;
+  const unipile = unipileFor(channel);
+  if (unipile) {
+    try {
+      const fresh = await getMessage(unipile, chatId, r.messageId);
+      if (fresh) {
+        await prisma.commsMessage.update({
+          where: { id: target.id },
+          data: { reactions: fresh.reactions?.length ? (fresh.reactions as Prisma.InputJsonArray) : Prisma.DbNull },
+        });
+        return;
+      }
+    } catch (err) {
+      if (!(err instanceof UnipileError)) throw err;
+    }
+  }
+  const list = readReactions(target.reactions);
+  const at = list.findIndex((x) => x.reaction === r.reaction);
+  if (r.removed) {
+    if (at >= 0) list[at] = { ...list[at], count: list[at].count - 1 };
+  } else if (at >= 0) list[at] = { ...list[at], count: list[at].count + 1 };
+  else list.push({ reaction: r.reaction, count: 1 });
+  const next = list.filter((x) => x.count > 0);
+  await prisma.commsMessage.update({
+    where: { id: target.id },
+    data: { reactions: next.length ? (next as Prisma.InputJsonArray) : Prisma.DbNull },
+  });
+}
+
+/// Stored reactions (JSON in the row), checked.
+export function readReactions(v: unknown): PocReaction[] {
+  if (!Array.isArray(v)) return [];
+  return v.flatMap((x) => {
+    const r = (x ?? {}) as { reaction?: unknown; count?: unknown };
+    return typeof r.reaction === "string" && typeof r.count === "number" && r.count > 0 ? [{ reaction: r.reaction, count: r.count }] : [];
+  });
 }
 
 function quoteColumns(m: PocMessage) {
@@ -195,15 +279,30 @@ export async function copyVoiceToDrive(channel: CommsChannel, chatId: string, me
   }
 }
 
-/// message.update: the text changed, or it was deleted for everyone.
+/// message.update: the text changed, or it was deleted for everyone. A
+/// deletion only marks the message (13.11.2026, Ariel): what the other side
+/// deletes in WhatsApp stays here, text, files and voice alike.
 export async function updateStoredMessage(channel: CommsChannel, chatId: string, m: PocMessage): Promise<boolean> {
   const conversation = await prisma.commsConversation.findUnique({
     where: { channelId_externalChatId: { channelId: channel.id, externalChatId: chatId } },
   });
   if (!conversation) return false;
+  // "נערכה" only when the text really changed, or WhatsApp says so
+  // (13.11.2026): an update also comes for a deletion or a reaction.
+  if (!m.isDeleted) {
+    await prisma.commsMessage.updateMany({
+      where: { conversationId: conversation.id, externalId: m.id, ...(m.isEdited ? {} : { NOT: { text: m.text } }) },
+      data: { isEdited: true },
+    });
+  }
   const { count } = await prisma.commsMessage.updateMany({
     where: { conversationId: conversation.id, externalId: m.id },
-    data: { text: m.text, isDeleted: m.isDeleted, isEdited: true },
+    data: {
+      // A deletion arrives with the text emptied; the kept text stays.
+      ...(m.isDeleted ? { isDeleted: true } : { text: m.text }),
+      // 13.11.2026: an update may carry WhatsApp's count of reactions.
+      ...(m.reactions?.length ? { reactions: m.reactions as Prisma.InputJsonArray } : {}),
+    },
   });
   return count > 0;
 }
@@ -241,8 +340,10 @@ export async function enrichStoredMessage(channelId: string, chatId: string, m: 
   }
 }
 
-/// message.delete. The text is cleared, not only flagged: what was deleted
-/// in WhatsApp is not kept here.
+/// message.delete. Marked, not erased (13.11.2026, Ariel): the text, the
+/// files, a voice message's audio and transcript, and the quote of it in
+/// replies all stay, and the screen says the message was deleted in
+/// WhatsApp. Until then the text was cleared here too.
 export async function deleteStoredMessage(channel: CommsChannel, chatId: string, messageId: string): Promise<boolean> {
   const conversation = await prisma.commsConversation.findUnique({
     where: { channelId_externalChatId: { channelId: channel.id, externalChatId: chatId } },
@@ -250,12 +351,7 @@ export async function deleteStoredMessage(channel: CommsChannel, chatId: string,
   if (!conversation) return false;
   const { count } = await prisma.commsMessage.updateMany({
     where: { conversationId: conversation.id, externalId: messageId },
-    data: { text: "", isDeleted: true },
-  });
-  // Replies to it keep that they were replies, not the deleted text.
-  await prisma.commsMessage.updateMany({
-    where: { conversationId: conversation.id, quotedExternalId: messageId },
-    data: { quotedText: "", quotedKind: null },
+    data: { isDeleted: true },
   });
   return count > 0;
 }

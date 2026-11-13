@@ -47,7 +47,8 @@ describe("gatherCommsExport", () => {
     expect(data).not.toBeNull();
     expect(data!.conversations.map((c) => c.name).sort()).toEqual(["דנה", "קבוצת לקוח"]);
     const dana = data!.conversations.find((c) => c.name === "דנה")!;
-    expect(dana.messages.map((m) => m.text)).toEqual(["נשאר"]);
+    // Deleted in WhatsApp: kept and exported with a mark (13.11.2026).
+    expect(dana.messages.map((m) => m.text)).toEqual(["נשאר", "[נמחקה בוואטסאפ] נמחק"]);
     expect(data!.calls).toHaveLength(1);
     expect(data!.calls[0].transcript).toBe("שלום");
     expect(data!.deletesOn?.toISOString()).toBe("2026-12-01T00:00:00.000Z");

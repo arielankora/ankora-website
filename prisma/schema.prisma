@@ -4571,6 +4571,22 @@ model CommsMessage {
   quotedKind       String?
   /// It was forwarded from another chat (13.11.2026).
   forwarded        Boolean  @default(false)
+  /// A WhatsApp event shown as a line (13.11.2026): Unipile's event_type
+  /// (a call: 9-12, a change in a group: the others) and its metadata.
+  /// Null for an ordinary message.
+  eventType        Int?
+  eventData        Json?
+  /// Reactions on it: [{ reaction, count }], as WhatsApp counts them.
+  reactions        Json?
+  /// Mentions in its text: [{ start, length, userId }].
+  mentions         Json?
+  /// Media that may be opened once.
+  viewOnce         Boolean  @default(false)
+  /// Sent in a chat whose messages WhatsApp deletes after a while. Kept
+  /// here, and marked.
+  disappearing     Boolean  @default(false)
+  /// A business message's buttons, by label.
+  buttons          String[] @default([])
   /// A block on its number is waiting for a manager: kept, shown to nobody,
   /// not transcribed, not extracted.
   held           Boolean  @default(false)
@@ -4598,6 +4614,12 @@ model CommsAttachment {
   /// card, not as a file to download.
   contactName   String?
   contactPhones String[] @default([])
+  contactEmails String[] @default([])
+  contactOrg    String?
+  /// Gone from WhatsApp's servers, as Unipile says (13.11.2026).
+  unavailable   Boolean  @default(false)
+  sticker       Boolean  @default(false)
+  gif           Boolean  @default(false)
   /// Voice messages only: the audio is copied to Drive. Other files are
   /// read from Unipile when opened.
   driveFileId String?

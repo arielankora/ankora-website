@@ -90,13 +90,35 @@ export type PocAttachment = {
   /// A shared contact (13.11.2026): its name and numbers, shown as a card
   /// in the chat, as WhatsApp does, and not as a file to download.
   contact?: PocContact | null;
+  /// 13.11.2026: the file's own name, for the download.
+  fileName?: string | null;
+  /// Unipile says the file is gone from WhatsApp's servers.
+  unavailable?: boolean;
+  /// An image that is a sticker, a video that is a GIF.
+  sticker?: boolean;
+  gif?: boolean;
 };
 
 /// The stored id of a contact card that came without one of its own (inside
 /// a forwarded message): never sent to Unipile, never offered as a file.
 export const CONTACT_ID_PREFIX = "contact-";
 
-export type PocContact = { name: string | null; phones: string[] };
+export type PocContact = { name: string | null; phones: string[]; emails?: string[]; organization?: string | null };
+
+/// A WhatsApp event shown as a line in the timeline (13.11.2026): a call
+/// (missed, started, ended, rejected) or a change in a group. `type` is
+/// Unipile's event_type; `data` its event_metadata, flattened.
+export type PocEvent = { type: number; data: Record<string, string | number | boolean> };
+
+/// Unipile's event types shown in the timeline. 0 (unknown) and 17 (a
+/// content mention) are not; 8 (a reaction) changes another message.
+export const CALL_EVENTS = [9, 10, 11, 12] as const;
+const SHOWN_EVENTS = new Set([1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16]);
+export const REACTION_EVENT = 8;
+
+export type PocReaction = { reaction: string; count: number };
+/// A mention in the text: where it is, and whom it names (a WhatsApp id).
+export type PocMention = { start: number; length: number; userId: string | null };
 
 export type PocMessage = {
   id: string;
@@ -110,6 +132,19 @@ export type PocMessage = {
   quoted: PocQuote | null;
   /// It was forwarded from another chat (13.11.2026).
   forwarded?: boolean;
+  /// 13.11.2026, the rest of what WhatsApp shows:
+  isEdited?: boolean;
+  event?: PocEvent | null;
+  /// A reaction event: the emoji on another message, not a message itself.
+  reactionTo?: { messageId: string; reaction: string; removed: boolean } | null;
+  reactions?: PocReaction[];
+  mentions?: PocMention[];
+  /// Media that may be opened once ("view once").
+  viewOnce?: boolean;
+  /// In a chat whose messages WhatsApp deletes after a while. Kept here.
+  disappearing?: boolean;
+  /// A business message's buttons, by label.
+  buttons?: string[];
 };
 
 /// What WhatsApp shows of the message a reply answers (13.11.2026, Ariel):
@@ -250,6 +285,12 @@ type RawAttachment = {
   content?: unknown;
   display_name?: unknown;
   phones?: unknown;
+  emails?: unknown;
+  organization?: unknown;
+  filename?: unknown;
+  is_unavailable?: unknown;
+  sticker?: unknown;
+  gif?: unknown;
 };
 
 type RawMessage = {
@@ -259,6 +300,14 @@ type RawMessage = {
   is_sender?: unknown;
   is_deleted?: unknown;
   is_event?: unknown;
+  is_edited?: unknown;
+  event_type?: unknown;
+  event_metadata?: unknown;
+  reactions_counter?: unknown;
+  mentions?: unknown;
+  view_mode?: unknown;
+  is_disappearing?: unknown;
+  specifics?: { interactive?: { buttons?: unknown } | null } | null;
   sender?: { display_name?: unknown } | null;
   attachments?: RawAttachment[] | null;
   quoted?: {
@@ -312,7 +361,16 @@ function contactOf(a: RawAttachment, type: string, mimetype: string | null): Poc
       })
     : [];
   const name = str(a.display_name);
-  if (name || phones.length > 0) return { name, phones };
+  if (name || phones.length > 0) {
+    const emails = Array.isArray(a.emails)
+      ? a.emails.flatMap((e) => {
+          const v = str((e as { address?: unknown } | null)?.address);
+          return v ? [v] : [];
+        })
+      : [];
+    const organization = str(a.organization);
+    return { name, phones, ...(emails.length ? { emails } : {}), ...(organization ? { organization } : {}) };
+  }
   // Some cards come as a vCard file with its content inline.
   const content = str(a.content);
   if (!content) return null;
@@ -335,6 +393,10 @@ function toPocAttachments(raw: RawAttachment[] | null | undefined): PocAttachmen
       voiceNote: a.voice_note === true,
       duration: typeof a.duration === "number" ? a.duration : null,
       ...(contact ? { contact } : {}),
+      ...(str(a.filename) ? { fileName: str(a.filename)!.slice(0, 200) } : {}),
+      ...(a.is_unavailable === true ? { unavailable: true } : {}),
+      ...(a.sticker === true ? { sticker: true } : {}),
+      ...(a.gif === true ? { gif: true } : {}),
     };
   });
 }
@@ -353,10 +415,70 @@ export function toPocQuote(raw: RawMessage["quoted"]): PocQuote | null {
   };
 }
 
+/// event_metadata, kept as plain values only.
+function flatData(raw: unknown): Record<string, string | number | boolean> {
+  const out: Record<string, string | number | boolean> = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === "string") out[k] = v.slice(0, 300);
+    else if (typeof v === "number" || typeof v === "boolean") out[k] = v;
+  }
+  return out;
+}
+
+function toReactions(raw: unknown): PocReaction[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((r) => {
+    const reaction = str((r as { reaction?: unknown } | null)?.reaction);
+    const count = (r as { count?: unknown } | null)?.count;
+    return reaction && typeof count === "number" && count > 0 ? [{ reaction: reaction.slice(0, 16), count }] : [];
+  });
+}
+
+function toMentions(raw: unknown): PocMention[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((m) => {
+    const r = (m ?? {}) as { start?: unknown; length?: unknown; user_id?: unknown };
+    return typeof r.start === "number" && typeof r.length === "number" && r.length > 0
+      ? [{ start: r.start, length: r.length, userId: str(r.user_id) }]
+      : [];
+  });
+}
+
+function toButtons(raw: RawMessage["specifics"]): string[] {
+  const buttons = raw?.interactive?.buttons;
+  if (!Array.isArray(buttons)) return [];
+  return buttons.flatMap((b) => {
+    const text = str((b as { text?: unknown } | null)?.text);
+    return text ? [text.slice(0, 80)] : [];
+  });
+}
+
 export function toPocMessage(raw: RawMessage): PocMessage | null {
   const id = str(raw.id);
   const timestamp = str(raw.timestamp);
-  if (!id || !timestamp || raw.is_event === true) return null;
+  if (!id || !timestamp) return null;
+  const base = {
+    id,
+    timestamp,
+    isSender: raw.is_sender === true,
+    senderName: str(raw.sender?.display_name),
+    isDeleted: raw.is_deleted === true,
+    quoted: null,
+    attachments: [],
+  };
+  if (raw.is_event === true) {
+    const type = typeof raw.event_type === "number" ? raw.event_type : 0;
+    const data = flatData(raw.event_metadata);
+    // A reaction changes the message it is on (13.11.2026).
+    if (type === REACTION_EVENT) {
+      const target = typeof data.message_id === "string" ? data.message_id : null;
+      if (!target || typeof data.reaction !== "string") return null;
+      return { ...base, text: "", reactionTo: { messageId: target, reaction: data.reaction.slice(0, 16), removed: data.reason === "removed" } };
+    }
+    if (!SHOWN_EVENTS.has(type)) return null;
+    return { ...base, text: typeof raw.text === "string" ? raw.text : "", event: { type, data } };
+  }
   const forwarded = raw.forwarded && typeof raw.forwarded === "object" ? raw.forwarded : null;
   let text = typeof raw.text === "string" ? raw.text : "";
   let attachments = toPocAttachments(raw.attachments);
@@ -366,16 +488,21 @@ export function toPocMessage(raw: RawMessage): PocMessage | null {
     // Only cards: a file inside the wrapper has no id this message can serve.
     attachments = toPocAttachments(forwarded.attachments).filter((a) => a.contact).map((a) => ({ ...a, id: null }));
   }
+  const reactions = toReactions(raw.reactions_counter);
+  const mentions = toMentions(raw.mentions);
+  const buttons = toButtons(raw.specifics);
   return {
-    id,
+    ...base,
     text,
-    timestamp,
-    isSender: raw.is_sender === true,
-    senderName: str(raw.sender?.display_name),
-    isDeleted: raw.is_deleted === true,
     quoted: toPocQuote(raw.quoted),
     attachments,
     ...(forwarded ? { forwarded: true } : {}),
+    ...(raw.is_edited === true ? { isEdited: true } : {}),
+    ...(reactions.length ? { reactions } : {}),
+    ...(mentions.length ? { mentions } : {}),
+    ...(raw.view_mode === "once" ? { viewOnce: true } : {}),
+    ...(raw.is_disappearing === true ? { disappearing: true } : {}),
+    ...(buttons.length ? { buttons } : {}),
   };
 }
 
@@ -570,7 +697,7 @@ export async function findChatByPhone(
 export async function listMessages(
   config: { apiKey: string; accountId: string },
   chatId: string,
-  limit = 40,
+  limit = 100,
 ): Promise<PocMessage[]> {
   const body = await call(config, `/chats/${encodeURIComponent(chatId)}/messages`, { query: { limit: String(limit) } });
   return dataArray(body)
