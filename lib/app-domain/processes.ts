@@ -35,6 +35,8 @@ import { readControlRefs } from "@/lib/procedure-document";
 import { buildSnapshot } from "@/lib/app-domain/procedure-documents";
 import { runReadiness } from "@/lib/process-readiness";
 import { runLeadBusinessDays } from "@/lib/process-runs";
+import { attachLinkedDates, syncStartsFromKinds } from "@/lib/app-domain/process-rhythm";
+import { describeRhythm } from "@/lib/process-rhythm";
 import { computeLeadDate } from "@/lib/app-domain/important-dates-recurrence";
 import { mentionedIn, processTexts, type Named } from "@/lib/process-mentions";
 import { flowFromSteps, flowIssues, flowSteps, readFlow, secondEyeNodes, type ProcessFlow } from "@/lib/process-flow";
@@ -60,6 +62,8 @@ export interface ProcessInput extends KnowledgeInput {
   purpose?: string | null;
   triggerKinds?: ProcessTrigger[];
   triggerText?: string | null;
+  /// 13.11.2026 (stage 1): notes on the rhythm that schedule nothing.
+  triggerNotes?: string | null;
   ownerId?: string | null;
   backupOwnerId?: string | null;
   slaText?: string | null;
@@ -173,6 +177,7 @@ function fields(input: Partial<ProcessInput>, ids: { contacts?: string[]; system
     purpose: input.purpose !== undefined ? clean(input.purpose) : undefined,
     triggerKinds: input.triggerKinds !== undefined ? [...new Set(input.triggerKinds)] : undefined,
     triggerText: input.triggerText !== undefined ? clean(input.triggerText) : undefined,
+    triggerNotes: input.triggerNotes !== undefined ? clean(input.triggerNotes) : undefined,
     ownerId: input.ownerId !== undefined ? input.ownerId || null : undefined,
     backupOwnerId: input.backupOwnerId !== undefined ? input.backupOwnerId || null : undefined,
     slaText: input.slaText !== undefined ? clean(input.slaText) : undefined,
@@ -214,7 +219,7 @@ function assertCheck(triggerKinds: ProcessTrigger[], checkEveryDays: number | nu
 }
 
 function assertNoSecrets(input: Partial<ProcessInput>) {
-  const text = [input.title, input.purpose, input.triggerText, input.slaText, input.externalPartyText, input.approverText, input.approvalText, input.exceptionPlaybook, input.executorText, input.checkText, input.scope, input.definitions, input.relatedDocs]
+  const text = [input.title, input.purpose, input.triggerText, input.triggerNotes, input.slaText, input.externalPartyText, input.approverText, input.approvalText, input.exceptionPlaybook, input.executorText, input.checkText, input.scope, input.definitions, input.relatedDocs]
     .filter(Boolean)
     .join("\n");
   if (findSecrets(text).length) throw new DomainError("processes.secrets", "יש כאן סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בתיק.");
@@ -254,6 +259,9 @@ export async function addProcess(actor: User, input: ProcessInput) {
         },
       });
       await recordAudit({ actorId: actor.id, action: "process.add", entityType: "Process", entityId: row.id, clientId: input.clientId, after: row });
+      // 13.11.2026 (stage 1): a process written with trigger kinds (Claude's
+      // proposal) gets the starts they say.
+      if (input.triggerKinds?.length) await syncStartsFromKinds(row.id);
       return row;
     } catch (err) {
       if (attempt < 3 && err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") continue;
@@ -273,6 +281,7 @@ export async function updateProcess(actor: User, id: string, input: Partial<Omit
   const sourced = await sourcedFields(before.clientId, input, [input.purpose ?? before.purpose, input.triggerText ?? before.triggerText], before);
   const updated = await prisma.process.update({ where: { id }, data: { ...fields(input, ids), ...knowledgeData(input), ...sourced } });
   await recordAudit({ actorId: actor.id, action: "process.update", entityType: "Process", entityId: id, clientId: before.clientId, before, after: updated });
+  if (input.triggerKinds !== undefined || input.checkEveryDays !== undefined) await syncStartsFromKinds(id);
   // Decision 6: its dates follow its calendar.
   if (updated.businessCalendar !== before.businessCalendar || updated.entityId !== before.entityId) await syncDateCalendars({ processId: id });
   return updated;
@@ -344,6 +353,7 @@ export async function linkProcessDates(actor: User, processId: string, dateIds: 
   ]);
   await recordAudit({ actorId: actor.id, action: "process.dates", entityType: "Process", entityId: processId, clientId: process.clientId, after: { dateIds: unique } });
   await syncDateCalendars({ processId });
+  await attachLinkedDates(processId);
 }
 
 // ---------------------------------------------------------------------------
@@ -769,8 +779,25 @@ export async function listProcesses(actor: User, clientId: string, options: { in
         versions: { orderBy: { version: "desc" } },
         dates: {
           where: { deletedAt: null },
-          select: { id: true, title: true, nextOccurrenceAt: true, status: true, autoTaskLeadDays: true, leadUnit: true, businessCalendar: true, timezone: true },
+          select: {
+            id: true,
+            title: true,
+            nextOccurrenceAt: true,
+            status: true,
+            autoTaskLeadDays: true,
+            leadUnit: true,
+            businessCalendar: true,
+            timezone: true,
+            recurrence: true,
+            month: true,
+            day: true,
+            weekday: true,
+            intervalMonths: true,
+            onceDate: true,
+            rollConvention: true,
+          },
         },
+        starts: { orderBy: { sortOrder: "asc" } },
       },
     }),
     prisma.systemAccess.findMany({ where: { clientId, deletedAt: null }, select: { id: true, systemName: true, accessStatus: true } }),
@@ -825,6 +852,9 @@ export async function listProcesses(actor: User, clientId: string, options: { in
         isFlow: !!(latest && readFlow(latest.flow)),
         nextDate,
         nextOpensAt,
+        /// 13.11.2026 (stage 1): the rhythm in one sentence, from its starts.
+        /// Empty starts: what triggerText said before stage 1.
+        rhythm: r.starts.length ? describeRhythm(r.starts, r.dates) : r.triggerText,
         completeness: completeness(input),
         documentation: documentation(input),
         readiness: runReadiness({ ...r, nextDate }),

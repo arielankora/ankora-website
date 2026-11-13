@@ -1432,7 +1432,8 @@
       "notApplicableNotAllowed": "Only a manager or the process owner marks a field not relevant.",
       "notApplicableField": "This field cannot be marked not relevant.",
       "discardNotDraft": "Only the latest draft can be discarded, before it is approved.",
-      "discardNotAuthor": "Only whoever wrote the draft, or a manager, can discard it."
+      "discardNotAuthor": "Only whoever wrote the draft, or a manager, can discard it.",
+      "rhythmInvalid": "The rhythm is not valid. Check the fields and try again."
     },
     "processRuns": {
       "sameDay": "There is already an open run of {code} for this day: \"{title}\" ({id}). Work on it, or close it and then open a new one.",
@@ -2067,7 +2068,8 @@
       "commsExportDownloaded": "Client conversations and recordings exported",
       "userCommsAccess": "Changed access to the communications screen",
       "clientCommunicationLocale": "Client communication language changed",
-      "processVersionDiscard": "Discard a draft of a procedure"
+      "processVersionDiscard": "Discard a draft of a procedure",
+      "processRhythm": "Edit the rhythm of a process"
     },
     "kinds": {
       "failure": "Failure",
@@ -3052,7 +3054,8 @@
           "SCHEDULED": "By date",
           "EVENT": "When something happens",
           "ON_DEMAND": "On request",
-          "CONTINUOUS": "Ongoing"
+          "CONTINUOUS": "Ongoing",
+          "EXTERNAL": "Automatic, outside the app"
         },
         "transitions": {
           "WITH_CLIENT": "With the client",
@@ -3678,7 +3681,145 @@
         "lessonChoice": "Choose whether it went into the procedure or not.",
         "stepsUnread": "The steps could not be read. Refresh and try again.",
         "runDate": "The run needs a date.",
-        "checkOutcome": "What did the check find?"
+        "checkOutcome": "What did the check find?",
+        "rhythmUnread": "The rhythm was not read. Refresh and try again."
+      },
+      "rhythm": {
+        "title": "When does the process run?",
+        "change": "Change",
+        "notSet": "When it runs is not set yet",
+        "set": "Set when it runs",
+        "startsTitle": "What starts the process",
+        "startsHint": "(more than one is fine; nothing is chosen in advance)",
+        "kinds": {
+          "SCHEDULE": {
+            "title": "On a schedule",
+            "hint": "Every month, every week"
+          },
+          "EXTERNAL": {
+            "title": "Automatic, outside the app",
+            "hint": "A scheduled task of Claude"
+          },
+          "EVENT": {
+            "title": "When something happens",
+            "hint": "A new employee, a request"
+          },
+          "CONTINUOUS": {
+            "title": "Ongoing",
+            "hint": "No runs, a periodic check"
+          },
+          "ON_DEMAND": {
+            "title": "Only on request",
+            "hint": "Run by hand"
+          }
+        },
+        "howOften": "How often",
+        "pickHowOften": "Choose how often.",
+        "frequencies": {
+          "BUSINESS_DAILY": "Every business day",
+          "DAILY": "Every day, weekends included",
+          "WEEKLY": "Every week",
+          "MONTHLY": "Every month",
+          "QUARTERLY": "Every quarter",
+          "YEARLY": "Every year",
+          "ONCE": "Once"
+        },
+        "weekdays": "On which days of the week",
+        "severalHint": "(several are fine)",
+        "weekdayNames": {
+          "d0": "Sunday",
+          "d1": "Monday",
+          "d2": "Tuesday",
+          "d3": "Wednesday",
+          "d4": "Thursday",
+          "d5": "Friday",
+          "d6": "Saturday"
+        },
+        "monthDays": "On which days of the month",
+        "lastDay": "Last",
+        "quarterMonth": "Which month of the quarter",
+        "quarterMonths": {
+          "m1": "The first month (January, April, July, October)",
+          "m2": "The second month (February, May, August, November)",
+          "m3": "The third month (March, June, September, December)"
+        },
+        "yearDates": "On which dates of the year",
+        "month": "Month",
+        "day": "Day",
+        "removeDate": "Remove",
+        "addYearDate": "+ Date",
+        "onceDate": "Date",
+        "rollLabel": "If the date falls on a weekend or a holiday",
+        "rolls": {
+          "PREVIOUS_BUSINESS_DAY": "Move to the business day before",
+          "NEXT_BUSINESS_DAY": "Move to the next business day",
+          "NONE": "Keep the same day"
+        },
+        "leadLabel": "When the run opens",
+        "leadBySteps": "{days} business days before (by the steps)",
+        "leadOnDay": "On the day (by the steps)",
+        "leadEarlier": "{days} business days before",
+        "calendarLine": "Business days: {calendar}, {by}.",
+        "periodLink": "Only in a certain period",
+        "conditionLink": "Only if something is true",
+        "rangeStart": "From",
+        "rangeEnd": "Until",
+        "condition": "Only if",
+        "conditionPlaceholder": "For example: the vulnerability SLA was missed",
+        "externalWhere": "Where it runs",
+        "externalWherePlaceholder": "A scheduled task of Claude",
+        "externalWhen": "When",
+        "externalWhenPlaceholder": "Every day at 07:40",
+        "externalRecipient": "Who gets the result",
+        "eventLabel": "What happens that starts it",
+        "eventPlaceholder": "For example: a new employee starts",
+        "checkEvery": "Check every (days)",
+        "checkText": "What is checked",
+        "previewTitle": "How it will look",
+        "nothingChosen": "Nothing that starts the process is chosen yet.",
+        "opens": "opens on {date}",
+        "movedFrom": "Moved from {weekday}",
+        "noDates": "No dates coming up.",
+        "previewNote": "There are no separate dates to link anymore. The rhythm belongs to the process, and shows in the client's dates.",
+        "legacy": "The process's dates were set before the new rhythm: {sentence} They stay as they are. To change them, choose how often, and the dates are replaced.",
+        "sentence": {
+          "external": "Runs by itself outside the app: {where}, {when}.",
+          "event": "When something happens: {what}",
+          "continuous": "Ongoing, checked every {days} days.",
+          "onDemand": "On request."
+        },
+        "save": "Save the rhythm",
+        "saving": "Saving...",
+        "cancel": "Cancel",
+        "saved": "The rhythm was saved",
+        "saveFailed": "The rhythm was not saved",
+        "errors": {
+          "noStart": "Choose at least one thing that starts the process.",
+          "duplicateKind": "Each kind of start once.",
+          "pickFrequency": "Choose how often.",
+          "noWeekday": "Choose at least one day of the week.",
+          "badWeekday": "A day of the week is not valid.",
+          "noMonthDay": "Choose at least one day of the month.",
+          "badMonthDay": "A day of the month is between 1 and 31.",
+          "noQuarterMonth": "Choose which month of the quarter.",
+          "noYearDate": "Choose at least one date in the year.",
+          "badYearDate": "A date in the year is not valid.",
+          "noOnceDate": "A date is needed.",
+          "noEvent": "Write what happens that starts the process.",
+          "noCheck": "An ongoing process needs how often it is checked.",
+          "checkRange": "A check every 1 to {max} days.",
+          "noWhere": "Write where it runs.",
+          "noWhen": "Write when it runs.",
+          "leadRange": "The run opens at most {max} business days before.",
+          "rangeOrder": "The period ends before it starts."
+        },
+        "calendarByEntity": "by the process's entity",
+        "calendarByProcess": "set on the process",
+        "calendarDefaultLine": "Business days: Israel, the default.",
+        "calendarAutoLine": "Business days: by the process's entity.",
+        "calendarLabel": "Business days",
+        "calendarAuto": "By the process's entity",
+        "calendarDefault": "The default: Israel"
       }
     },
     "procedures": {
@@ -5888,7 +6029,8 @@
         "MONTHLY": "Monthly",
         "CUSTOM_INTERVAL": "Fixed interval",
         "WEEKLY": "Weekly",
-        "BUSINESS_DAILY": "Every business day"
+        "BUSINESS_DAILY": "Every business day",
+        "DAILY": "Every day"
       },
       "status": {
         "ACTIVE": "Active",
@@ -6015,7 +6157,8 @@
         "ONCE": "One-time",
         "WEEKLY": "Weekly",
         "BUSINESS_DAILY": "Every business day",
-        "CUSTOM_INTERVAL": "Custom interval (days)"
+        "CUSTOM_INTERVAL": "Custom interval (days)",
+        "DAILY": "Every day (weekends and holidays included)"
       },
       "precision": "How well the date is known",
       "precisionOptions": {
@@ -6090,7 +6233,8 @@
       "save": "Save changes",
       "saving": "Saving...",
       "create": "Add date",
-      "creating": "Creating..."
+      "creating": "Creating...",
+      "dailyHint": "The date falls every day, weekends and holidays included."
     },
     "errors": {
       "forbidden": "You don't have permission to do this. The client isn't assigned to you.",

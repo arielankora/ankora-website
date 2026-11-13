@@ -88,7 +88,9 @@ export async function buildSnapshot(processId: string, frozenBy: ProcedureSnapsh
     scope: p.scope,
     definitions: p.definitions,
     triggerKinds: p.triggerKinds,
-    triggerText: p.triggerText,
+    // 13.11.2026 (stage 1): the rhythm's sentence, and its notes, which the
+    // person running it needs ("the file goes two business days before").
+    triggerText: [p.triggerText, p.triggerNotes && p.triggerNotes !== p.triggerText ? p.triggerNotes : null].filter(Boolean).join(" ") || null,
     slaText: p.slaText,
     owner: user(p.ownerId),
     backupOwner: user(p.backupOwnerId),

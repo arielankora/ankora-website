@@ -143,6 +143,7 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   RequestType: { decision: "DUMP", table: "request_types", reason: "What comes in from whom and how it is answered. Typed by people." },
   Process: { decision: "DUMP", table: "processes", reason: "The client's recurring processes: owner, trigger, SLA, systems, approvals and handover status. Typed by people." },
   ProcessCheck: { decision: "DUMP", table: "process_checks", reason: "Each check of an ongoing process: who looked, what they found, and the task an issue opened." },
+  ProcessStart: { decision: "DUMP", table: "process_starts", reason: "What starts each process and the schedule rule its dates are made from, set by a person in the rhythm editor; nothing regenerates it." },
   ProcessLesson: { decision: "DUMP", table: "process_lessons", reason: "What the person who closed a run said about the procedure, and whether it went into the next version." },
   CommsChannel: { decision: "DUMP", table: "comms_channels", reason: "Which WhatsApp numbers are stored, whose they are and who never sees them." },
   CommsLineOwner: { decision: "DUMP", table: "comms_line_owners", reason: "Whose Aloha line is whose, set by a person in the app; nothing regenerates it." },

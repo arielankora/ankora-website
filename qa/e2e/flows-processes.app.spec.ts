@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures";
+import { onceInThePast, ongoing, setRhythm, whenSomethingHappens } from "./rhythm";
 
 // Org brain, phase 1 (16.10.2026): a process and its procedure on the
 // client screen, submitted for real, as the seeded admin. Same prose rule
@@ -66,8 +67,6 @@ test.describe("clients/process-actions", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await dialog.locator('input[name="title"]').fill(title);
-    await dialog.locator('input[name="triggerKinds"][value="EVENT"]').check();
-    await dialog.locator('input[name="triggerText"]').fill("בקשת עובד");
     const owner = dialog.locator('select[name="ownerId"] option', { hasText: "מנהל Ankora" }).first();
     await dialog.locator('select[name="ownerId"]').selectOption((await owner.getAttribute("value"))!);
     await dialog.locator('input[name="sources"]').fill(code);
@@ -76,6 +75,8 @@ test.describe("clients/process-actions", () => {
     // The process's card in the panel, not a line elsewhere with the same name.
     const card = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
     await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
+    // 13.11.2026: what starts it is set in the rhythm editor.
+    await setRhythm(page, card(), whenSomethingHappens("בקשת עובד"));
     // 25.10.2026: whether it runs, and why not, apart from the documentation.
     await expect(card().getByTestId("process-readiness")).toHaveText("לא ירוץ: אין נוהל מאושר");
     await expect(card().getByTestId("process-readiness")).toHaveAttribute("data-ready", "false");
@@ -150,8 +151,6 @@ test.describe("clients/process-actions", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await dialog.locator('input[name="title"]').fill(title);
-    await dialog.locator('input[name="triggerKinds"][value="SCHEDULED"]').check();
-    await dialog.locator('input[name="triggerText"]').fill("ב-10 וב-25 לחודש");
     const owner = dialog.locator('select[name="ownerId"] option', { hasText: "מנהל Ankora" }).first();
     await dialog.locator('select[name="ownerId"]').selectOption((await owner.getAttribute("value"))!);
     await dialog.locator('input[name="sources"]').fill(code);
@@ -159,6 +158,8 @@ test.describe("clients/process-actions", () => {
 
     const card = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
     await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
+    // 13.11.2026: by a date that has passed, so nothing is ahead.
+    await setRhythm(page, card(), onceInThePast);
     // A draft does not run anyway: its dates are asked for, but no run is
     // said to be stopped yet.
     await expect(card().getByTestId("process-next-step")).not.toContainText("לא ירוץ: תהליך לפי מועד");
@@ -190,18 +191,16 @@ test.describe("clients/process-actions", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await dialog.locator('input[name="title"]').fill(title);
-    await dialog.locator('input[name="triggerKinds"][value="CONTINUOUS"]').check();
     // The seeded admin owns it, so it lands in this session's routine.
     const owner = dialog.locator('select[name="ownerId"] option', { hasText: "מנהל Ankora" }).first();
     await dialog.locator('select[name="ownerId"]').selectOption((await owner.getAttribute("value"))!);
-    await dialog.locator("section", { hasText: "זמנים ובקרה" }).getByText("הצג עוד").click();
-    await dialog.locator('input[name="checkEveryDays"]').fill("7");
-    await dialog.locator('input[name="checkText"]').fill("שאין חשבוניות תקועות");
     await dialog.locator('input[name="sources"]').fill(code);
     await submit(page, "הוספה לתיק");
 
     const card = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
     await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
+    // 13.11.2026: ongoing, and how often it is checked, in the rhythm editor.
+    await setRhythm(page, card(), ongoing("7", "שאין חשבוניות תקועות"));
     await expect(card()).toContainText("בדיקה פעם בשבוע: שאין חשבוניות תקועות");
     await expect(card()).toContainText("היום");
     await expect(card().getByRole("button", { name: "פתיחת ריצה" })).toHaveCount(0);
@@ -236,13 +235,12 @@ test.describe("clients/process-actions", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await dialog.locator('input[name="title"]').fill(title);
-    await dialog.locator('input[name="triggerKinds"][value="EVENT"]').check();
-    await dialog.locator('input[name="triggerText"]').fill("עובד חדש");
     await dialog.locator('input[name="sources"]').fill(code);
     await submit(page, "הוספה לתיק");
 
     const card = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
     await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
+    await setRhythm(page, card(), whenSomethingHappens("עובד חדש"));
     await expect(card().getByTestId("process-documentation")).toHaveText("תיעוד 0 מתוך 6");
 
     const external = card().getByTestId("process-checklist").locator('li[data-step="doc_field"]', { hasText: "גורם חיצוני" });

@@ -142,6 +142,9 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
   const saidBelow = blocker === SCHEDULED_NO_DATE_BLOCKER || (!!p.draft && !!blocker && /נוהל/.test(blocker));
   if (blocker && !saidBelow) {
     const noOwnerOrTrigger = /אחראי|מפעיל/.test(blocker);
+    // 13.11.2026 (stage 1): what starts it and how often it is checked
+    // are the rhythm's, edited in the rhythm editor, not in the form.
+    const inRhythm = /מפעיל/.test(blocker) || blocker === CONTINUOUS_NO_CHECK_BLOCKER;
     // 13.11.2026: an ongoing process with no check every N days was told
     // to "decide whether to resume it", the paused process's step. It
     // needs the check's frequency, in the form.
@@ -161,7 +164,7 @@ export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: b
             ? "לכתוב את הנוהל ולשלוח לאישור"
             : "להחליט אם לחדש אותו",
       why: noCheck ? "עד אז הבדיקה לא מגיעה לשגרה של אף אחד, ואף אחד לא מקבל תזכורת." : "עד אז התהליך לא פותח ריצות לבד.",
-      fix: editsForm ? { kind: "edit", label: "להשלים" } : noProcedure ? { kind: "procedure", label: "לכתוב נוהל" } : { kind: "open", label: "לתהליך" },
+      fix: inRhythm ? { kind: "dates", label: "להשלים" } : editsForm ? { kind: "edit", label: "להשלים" } : noProcedure ? { kind: "procedure", label: "לכתוב נוהל" } : { kind: "open", label: "לתהליך" },
       blocking: true,
       text: {
         title: (() => {

@@ -452,7 +452,7 @@ const L = {
     stepChannel: "Channel",
     dayOf: (n: number) => (n === 0 ? "On the scheduled date" : n < 0 ? `${-n} business day${n === -1 ? "" : "s"} before the scheduled date` : `${n} business day${n === 1 ? "" : "s"} after the scheduled date`),
     modes: { MANUAL: "Manually", ASSISTED: "Prepared by AI, reviewed by a person", AUTOMATED: "Automatically" } as Record<StepModeLike, string>,
-    triggers: { SCHEDULED: "Scheduled", EVENT: "Event-driven", ON_DEMAND: "On request", CONTINUOUS: "Ongoing" } as Record<TriggerLike, string>,
+    triggers: { SCHEDULED: "Scheduled", EVENT: "Event-driven", ON_DEMAND: "On request", CONTINUOUS: "Ongoing", EXTERNAL: "Runs automatically outside the app" } as Record<TriggerLike, string>,
     channels: { EMAIL: "Email", WHATSAPP: "WhatsApp", SLACK: "Slack", PHONE: "Phone", PORTAL: "Client portal", OTHER: "Other" } as Record<Channel, string>,
     highlights: "Key points",
     exceptions: "Exceptions and escalation",

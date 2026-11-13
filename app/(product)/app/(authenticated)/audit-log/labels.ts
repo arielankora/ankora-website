@@ -183,6 +183,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "process.status": "השהיה, חידוש או ביטול של תהליך",
   "process.remove": "הסרת תהליך מתיק הלקוח",
   "process.dates": "קישור מועדים לתהליך",
+  "process.rhythm": "עריכת הקצב של תהליך",
   "process.version_save": "שמירת טיוטה של נוהל",
   "process.version_discard": "ויתור על טיוטה של נוהל",
   "process.version_approve": "אישור נוהל",

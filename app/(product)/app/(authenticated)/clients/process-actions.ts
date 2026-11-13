@@ -21,6 +21,8 @@ import {
 } from "@/lib/app-domain/processes";
 import { startProcessRun } from "@/lib/app-domain/process-runs";
 import { addProcessDate } from "@/lib/app-domain/process-dates";
+import { previewProcessRhythm, processRhythmContext, saveProcessRhythm, stepsLeadOf, type RhythmPreviewRow } from "@/lib/app-domain/process-rhythm";
+import { readRule, readStartInput, type StartInput } from "@/lib/process-rhythm";
 import { readProcessDateSchedule } from "@/lib/process-date-schedule";
 import { recordProcessCheck } from "@/lib/app-domain/process-checks";
 import { markProcessReviewed, rescanAfterRuleChange } from "@/lib/app-domain/process-review";
@@ -70,8 +72,6 @@ async function parseProcess(f: FormData, selfId?: string): Promise<{ error?: str
   const transition = String(f.get("transitionStatus") ?? "");
   const sla = text(f, "slaBusinessDays");
   if (sla !== null && !/^\d+$/.test(sla)) return { error: t("slaInteger") };
-  const every = text(f, "checkEveryDays");
-  if (every !== null && !/^\d+$/.test(every)) return { error: t("checkInteger") };
   const review = text(f, "reviewEveryDays");
   if (review !== null && !/^\d+$/.test(review)) return { error: t("reviewInteger") };
   return {
@@ -79,8 +79,8 @@ async function parseProcess(f: FormData, selfId?: string): Promise<{ error?: str
       ...itemExtrasFrom(f, selfId),
       title: String(f.get("title") ?? ""),
       purpose: text(f, "purpose"),
-      triggerKinds: list(f, "triggerKinds").filter((t): t is ProcessTrigger => (TRIGGERS as string[]).includes(t)),
-      triggerText: text(f, "triggerText"),
+      // 13.11.2026 (stage 1): what starts it, how often it is checked and
+      // its business calendar are the rhythm's (saveProcessRhythmAction).
       ownerId: text(f, "ownerId"),
       backupOwnerId: text(f, "backupOwnerId"),
       slaText: text(f, "slaText"),
@@ -99,15 +99,12 @@ async function parseProcess(f: FormData, selfId?: string): Promise<{ error?: str
       approvalText: text(f, "approvalText"),
       exceptionPlaybook: text(f, "exceptionPlaybook"),
       entityId: text(f, "entityId"),
-      businessCalendar: text(f, "businessCalendar"),
       executorText: text(f, "executorText"),
       executorUserId: text(f, "executorUserId"),
       executorContactId: text(f, "executorContactId"),
       transitionStatus: (TRANSITIONS as string[]).includes(transition) ? (transition as ProcessTransition) : undefined,
       knowledgeStatus: (STATUSES as string[]).includes(status) ? (status as KnowledgeStatus) : undefined,
       toResolve: text(f, "toResolve"),
-      checkEveryDays: every === null ? null : Number(every),
-      checkText: text(f, "checkText"),
       reviewEveryDays: review === null ? null : Number(review),
       // The procedure as a document (23.10.2026).
       scope: text(f, "scope"),
@@ -339,4 +336,36 @@ export async function approveProcedureTranslationAction(processId: string, versi
   revalidatePath(`/app/clients/${clientId}/processes/${processId}/document`);
   revalidatePath(`/app/clients/${clientId}/procedures`);
   return { ok: true };
+}
+
+/// 13.11.2026 (processes redesign, stage 1): the whole rhythm, from the
+/// rhythm editor.
+export async function saveProcessRhythmAction(clientId: string, processId: string, payload: { starts: unknown[]; businessCalendar?: string | null }): Promise<FormState> {
+  const user = await requireUser();
+  const starts = (Array.isArray(payload.starts) ? payload.starts : []).map(readStartInput);
+  if (starts.some((s) => s === null)) return { error: (await errors())("rhythmUnread") };
+  return run(clientId, () => saveProcessRhythm(user, processId, starts as StartInput[], undefined, { businessCalendar: payload.businessCalendar }));
+}
+
+/// The calendar line and the steps' lead, when the editor opens.
+export async function processRhythmContextAction(processId: string) {
+  const user = await requireUser();
+  try {
+    return { context: await processRhythmContext(user, processId) };
+  } catch (err) {
+    return { error: await friendlyError(err) };
+  }
+}
+
+/// The next occurrences of a schedule the editor has not saved yet.
+export async function previewProcessRhythmAction(processId: string, rule: unknown): Promise<{ rows?: RhythmPreviewRow[]; stepsLead?: number; error?: string }> {
+  const user = await requireUser();
+  const read = readRule(rule);
+  if (!read) return { error: (await errors())("rhythmUnread") };
+  try {
+    const [rows, stepsLead] = await Promise.all([previewProcessRhythm(user, processId, read), stepsLeadOf(processId)]);
+    return { rows, stepsLead };
+  } catch (err) {
+    return { error: await friendlyError(err) };
+  }
 }

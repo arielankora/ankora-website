@@ -219,3 +219,97 @@ export function Drawer({
     </>
   );
 }
+
+/// The refresh after a write, as the drawer above does it: a counter
+/// bumped on each accepted write, and a navigation once the form that
+/// wrote is gone. Shared with CenterDialog.
+function useRefreshAfterWrite() {
+  const [writes, setWrites] = useState(0);
+  const router = useRouter();
+  useEffect(() => {
+    if (writes === 0) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("w", String(Date.now()));
+    startTransition(() => router.replace(`${url.pathname}${url.search}`, { scroll: false }));
+  }, [writes, router]);
+  return () => setWrites((n) => n + 1);
+}
+
+/// 13.11.2026 (processes redesign, stage 1): a window in the middle of the
+/// screen, for a form laid out in two columns that a side drawer would
+/// squeeze (the rhythm editor, "מתי התהליך רץ?"). A small line above the
+/// title says what it is about. Esc and the backdrop dismiss it; the form
+/// closes it after a write with useDrawerClose(), as in the drawer. On a
+/// phone it takes the whole screen.
+export function CenterDialog({
+  triggerLabel,
+  eyebrow,
+  title,
+  children,
+  triggerClassName = "",
+}: {
+  triggerLabel: string;
+  eyebrow?: string;
+  title: string;
+  children: ReactNode;
+  triggerClassName?: string;
+}) {
+  const tShell = useTranslations("shell");
+  const [open, setOpen] = useState(false);
+  const refresh = useRefreshAfterWrite();
+  const dismiss = () => setOpen(false);
+  const closeAfterWrite = () => {
+    setOpen(false);
+    refresh();
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={`text-xs font-medium text-app-text-accent hover:underline ${triggerClassName}`}>
+        {triggerLabel}
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-label={eyebrow ? `${eyebrow}: ${title}` : title}>
+          <button type="button" aria-label={tShell("close")} onClick={dismiss} className="fixed inset-0 bg-app-surface-nav/60" />
+          <div className="relative flex min-h-full items-start justify-center sm:p-12">
+            <div
+              ref={(el) => el?.focus()}
+              tabIndex={-1}
+              className="relative flex min-h-screen w-full max-w-[1100px] flex-col overflow-hidden bg-white outline-none sm:min-h-0 sm:rounded-[18px] sm:shadow-xl"
+            >
+              <div className="flex items-center justify-between gap-4 border-b border-app-border px-5 py-5 sm:px-8 sm:py-6">
+                <div className="flex flex-col gap-1">
+                  {eyebrow && <p className="text-sm font-bold text-app-text-accent">{eyebrow}</p>}
+                  <h2 className="text-[22px] font-extrabold text-app-text-primary sm:text-[26px]">{title}</h2>
+                </div>
+                <button
+                  type="button"
+                  aria-label={tShell("close")}
+                  onClick={dismiss}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border border-app-border text-app-text-secondary hover:text-app-text-primary"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <DrawerCloseContext.Provider value={closeAfterWrite}>{children}</DrawerCloseContext.Provider>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

@@ -1432,7 +1432,8 @@
       "notApplicableNotAllowed": "רק מנהל או הבעלים של התהליך מסמנים שדה כלא רלוונטי.",
       "notApplicableField": "את השדה הזה אי אפשר לסמן כלא רלוונטי.",
       "discardNotDraft": "אפשר לוותר רק על הטיוטה האחרונה, לפני שאושרה.",
-      "discardNotAuthor": "רק מי שכתב את הטיוטה, או מנהל, מוותר עליה."
+      "discardNotAuthor": "רק מי שכתב את הטיוטה, או מנהל, מוותר עליה.",
+      "rhythmInvalid": "הקצב לא תקין. בדקו את השדות ונסו שוב."
     },
     "processRuns": {
       "sameDay": "כבר יש ריצה פתוחה של {code} ליום הזה: \"{title}\" ({id}). אפשר לעבוד עליה, או לסגור אותה ואז לפתוח חדשה.",
@@ -2067,7 +2068,8 @@
       "commsExportDownloaded": "ייצוא שיחות והקלטות של לקוח",
       "userCommsAccess": "שינוי הגישה למסך התקשורת",
       "clientCommunicationLocale": "שינוי שפת התקשורת עם הלקוח",
-      "processVersionDiscard": "ויתור על טיוטה של נוהל"
+      "processVersionDiscard": "ויתור על טיוטה של נוהל",
+      "processRhythm": "עריכת הקצב של תהליך"
     },
     "kinds": {
       "failure": "כשלון",
@@ -3052,7 +3054,8 @@
           "SCHEDULED": "לפי מועד",
           "EVENT": "כשמשהו קורה",
           "ON_DEMAND": "לפי בקשה",
-          "CONTINUOUS": "שוטף"
+          "CONTINUOUS": "שוטף",
+          "EXTERNAL": "אוטומטי, מחוץ לאפליקציה"
         },
         "transitions": {
           "WITH_CLIENT": "אצל הלקוח",
@@ -3678,7 +3681,145 @@
         "lessonChoice": "בוחרים אם זה נכנס לנוהל או לא.",
         "stepsUnread": "השלבים לא נקראו. רעננו ונסו שוב.",
         "runDate": "צריך תאריך לריצה.",
-        "checkOutcome": "מה נמצא בבדיקה?"
+        "checkOutcome": "מה נמצא בבדיקה?",
+        "rhythmUnread": "הקצב לא נקרא. רעננו ונסו שוב."
+      },
+      "rhythm": {
+        "title": "מתי התהליך רץ?",
+        "change": "שינוי",
+        "notSet": "עוד לא נקבע מתי התהליך רץ",
+        "set": "לקבוע מתי הוא רץ",
+        "startsTitle": "מה מתחיל את התהליך",
+        "startsHint": "(אפשר יותר מאחד, אין בחירה מסומנת מראש)",
+        "kinds": {
+          "SCHEDULE": {
+            "title": "לפי לוח זמנים",
+            "hint": "כל חודש, כל שבוע"
+          },
+          "EXTERNAL": {
+            "title": "אוטומטי, מחוץ לאפליקציה",
+            "hint": "משימה מתוזמנת של קלוד"
+          },
+          "EVENT": {
+            "title": "כשמשהו קורה",
+            "hint": "עובד חדש, בקשה"
+          },
+          "CONTINUOUS": {
+            "title": "שוטף",
+            "hint": "בלי ריצות, עם בדיקה"
+          },
+          "ON_DEMAND": {
+            "title": "רק כשמבקשים",
+            "hint": "מריצים ידנית"
+          }
+        },
+        "howOften": "כל כמה זמן",
+        "pickHowOften": "צריך לבחור כל כמה זמן.",
+        "frequencies": {
+          "BUSINESS_DAILY": "כל יום עסקים",
+          "DAILY": "כל יום, כולל סוף שבוע",
+          "WEEKLY": "כל שבוע",
+          "MONTHLY": "כל חודש",
+          "QUARTERLY": "כל רבעון",
+          "YEARLY": "כל שנה",
+          "ONCE": "פעם אחת"
+        },
+        "weekdays": "באילו ימים בשבוע",
+        "severalHint": "(אפשר כמה)",
+        "weekdayNames": {
+          "d0": "ראשון",
+          "d1": "שני",
+          "d2": "שלישי",
+          "d3": "רביעי",
+          "d4": "חמישי",
+          "d5": "שישי",
+          "d6": "שבת"
+        },
+        "monthDays": "באילו ימים בחודש",
+        "lastDay": "אחרון",
+        "quarterMonth": "באיזה חודש ברבעון",
+        "quarterMonths": {
+          "m1": "החודש הראשון (ינואר, אפריל, יולי, אוקטובר)",
+          "m2": "החודש השני (פברואר, מאי, אוגוסט, נובמבר)",
+          "m3": "החודש השלישי (מרץ, יוני, ספטמבר, דצמבר)"
+        },
+        "yearDates": "באילו תאריכים בשנה",
+        "month": "חודש",
+        "day": "יום",
+        "removeDate": "הסרה",
+        "addYearDate": "+ תאריך",
+        "onceDate": "תאריך",
+        "rollLabel": "אם המועד נופל בסוף שבוע או בחג",
+        "rolls": {
+          "PREVIOUS_BUSINESS_DAY": "מקדימים ליום העסקים שלפני",
+          "NEXT_BUSINESS_DAY": "דוחים ליום העסקים שאחרי",
+          "NONE": "נשאר באותו יום"
+        },
+        "leadLabel": "מתי לפתוח את הריצה",
+        "leadBySteps": "{days} ימי עסקים לפני (לפי השלבים)",
+        "leadOnDay": "ביום המועד (לפי השלבים)",
+        "leadEarlier": "{days} ימי עסקים לפני",
+        "calendarLine": "לוח ימי עבודה: {calendar}, {by}.",
+        "periodLink": "רק בתקופה מסוימת",
+        "conditionLink": "רק אם מתקיים תנאי",
+        "rangeStart": "מתאריך",
+        "rangeEnd": "עד תאריך",
+        "condition": "רק אם",
+        "conditionPlaceholder": "למשל: יעד ה-SLA לפגיעויות לא עמד",
+        "externalWhere": "איפה הוא רץ",
+        "externalWherePlaceholder": "משימה מתוזמנת של Claude",
+        "externalWhen": "מתי",
+        "externalWhenPlaceholder": "כל יום ב-07:40",
+        "externalRecipient": "מי מקבל את התוצאה",
+        "eventLabel": "מה קורה שמתחיל אותו",
+        "eventPlaceholder": "למשל: עובד חדש מתחיל לעבוד",
+        "checkEvery": "בדיקה כל (ימים)",
+        "checkText": "מה בודקים",
+        "previewTitle": "כך זה ייראה",
+        "nothingChosen": "עוד לא נבחר מה מתחיל את התהליך.",
+        "opens": "נפתחת ב-{date}",
+        "movedFrom": "הוזז מיום {weekday}",
+        "noDates": "אין מועדים קרובים.",
+        "previewNote": "אין יותר מועדים נפרדים לקשר. הקצב שייך לתהליך, ומופיע בלוח המועדים של הלקוח.",
+        "legacy": "המועדים של התהליך נקבעו לפני הקצב החדש: {sentence} הם נשארים כמו שהם. כדי לשנות, בוחרים כל כמה זמן, והמועדים יוחלפו.",
+        "sentence": {
+          "external": "רץ אוטומטית מחוץ לאפליקציה: {where}, {when}.",
+          "event": "כשמשהו קורה: {what}",
+          "continuous": "שוטף, בדיקה כל {days} ימים.",
+          "onDemand": "כשמבקשים."
+        },
+        "save": "שמירת הקצב",
+        "saving": "שומר...",
+        "cancel": "ביטול",
+        "saved": "הקצב נשמר",
+        "saveFailed": "הקצב לא נשמר",
+        "errors": {
+          "noStart": "צריך לבחור לפחות דבר אחד שמתחיל את התהליך.",
+          "duplicateKind": "כל סוג התחלה פעם אחת.",
+          "pickFrequency": "צריך לבחור כל כמה זמן.",
+          "noWeekday": "צריך לבחור לפחות יום אחד בשבוע.",
+          "badWeekday": "יום בשבוע לא תקין.",
+          "noMonthDay": "צריך לבחור לפחות יום אחד בחודש.",
+          "badMonthDay": "יום בחודש צריך להיות בין 1 ל-31.",
+          "noQuarterMonth": "צריך לבחור באיזה חודש ברבעון.",
+          "noYearDate": "צריך לבחור לפחות תאריך אחד בשנה.",
+          "badYearDate": "תאריך בשנה לא תקין.",
+          "noOnceDate": "צריך תאריך.",
+          "noEvent": "צריך לכתוב מה קורה שמתחיל את התהליך.",
+          "noCheck": "בתהליך שוטף צריך לקבוע כל כמה ימים בודקים.",
+          "checkRange": "בדיקה כל 1 עד {max} ימים.",
+          "noWhere": "צריך לכתוב איפה הוא רץ.",
+          "noWhen": "צריך לכתוב מתי הוא רץ.",
+          "leadRange": "פתיחת הריצה: עד {max} ימי עסקים לפני.",
+          "rangeOrder": "סוף התקופה לפני ההתחלה שלה."
+        },
+        "calendarByEntity": "לפי הישות של התהליך",
+        "calendarByProcess": "נקבע בתהליך",
+        "calendarDefaultLine": "לוח ימי עבודה: ישראל, ברירת המחדל.",
+        "calendarAutoLine": "לוח ימי עבודה: לפי הישות של התהליך.",
+        "calendarLabel": "לוח ימי עבודה",
+        "calendarAuto": "לפי הישות של התהליך",
+        "calendarDefault": "ברירת המחדל: ישראל"
       }
     },
     "procedures": {
@@ -5888,7 +6029,8 @@
         "MONTHLY": "חוזר חודשי",
         "CUSTOM_INTERVAL": "חוזר במרווח קבוע",
         "WEEKLY": "חוזר שבועי",
-        "BUSINESS_DAILY": "כל יום עסקים"
+        "BUSINESS_DAILY": "כל יום עסקים",
+        "DAILY": "כל יום"
       },
       "status": {
         "ACTIVE": "פעיל",
@@ -6015,7 +6157,8 @@
         "ONCE": "חד-פעמי",
         "WEEKLY": "שבועי",
         "BUSINESS_DAILY": "כל יום עסקים",
-        "CUSTOM_INTERVAL": "מרווח מותאם (ימים)"
+        "CUSTOM_INTERVAL": "מרווח מותאם (ימים)",
+        "DAILY": "כל יום (כולל סוף שבוע וחגים)"
       },
       "precision": "כמה המועד ידוע",
       "precisionOptions": {
@@ -6090,7 +6233,8 @@
       "save": "שמירת שינויים",
       "saving": "שומר...",
       "create": "הוספת מועד",
-      "creating": "נוצר..."
+      "creating": "נוצר...",
+      "dailyHint": "המועד חל כל יום, כולל סוף שבוע וחגים."
     },
     "errors": {
       "forbidden": "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.",

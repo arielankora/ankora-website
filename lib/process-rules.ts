@@ -8,7 +8,7 @@ import { findSecrets, type SecretHit } from "@/lib/secret-scan";
 type SecretKind = SecretHit["kind"];
 
 export type StepModeLike = "MANUAL" | "ASSISTED" | "AUTOMATED";
-export type TriggerLike = "SCHEDULED" | "EVENT" | "ON_DEMAND" | "CONTINUOUS";
+export type TriggerLike = "SCHEDULED" | "EVENT" | "ON_DEMAND" | "CONTINUOUS" | "EXTERNAL";
 export type TransitionLike = "WITH_CLIENT" | "IN_HANDOVER" | "WITH_ANKORA" | "NOT_PLANNED";
 
 export const MAX_PROCESS_STEPS = 15;
@@ -24,6 +24,7 @@ export const TRIGGER_LABELS: Record<TriggerLike, string> = {
   EVENT: "כשמשהו קורה",
   ON_DEMAND: "לפי בקשה",
   CONTINUOUS: "שוטף",
+  EXTERNAL: "אוטומטי, מחוץ לאפליקציה",
 };
 
 export const TRANSITION_LABELS: Record<TransitionLike, string> = {

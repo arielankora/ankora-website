@@ -190,7 +190,7 @@ export function assertValidSchedule(s: {
       throw new DomainError("importantDates.weeklyNeedsWeekday", "במועד שבועי צריך לבחור יום בשבוע.");
     }
   }
-  if (s.recurrence === "BUSINESS_DAILY" && s.calendarType !== "GREGORIAN") throw new DomainError("importantDates.businessDailyGregorianOnly", "מועד של כל יום עסקים נקבע לפי הלוח הלועזי.");
+  if ((s.recurrence === "BUSINESS_DAILY" || s.recurrence === "DAILY") && s.calendarType !== "GREGORIAN") throw new DomainError("importantDates.businessDailyGregorianOnly", "מועד של כל יום עסקים נקבע לפי הלוח הלועזי.");
   if (s.intervalMonths !== null && s.intervalMonths !== 1) {
     if (s.recurrence !== "MONTHLY" || s.calendarType !== "GREGORIAN") {
       throw new DomainError("importantDates.intervalMonthsMonthlyOnly", '"כל כמה חודשים" רלוונטי רק למועד חודשי בלוח הלועזי.');
@@ -213,7 +213,7 @@ export function resolvePrecision(s: {
   recurrence: RecurrenceType;
 }): { precision: DatePrecisionLike; dayAlternatives: number[]; day: number } {
   if (s.precision !== "APPROXIMATE") return { precision: s.precision, dayAlternatives: [], day: s.day };
-  if (s.recurrence === "ONCE" || s.recurrence === "WEEKLY" || s.recurrence === "BUSINESS_DAILY" || s.recurrence === "CUSTOM_INTERVAL") {
+  if (s.recurrence === "ONCE" || s.recurrence === "WEEKLY" || s.recurrence === "BUSINESS_DAILY" || s.recurrence === "DAILY" || s.recurrence === "CUSTOM_INTERVAL") {
     throw new DomainError("importantDates.approximateRecurrence", "מועד משוער אפשרי רק במועד שנתי או חודשי.");
   }
   const days = Array.from(new Set(s.dayAlternatives.filter((d) => Number.isInteger(d)))).sort((a, b) => a - b);
