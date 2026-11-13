@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures";
+import { setRhythm, whenSomethingHappens } from "./rhythm";
 
 // 4.11.2026 (task cmvtivumj000pjs08q9qj4t67): the procedure flow editor,
 // as the seeded admin. A process gets a flow with a condition whose
@@ -37,13 +38,13 @@ test("a flow with a condition goes live with one click; an automatic mail waits 
   await page.getByRole("button", { name: "+ תהליך", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.locator('input[name="title"]').fill(title);
-  await dialog.locator('input[name="triggerKinds"][value="EVENT"]').check();
-  await dialog.locator('input[name="triggerText"]').fill("בקשת לקוח");
   await dialog.locator('input[name="sources"]').fill(code);
   await submit(page, "הוספה לתיק");
 
   const card = page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
   await expect(card).toBeVisible({ timeout: 15_000 });
+  // 13.11.2026: what starts it is set in the rhythm editor.
+  await setRhythm(page, card, whenSomethingHappens("בקשת לקוח"));
   await card.getByTestId("procedure-flow-link").click();
   await expect(page.getByTestId("flow-editor")).toBeVisible({ timeout: 15_000 });
 

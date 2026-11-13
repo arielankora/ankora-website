@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures";
+import { setRhythm, whenSomethingHappens } from "./rhythm";
 
 // "אישורים" (20.10.2026): every manual approval on one screen, a tab per
 // kind. The Preview seed always leaves demo proposals pending on the
@@ -42,8 +43,6 @@ async function draftProcedure(page: import("@playwright/test").Page, step: strin
   await page.getByRole("button", { name: "+ תהליך", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.locator('input[name="title"]').fill(title);
-  await dialog.locator('input[name="triggerKinds"][value="EVENT"]').check();
-  await dialog.locator('input[name="triggerText"]').fill("בקשת עובד");
   // 25.10.2026: with an owner, the only thing between it and running is
   // the procedure waiting for approval.
   const owner = dialog.locator('select[name="ownerId"] option', { hasText: "מנהל Ankora" }).first();
@@ -52,6 +51,8 @@ async function draftProcedure(page: import("@playwright/test").Page, step: strin
   await submit(page, "הוספה לתיק");
   const card = page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
   await expect(card, "the process was not added").toBeVisible({ timeout: 15_000 });
+  // 13.11.2026: what starts it is set in the rhythm editor.
+  await setRhythm(page, card, whenSomethingHappens("בקשת עובד"));
   await card.getByRole("button", { name: "כתיבת נוהל" }).click();
   await page.getByRole("dialog").getByLabel("שלב 1: מה עושים").fill(step);
   await submit(page, "שמירת טיוטה");

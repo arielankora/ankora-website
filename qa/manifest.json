@@ -2272,6 +2272,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-12",
       "riskReason": "Who opens the communications screen: every conversation and call with every client; CALLS and FULL only after the confidentiality undertaking is signed in both channels"
+    },
+    "domain:process-rhythm": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-13",
+      "riskReason": "What starts a process and the dates generated from its schedule rule: a changed rule replaces its dates, dates linked before are unlinked and never deleted, the business calendar is saved with it, and the process's trigger kinds and sentence follow on every save so the daily job and readiness read them as before"
     }
   },
   "waivers": {},
