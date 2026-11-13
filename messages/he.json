@@ -3450,9 +3450,7 @@
         "classification": "סיווג",
         "relatedDocs": "מסמכים קשורים",
         "relatedDocsPlaceholder": "מדיניות בקרת גישה, נוהל קליטת עובד",
-        "addToFile": "הוספה לתיק",
-        "triggerNotes": "הערות לקצב",
-        "triggerNotesHint": "מה שלא קובע מועד, למשל \"הקובץ נשלח ל-Nextage שני ימי עסקים לפני\"."
+        "addToFile": "הוספה לתיק"
       },
       "editor": {
         "savedAs": "נשמר כגרסה {version}, טיוטה. מנהל מאשר, והבדיקות רצות לפני האישור.",
@@ -3761,7 +3759,7 @@
         "leadBySteps": "{days} ימי עסקים לפני (לפי השלבים)",
         "leadOnDay": "ביום המועד (לפי השלבים)",
         "leadEarlier": "{days} ימי עסקים לפני",
-        "calendarLine": "ימי העבודה לפי הלוח של התהליך.",
+        "calendarLine": "לוח ימי עבודה: {calendar}, {by}.",
         "periodLink": "רק בתקופה מסוימת",
         "conditionLink": "רק אם מתקיים תנאי",
         "rangeStart": "מתאריך",
@@ -3814,7 +3812,14 @@
           "noWhen": "צריך לכתוב מתי הוא רץ.",
           "leadRange": "פתיחת הריצה: עד {max} ימי עסקים לפני.",
           "rangeOrder": "סוף התקופה לפני ההתחלה שלה."
-        }
+        },
+        "calendarByEntity": "לפי הישות של התהליך",
+        "calendarByProcess": "נקבע בתהליך",
+        "calendarDefaultLine": "לוח ימי עבודה: ישראל, ברירת המחדל.",
+        "calendarAutoLine": "לוח ימי עבודה: לפי הישות של התהליך.",
+        "calendarLabel": "לוח ימי עבודה",
+        "calendarAuto": "לפי הישות של התהליך",
+        "calendarDefault": "ברירת המחדל: ישראל"
       }
     },
     "procedures": {

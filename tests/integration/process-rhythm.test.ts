@@ -84,6 +84,14 @@ describe("process rhythm", () => {
     expect([after.processId, after.deletedAt]).toEqual([null, null]);
   });
 
+  it("sets the business calendar next to the dates it moves", async () => {
+    const { hadas, p } = await setup();
+    await saveProcessRhythm(hadas, p.id, [{ kind: "SCHEDULE", schedule: monthly([10]) }], undefined, { businessCalendar: "US" });
+    expect((await prisma.process.findUniqueOrThrow({ where: { id: p.id } })).businessCalendar).toBe("US");
+    expect((await prisma.importantDate.findFirstOrThrow({ where: { processId: p.id, deletedAt: null } })).businessCalendar).toBe("US");
+    await expect(saveProcessRhythm(hadas, p.id, [{ kind: "ON_DEMAND" }], undefined, { businessCalendar: "XX" })).rejects.toThrow("לא מוכר");
+  });
+
   it("refuses what is not a rhythm, and keeping a schedule that was never legacy", async () => {
     const { hadas, p } = await setup();
     await expect(saveProcessRhythm(hadas, p.id, [])).rejects.toThrow("לפחות דבר אחד");

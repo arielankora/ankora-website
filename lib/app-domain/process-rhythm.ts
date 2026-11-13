@@ -10,6 +10,7 @@ import { createImportantDate, deleteImportantDate } from "@/lib/app-domain/impor
 import { calendarOfProcess, syncDateCalendars } from "@/lib/app-domain/date-calendars";
 import { computeLeadDate, computeNextOccurrence, computeRawNextOccurrence, type RecurrenceInput } from "@/lib/app-domain/important-dates-recurrence";
 import { findSecrets } from "@/lib/secret-scan";
+import { isBusinessCalendarKey } from "@/lib/business-calendar";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { readSteps } from "@/lib/process-rules";
 import { runLeadBusinessDays } from "@/lib/process-runs";
@@ -98,7 +99,7 @@ function sameRule(a: unknown, b: ScheduleRule): boolean {
 /// Saves the whole rhythm. What the editor no longer has is removed: a
 /// schedule's generated dates are deleted, dates linked before stage 1 are
 /// unlinked and stay in the client's dates as they were.
-export async function saveProcessRhythm(actor: User, processId: string, starts: StartInput[], notes?: string | null) {
+export async function saveProcessRhythm(actor: User, processId: string, starts: StartInput[], notes?: string | null, options: { businessCalendar?: string | null } = {}) {
   assertCan(actor.role, "time_entry.create_self");
   const process = await findProcess(actor, processId);
   const error = rhythmError(starts);
@@ -109,6 +110,15 @@ export async function saveProcessRhythm(actor: User, processId: string, starts: 
   if (findSecrets(words).length) throw new DomainError("processes.secrets", "יש כאן סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בתיק.");
 
   const before = await getProcessRhythm(actor, processId);
+  // The business calendar is set next to the dates it moves (the board's
+  // "לוח ימי עבודה ... שינוי"). Null: the entity's country decides.
+  if (options.businessCalendar !== undefined) {
+    if (options.businessCalendar !== null && !isBusinessCalendarKey(options.businessCalendar)) throw new DomainError("processes.calendarUnknown", "לוח ימי העבודה לא מוכר.");
+    if (options.businessCalendar !== process.businessCalendar) {
+      await prisma.process.update({ where: { id: processId }, data: { businessCalendar: options.businessCalendar } });
+      process.businessCalendar = options.businessCalendar;
+    }
+  }
   const existing = await prisma.processStart.findMany({ where: { processId }, select: { id: true, kind: true, schedule: true } });
   const byKind = new Map(existing.map((s) => [s.kind, s]));
   const calendar = await calendarOfProcess(process);
@@ -337,4 +347,21 @@ export async function attachLinkedDates(processId: string) {
     await prisma.processStart.update({ where: { id: start.id }, data: { schedule: { legacy: true } } });
   }
   await prisma.importantDate.updateMany({ where: { processId, deletedAt: null, processStartId: null }, data: { processStartId: start.id } });
+}
+
+/// What the editor shows around the rule: which business calendar the
+/// process follows and why, and how early its steps open a run.
+export async function processRhythmContext(actor: User, processId: string) {
+  assertCan(actor.role, "time_entry.create_self");
+  const process = await findProcess(actor, processId);
+  const calendar = await calendarOfProcess(process);
+  const entity = process.entityId ? await prisma.clientEntity.findFirst({ where: { id: process.entityId, deletedAt: null }, select: { name: true, country: true } }) : null;
+  return {
+    /// What the process itself says; null when its entity decides.
+    setting: process.businessCalendar,
+    /// The calendar in force, how it was decided, and the entity's name.
+    calendar: calendar ? { key: calendar.key, by: calendar.by, entityName: calendar.entityName } : null,
+    hasEntity: !!entity,
+    stepsLead: await stepsLeadOf(processId),
+  };
 }

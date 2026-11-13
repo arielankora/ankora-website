@@ -3450,9 +3450,7 @@
         "classification": "Classification",
         "relatedDocs": "Related documents",
         "relatedDocsPlaceholder": "Access control policy, employee onboarding procedure",
-        "addToFile": "Add to the file",
-        "triggerNotes": "Notes on the rhythm",
-        "triggerNotesHint": "What schedules nothing, for example \"the file goes to Nextage two business days before\"."
+        "addToFile": "Add to the file"
       },
       "editor": {
         "savedAs": "Saved as version {version}, a draft. A manager approves it, and the checks run before approval.",
@@ -3761,7 +3759,7 @@
         "leadBySteps": "{days} business days before (by the steps)",
         "leadOnDay": "On the day (by the steps)",
         "leadEarlier": "{days} business days before",
-        "calendarLine": "Business days follow the process's calendar.",
+        "calendarLine": "Business days: {calendar}, {by}.",
         "periodLink": "Only in a certain period",
         "conditionLink": "Only if something is true",
         "rangeStart": "From",
@@ -3814,7 +3812,14 @@
           "noWhen": "Write when it runs.",
           "leadRange": "The run opens at most {max} business days before.",
           "rangeOrder": "The period ends before it starts."
-        }
+        },
+        "calendarByEntity": "by the process's entity",
+        "calendarByProcess": "set on the process",
+        "calendarDefaultLine": "Business days: Israel, the default.",
+        "calendarAutoLine": "Business days: by the process's entity.",
+        "calendarLabel": "Business days",
+        "calendarAuto": "By the process's entity",
+        "calendarDefault": "The default: Israel"
       }
     },
     "procedures": {

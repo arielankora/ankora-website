@@ -11,7 +11,7 @@ import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { useDrawerClose } from "@/components/app/Drawer";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { Field, INPUT } from "./knowledge-ui";
-import { previewProcessRhythmAction, saveProcessRhythmAction } from "../process-actions";
+import { previewProcessRhythmAction, processRhythmContextAction, saveProcessRhythmAction } from "../process-actions";
 import {
   describeLegacyDates,
   describeRule,
@@ -33,6 +33,8 @@ import {
 
 type Tx = (key: string, values?: Record<string, string | number>) => string;
 type PreviewRow = { date: string; opens: string; movedFrom: string | null };
+type Ctx = { setting: string | null; calendar: { key: string; by: "PROCESS" | "ENTITY"; entityName: string | null } | null; hasEntity: boolean; stepsLead: number };
+const CALENDARS = ["IL", "US"] as const;
 
 export type RhythmEditorProps = {
   clientId: string;
@@ -96,6 +98,7 @@ const chip = (on: boolean) =>
 
 export function RhythmEditor({ clientId, processId, starts, dates }: RhythmEditorProps) {
   const t = useTranslations("clients.processes.rhythm") as unknown as Tx;
+  const tp = useTranslations("clients.processes") as unknown as Tx;
   const locale = useLocale();
   const lang = locale.startsWith("en") ? "en" : "he";
   const format = useFormatter();
@@ -107,6 +110,29 @@ export function RhythmEditor({ clientId, processId, starts, dates }: RhythmEdito
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [problem, setProblem] = useState<RhythmIssue | null>(null);
   const [pending, setPending] = useState(false);
+  // The business calendar line ("לוח ימי עבודה: ישראל, לפי הישות של
+  // התהליך. שינוי"). `calendar` undefined: not touched in this editor.
+  const [ctx, setCtx] = useState<Ctx | null>(null);
+  const [calendar, setCalendar] = useState<string | null | undefined>(undefined);
+  const [editingCalendar, setEditingCalendar] = useState(false);
+  useEffect(() => {
+    let live = true;
+    processRhythmContextAction(processId).then((r) => {
+      if (live && "context" in r && r.context) setCtx(r.context as Ctx);
+    });
+    return () => {
+      live = false;
+    };
+  }, [processId]);
+  const calendarLine = (() => {
+    if (calendar !== undefined) {
+      if (calendar) return t("calendarLine", { calendar: tp(`labels.businessCalendars.${calendar}`), by: t("calendarByProcess") });
+      return ctx?.hasEntity ? t("calendarAutoLine") : t("calendarDefaultLine");
+    }
+    if (!ctx) return null;
+    if (!ctx.calendar) return t("calendarDefaultLine");
+    return t("calendarLine", { calendar: tp(`labels.businessCalendars.${ctx.calendar.key}`), by: ctx.calendar.by === "ENTITY" ? t("calendarByEntity") : t("calendarByProcess") });
+  })();
 
   const set = (patch: Partial<Draft>) => {
     setProblem(null);
@@ -166,7 +192,7 @@ export function RhythmEditor({ clientId, processId, starts, dates }: RhythmEdito
       return;
     }
     setPending(true);
-    const r = await saveProcessRhythmAction(clientId, processId, { starts: inputs });
+    const r = await saveProcessRhythmAction(clientId, processId, { starts: inputs, ...(calendar !== undefined ? { businessCalendar: calendar } : {}) });
     setPending(false);
     if (r.error) {
       showToast({ tone: "error", title: t("saveFailed"), description: r.error });
@@ -178,17 +204,17 @@ export function RhythmEditor({ clientId, processId, starts, dates }: RhythmEdito
 
   const rule = d.rule;
   const lead = rule?.leadBusinessDays ?? null;
-  const stepsLead = preview?.stepsLead ?? 0;
+  const stepsLead = preview?.stepsLead ?? ctx?.stepsLead ?? 0;
 
   return (
-    <div className="flex flex-col gap-6" data-testid="rhythm-editor">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px]">
-        <div className="flex min-w-0 flex-col gap-6">
+    <div className="flex flex-col" data-testid="rhythm-editor">
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex min-w-0 flex-col gap-[26px] px-5 py-6 sm:px-8 sm:py-7">
           <section className="flex flex-col gap-2.5">
             <p className="text-sm font-semibold text-app-text-primary">
               {t("startsTitle")} <span className="font-normal text-app-text-secondary">{t("startsHint")}</span>
             </p>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
               {START_KINDS.map((k) => {
                 const on = d.kinds.includes(k);
                 return (
@@ -308,7 +334,7 @@ export function RhythmEditor({ clientId, processId, starts, dates }: RhythmEdito
               )}
 
               {rule && (
-                <div className="grid max-w-md gap-4">
+                <div className="grid gap-5 sm:grid-cols-2">
                   {rule.frequency !== "BUSINESS_DAILY" && rule.frequency !== "DAILY" && (
                     <Field label={t("rollLabel")}>
                       <select value={rule.roll} onChange={(e) => setRule({ roll: e.target.value as ScheduleRule["roll"] })} className={INPUT}>
@@ -336,7 +362,15 @@ export function RhythmEditor({ clientId, processId, starts, dates }: RhythmEdito
               {rule && (
                 <div className="flex flex-col gap-3">
                   <p className="text-xs text-app-text-secondary">
-                    {t("calendarLine")}{" "}
+                    {calendarLine}{" "}
+                    {calendarLine && !editingCalendar && (
+                      <>
+                        <button type="button" onClick={() => setEditingCalendar(true)} className="font-medium text-app-text-accent hover:underline" data-testid="rhythm-calendar-change">
+                          {t("change")}
+                        </button>
+                        {" · "}
+                      </>
+                    )}
                     {!shown.period && (
                       <button type="button" onClick={() => setShown((s) => ({ ...s, period: true }))} className="font-medium text-app-text-accent hover:underline">
                         {t("periodLink")}
@@ -349,6 +383,23 @@ export function RhythmEditor({ clientId, processId, starts, dates }: RhythmEdito
                       </button>
                     )}
                   </p>
+                  {editingCalendar && (
+                    <Field label={t("calendarLabel")}>
+                      <select
+                        value={(calendar !== undefined ? calendar : ctx?.setting) ?? ""}
+                        onChange={(e) => setCalendar(e.target.value || null)}
+                        className={INPUT}
+                        data-testid="rhythm-calendar"
+                      >
+                        <option value="">{ctx?.hasEntity ? t("calendarAuto") : t("calendarDefault")}</option>
+                        {CALENDARS.map((c) => (
+                          <option key={c} value={c}>
+                            {tp(`labels.businessCalendars.${c}`)}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  )}
                   {shown.period && (
                     <div className="grid gap-4 sm:grid-cols-2">
                       <Field label={t("rangeStart")}>
@@ -406,9 +457,9 @@ export function RhythmEditor({ clientId, processId, starts, dates }: RhythmEdito
           )}
         </div>
 
-        <aside className="flex flex-col gap-4 rounded-xl bg-app-surface-sunken p-5" aria-live="polite" data-testid="rhythm-preview">
+        <aside className="flex flex-col gap-4 bg-app-surface-sunken px-5 py-6 sm:px-[26px] sm:py-7" aria-live="polite" data-testid="rhythm-preview">
           <p className="text-xs font-semibold text-app-text-secondary">{t("previewTitle")}</p>
-          <p className="text-base font-bold leading-snug text-app-text-primary" data-testid="rhythm-sentence">
+          <p className="text-xl font-extrabold leading-snug text-app-text-primary" data-testid="rhythm-sentence">
             {d.kinds.length ? sentence : t("nothingChosen")}
           </p>
           {preview && preview.rows.length > 0 && (
@@ -431,11 +482,11 @@ export function RhythmEditor({ clientId, processId, starts, dates }: RhythmEdito
       </div>
 
       {problem && (
-        <p className="text-sm text-app-error" role="alert" data-testid="rhythm-problem">
+        <p className="px-5 pt-4 text-sm text-app-error sm:px-8" role="alert" data-testid="rhythm-problem">
           {t(`errors.${problem.code}`, problem.params ?? {})}
         </p>
       )}
-      <div className="flex flex-wrap gap-3 border-t border-app-border pt-4">
+      <div className="flex flex-wrap gap-3 border-t border-app-border px-5 py-[18px] sm:px-8">
         <button type="button" onClick={save} disabled={pending} className="min-h-[46px] rounded-xl bg-app-surface-nav px-6 text-sm font-bold text-white disabled:opacity-50" data-testid="rhythm-save">
           {pending ? t("saving") : t("save")}
         </button>

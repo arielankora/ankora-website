@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
-import { Drawer, useDrawerClose } from "@/components/app/Drawer";
+import { CenterDialog, Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { StatusBadge } from "@/components/app/StatusBadge";
@@ -437,11 +437,7 @@ function ProcessForm({
           </Field>
         </div>
         {/* 13.11.2026 (stage 1): what starts it is the rhythm, edited from the
-            card ("מתי התהליך רץ?"). The form keeps only notes on it. */}
-        <Field label={t("form.triggerNotes")}>
-          <input name="triggerNotes" defaultValue={e?.triggerNotes ?? ""} className={INPUT} />
-          <span className="mt-1 block text-xs text-app-text-tertiary">{t("form.triggerNotesHint")}</span>
-        </Field>
+            card ("מתי התהליך רץ?"). */}
       </FormGroup>
 
       <FormGroup
@@ -527,21 +523,12 @@ function ProcessForm({
 
       <FormGroup
         title={t("form.groupTiming")}
-        filled={filled(e?.businessCalendar, e?.reviewEveryDays)}
+        filled={filled(e?.reviewEveryDays)}
         more={
           <>
+            {/* 13.11.2026 (stage 1): the business calendar is the rhythm's,
+                set in the rhythm editor next to the dates it moves. */}
             <div className="grid gap-3.5 lg:grid-cols-2">
-              <Field label={t("form.calendar")}>
-                <select name="businessCalendar" defaultValue={e?.businessCalendar ?? ""} aria-label={t("form.calendar")} className={INPUT}>
-                  <option value="">{t("form.calendarByEntity")}</option>
-                  {BUSINESS_CALENDARS.map((c) => (
-                    <option key={c} value={c}>
-                      {t(`labels.businessCalendars.${c}`)}
-                    </option>
-                  ))}
-                </select>
-                <span className="mt-1 block text-xs text-app-text-tertiary">{t("form.calendarHelp")}</span>
-              </Field>
               <Field label={t("form.reviewEvery")}>
                 <input name="reviewEveryDays" inputMode="numeric" defaultValue={e?.reviewEveryDays ?? ""} placeholder="90" className={INPUT} />
               </Field>
@@ -1078,9 +1065,9 @@ function ProcessCard({
     }
     if (f.kind === "dates") {
       return (
-        <Drawer triggerLabel={label} title={`${p.code} ${p.title}: ${t("rhythm.title")}`} variant="link">
+        <CenterDialog triggerLabel={label} eyebrow={`${p.code} ${p.title}`} title={t("rhythm.title")}>
           <RhythmEditor clientId={clientId} processId={p.id} starts={p.rhythmStarts ?? []} dates={p.rhythmDates ?? []} />
-        </Drawer>
+        </CenterDialog>
       );
     }
     return (
@@ -1145,9 +1132,9 @@ function ProcessCard({
           </p>
           <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-app-text-primary" data-testid="process-rhythm">
             <span>{p.rhythmStarts?.length ? describeRhythm(p.rhythmStarts, p.rhythmDates ?? [], rhythmLang) : <span className="text-app-text-secondary">{t("rhythm.notSet")}</span>}</span>
-            <Drawer triggerLabel={p.rhythmStarts?.length ? t("rhythm.change") : t("rhythm.set")} title={`${p.code} ${p.title}: ${t("rhythm.title")}`} variant="link">
+            <CenterDialog triggerLabel={p.rhythmStarts?.length ? t("rhythm.change") : t("rhythm.set")} eyebrow={`${p.code} ${p.title}`} title={t("rhythm.title")}>
               <RhythmEditor clientId={clientId} processId={p.id} starts={p.rhythmStarts ?? []} dates={p.rhythmDates ?? []} />
-            </Drawer>
+            </CenterDialog>
           </p>
           {p.nextDate && p.nextOpensAt && day(p.nextOpensAt) !== day(p.nextDate) && (
             <p className="text-xs text-app-text-tertiary" data-testid="process-next-opens">
