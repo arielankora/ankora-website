@@ -888,7 +888,10 @@ function NewProcessDateForm({ clientId, process }: { clientId: string; process: 
   const t = useTx();
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(addProcessDateAction, close);
-  const [recurrence, setRecurrence] = useState("BUSINESS_DAILY");
+  // 13.11.2026: no default. It was "every business day", and a monthly
+  // process saved without changing it opened a run every day (P1 of
+  // אוטניק, 10-12.11). The frequency is chosen, never assumed.
+  const [recurrence, setRecurrence] = useState("");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5" data-testid="process-date-new">
       <input type="hidden" name="clientId" value={clientId} />
@@ -896,7 +899,10 @@ function NewProcessDateForm({ clientId, process }: { clientId: string; process: 
       <p className="text-sm font-medium text-app-text-primary">{t("dates.newTitle")}</p>
       <p className="text-xs text-app-text-secondary">{t("dates.newHelp")}</p>
       <Field label={t("dates.howOften")}>
-        <select name="recurrence" value={recurrence} onChange={(e) => setRecurrence(e.target.value)} className={INPUT}>
+        <select name="recurrence" value={recurrence} onChange={(e) => setRecurrence(e.target.value)} required className={INPUT}>
+          <option value="" disabled>
+            {t("dates.chooseHowOften")}
+          </option>
           <option value="BUSINESS_DAILY">{t("dates.BUSINESS_DAILY")}</option>
           <option value="WEEKLY">{t("dates.WEEKLY")}</option>
           <option value="MONTHLY">{t("dates.MONTHLY")}</option>

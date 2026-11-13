@@ -3478,6 +3478,7 @@
         "newTitle": "A new date for the process",
         "newHelp": "The date is created in the file under the process's name, linked to it, and opens a run every time it comes.",
         "howOften": "How often",
+        "chooseHowOften": "Choose how often",
         "BUSINESS_DAILY": "Every business day (Sunday to Thursday, no holidays)",
         "WEEKLY": "Once a week",
         "MONTHLY": "Once a month",
