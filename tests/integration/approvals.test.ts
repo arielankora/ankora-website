@@ -73,7 +73,7 @@ describe("approvals", () => {
     const rules = forAriel.filter((i) => i.kind === "rule");
     expect(rules.find((r) => r.id === proposed.id)?.actions.approve).toBe("אישור הכלל");
     expect(rules.some((r) => r.id === unsure.id)).toBe(false);
-    expect(forAriel.find((i) => i.kind === "procedure")).toMatchObject({ id: process.id, version: 1, href: `/app/clients/${client.id}?tab=file#item-${process.id}` });
+    expect(forAriel.find((i) => i.kind === "procedure")).toMatchObject({ id: process.id, version: 1, href: `/app/clients/${client.id}/processes/${process.id}` });
 
     // 22.10.2026: a missing backup is no longer a decision.
     expect((await mine(ariel, client.id)).filter((i) => i.kind === "process")).toEqual([]);
