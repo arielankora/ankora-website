@@ -15,7 +15,7 @@ import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import type { DocumentTab as Data } from "@/lib/app-domain/procedure-audit";
 import type { ReadinessItem } from "@/lib/audit-readiness";
-import { markProcessFieldNotApplicableAction, updateProcessAction } from "../process-actions";
+import { markProcessFieldNotApplicableAction, reconfirmProcedureAction, updateProcessAction } from "../process-actions";
 import type { PanelProcess } from "./ProcessesPanel";
 
 type Tx = (key: string, values?: Record<string, string | number>) => string;
@@ -23,7 +23,20 @@ type Tx = (key: string, values?: Record<string, string | number>) => string;
 const INPUT = "w-full rounded-[9px] border border-app-border bg-white px-3 py-2.5 text-[15px] font-normal text-app-text-primary";
 const CARD = "flex flex-col gap-3 rounded-[14px] border border-app-border bg-white px-[22px] py-5";
 
-export function DocumentTab({ clientId, process: p, data, onTab }: { clientId: string; process: PanelProcess; data: Data; onTab: (tab: "work") => void }) {
+export function DocumentTab({
+  clientId,
+  process: p,
+  data,
+  onTab,
+  canApprove = false,
+}: {
+  clientId: string;
+  process: PanelProcess;
+  data: Data;
+  onTab: (tab: "work") => void;
+  /// Approves the client's procedures, so may say "המסמך עדיין נכון".
+  canApprove?: boolean;
+}) {
   const t = useTranslations("clients.processes.docTab") as unknown as Tx;
   const tp = useTranslations("clients.processes") as unknown as Tx;
   const format = useFormatter();
@@ -118,6 +131,27 @@ export function DocumentTab({ clientId, process: p, data, onTab }: { clientId: s
                 {staleLine(r)}
               </p>
             ))}
+            {/* 14.11.2026: when only the rhythm or a rule changed and the steps
+                still hold, the approver says so instead of approving a copy.
+                A contact who left still needs a new approver. */}
+            {canApprove && v && data.stale.some((r) => r.key !== "approverLeft") && !data.stale.some((r) => r.key === "approverLeft") && (
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const r = await reconfirmProcedureAction(p.id, clientId);
+                    if (r.error) return showToast({ tone: "error", title: r.error });
+                    showToast({ tone: "success", title: t("stale.stillRightDone") });
+                    router.refresh();
+                  }}
+                  className="inline-flex h-[38px] items-center rounded-[9px] border border-app-border-strong bg-white px-3.5 text-sm font-bold text-app-text-primary"
+                  data-testid="document-still-right"
+                >
+                  {t("stale.stillRight")}
+                </button>
+                <span className="text-sm text-app-text-secondary">{t("stale.stillRightHint", { version: v })}</span>
+              </div>
+            )}
           </section>
         )}
 

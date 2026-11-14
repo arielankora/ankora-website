@@ -178,6 +178,13 @@ export function ProcessPage({
                 {blocker}
               </p>
             )}
+            {/* 14.11.2026: "לעדכן" is in the document's tab; the top says so
+                in one line, like everything else that needs a hand. */}
+            {docTab.stale.length > 0 && (
+              <button type="button" onClick={() => setTab("document")} className="self-start text-sm font-bold text-app-warning hover:underline" data-testid="process-stale">
+                {t("documentStale")}
+              </button>
+            )}
             {(p.approverLeft ?? []).map((l) => (
               <p key={l.step} className="text-sm font-bold text-app-warning" data-testid="process-approver-left">
                 {l.step ? tp("approverLeft", { step: l.step, name: l.name }) : tp("approverLeftProcess", { name: l.name })}
@@ -466,7 +473,7 @@ export function ProcessPage({
           </div>
         )}
 
-        {tab === "document" && <DocumentTab clientId={clientId} process={p} data={docTab} onTab={setTab} />}
+        {tab === "document" && <DocumentTab clientId={clientId} process={p} data={docTab} onTab={setTab} canApprove={canApprove} />}
       </div>
     </div>
   );

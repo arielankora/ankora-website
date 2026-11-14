@@ -11,7 +11,7 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { processUrl } from "@/lib/approval-links";
 import { prisma } from "@/lib/prisma";
 import { canSendToAi } from "@/lib/knowledge";
-import { addProcess, setProcessFieldNotApplicable, setProcessKind, updateProcess } from "@/lib/app-domain/processes";
+import { addProcess, reconfirmProcedure, setProcessFieldNotApplicable, setProcessKind, updateProcess } from "@/lib/app-domain/processes";
 import { updateClient } from "@/lib/app-domain/clients";
 import { NOT_APPLICABLE_FIELDS } from "@/lib/process-rules";
 import { saveProcessRhythm } from "@/lib/app-domain/process-rhythm";
@@ -315,6 +315,31 @@ export function registerProcessTools(server: McpServer): void {
         return toolJson({ saved: true, url: processUrl(appBaseUrl(), client.value.id, process.id) });
       } catch (err) {
         console.error("[mcp] mark_process_reviewed failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "confirm_procedure_still_right",
+    {
+      title: "Say an approved procedure is still right",
+      description:
+        "When get_process `staleReasons` says the approved document is out of date because the rhythm or one of the client's rules changed, and the steps still hold, this records that the approved version is still right (\"המסמך עדיין נכון\"), and the notice goes away. A contact who left as a step's approver is not cleared this way: the step needs a new approver (save_procedure_draft). Someone who approves the client's procedures, and only after they said the document is still right.",
+      inputSchema: z.object({ client: CLIENT, process: PROCESS }),
+      annotations: TOOL_ANNOTATIONS.confirm_procedure_still_right,
+    },
+    async (args: { client: string; process: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const process = await resolveProcess(client.value, args.process);
+        if (!process.ok) return toolText(process.message);
+        const done = await reconfirmProcedure(actor, process.id);
+        return toolJson({ saved: true, version: done.version, url: processUrl(appBaseUrl(), client.value.id, process.id) });
+      } catch (err) {
+        console.error("[mcp] confirm_procedure_still_right failed", err);
         return toolFailure(err);
       }
     }

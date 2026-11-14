@@ -2160,6 +2160,7 @@
       "clientCommunicationLocale": "שינוי שפת התקשורת עם הלקוח",
       "processVersionDiscard": "ויתור על טיוטה של נוהל",
       "processRhythm": "עריכת הקצב של תהליך",
+      "processReconfirmed": "אישור שמסמך הנוהל עדיין נכון",
       "processAuditPrep": "הכנה לביקורת של נוהל",
       "processKind": "שינוי סוג של תהליך (תהליך שרץ או הוראת עבודה)"
     },
@@ -4056,7 +4057,8 @@
         "waitingForApproval": "מחכה לאישור של {name}",
         "remindTo": "תזכורת ל{name}",
         "runOnTime": "הושלמה בזמן",
-        "runLate": "{days, plural, one {באיחור של יום} other {באיחור של # ימים}}"
+        "runLate": "{days, plural, one {באיחור של יום} other {באיחור של # ימים}}",
+        "documentStale": "מסמך הנוהל צריך עדכון: למה"
       },
       "approverLeft": "צריך מאשר חדש לשלב {step}: {name} עזב",
       "approverLeftProcess": "צריך מאשר חדש: {name} עזב",
@@ -4136,7 +4138,10 @@
           "approverLeft": "{name}, המאשר בשלב {step}, עזב.",
           "processApproverLeft": "{name}, המאשר של התהליך, עזב.",
           "rhythmChanged": "הקצב השתנה אחרי האישור של גרסה {version}.",
-          "ruleChanged": "הכלל \"{title}\" השתנה ב-{date}."
+          "ruleChanged": "הכלל \"{title}\" השתנה ב-{date}.",
+          "stillRight": "המסמך עדיין נכון",
+          "stillRightDone": "נרשם שהמסמך עדיין נכון",
+          "stillRightHint": "השלבים לא השתנו. נרשם אישור מחדש של גרסה {version}, וההודעה יורדת."
         },
         "docTitle": "מסמך הנוהל, גרסה {version}",
         "approvedOnBy": "מאושר {date} על ידי {name}",

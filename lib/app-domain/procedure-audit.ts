@@ -39,7 +39,7 @@ export async function documentTabOf(
   const [approved, lastStart, runs] = await Promise.all([
     prisma.processVersion.findFirst({
       where: { processId: p.id, status: "APPROVED" },
-      select: { version: true, approvedAt: true, approvedById: true, translationEnApprovedAt: true, translationEn: true },
+      select: { version: true, approvedAt: true, reconfirmedAt: true, approvedById: true, translationEnApprovedAt: true, translationEn: true },
     }),
     // A rhythm saved in the editor, as its audit says. Not ProcessStart's
     // updatedAt: the stage 1 backfill wrote every row on 13.11.2026, and
@@ -55,7 +55,8 @@ export async function documentTabOf(
   ]);
   const approver = approved?.approvedById ? await prisma.user.findUnique({ where: { id: approved.approvedById }, select: { name: true } }) : null;
   const stale = staleReasons({
-    approvedAt: approved?.approvedAt ?? null,
+    // "המסמך עדיין נכון" moves the line changes are counted from.
+    approvedAt: approved ? (approved.reconfirmedAt && approved.approvedAt && approved.reconfirmedAt > approved.approvedAt ? approved.reconfirmedAt : approved.approvedAt) : null,
     approverLeft: (p.approverLeft ?? []).map((l) => ({ ...l, at: ctx.endedAt.get(l.name) ?? null })),
     rhythmChangedAt: lastStart?.createdAt ?? null,
     rules: ctx.rules,
