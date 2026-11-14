@@ -798,7 +798,12 @@
         "evidenceAdd": "+ Link to evidence",
         "evidenceAria": "Link to the evidence of the step {title}",
         "evidencePlaceholder": "A link to a mail, a file or a bank confirmation",
-        "evidenceSave": "Save"
+        "evidenceSave": "Save",
+        "mode": {
+          "ASSISTED": "Claude prepares, a person checks",
+          "AUTOMATED": "Automated"
+        },
+        "namedApprover": "Needs approval from {name}"
       },
       "advance": {
         "plan": "Advance with Claude",
@@ -870,6 +875,28 @@
         "suggested": "Suggested:",
         "link": "Link",
         "no": "No"
+      },
+      "runBrief": {
+        "title": "The procedure of {code}, version {version}",
+        "review": "The procedure needs review: {reason}. Check it against the client's rules in the file before doing it.",
+        "why": "Why:",
+        "doNotDisclose": "Do not tell:",
+        "steps": "The steps",
+        "output": "Output: {output}",
+        "verification": "Check: {verification}",
+        "approver": "needs approval from {name}",
+        "highlights": "Highlights:",
+        "doneWhen": "The run is done when there is:",
+        "rules": "The client's rules that apply",
+        "from": "from {date},",
+        "interim": "(until the rule is approved. The proposed rule: {rule})",
+        "proposed": "(proposed, not approved yet)",
+        "exceptions": "Approved exceptions",
+        "until": "until {date}",
+        "gaps": "Gaps in the process",
+        "missing": "Missing: {field}",
+        "noAccess": "We have no access to: {systems}",
+        "playbook": "When something goes off course:"
       }
     },
     "list": {

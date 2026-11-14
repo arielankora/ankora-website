@@ -8,11 +8,11 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { isBusinessCalendarKey, type BusinessCalendarKey } from "@/lib/business-calendar";
 import { calendarOfProcess } from "@/lib/app-domain/date-calendars";
-import { processGaps, readSteps } from "@/lib/process-rules";
-import { ruleLine, isExceptionInForce } from "@/lib/client-policies";
+import { processGapItems, readSteps } from "@/lib/process-rules";
+import { ruleInForce, isExceptionInForce } from "@/lib/client-policies";
 import { canCopyIntoTask } from "@/lib/knowledge";
-import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
-import { runDescription, stepDueKeys, stepTitle } from "@/lib/process-runs";
+import { readReviewReason } from "@/lib/process-review";
+import { stepDueKeys, stepTitle, type RunBrief } from "@/lib/process-runs";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 
 // Org brain, phase 1: a run of a process (claude/org-brain-spec-2026-10-12.md,
@@ -106,7 +106,7 @@ export async function openProcessRun(input: OpenRunInput) {
   ]);
   const systemById = new Map(systems.map((s) => [s.id, s]));
   const needed = [...new Set([...process.requiredSystemIds, ...steps.flatMap((s) => s.systemIds)])];
-  const gaps = processGaps(
+  const gaps = processGapItems(
     {
       ...process,
       systemsWithoutAccess: needed.filter((id) => {
@@ -120,7 +120,6 @@ export async function openProcessRun(input: OpenRunInput) {
   // A run opened while the procedure needs review says so first: whoever
   // works it is about to follow a procedure someone has to look at.
   const review = readReviewReason(process.reviewReason);
-  if (review) gaps.unshift(`הנוהל דורש סקירה: ${REVIEW_REASON_LABELS[review]}. לבדוק מול כללי הלקוח בתיק לפני שמבצעים.`);
   // Who signs an approval step, by name (spec 5.3). Someone at Ankora is
   // a signature in the product: the step waits for them. A contact at the
   // client is named, and the approval is collected from them outside.
@@ -155,32 +154,47 @@ export async function openProcessRun(input: OpenRunInput) {
   };
 
   const assignee = process.ownerId ?? input.fallbackAssigneeId ?? null;
-  const description = runDescription({
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+  const brief: RunBrief = {
+    v: 1,
     code: process.code,
     title: process.title,
     version: version.version,
     purpose: process.purpose,
-    doNotDisclose: process.doNotDisclose,
-    steps,
+    doNotDisclose: process.doNotDisclose?.trim() || null,
+    steps: steps.map((st) => ({
+      title: st.title,
+      mode: st.mode,
+      actionTags: st.actionTags,
+      systems: st.systemIds.map((id) => systemById.get(id)?.systemName ?? "?"),
+      output: st.output,
+      verification: st.verification,
+      approver: st.requiresApproval ? approverOfStep(st).name : null,
+    })),
     highlights: version.highlights,
     outputs: version.outputs,
-    gaps,
     // The run is a task every one on the client reads, and Claude with
     // them: a sensitive or restricted rule stays in the file.
-    rules: policies.filter(canCopyIntoTask).map(ruleLine).filter((l): l is string => !!l),
-    exceptions: exceptions
-      .filter((e) => isExceptionInForce(e, now))
-      .map((e) => `${e.policy.title}: ${e.what}, עד ${e.validUntil.toISOString().slice(0, 10).split("-").reverse().join(".")}`),
+    rules: policies.filter(canCopyIntoTask).flatMap((r) => {
+      const inForce = ruleInForce(r);
+      if (!inForce) return [];
+      return [{ title: r.title, text: inForce.text, proposed: r.status === "PROPOSED", startsOn: inForce.startsOn ? day(inForce.startsOn) : null, proposedRule: inForce.interim ? r.statement.trim() : null }];
+    }),
+    exceptions: exceptions.filter((e) => isExceptionInForce(e, now)).map((e) => ({ policy: e.policy.title, what: e.what, until: day(e.validUntil) })),
+    gaps,
+    review: review ?? null,
     exceptionPlaybook: process.exceptionPlaybook,
-    systemName: (id) => systemById.get(id)?.systemName ?? "מערכת שהוסרה",
-  });
+  };
   const dueKeys = stepDueKeys(runKey, steps, calendar);
 
   const runData = {
     clientId: process.clientId,
     categoryId: process.categoryId ?? input.fallbackCategoryId ?? null,
     title: `${process.code} ${process.title}${input.titleSuffix ? `: ${input.titleSuffix}` : ""}`.slice(0, 200),
-    description: input.descriptionPrefix ? `${input.descriptionPrefix}\n\n${description}` : description,
+    // 14.11.2026: the procedure is in runBrief, shown in each reader's
+    // language. The description keeps only what a person or Claude wrote.
+    description: input.descriptionPrefix ?? null,
+    runBrief: brief as unknown as Prisma.InputJsonValue,
     assignedToId: assignee,
     dueDate: dayAt(runKey),
     importantDateId: input.importantDateId ?? null,
@@ -206,7 +220,7 @@ export async function openProcessRun(input: OpenRunInput) {
       data: {
         clientId: process.clientId,
         parentId: run.id,
-        title: stepTitle(step, approver?.name ?? null),
+        title: stepTitle(step),
         // "מי עושה" (stage 3): a step's own doer at Ankora gets it.
         assignedToId: (step.owner?.userId && userById.get(step.owner.userId)?.id) || assignee,
         dueDate: dayAt(dueKeys[i]),

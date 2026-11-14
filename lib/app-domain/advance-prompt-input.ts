@@ -8,6 +8,7 @@ import { formatDecimalHours } from "@/lib/hours-format";
 import { taskUrl } from "@/lib/mcp/serialize";
 import { appBaseUrl } from "@/lib/email-templates";
 import { taskAiExclusion } from "@/lib/ai-exclusion";
+import { readRunBrief, runBriefText } from "@/lib/process-runs";
 import { buildAdvancePrompt, buildLessonsPrompt, fileSizeLabel, fileTypeLabel, SOURCES_LOOKBACK_DAYS, SOURCES_WIDE_LOOKBACK_DAYS, type AdvancePromptSources } from "@/lib/advance-prompt";
 
 // "קדם עם קלוד" (10.10.2026): turns what the task screen already loaded
@@ -131,7 +132,9 @@ export async function advancePromptFor(
     dueLabel: task.dueDate ? day.format(task.dueDate) : null,
     createdLabel: day.format(task.createdAt),
     completedLabel: task.completedAt ? day.format(task.completedAt) : null,
-    description: task.description,
+    // A run opened since 14.11.2026 keeps its procedure as data: Claude
+    // reads it as text after what a person wrote.
+    description: withRunBrief(task.description, task.runBrief),
     clientVisible: task.clientVisible,
     clientTitle: task.clientTitle,
     clientRequest: task.clientRequest,
@@ -173,4 +176,11 @@ export async function advancePromptFor(
     requestedBy: actor.name,
     todayLabel: day.format(new Date()),
   });
+}
+
+/// What a person wrote, then a run's procedure as text.
+function withRunBrief(description: string | null, runBrief: unknown): string | null {
+  const brief = readRunBrief(runBrief);
+  if (!brief) return description;
+  return [description?.trim(), runBriefText(brief)].filter(Boolean).join("\n\n");
 }

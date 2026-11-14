@@ -3,7 +3,9 @@
 // the "start a run" button and the tests compute it the same way.
 
 import { shiftBusinessDays, type BusinessCalendarKey } from "@/lib/business-calendar";
-import { ACTION_TAG_LABELS, STEP_MODE_LABELS, type ProcessStep } from "@/lib/process-rules";
+import { ACTION_TAG_LABELS, FIELD_LABELS, STEP_MODE_LABELS, type ProcessStep } from "@/lib/process-rules";
+
+const FIELD_LABELS_HE: Record<string, string> = FIELD_LABELS;
 
 /// Business days before the date that the run has to open, so that the
 /// earliest step is not already late when it does: a step at -2 needs
@@ -20,13 +22,71 @@ export function stepDueKeys(runKey: string, steps: ProcessStep[], calendar: Busi
   return steps.map((s) => shiftBusinessDays(runKey, s.offsetBusinessDays ?? 0, calendar));
 }
 
-/// A step's title in the run: the step, and when it is not plain manual
-/// work, how it is done; when it needs approval, by whom.
-export function stepTitle(step: ProcessStep, approver: string | null): string {
-  const parts = [step.title];
-  if (step.mode !== "MANUAL") parts.push(`(${STEP_MODE_LABELS[step.mode]})`);
-  if (step.requiresApproval) parts.push(`, דורש אישור${approver ? ` של ${approver}` : ""}`);
-  return parts.join(" ").replace(" ,", ",").slice(0, 200);
+/// A step's title in the run: the step's own words. How it is done and who
+/// approves it are on the step (stepMode, supervisorId, approvalContactId)
+/// and the screen says them in its reader's language (14.11.2026; before,
+/// they were written into the title in Hebrew).
+export function stepTitle(step: ProcessStep): string {
+  return step.title.slice(0, 200);
+}
+
+/// What a run's task shows about its procedure (14.11.2026), as data: the
+/// screen renders it in the reader's language, and runDescription below
+/// writes it as text for Claude. Frozen when the run opens, like the
+/// version it follows.
+export type RunBrief = {
+  v: 1;
+  code: string;
+  title: string;
+  version: number;
+  purpose: string | null;
+  doNotDisclose: string | null;
+  /// `approver`: who approves the step, by name, when it asks for one.
+  steps: { title: string; mode: ProcessStep["mode"]; actionTags: ProcessStep["actionTags"]; systems: string[]; output: string | null; verification: string | null; approver?: string | null }[];
+  highlights: string | null;
+  outputs: string | null;
+  /// The client's rules that apply, each as its title and what it says
+  /// (client data, in the file's words).
+  rules: { title: string; text: string; proposed: boolean; startsOn: string | null; proposedRule: string | null }[];
+  exceptions: { policy: string; what: string; until: string }[];
+  gaps: { missing: string[]; noAccess: string[] };
+  review: "RULES" | "PERIODIC" | null;
+  exceptionPlaybook: string | null;
+};
+
+export function readRunBrief(value: unknown): RunBrief | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Partial<RunBrief>;
+  if (v.v !== 1 || typeof v.code !== "string" || !Array.isArray(v.steps)) return null;
+  return v as RunBrief;
+}
+
+/// The brief as Hebrew text, for Claude (get_task, "קדם עם קלוד").
+export function runBriefText(b: RunBrief): string {
+  const rule = (r: RunBrief["rules"][number]) =>
+    r.proposedRule
+      ? `${r.title}: עד שהכלל יאושר, ${r.text} (הכלל המוצע: ${r.proposedRule})`
+      : `${r.title}: ${r.startsOn ? `מ-${r.startsOn.split("-").reverse().join(".")}, ` : ""}${r.text}${r.proposed ? " (מוצע, עוד לא אושר)" : ""}`;
+  const gaps = [
+    ...(b.review ? [`הנוהל דורש סקירה: ${b.review === "RULES" ? "הנוהל שבתוקף לא עומד בכללי הלקוח" : "הגיע מועד הסקירה התקופתית"}. לבדוק מול כללי הלקוח בתיק לפני שמבצעים.`] : []),
+    ...b.gaps.missing.map((k) => `חסר: ${FIELD_LABELS_HE[k] ?? k}`),
+    ...(b.gaps.noAccess.length ? [`אין לנו גישה ל: ${b.gaps.noAccess.join(", ")}`] : []),
+  ];
+  return runDescription({
+    code: b.code,
+    title: b.title,
+    version: b.version,
+    purpose: b.purpose,
+    doNotDisclose: b.doNotDisclose,
+    steps: b.steps.map((s) => ({ ...s, title: s.approver ? `${s.title}, דורש אישור של ${s.approver}` : s.title, systemIds: s.systems }) as unknown as ProcessStep),
+    highlights: b.highlights,
+    outputs: b.outputs,
+    gaps,
+    rules: b.rules.map(rule),
+    exceptions: b.exceptions.map((e) => `${e.policy}: ${e.what}, עד ${e.until.split("-").reverse().join(".")}`),
+    exceptionPlaybook: b.exceptionPlaybook,
+    systemName: (name) => name,
+  });
 }
 
 export type RunDescriptionInput = {

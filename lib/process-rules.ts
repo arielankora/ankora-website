@@ -385,9 +385,18 @@ export function documentationLine(d: { score: number; of: number }): string {
 /// 22.10.2026: no backup is no longer a gap (Ariel: what lets someone step
 /// in is an approved procedure and access, not a name on the process).
 export function processGaps(p: CompletenessInput & { backupOwnerId?: string | null }, systemName: (id: string) => string): string[] {
-  const gaps: string[] = [];
-  const { missing } = completeness(p);
-  for (const k of missing) if (k !== "permissions") gaps.push(`חסר: ${FIELD_LABELS[k]}`);
-  if (p.systemsWithoutAccess.length && !notApplicableSet(p).has("systems")) gaps.push(`אין לנו גישה ל: ${p.systemsWithoutAccess.map(systemName).join(", ")}`);
+  const { missing, noAccess } = processGapItems(p, systemName);
+  const gaps: string[] = missing.map((k) => `חסר: ${FIELD_LABELS[k]}`);
+  if (noAccess.length) gaps.push(`אין לנו גישה ל: ${noAccess.join(", ")}`);
   return gaps;
+}
+
+/// The same gaps as data, for a screen that says them in its reader's
+/// language (a run's brief, 14.11.2026).
+export function processGapItems(p: CompletenessInput & { backupOwnerId?: string | null }, systemName: (id: string) => string): { missing: FieldKey[]; noAccess: string[] } {
+  const { missing } = completeness(p);
+  return {
+    missing: missing.filter((k) => k !== "permissions"),
+    noAccess: p.systemsWithoutAccess.length && !notApplicableSet(p).has("systems") ? p.systemsWithoutAccess.map(systemName) : [],
+  };
 }

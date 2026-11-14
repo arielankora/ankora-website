@@ -42,6 +42,8 @@ import { taskAiExclusion } from "@/lib/ai-exclusion";
 import { NoMachineTranslation } from "@/components/app/NoMachineTranslation";
 import { listTaskPortalNotes } from "@/lib/app-domain/task-portal-notes";
 import { PortalNotesPanel } from "./PortalNotesPanel";
+import { RunBrief } from "./RunBrief";
+import { readRunBrief } from "@/lib/process-runs";
 
 /// The audit actions a task's thread names, by their dictionary key under
 /// tasks.detail.thread.events (the Hebrew is TASK_AUDIT_LABELS in
@@ -230,6 +232,7 @@ export default async function TaskDetailPage(props: {
   const runOf = task.processId
     ? await prisma.process.findUnique({ where: { id: task.processId }, select: { id: true, code: true, title: true, clientId: true, deletedAt: true } })
     : null;
+  const brief = task.parentId ? null : readRunBrief(task.runBrief);
   const runVersion = runOf && task.processVersionId ? await prisma.processVersion.findUnique({ where: { id: task.processVersionId }, select: { version: true } }) : null;
   // 14.11.2026 (stage 3, "Run.dc.html"): the run's steps approved at the
   // client, by name; and for a task opened by hand, the client's
@@ -316,6 +319,7 @@ export default async function TaskDetailPage(props: {
           {runVersion && <span className="text-app-text-secondary">{t("runOfVersionTail", { version: runVersion.version })}</span>}
         </p>
       )}
+      {brief && <RunBrief brief={brief} />}
       {runChoices.length > 0 && <RunOfPicker taskId={task.id} processes={runChoices.map(({ id, code, title }) => ({ id, code, title }))} suggested={runSuggestion ? { id: runSuggestion.id, code: runSuggestion.code, title: runSuggestion.title } : null} />}
 
       <TaskDetail
@@ -462,6 +466,10 @@ export default async function TaskDetailPage(props: {
           clientApprover: s.approvalContactId ? clientApprovers.get(s.approvalContactId) ?? null : null,
           clientApproval: readApprovalEvidence(s.approvalEvidence),
           evidenceLink: s.evidenceLink ?? null,
+          // 14.11.2026: how it is done, and an approver named only in
+          // words, said here in the reader's language (no longer in the title).
+          mode: s.stepMode && s.stepMode !== "MANUAL" ? s.stepMode : null,
+          namedApprover: !s.requiresApproval && !s.approvalContactId ? (brief?.steps.find((b) => b.title === s.title)?.approver ?? null) : null,
         }))}
         evidence={!!task.processId && !!task.client.auditRequirements}
         reminder={composer ? { clientId: task.clientId, taskId: task.id, composer } : null}

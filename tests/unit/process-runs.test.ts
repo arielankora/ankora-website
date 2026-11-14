@@ -43,9 +43,9 @@ describe("a run", () => {
     expect(stepDueKeys("2026-11-10", steps, "IL")).toEqual(["2026-11-10", "2026-11-08"]);
   });
 
-  it("names each step with how it is done and who approves", () => {
-    expect(stepTitle(steps[0], "אורן")).toBe("חשבוניות ל-Doka");
-    expect(stepTitle(steps[1], "מורשה חתימה")).toBe("מייל לאיילה (Claude מכין, אדם בודק), דורש אישור של מורשה חתימה");
+  it("names each step in its own words: how and who are on the step, in the reader's language", () => {
+    expect(stepTitle(steps[0])).toBe("חשבוניות ל-Doka");
+    expect(stepTitle(steps[1])).toBe("מייל לאיילה");
   });
 
   it("says which procedure, the steps, the rules, the exceptions and the gaps", () => {

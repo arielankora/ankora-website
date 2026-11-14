@@ -1037,6 +1037,10 @@ model Task {
   /// file, a bank confirmation). Optional; counted in the readiness for an
   /// audit ("ראיה מהריצות").
   evidenceLink      String?
+  /// 14.11.2026: what a run's task shows about its procedure, as data
+  /// (lib/process-runs.ts RunBrief), so each reader sees it in their own
+  /// language. Runs opened before keep their Hebrew description.
+  runBrief          Json?
 
   // Tasks phase 5 ("חסימה פשוטה"), and the generalisation of a field
   // that has been here since portal phase 1.

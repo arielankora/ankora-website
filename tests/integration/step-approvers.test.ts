@@ -67,7 +67,7 @@ describe("step approvers", () => {
       [true, guy.id, null],
       [false, null, dana.id],
     ]);
-    expect(steps[2].title).toContain("דנה כהן");
+    expect(steps[2].title).toBe("אישור רשימת התשלומים");
   });
 
   it("closes a client-approved step only with when and how, and not by closing the run", async () => {

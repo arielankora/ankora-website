@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readRunBrief, runBriefText } from "@/lib/process-runs";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
 import { addClientSource } from "@/lib/app-domain/client-sources";
@@ -74,13 +75,15 @@ describe("runs from a date", () => {
     const run = await prisma.task.findFirstOrThrow({ where: { clientId: client.id, parentId: null, processId: process.id } });
     expect(run.title).toBe("P1 תשלומי ספקים, LTD");
     expect(run.assignedToId).toBe(hadas.id);
-    expect(run.description).toContain("לפי נוהל גרסה 1");
-    expect(run.description).toContain("Inc ו-LTD: לא שולחים לאיילה שום דבר של Inc");
+    expect(run.description).toBeNull();
+    const brief = runBriefText(readRunBrief(run.runBrief)!);
+    expect(brief).toContain("לפי נוהל גרסה 1");
+    expect(brief).toContain("Inc ו-LTD: לא שולחים לאיילה שום דבר של Inc");
     const runKey = localDateKey(occurrence, TIMEZONE);
     expect(run.dueDate?.toISOString().slice(0, 10)).toBe(runKey);
 
     const steps = await prisma.task.findMany({ where: { parentId: run.id }, orderBy: { createdAt: "asc" } });
-    expect(steps.map((s) => s.title)).toEqual(["מעלים כל חשבונית ל-Doka", "מייל מרוכז לאיילה (Claude מכין, אדם בודק)"]);
+    expect(steps.map((s) => s.title)).toEqual(["מעלים כל חשבונית ל-Doka", "מייל מרוכז לאיילה"]);
     expect(steps.map((s) => s.stepMode)).toEqual(["MANUAL", "ASSISTED"]);
     expect(steps[1].dueDate?.toISOString().slice(0, 10)).toBe(shiftBusinessDays(runKey, -2, "IL"));
     expect(steps.every((s) => s.processVersionId === run.processVersionId)).toBe(true);
@@ -168,7 +171,7 @@ describe("runs started by a person", () => {
     await addClientPolicy(hadas, { clientId: client.id, kind: "INFO", title: "בירור רפואי", statement: "פרט רפואי על המנכ״ל", sensitivity: "SENSITIVE", sources: S1 });
     await addClientPolicy(hadas, { clientId: client.id, kind: "INFO", title: "עסקה סודית", statement: "שוקלים למכור את החברה", audience: "RESTRICTED", audienceUserIds: [hadas.id], sources: S1 });
     const run = await startProcessRun(hadas, process.id, new Date("2026-11-10T00:00:00Z"));
-    const description = (await prisma.task.findUniqueOrThrow({ where: { id: run.id } })).description ?? "";
+    const description = runBriefText(readRunBrief((await prisma.task.findUniqueOrThrow({ where: { id: run.id } })).runBrief)!);
     expect(description).toContain("לא שולחים לאיילה שום דבר של Inc");
     expect(description).not.toContain("פרט רפואי");
     expect(description).not.toContain("שוקלים למכור");
