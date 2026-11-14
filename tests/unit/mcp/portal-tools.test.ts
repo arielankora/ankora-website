@@ -59,7 +59,7 @@ function collectTools() {
     registerTool: (name: string, config: never, handler: Handler) => {
       tools.set(name, { config, handler });
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
   } as any);
   return tools;
 }

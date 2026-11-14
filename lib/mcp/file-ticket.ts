@@ -70,7 +70,7 @@ export function fileTicketUrl(baseUrl: string, ticket: string): string {
 /// control characters, at most 200 characters. Hebrew is kept as is.
 export function cleanFileName(raw: string): string {
   const base = raw.split(/[\\/]/).pop() ?? "";
-  // eslint-disable-next-line no-control-regex
+   
   const cleaned = base.replace(/[\u0000-\u001f\u007f]/g, "").trim();
   return cleaned.slice(0, 200);
 }

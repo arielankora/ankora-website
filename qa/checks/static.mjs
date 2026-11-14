@@ -33,7 +33,9 @@ export async function lint() {
   // eslint.config.mjs keeps at "warn" until they are cleaned up, and
   // directives that now disable nothing. Anything above that is new and
   // worth a look, but lint noise is never a reason to block a deploy.
-  const BASELINE = 30;
+  // 14.11.2026: 22. The directives that disabled nothing were removed (one
+  // more had appeared since, which took the count to 31).
+  const BASELINE = 22;
   if (errors) out.push(finding("major", `${errors} lint error(s)`, tail(r.all, 20)));
   if (warnings > BASELINE) out.push(finding("minor", `${warnings} lint warnings (baseline is ${BASELINE})`, tail(r.all, 20)));
   return out;
