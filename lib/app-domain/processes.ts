@@ -38,7 +38,7 @@ import { stepsDraftPrompt } from "@/lib/stranger-test";
 import { runLeadBusinessDays } from "@/lib/process-runs";
 import { attachLinkedDates, syncStartsFromKinds } from "@/lib/app-domain/process-rhythm";
 import { describeRhythm } from "@/lib/process-rhythm";
-import { computeLeadDate } from "@/lib/app-domain/important-dates-recurrence";
+import { runOpensOn } from "@/lib/app-domain/important-dates-recurrence";
 import { mentionedIn, processTexts, type Named } from "@/lib/process-mentions";
 import { flowFromSteps, flowIssues, flowSteps, readFlow, secondEyeNodes, type ProcessFlow } from "@/lib/process-flow";
 
@@ -909,9 +909,7 @@ function runOpensAt(
   steps: ProcessStep[]
 ): Date | null {
   if (!d.nextOccurrenceAt) return null;
-  const byDate = computeLeadDate(d.nextOccurrenceAt, d.autoTaskLeadDays ?? 0, d.leadUnit, d.businessCalendar, d.timezone);
-  const bySteps = computeLeadDate(d.nextOccurrenceAt, runLeadBusinessDays(steps), "BUSINESS_DAYS", d.businessCalendar, d.timezone);
-  return bySteps.getTime() < byDate.getTime() ? bySteps : byDate;
+  return runOpensOn(d.nextOccurrenceAt, d, runLeadBusinessDays(steps));
 }
 
 /// Every process of the client this person may see, with its current and

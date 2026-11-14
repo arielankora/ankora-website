@@ -8,7 +8,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { createImportantDate, deleteImportantDate } from "@/lib/app-domain/important-dates";
 import { calendarOfProcess, syncDateCalendars } from "@/lib/app-domain/date-calendars";
-import { computeLeadDate, computeNextOccurrence, computeRawNextOccurrence, recurrenceInputFromRow, type RecurrenceInput } from "@/lib/app-domain/important-dates-recurrence";
+import { computeLeadDate, computeNextOccurrence, runOpensOn, computeRawNextOccurrence, recurrenceInputFromRow, type RecurrenceInput } from "@/lib/app-domain/important-dates-recurrence";
 import { findSecrets } from "@/lib/secret-scan";
 import { isBusinessCalendarKey } from "@/lib/business-calendar";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
@@ -377,7 +377,6 @@ export async function upcomingOfProcess(actor: User, processId: string, count = 
   const found = new Map<string, RhythmPreviewRow>();
   for (const row of dates) {
     const input = recurrenceInputFromRow(row);
-    const lead = Math.max(stepsLead, row.autoTaskLeadDays ?? 0);
     let from = now;
     for (let i = 0; i < count; i++) {
       const next = computeNextOccurrence(input, from);
@@ -385,7 +384,7 @@ export async function upcomingOfProcess(actor: User, processId: string, count = 
       const key = localDateKey(next, TIMEZONE);
       const raw = row.rollConvention === "NONE" ? null : computeRawNextOccurrence(input, from);
       const rawKey = raw ? localDateKey(raw, TIMEZONE) : null;
-      if (!found.has(key)) found.set(key, { date: key, opens: localDateKey(computeLeadDate(next, lead, "BUSINESS_DAYS", row.businessCalendar, TIMEZONE), TIMEZONE), movedFrom: rawKey && rawKey !== key ? rawKey : null });
+      if (!found.has(key)) found.set(key, { date: key, opens: localDateKey(runOpensOn(next, row, stepsLead), TIMEZONE), movedFrom: rawKey && rawKey !== key ? rawKey : null });
       from = new Date(Math.max(next.getTime(), raw?.getTime() ?? 0) + 24 * 60 * 60 * 1000);
     }
   }
