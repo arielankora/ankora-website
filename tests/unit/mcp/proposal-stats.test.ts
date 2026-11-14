@@ -13,6 +13,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 //      whether it was taken back, and whether a date opens a task.
 //   6. Part 2: whether a person marked it right after, the switch, and the
 //      pauses, with a paused client as its opaque key.
+//   7. 14.11.2026: what each auto-applied error was (`autoError`), and per
+//      pause, by type and field (`byType`, `topFields`): names, no values.
 
 const prisma = vi.hoisted(() => ({
   knowledgeProposal: { findMany: vi.fn(), count: vi.fn() },
@@ -20,7 +22,7 @@ const prisma = vi.hoisted(() => ({
   clientSource: { findMany: vi.fn() },
   auditEvent: { findMany: vi.fn() },
   appSetting: { findUnique: vi.fn(), upsert: vi.fn() },
-  autoApplyPause: { findMany: vi.fn() },
+  autoApplyPause: { findMany: vi.fn(), findFirst: vi.fn() },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma }));
 
@@ -60,6 +62,7 @@ beforeEach(() => {
   prisma.auditEvent.findMany.mockResolvedValue([{ entityId: "p1", afterJson: { bulk: true } }]);
   prisma.appSetting.findUnique.mockResolvedValue({ key: "knowledge.auto_apply", value: { enabled: true, firstEnabledAt: "2026-11-03T12:00:00.000Z" } });
   prisma.autoApplyPause.findMany.mockResolvedValue([]);
+  prisma.autoApplyPause.findFirst.mockResolvedValue(null);
 });
 
 describe("proposalStatsForAi", () => {
@@ -144,8 +147,8 @@ describe("proposalStatsForAi", () => {
       enabled: true,
       firstEnabledAt: "2026-11-03T12:00:00.000Z",
       pauses: [
-        { scope: "KIND", key: "FACT.NOTE", errors: 3, since: "2026-11-01T00:00:00.000Z" },
-        { scope: "CLIENT", key: "L2", errors: 2, since: "2026-11-02T00:00:00.000Z" },
+        { scope: "KIND", key: "FACT.NOTE", errors: 3, since: "2026-11-01T00:00:00.000Z", byType: {}, topFields: [] },
+        { scope: "CLIENT", key: "L2", errors: 2, since: "2026-11-02T00:00:00.000Z", byType: {}, topFields: [] },
       ],
     });
     expect(JSON.stringify(out)).not.toContain("c-rimed");
@@ -188,5 +191,52 @@ describe("proposalStatsForAi", () => {
     const where = prisma.knowledgeProposal.findMany.mock.calls[0][0].where;
     expect(where.createdAt).toEqual({ gte: new Date("2026-10-01T00:00:00Z") });
     expect(where.batch).toEqual({ via: "MCP", client: { aiExcluded: false } });
+  });
+  it("says what each auto-applied error was, and per pause by type and field, never the values", async () => {
+    const auto = { ...base, clientId: "c-nux", target: "CONTACT", action: "CREATE", state: "APPROVED", autoApplied: true, payload: {} };
+    const rows = [
+      { ...auto, id: "a1", resultId: "r1" },
+      { ...auto, id: "a2", resultId: "r2", revertedAt: new Date("2026-10-22T08:00:00Z") },
+      { ...auto, id: "a3", resultId: "r3" },
+      { ...base, id: "m1", clientId: "c-nux", target: "CONTACT", action: "CREATE", state: "APPROVED", resultId: "r4", payload: {} },
+    ];
+    // The pause's own read asks for the auto-applied ones only.
+    prisma.knowledgeProposal.findMany.mockImplementation(async (args: { where: { autoApplied?: boolean } }) => (args.where.autoApplied ? rows.filter((r) => r.autoApplied) : rows));
+    prisma.auditEvent.findMany.mockImplementation(async (args: { where: { action: { in: string[] } } }) =>
+      args.where.action.in.includes("client_contact.update")
+        ? [
+            { entityId: "r1", action: "client_contact.update", createdAt: new Date("2026-10-25T00:00:00Z"), beforeJson: { role: "CEO", person: { name: "a", emails: ["x@y.z"] } }, afterJson: { role: SECRET_TEXT, person: { name: "a", emails: [SECRET_TEXT] } } },
+            { entityId: "r2", action: "client_contact.remove", createdAt: new Date("2026-10-22T08:00:01Z"), beforeJson: { role: "CEO" } },
+            { entityId: "r4", action: "client_contact.remove", createdAt: new Date("2026-10-25T00:00:00Z"), beforeJson: { role: "CEO" } },
+          ]
+        : []
+    );
+    prisma.autoApplyPause.findMany.mockResolvedValue([{ id: "z1", scope: "KIND", key: "CONTACT", errors: 2, reason: "r", createdAt: new Date("2026-11-01T00:00:00Z"), liftedAt: null }]);
+    const out = await proposalStatsForAi(MANAGER, { rows: true });
+    const byId = Object.fromEntries(out.rows!.map((r) => [r.id, r]));
+    expect(byId.a1.autoError).toEqual({ type: "UPDATED", fields: ["emails", "role"] });
+    // The removal the revert made is the revert.
+    expect(byId.a2.autoError).toEqual({ type: "REVERTED", fields: [] });
+    expect(byId.a3.autoError).toBeNull();
+    // A person approved it: no autoError at all.
+    expect(byId.m1).not.toHaveProperty("autoError");
+    expect(out.autoApply.pauses).toEqual([
+      {
+        scope: "KIND",
+        key: "CONTACT",
+        errors: 2,
+        since: "2026-11-01T00:00:00.000Z",
+        byType: { REVERTED: 1, UPDATED: 1 },
+        topFields: [
+          { field: "emails", count: 1 },
+          { field: "role", count: 1 },
+        ],
+      },
+    ]);
+    // A marked client's errors are left out of the breakdown too.
+    const pauseQuery = prisma.knowledgeProposal.findMany.mock.calls.map((c) => c[0]).find((a) => a.where?.autoApplied === true);
+    expect(pauseQuery.where.batch).toEqual({ client: { aiExcluded: false } });
+    expect(JSON.stringify(out)).not.toContain(SECRET_TEXT);
+    expect(JSON.stringify(out)).not.toContain("CEO");
   });
 });

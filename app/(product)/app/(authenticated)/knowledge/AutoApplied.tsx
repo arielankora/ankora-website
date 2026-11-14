@@ -5,6 +5,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { autoReviewAnchor } from "@/lib/approval-links";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { kindKeyLabel } from "./labels";
+import type { AutoErrorType } from "@/lib/auto-apply";
 import { liftAutoApplyPauseAction, markAutoReviewedAction, revertProposalAction, setAutoApplyAction } from "./actions";
 
 // "נכנס אוטומטית" (3.11.2026, approval tiers part 2): the items that
@@ -42,9 +43,27 @@ export type AutoApplyPauseRow = {
   approvedAsIs: number;
   lowerBoundPct: number;
   barMet: boolean;
+  /// 14.11.2026: the errors that caused the pause, by type, each with the
+  /// names of the fields fixed most often (pauseBreakdown). Names only.
+  errorTypes: { type: AutoErrorType; count: number; fields: string[] }[];
 };
 
 export type AutoApplyControls = { enabled: boolean; firstEnabled: Date | null; pauses: AutoApplyPauseRow[] };
+
+/// Fields named beside each type of error, at most.
+const FIELDS_PER_TYPE = 3;
+
+/// "3 טעויות: 2 עריכות (תפקיד, אימייל), 1 מחיקה": what the errors that
+/// caused a pause were, in one line. A field with no label keeps its name.
+function errorsLine(t: ReturnType<typeof useTranslations<"knowledge.auto">>, types: AutoApplyPauseRow["errorTypes"]): string | null {
+  if (types.length === 0) return null;
+  const parts = types.map((e) => {
+    const fields = e.fields.slice(0, FIELDS_PER_TYPE).map((f) => (t.has(`errorFields.${f}` as never) ? t(`errorFields.${f}` as never) : f));
+    const what = t(`errorTypes.${e.type}`, { count: e.count });
+    return fields.length ? `${what} (${fields.join(", ")})` : what;
+  });
+  return t("pauseErrors", { count: types.reduce((n, e) => n + e.count, 0), parts: parts.join(", ") });
+}
 
 /// A day, in the reader's time zone: these are moments, not dates.
 const DAY_FORMAT = { day: "numeric", month: "numeric", year: "numeric" } as const;
@@ -152,6 +171,7 @@ function PauseRow({ p }: { p: AutoApplyPauseRow }) {
   const format = useFormatter();
   const { showToast } = useToast();
   const label = p.kindKey ? kindKeyLabel(tk, p.kindKey) : (p.clientName ?? t("clientFallback"));
+  const errors = errorsLine(t, p.errorTypes);
   const [pending, setPending] = useState(false);
   async function lift() {
     setPending(true);
@@ -169,6 +189,11 @@ function PauseRow({ p }: { p: AutoApplyPauseRow }) {
         <p className="mt-0.5 text-xs text-app-text-tertiary">
           <bdi>{p.reason}</bdi> · {t("pausedSince", { date: format.dateTime(p.since, DAY_FORMAT) })}
         </p>
+        {errors && (
+          <p className="mt-0.5 text-xs text-app-text-secondary" data-testid="auto-apply-pause-errors">
+            {errors}
+          </p>
+        )}
         <p className={`mt-0.5 text-xs ${p.barMet ? "text-app-success" : "text-app-text-secondary"}`}>
           {t("pauseBar", { decisions: p.decisions, approvedAsIs: p.approvedAsIs, lowerBound: p.lowerBoundPct })}
         </p>

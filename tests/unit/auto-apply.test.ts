@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   AUTO_REVIEW_SAMPLE_PERCENT,
   autoDecisionBlocker,
-  autoErrorAt,
+  autoError,
+  changedFields,
+  summarizeAutoErrors,
+  REVERT_SLACK_MS,
   autoReviewReason,
   clientPauseDue,
   idBucket,
@@ -75,15 +78,79 @@ describe("which auto-applied items a person looks at", () => {
 
 describe("what an error is", () => {
   const decidedAt = D("2026-11-01T00:00:00Z");
+  const change = (action: string, at: string, before?: unknown, after?: unknown) => ({ action, at: D(at), before, after });
   it("a revert", () => {
-    expect(autoErrorAt({ decidedAt, revertedAt: D("2026-11-05T00:00:00Z") }, [])).toEqual(D("2026-11-05T00:00:00Z"));
+    expect(autoError({ decidedAt, revertedAt: D("2026-11-05T00:00:00Z") }, [])).toEqual({ type: "REVERTED", at: D("2026-11-05T00:00:00Z"), fields: [] });
   });
   it("a change to the item within 30 days, the earliest one", () => {
-    expect(autoErrorAt({ decidedAt, revertedAt: null }, [D("2026-11-20T00:00:00Z"), D("2026-11-10T00:00:00Z")])).toEqual(D("2026-11-10T00:00:00Z"));
+    const e = autoError({ decidedAt, revertedAt: null }, [change("client_fact.remove", "2026-11-20T00:00:00Z"), change("client_fact.supersede", "2026-11-10T00:00:00Z", { body: "a" }, { body: "b" })]);
+    expect(e).toEqual({ type: "SUPERSEDED", at: D("2026-11-10T00:00:00Z"), fields: ["body"] });
   });
-  it("not a change after 30 days, and nothing at all", () => {
-    expect(autoErrorAt({ decidedAt, revertedAt: null }, [D("2026-12-15T00:00:00Z")])).toBeNull();
-    expect(autoErrorAt({ decidedAt, revertedAt: null }, [])).toBeNull();
+  it("not a change after 30 days, nor before it entered, nor an action that is not a change, and nothing at all", () => {
+    expect(autoError({ decidedAt, revertedAt: null }, [change("client_fact.remove", "2026-12-15T00:00:00Z")])).toBeNull();
+    expect(autoError({ decidedAt, revertedAt: null }, [change("client_contact.update", "2026-10-31T00:00:00Z")])).toBeNull();
+    expect(autoError({ decidedAt, revertedAt: null }, [change("client_fact.confirm", "2026-11-02T00:00:00Z")])).toBeNull();
+    expect(autoError({ decidedAt, revertedAt: null }, [])).toBeNull();
+  });
+  it("names each type", () => {
+    const one = (action: string) => autoError({ decidedAt, revertedAt: null }, [change(action, "2026-11-02T00:00:00Z", { a: 1 }, { a: 1 })])?.type;
+    expect(one("client_fact.contradict")).toBe("CONTRADICTED");
+    expect(one("client_contact.update")).toBe("UPDATED");
+    expect(one("client_organization.update")).toBe("UPDATED");
+    expect(one("client_entity.update")).toBe("UPDATED");
+    expect(one("client_contact.remove")).toBe("REMOVED");
+    expect(one("client_entity.remove")).toBe("REMOVED");
+  });
+  it("the removal a revert makes is the revert, not a second error; a removal well before it is its own", () => {
+    const revertedAt = D("2026-11-05T00:00:00Z");
+    const own = new Date(revertedAt.getTime() + 5).toISOString();
+    expect(autoError({ decidedAt, revertedAt }, [change("client_contact.remove", own)])).toMatchObject({ type: "REVERTED" });
+    // Clocks a moment apart: still the revert.
+    const skew = new Date(revertedAt.getTime() - REVERT_SLACK_MS / 2).toISOString();
+    expect(autoError({ decidedAt, revertedAt }, [change("client_contact.remove", skew)])).toMatchObject({ type: "REVERTED", at: revertedAt });
+    expect(autoError({ decidedAt, revertedAt }, [change("client_contact.update", "2026-11-03T00:00:00Z", { role: "CEO" }, { role: "CTO" })])).toMatchObject({ type: "UPDATED", fields: ["role"] });
+  });
+});
+
+describe("which fields were fixed", () => {
+  const row = { id: "c1", clientId: "x", createdAt: "2026-11-01", updatedAt: "2026-11-01", role: "CEO", context: "  נאמר  ", channelOrder: ["mail", "phone"], sources: [{ code: "S1" }] };
+  it("names only, by the same normalization as a proposal's edit, never the row's bookkeeping", () => {
+    expect(changedFields(row, { ...row, updatedAt: "2026-11-09", sources: [], role: "CTO", context: "נאמר", channelOrder: ["phone", "mail"] })).toEqual(["role"]);
+  });
+  it("reads a contact's person as its own fields, and only fields both sides carry", () => {
+    const before = { ...row, person: { id: "p", name: "Dana", emails: ["a@x.com"], phones: [] } };
+    expect(changedFields(before, { ...row, person: { id: "p", name: "Dana", emails: ["b@x.com"], phones: [] } })).toEqual(["emails"]);
+    // An audit row from before the person was stored after the change.
+    expect(changedFields(before, { ...row, role: "CTO" })).toEqual(["role"]);
+  });
+  it("nothing for a removal or a row that is not one", () => {
+    expect(changedFields(row, undefined)).toEqual([]);
+    expect(changedFields(null, row)).toEqual([]);
+  });
+});
+
+describe("the errors behind a pause, summed up", () => {
+  it("counts per type in a fixed order, and the fields fixed most often, each once per error", () => {
+    const s = summarizeAutoErrors([
+      { type: "UPDATED", fields: ["role", "emails"] },
+      { type: "REMOVED", fields: [] },
+      { type: "UPDATED", fields: ["role"] },
+      { type: "REVERTED", fields: [] },
+    ]);
+    expect(s.errors).toBe(4);
+    expect(s.byType).toEqual({ REVERTED: 1, UPDATED: 2, REMOVED: 1 });
+    expect(s.topFields).toEqual([
+      { field: "role", count: 2 },
+      { field: "emails", count: 1 },
+    ]);
+    expect(s.types.map((t) => [t.type, t.count, t.fields.map((f) => f.field)])).toEqual([
+      ["REVERTED", 1, []],
+      ["UPDATED", 2, ["role", "emails"]],
+      ["REMOVED", 1, []],
+    ]);
+  });
+  it("nothing to sum up", () => {
+    expect(summarizeAutoErrors([])).toEqual({ errors: 0, byType: {}, topFields: [], types: [] });
   });
 });
 
