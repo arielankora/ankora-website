@@ -53,6 +53,8 @@ function clip(text: string, max = 160): string {
 }
 
 const itemHref = (clientId: string, id: string) => `/app/clients/${clientId}?tab=file#item-${id}`;
+/// 13.11.2026 (stage 2): a process and its procedure open the process's page.
+const processHref = (clientId: string, id: string) => `/app/clients/${clientId}/processes/${id}`;
 
 async function namesOf(ids: (string | null | undefined)[]): Promise<Map<string, string>> {
   const unique = [...new Set(ids.filter((id): id is string => !!id))];
@@ -248,7 +250,7 @@ async function procedures(s: Scope): Promise<ApprovalItem[]> {
       detail: `${d.changeNote ? `גרסה ${d.version}: ${clip(d.changeNote)}` : `גרסה ${d.version} של הנוהל`} · ${steps.length === 1 ? "שלב אחד" : `${steps.length} שלבים`}`,
       since: d.createdAt,
       by: names.get(d.createdById ?? "") ?? null,
-      href: itemHref(d.process.clientId, d.processId),
+      href: processHref(d.process.clientId, d.processId),
       preview,
       blocked: held ? "הנוהל לא עובר את הבדיקות. מתקנים אותו בתהליך, ואז מאשרים." : separated,
       failing: held ? preview.problems : undefined,
@@ -441,7 +443,7 @@ async function processes(s: Scope): Promise<ApprovalItem[]> {
   );
   const out: ApprovalItem[] = [];
   for (const r of rows) {
-    const href = itemHref(r.clientId, r.facts.id);
+    const href = processHref(r.clientId, r.facts.id);
     for (const step of nextSteps(r.facts, s.manager)) {
       if (!DECISION_STEPS.includes(step.kind)) continue;
       // A process not yet approved, without dates, stops nothing yet: its

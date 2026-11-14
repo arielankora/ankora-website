@@ -2069,7 +2069,8 @@
       "userCommsAccess": "Changed access to the communications screen",
       "clientCommunicationLocale": "Client communication language changed",
       "processVersionDiscard": "Discard a draft of a procedure",
-      "processRhythm": "Edit the rhythm of a process"
+      "processRhythm": "Edit the rhythm of a process",
+      "processKind": "Change the kind of a process (one that runs, or a work instruction)"
     },
     "kinds": {
       "failure": "Failure",
@@ -3176,6 +3177,12 @@
           "CONDITION": "Condition",
           "END": "End",
           "MAIL": "Send email"
+        },
+        "statuses": {
+          "DRAFT": "Draft",
+          "ACTIVE": "Active",
+          "PAUSED": "Paused",
+          "RETIRED": "Retired"
         }
       },
       "readiness": {
@@ -3450,7 +3457,8 @@
         "classification": "Classification",
         "relatedDocs": "Related documents",
         "relatedDocsPlaceholder": "Access control policy, employee onboarding procedure",
-        "addToFile": "Add to the file"
+        "addToFile": "Add to the file",
+        "groupDocument": "The procedure document"
       },
       "editor": {
         "savedAs": "Saved as version {version}, a draft. A manager approves it, and the checks run before approval.",
@@ -3820,6 +3828,134 @@
         "calendarLabel": "Business days",
         "calendarAuto": "By the process's entity",
         "calendarDefault": "The default: Israel"
+      },
+      "list": {
+        "title": "Processes",
+        "documents": "Procedure documents",
+        "new": "+ New process",
+        "newTitle": "New process",
+        "summary": {
+          "total": "{count} processes",
+          "running": "{count} running",
+          "attention": "{count} need attention",
+          "drafts": "{count} drafts",
+          "guides": "{count} work instructions"
+        },
+        "attention": "Needs attention",
+        "toProcess": "Open",
+        "toApprove": "To approval",
+        "toRun": "Open the run",
+        "draftWaits": "Draft {version} of the procedure waits for approval",
+        "runWaits": "A run from {date} is still open, waiting on: {step}",
+        "runOpen": "A run from {date} is still open",
+        "filterLabel": "Filter",
+        "filters": {
+          "all": "All {count}",
+          "active": "Active {count}",
+          "draft": "Drafts {count}",
+          "paused": "Paused {count}",
+          "mine": "Mine"
+        },
+        "cols": {
+          "code": "ID",
+          "process": "Process",
+          "rhythm": "Rhythm",
+          "owner": "Owner",
+          "next": "Next run",
+          "last": "Last run",
+          "status": "Status"
+        },
+        "noRhythm": "Not set yet",
+        "noOwner": "No owner",
+        "paused": "Paused",
+        "next": {
+          "external": "Automatic",
+          "continuous": "Ongoing",
+          "event": "By event",
+          "onDemand": "On request",
+          "check": "Check {date}"
+        },
+        "last": {
+          "never": "Never ran",
+          "done": "Done {date}",
+          "doneNoDate": "Done",
+          "open": "Open, {done} of {total}",
+          "openPlain": "Open",
+          "checkedOk": "Checked {date}, fine",
+          "checkedIssue": "Checked {date}, issue found"
+        },
+        "empty": "No processes in this filter.",
+        "guides": "Work instructions",
+        "guidesHint": "How to do something right. No rhythm, no runs, and never \"will not run\".",
+        "version": "Version {version}",
+        "noProcedure": "No approved procedure"
+      },
+      "page": {
+        "breadcrumb": "Location",
+        "processes": "Processes",
+        "guide": "Work instruction",
+        "version": "version {version}",
+        "runNow": "Run now",
+        "runNowTitle": "Open a run",
+        "recordCheck": "Record a check",
+        "more": "More actions",
+        "menu": {
+          "editWhat": "Name and purpose",
+          "knowledge": "Knowledge settings",
+          "toGuide": "Make it a work instruction",
+          "toProcess": "Make it a process that runs",
+          "nowGuide": "It is now a work instruction",
+          "nowProcess": "It is now a process that runs"
+        },
+        "actionFailed": "The action failed",
+        "when": "When",
+        "change": "Change",
+        "noRhythm": "When it runs is not set yet",
+        "earlier": "moved earlier",
+        "later": "moved later",
+        "opensBefore": "The run opens {days} business days before each date",
+        "opensOnDay": "The run opens on the day",
+        "who": "Who",
+        "edit": "Edit",
+        "whoTitle": "Who does it and who approves",
+        "owner": "Owner",
+        "backup": "Backup",
+        "executor": "Does it",
+        "approver": "Approver",
+        "none": "Not set",
+        "atClient": "at the client",
+        "openRun": "Open run",
+        "openRunOn": "Open run · {date}",
+        "progress": "{done} of {total} steps",
+        "waitingOn": "Waiting on: {step}",
+        "toRun": "Open the run",
+        "noOpenRun": "No open run",
+        "lastRun": "Last run on {date}",
+        "neverRan": "Never ran",
+        "tabs": {
+          "steps": "Steps",
+          "runs": "Runs {count}",
+          "lessons": "Notes from the field {count}",
+          "work": "Details for the work",
+          "document": "Procedure document"
+        },
+        "stepsCount": "{count} steps",
+        "noSteps": "No steps yet",
+        "editSteps": "Edit the steps",
+        "writeSteps": "Write the steps",
+        "stepsTitle": "The steps",
+        "draftWaits": "Draft {version} waits for approval",
+        "approve": "Approve the procedure",
+        "approved": "The procedure was approved",
+        "needsApproval": "Needs approval",
+        "needsApprovalBy": "Needs approval from {name}",
+        "fromTheField": "A note from the field",
+        "recentRuns": "Recent runs",
+        "runDone": "Done",
+        "runOpenShort": "Open",
+        "noLessons": "No notes from the field.",
+        "openDocument": "The full procedure document",
+        "docScore": "Documentation: {score} of {of}"
       }
     },
     "procedures": {

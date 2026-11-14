@@ -292,7 +292,7 @@ export default async function TaskDetailPage(props: {
       </nav>
       {runOf && !runOf.deletedAt && (
         <p className="text-[13px] text-app-text-secondary" data-testid="task-run-of">
-          <a href={`/app/clients/${runOf.clientId}?tab=file#item-${runOf.id}`} className="font-medium text-app-text-accent hover:underline">
+          <a href={`/app/clients/${runOf.clientId}/processes/${runOf.id}`} className="font-medium text-app-text-accent hover:underline">
             {runVersion
               ? t("runOfVersion", { code: runOf.code, title: runOf.title, version: runVersion.version })
               : t("runOf", { code: runOf.code, title: runOf.title })}

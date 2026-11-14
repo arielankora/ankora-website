@@ -1,4 +1,6 @@
 import { test, expect } from "./fixtures";
+import { fillRhythm, whenSomethingHappens } from "./rhythm";
+import { approveDraft, CLIENT, newProcess, tag, writeStep } from "./process-page";
 
 // The procedure as a document (23.10.2026), as the seeded admin: a process
 // with a scope and controls, its procedure approved, read as a document,
@@ -9,66 +11,34 @@ import { test, expect } from "./fixtures";
 
 test.describe.configure({ timeout: 120_000 });
 
-const CLIENT = "demo-client-b";
-
-function tag(prefix: string) {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-async function submit(page: import("@playwright/test").Page, button: string) {
-  const written = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400, { timeout: 30_000 });
-  await page.getByRole("dialog").getByRole("button", { name: button }).click({ timeout: 15_000 });
-  await written;
-  await page.reload();
-}
-
-/// The same as flows-processes: a source, and its code.
-async function addSource(page: import("@playwright/test").Page): Promise<string> {
-  const title = tag("[E2E] מקור");
-  await page.getByRole("button", { name: "+ מקור", exact: true }).click({ timeout: 15_000 });
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await dialog.locator('input[name="title"]').fill(title, { timeout: 15_000 });
-  await submit(page, "הוספה למרשם");
-  const row = page.locator("li", { hasText: title });
-  await expect(row.first(), "the source was not added").toBeVisible({ timeout: 15_000 });
-  return (await row.first().locator("span.font-mono").innerText({ timeout: 15_000 })).trim();
-}
-
 test("an approved procedure reads as a document and downloads as PDF and Word", async ({ page }) => {
   const title = tag("[E2E] נוהל");
 
-  await page.goto(`/app/clients/${CLIENT}?tab=file`);
-  const code = await test.step("a source", () => addSource(page));
-
-  await page.getByRole("button", { name: "+ תהליך", exact: true }).click({ timeout: 15_000 });
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await dialog.locator('input[name="title"]').fill(title);
-  await dialog.locator('input[name="purpose"]').fill("לפתוח ולסגור משתמשים עם תיעוד");
-  await dialog.locator('input[name="sources"]').fill(code);
-  await dialog.locator("section", { hasText: "חריגים ומסמך הנוהל" }).getByText("הצג עוד").click({ timeout: 15_000 });
-  await dialog.locator('textarea[name="scope"]').fill("כל העובדים בישראל");
-  await dialog.locator('input[name="controlRefs"]').fill("CC6.2, CC6.3");
-  await submit(page, "הוספה לתיק");
-
-  const card = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
-  await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
-  await test.step("write and approve the procedure", async () => {
-    await card().getByRole("button", { name: "כתיבת נוהל" }).click({ timeout: 15_000 });
-    const editor = page.getByRole("dialog");
-    await expect(editor).toBeVisible();
-    await editor.getByLabel("שלב 1: מה עושים").fill("אוספים את פרטי הבקשה", { timeout: 15_000 });
-    await submit(page, "שמירת טיוטה");
-    await expect(card()).toContainText("טיוטה, גרסה 1", { timeout: 15_000 });
-    const approved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400, { timeout: 30_000 });
-    await card().getByRole("button", { name: "אישור הנוהל" }).first().click({ timeout: 15_000 });
-    await approved;
+  // 13.11.2026 (stage 2): added from the list, then the document's fields in
+  // the process page's "מסמך הנוהל" tab.
+  await test.step("a process", async () => {
+    await newProcess(page, title, { purpose: "לפתוח ולסגור משתמשים עם תיעוד" });
+    await fillRhythm(page, whenSomethingHappens("בקשת עובד"));
+  });
+  await test.step("its document's fields", async () => {
+    await page.getByTestId("process-tab-document").click();
+    const doc = page.getByTestId("process-document");
+    await doc.locator('textarea[name="scope"]').fill("כל העובדים בישראל");
+    await doc.locator('input[name="controlRefs"]').fill("CC6.2, CC6.3");
+    const saved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400, { timeout: 30_000 });
+    await doc.getByRole("button", { name: "שמירה" }).click();
+    await saved;
     await page.reload();
-    await expect(card()).toContainText("נוהל, גרסה 1", { timeout: 15_000 });
+  });
+  await test.step("write and approve the procedure", async () => {
+    await writeStep(page, "אוספים את פרטי הבקשה");
+    await expect(page.getByTestId("process-draft")).toContainText("טיוטה 1 מחכה לאישור", { timeout: 15_000 });
+    await approveDraft(page);
+    await expect(page.getByTestId("process-page")).toContainText("גרסה 1");
   });
 
-  await card().getByTestId("procedure-document-link").click({ timeout: 15_000 });
+  await page.getByTestId("process-tab-document").click();
+  await page.getByTestId("procedure-document-link").click({ timeout: 15_000 });
   await expect(page).toHaveURL(/\/processes\/[^/]+\/document/, { timeout: 15_000 });
   const paper = page.getByTestId("procedure-paper");
   await expect(paper).toContainText(title);
@@ -94,8 +64,8 @@ test("an approved procedure reads as a document and downloads as PDF and Word", 
   const en = await page.request.get((await page.getByTestId("export-pdf").getAttribute("href", { timeout: 15_000 }))!.replace("lang=he", "lang=en"));
   expect(en.status()).toBe(404);
 
-  // The processes panel is on the client file's tab.
-  await page.goto(`/app/clients/${CLIENT}?tab=file`);
+  // The way to the client's procedures is on the processes list.
+  await page.goto(`/app/clients/${CLIENT}?tab=file&section=processes`);
   await page.getByTestId("procedures-index-link").click({ timeout: 15_000 });
   await expect(page.getByTestId("procedure-row").filter({ hasText: title })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("procedures-pack")).toBeVisible();

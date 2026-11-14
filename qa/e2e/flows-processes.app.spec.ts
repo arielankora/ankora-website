@@ -1,41 +1,15 @@
 import { test, expect } from "./fixtures";
-import { onceInThePast, ongoing, setRhythm, whenSomethingHappens } from "./rhythm";
+import { fillRhythm, onceInThePast, ongoing, whenSomethingHappens } from "./rhythm";
+import { CLIENT, newProcess, submit, tag } from "./process-page";
 
 // Org brain, phase 1 (16.10.2026): a process and its procedure on the
 // client screen, submitted for real, as the seeded admin. Same prose rule
 // as flows-admin: modules are named in words here, never by path.
 //
 // @covers action:(product)/app/(authenticated)/clients/process-actions
+// @covers screen:/app/clients/[clientId]/processes/[processId]
 
 test.describe.configure({ timeout: 120_000 });
-
-const CLIENT = "demo-client-b";
-
-function tag(prefix: string) {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-async function addSource(page: import("@playwright/test").Page): Promise<string> {
-  const title = tag("[E2E] מקור");
-  await page.getByRole("button", { name: "+ מקור", exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await dialog.locator('input[name="title"]').fill(title);
-  const written = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-  await dialog.getByRole("button", { name: "הוספה למרשם" }).click();
-  await written;
-  await page.reload();
-  const row = page.locator("li", { hasText: title });
-  await expect(row.first(), "the source was not added").toBeVisible({ timeout: 15_000 });
-  return (await row.first().locator("span.font-mono").innerText()).trim();
-}
-
-async function submit(page: import("@playwright/test").Page, button: string) {
-  const written = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-  await page.getByRole("dialog").getByRole("button", { name: button }).click();
-  await written;
-  await page.reload();
-}
 
 test.describe("clients/process-actions", () => {
   // 31.10.2026: the file shows one part at a time, and the part last
@@ -59,30 +33,14 @@ test.describe("clients/process-actions", () => {
 
   test("a procedure that automates a payment is held back; fixed, a manager approves it", async ({ page }) => {
     const title = tag("[E2E] תהליך");
+    const href = await newProcess(page, title);
+    // 13.11.2026: what starts it is set in the rhythm editor, open on arrival.
+    await fillRhythm(page, whenSomethingHappens("בקשת עובד"));
+    await expect(page.getByTestId("process-when")).toContainText("כשמשהו קורה: בקשת עובד");
+    // Only what stops a run is said on top, in one line.
+    await expect(page.getByTestId("process-blocker")).toHaveText("לא ירוץ: אין נוהל מאושר");
 
-    await page.goto(`/app/clients/${CLIENT}?tab=file`);
-    const code = await addSource(page);
-
-    await page.getByRole("button", { name: "+ תהליך", exact: true }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await dialog.locator('input[name="title"]').fill(title);
-    const owner = dialog.locator('select[name="ownerId"] option', { hasText: "מנהל Ankora" }).first();
-    await dialog.locator('select[name="ownerId"]').selectOption((await owner.getAttribute("value"))!);
-    await dialog.locator('input[name="sources"]').fill(code);
-    await submit(page, "הוספה לתיק");
-
-    // The process's card in the panel, not a line elsewhere with the same name.
-    const card = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
-    await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
-    // 13.11.2026: what starts it is set in the rhythm editor.
-    await setRhythm(page, card(), whenSomethingHappens("בקשת עובד"));
-    // 25.10.2026: whether it runs, and why not, apart from the documentation.
-    await expect(card().getByTestId("process-readiness")).toHaveText("לא ירוץ: אין נוהל מאושר");
-    await expect(card().getByTestId("process-readiness")).toHaveAttribute("data-ready", "false");
-    await expect(card().getByTestId("process-documentation")).toContainText("תיעוד");
-
-    await card().getByRole("button", { name: "כתיבת נוהל" }).click();
+    await page.getByRole("button", { name: "כתיבת השלבים" }).click();
     const editor = page.getByRole("dialog");
     await expect(editor).toBeVisible();
     await editor.getByLabel("שלב 1: מה עושים").fill("מעבירים תשלום לספק");
@@ -90,11 +48,12 @@ test.describe("clients/process-actions", () => {
     await editor.getByRole("checkbox", { name: "תשלום" }).check();
     await submit(page, "שמירת טיוטה");
 
-    await expect(card()).toContainText("טיוטה, גרסה 1", { timeout: 15_000 });
-    await expect(card()).toContainText("לא נעשה אוטומטית");
-    await expect(card().getByRole("button", { name: "אישור הנוהל" })).toHaveCount(0);
+    const draft = page.getByTestId("process-draft");
+    await expect(draft).toContainText("טיוטה 1 מחכה לאישור", { timeout: 15_000 });
+    await expect(draft).toContainText("לא נעשה אוטומטית");
+    await expect(draft.getByRole("button", { name: "אישור הנוהל" })).toHaveCount(0);
 
-    await card().getByRole("button", { name: "עריכת הטיוטה" }).click();
+    await page.getByRole("button", { name: "עריכת השלבים" }).click();
     const fix = page.getByRole("dialog");
     await expect(fix).toBeVisible();
     // 28.10.2026: the editor says what holds the approval, and where.
@@ -104,39 +63,34 @@ test.describe("clients/process-actions", () => {
     await fix.getByLabel("שלב 1: איך").selectOption("MANUAL");
     await expect(fix.getByTestId("procedure-issues")).toHaveCount(0);
     await submit(page, "שמירת טיוטה");
-    await expect(card()).toContainText("טיוטה, גרסה 2", { timeout: 15_000 });
+    await expect(draft).toContainText("טיוטה 2 מחכה לאישור", { timeout: 15_000 });
 
     const approved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-    await card().getByRole("button", { name: "אישור הנוהל" }).click();
+    await draft.getByRole("button", { name: "אישור הנוהל" }).click();
     await approved;
     await page.reload();
-    await expect(card()).toContainText("נוהל, גרסה 2", { timeout: 15_000 });
-    await expect(card()).not.toContainText("אין נוהל מאושר");
-    await expect(card().getByTestId("process-readiness")).toHaveText("רץ");
-    await expect(card().getByTestId("process-readiness")).toHaveAttribute("data-ready", "true");
+    await expect(page.getByTestId("process-page")).toContainText("גרסה 2", { timeout: 15_000 });
+    await expect(page.getByTestId("process-draft")).toHaveCount(0);
+    await expect(page.getByTestId("process-blocker")).toHaveCount(0);
+    await expect(page.getByText("מעבירים תשלום לספק").first()).toBeVisible();
 
-    // 31.10.2026: the approved procedure is drawn in the card by default, as
-    // a band of days over its steps; "טקסט" hides it, "תרשים" brings it back.
-    const switcher = card().getByTestId("process-view-switch");
-    await expect(switcher.getByRole("button", { name: "תרשים" })).toHaveAttribute("aria-pressed", "true");
-    await expect(card().getByTestId("process-visual")).toBeVisible();
-    await expect(card().getByTestId("process-visual")).toContainText("מעבירים תשלום לספק");
-    await switcher.getByRole("button", { name: "טקסט" }).click();
-    await expect(card().getByTestId("process-visual")).toHaveCount(0);
-    await switcher.getByRole("button", { name: "תרשים" }).click();
-    await expect(card().getByTestId("process-visual")).toBeVisible();
+    // The list: one row for it, its rhythm in words, and its page from the name.
+    await page.goto(`/app/clients/${CLIENT}?tab=file&section=processes`);
+    const row = page.getByTestId("process-list").locator("tr", { hasText: title });
+    await expect(row).toContainText("כשמשהו קורה: בקשת עובד");
+    await expect(row).toContainText("פעיל");
+    await row.getByRole("link", { name: title }).click();
+    await expect(page).toHaveURL(new RegExp(`${href}$`), { timeout: 15_000 });
 
-    // An event happened: a run opens as a task, and the card links to it.
-    await card().getByRole("button", { name: "פתיחת ריצה" }).click();
+    // An event happened: a run opens as a task, and the page links to it.
+    await page.getByRole("button", { name: "הרצה עכשיו" }).click();
     const start = page.getByRole("dialog");
     await expect(start).toBeVisible();
     const today = new Date().toISOString().slice(0, 10);
     await start.locator('input[name="day"]').fill(today);
     await submit(page, "פתיחת הריצה");
-    await expect(card()).toContainText("ריצות:", { timeout: 15_000 });
-    // 22.10.2026: the runs are under "פרטים", closed once nothing waits.
-    await card().getByTestId("process-details").locator("summary").click();
-    await card().getByTestId("process-details").getByRole("link").first().click();
+    await expect(page.getByTestId("process-tab-runs")).toHaveText("ריצות 1", { timeout: 15_000 });
+    await page.getByTestId("process-open-run").getByRole("link", { name: "לריצה" }).click();
     await expect(page).toHaveURL(/\/app\/tasks\//, { timeout: 15_000 });
     await expect(page.getByText(title).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("מעבירים תשלום לספק").first()).toBeVisible();
@@ -144,66 +98,39 @@ test.describe("clients/process-actions", () => {
 
   test("an approved process that runs by a date, with none ahead, says no run will open", async ({ page }) => {
     const title = tag("[E2E] תשלומי ספקים");
-
-    await page.goto(`/app/clients/${CLIENT}?tab=file`);
-    const code = await addSource(page);
-    await page.getByRole("button", { name: "+ תהליך", exact: true }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await dialog.locator('input[name="title"]').fill(title);
-    const owner = dialog.locator('select[name="ownerId"] option', { hasText: "מנהל Ankora" }).first();
-    await dialog.locator('select[name="ownerId"]').selectOption((await owner.getAttribute("value"))!);
-    await dialog.locator('input[name="sources"]').fill(code);
-    await submit(page, "הוספה לתיק");
-
-    const card = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
-    await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
+    await newProcess(page, title);
     // 13.11.2026: by a date that has passed, so nothing is ahead.
-    await setRhythm(page, card(), onceInThePast);
-    // A draft does not run anyway: its dates are asked for, but no run is
-    // said to be stopped yet.
-    await expect(card().getByTestId("process-next-step")).not.toContainText("לא ירוץ: תהליך לפי מועד");
+    await fillRhythm(page, onceInThePast);
+    // A draft does not run anyway: no run is said to be stopped yet.
+    await expect(page.getByTestId("process-blocker")).not.toContainText("לא ירוץ: תהליך לפי מועד");
 
-    await card().getByRole("button", { name: "כתיבת נוהל" }).click();
+    await page.getByRole("button", { name: "כתיבת השלבים" }).click();
     const editor = page.getByRole("dialog");
     await expect(editor).toBeVisible();
     await editor.getByLabel("שלב 1: מה עושים").fill("מכינים את קובץ התשלומים");
     await submit(page, "שמירת טיוטה");
     const approved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-    await card().getByRole("button", { name: "אישור הנוהל" }).click();
+    await page.getByTestId("process-draft").getByRole("button", { name: "אישור הנוהל" }).click();
     await approved;
     await page.reload();
 
-    // 22.10.2026: it is the step that stops work, so it is "הצעד הבא".
-    await expect(card().getByTestId("process-next-step")).toHaveAttribute("data-step", "no_next_date", { timeout: 15_000 });
-    await expect(card().getByTestId("process-next-step")).toContainText("לא ירוץ: תהליך לפי מועד בלי מועד");
-    // The control line counts it among the processes that will not run.
-    await expect(page.getByText(/לא ירוצ?ו?/).first()).toBeVisible();
+    // It is what stops work, so it is the one line on top.
+    await expect(page.getByTestId("process-blocker")).toHaveText("לא ירוץ: תהליך לפי מועד בלי מועד", { timeout: 15_000 });
+    // And the list puts it under "צריך טיפול", with the way to the process.
+    await page.goto(`/app/clients/${CLIENT}?tab=file&section=processes`);
+    const attention = page.getByTestId("process-attention").locator("div", { hasText: title }).last();
+    await expect(attention).toContainText("לא ירוץ: תהליך לפי מועד בלי מועד");
+    await expect(attention.getByRole("link", { name: "לתהליך" })).toBeVisible();
   });
 
   test("an ongoing process is in its owner's routine; a check that finds an issue opens a task", async ({ page }) => {
     const title = tag("[E2E] שוטף");
-
-    await page.goto(`/app/clients/${CLIENT}?tab=file`);
-    const code = await addSource(page);
-
-    await page.getByRole("button", { name: "+ תהליך", exact: true }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await dialog.locator('input[name="title"]').fill(title);
     // The seeded admin owns it, so it lands in this session's routine.
-    const owner = dialog.locator('select[name="ownerId"] option', { hasText: "מנהל Ankora" }).first();
-    await dialog.locator('select[name="ownerId"]').selectOption((await owner.getAttribute("value"))!);
-    await dialog.locator('input[name="sources"]').fill(code);
-    await submit(page, "הוספה לתיק");
-
-    const card = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
-    await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
+    await newProcess(page, title);
     // 13.11.2026: ongoing, and how often it is checked, in the rhythm editor.
-    await setRhythm(page, card(), ongoing("7", "שאין חשבוניות תקועות"));
-    await expect(card()).toContainText("בדיקה פעם בשבוע: שאין חשבוניות תקועות");
-    await expect(card()).toContainText("היום");
-    await expect(card().getByRole("button", { name: "פתיחת ריצה" })).toHaveCount(0);
+    await fillRhythm(page, ongoing("7", "שאין חשבוניות תקועות"));
+    await expect(page.getByTestId("process-when")).toContainText("שוטף, בדיקה כל שבוע: שאין חשבוניות תקועות");
+    await expect(page.getByRole("button", { name: "הרצה עכשיו" })).toHaveCount(0);
 
     // The routine on the home screen, and the check from there.
     await page.goto("/app");
@@ -218,44 +145,21 @@ test.describe("clients/process-actions", () => {
     await submit(page, "רישום הבדיקה");
     await expect(row()).toContainText("הבאה ב-", { timeout: 15_000 });
 
-    await page.goto(`/app/clients/${CLIENT}?tab=file`);
-    await expect(card()).toContainText("נמצאה בעיה. חשבונית של Notion לא הגיעה", { timeout: 15_000 });
-    await card().getByTestId("process-details").locator("summary").click();
-    await card().getByTestId("process-details").getByRole("link", { name: "המשימה" }).click();
+    // The board: in the list, its last is the check, and its next the next one.
+    await page.goto(`/app/clients/${CLIENT}?tab=file&section=processes`);
+    const line = page.getByTestId("process-list").locator("tr", { hasText: title });
+    await expect(line).toContainText("נמצאה בעיה", { timeout: 15_000 });
+    await expect(line).toContainText("בדיקה ");
+    // The issue opened a task, a run of the process.
+    await line.getByRole("link", { name: title }).click();
+    await expect(page.getByTestId("process-open-run")).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId("process-open-run").getByRole("link", { name: "לריצה" }).click();
     await expect(page).toHaveURL(/\/app\/tasks\//, { timeout: 15_000 });
     await expect(page.getByText("חשבונית של Notion לא הגיעה").first()).toBeVisible({ timeout: 15_000 });
   });
 
-  test("a documentation field marked not relevant leaves the count, and the mark can be taken off", async ({ page }) => {
-    const title = tag("[E2E] לא רלוונטי");
-
-    await page.goto(`/app/clients/${CLIENT}?tab=file`);
-    const code = await addSource(page);
-    await page.getByRole("button", { name: "+ תהליך", exact: true }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await dialog.locator('input[name="title"]').fill(title);
-    await dialog.locator('input[name="sources"]').fill(code);
-    await submit(page, "הוספה לתיק");
-
-    const card = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
-    await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
-    await setRhythm(page, card(), whenSomethingHappens("עובד חדש"));
-    await expect(card().getByTestId("process-documentation")).toHaveText("תיעוד 0 מתוך 6");
-
-    const external = card().getByTestId("process-checklist").locator('li[data-step="doc_field"]', { hasText: "גורם חיצוני" });
-    const marked = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-    await external.getByTestId("mark-not-applicable").click();
-    await marked;
-    await page.reload();
-    await expect(card().getByTestId("process-not-applicable")).toContainText("גורם חיצוני", { timeout: 15_000 });
-    await expect(card().getByTestId("process-documentation")).toHaveText("תיעוד 0 מתוך 5");
-    await expect(card().getByTestId("process-checklist")).not.toContainText("תיעוד: חסר גורם חיצוני");
-
-    const restored = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-    await card().getByTestId("process-not-applicable").getByRole("button", { name: "(ביטול)" }).click();
-    await restored;
-    await page.reload();
-    await expect(card().getByTestId("process-documentation")).toHaveText("תיעוד 0 מתוך 6", { timeout: 15_000 });
-  });
+  // 13.11.2026 (stage 2): "a documentation field marked not relevant" was a
+  // card's checklist. The spec (5.2) leaves the documentation score and the
+  // fix list off the process page; stage 4 brings them back in the
+  // procedure document's tab, for a client with audit requirements.
 });

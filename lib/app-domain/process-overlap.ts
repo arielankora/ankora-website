@@ -115,7 +115,7 @@ export async function closeTaskCoveredByProcess(actor: User, taskId: string, pro
   if (!(OPEN as readonly string[]).includes(task.status)) throw new DomainError("processOverlap.notOpen", "המשימה כבר לא פתוחה.");
   if ((await sourceTasksByProcess([process.id])).get(process.id)?.has(taskId)) throw new DomainError("processOverlap.sourceTask", "התהליך הוצע מהמשימה הזו, והיא לא כפולה לו.");
   await updateTask(actor, taskId, { status: "ARCHIVED" });
-  await addTaskComment(actor, taskId, `נסגרה: התהליך ${process.code} ${process.title} מכסה את העבודה הזו, וכל ריצה שלו פותחת משימה משלה. /app/clients/${process.clientId}?tab=file#item-${process.id}`);
+  await addTaskComment(actor, taskId, `נסגרה: התהליך ${process.code} ${process.title} מכסה את העבודה הזו, וכל ריצה שלו פותחת משימה משלה. /app/clients/${process.clientId}/processes/${process.id}`);
   await recordAudit({
     actorId: actor.id,
     action: "task.close_covered_by_process",

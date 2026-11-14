@@ -8,7 +8,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { createImportantDate, deleteImportantDate } from "@/lib/app-domain/important-dates";
 import { calendarOfProcess, syncDateCalendars } from "@/lib/app-domain/date-calendars";
-import { computeLeadDate, computeNextOccurrence, computeRawNextOccurrence, type RecurrenceInput } from "@/lib/app-domain/important-dates-recurrence";
+import { computeLeadDate, computeNextOccurrence, computeRawNextOccurrence, recurrenceInputFromRow, type RecurrenceInput } from "@/lib/app-domain/important-dates-recurrence";
 import { findSecrets } from "@/lib/secret-scan";
 import { isBusinessCalendarKey } from "@/lib/business-calendar";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
@@ -364,4 +364,30 @@ export async function processRhythmContext(actor: User, processId: string) {
     hasEntity: !!entity,
     stepsLead: await stepsLeadOf(processId),
   };
+}
+
+/// The next occurrences of the process's own dates, for the "מתי" card on
+/// its page: the day, the day its run opens, and the day a roll moved.
+export async function upcomingOfProcess(actor: User, processId: string, count = 3, now = new Date()): Promise<RhythmPreviewRow[]> {
+  await findProcess(actor, processId);
+  const [dates, stepsLead] = await Promise.all([
+    prisma.importantDate.findMany({ where: { processId, deletedAt: null, status: { notIn: ["ARCHIVED", "PAUSED"] } } }),
+    stepsLeadOf(processId),
+  ]);
+  const found = new Map<string, RhythmPreviewRow>();
+  for (const row of dates) {
+    const input = recurrenceInputFromRow(row);
+    const lead = Math.max(stepsLead, row.autoTaskLeadDays ?? 0);
+    let from = now;
+    for (let i = 0; i < count; i++) {
+      const next = computeNextOccurrence(input, from);
+      if (!next) break;
+      const key = localDateKey(next, TIMEZONE);
+      const raw = row.rollConvention === "NONE" ? null : computeRawNextOccurrence(input, from);
+      const rawKey = raw ? localDateKey(raw, TIMEZONE) : null;
+      if (!found.has(key)) found.set(key, { date: key, opens: localDateKey(computeLeadDate(next, lead, "BUSINESS_DAYS", row.businessCalendar, TIMEZONE), TIMEZONE), movedFrom: rawKey && rawKey !== key ? rawKey : null });
+      from = new Date(Math.max(next.getTime(), raw?.getTime() ?? 0) + 24 * 60 * 60 * 1000);
+    }
+  }
+  return [...found.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(0, count);
 }

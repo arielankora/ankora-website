@@ -2069,7 +2069,8 @@
       "userCommsAccess": "שינוי הגישה למסך התקשורת",
       "clientCommunicationLocale": "שינוי שפת התקשורת עם הלקוח",
       "processVersionDiscard": "ויתור על טיוטה של נוהל",
-      "processRhythm": "עריכת הקצב של תהליך"
+      "processRhythm": "עריכת הקצב של תהליך",
+      "processKind": "שינוי סוג של תהליך (תהליך שרץ או הוראת עבודה)"
     },
     "kinds": {
       "failure": "כשלון",
@@ -3176,6 +3177,12 @@
           "CONDITION": "תנאי",
           "END": "סיום",
           "MAIL": "שליחת מייל"
+        },
+        "statuses": {
+          "DRAFT": "טיוטה",
+          "ACTIVE": "פעיל",
+          "PAUSED": "מושהה",
+          "RETIRED": "בוטל"
         }
       },
       "readiness": {
@@ -3450,7 +3457,8 @@
         "classification": "סיווג",
         "relatedDocs": "מסמכים קשורים",
         "relatedDocsPlaceholder": "מדיניות בקרת גישה, נוהל קליטת עובד",
-        "addToFile": "הוספה לתיק"
+        "addToFile": "הוספה לתיק",
+        "groupDocument": "מסמך הנוהל"
       },
       "editor": {
         "savedAs": "נשמר כגרסה {version}, טיוטה. מנהל מאשר, והבדיקות רצות לפני האישור.",
@@ -3820,6 +3828,134 @@
         "calendarLabel": "לוח ימי עבודה",
         "calendarAuto": "לפי הישות של התהליך",
         "calendarDefault": "ברירת המחדל: ישראל"
+      },
+      "list": {
+        "title": "תהליכים",
+        "documents": "מסמכי הנהלים",
+        "new": "+ תהליך חדש",
+        "newTitle": "תהליך חדש",
+        "summary": {
+          "total": "{count} תהליכים",
+          "running": "{count} רצים",
+          "attention": "{count} צריכים טיפול",
+          "drafts": "{count} טיוטות",
+          "guides": "{count} הוראות עבודה"
+        },
+        "attention": "צריך טיפול",
+        "toProcess": "לתהליך",
+        "toApprove": "לאישור",
+        "toRun": "לריצה",
+        "draftWaits": "טיוטה {version} של הנוהל מחכה לאישור",
+        "runWaits": "ריצה מ-{date} עוד פתוחה, מחכה ל: {step}",
+        "runOpen": "ריצה מ-{date} עוד פתוחה",
+        "filterLabel": "סינון",
+        "filters": {
+          "all": "הכול {count}",
+          "active": "פעילים {count}",
+          "draft": "טיוטות {count}",
+          "paused": "מושהים {count}",
+          "mine": "שלי"
+        },
+        "cols": {
+          "code": "מזהה",
+          "process": "תהליך",
+          "rhythm": "קצב",
+          "owner": "בעלים",
+          "next": "ריצה הבאה",
+          "last": "ריצה אחרונה",
+          "status": "מצב"
+        },
+        "noRhythm": "עוד לא נקבע",
+        "noOwner": "אין בעלים",
+        "paused": "מושהה",
+        "next": {
+          "external": "אוטומטי",
+          "continuous": "שוטף",
+          "event": "לפי אירוע",
+          "onDemand": "לפי בקשה",
+          "check": "בדיקה {date}"
+        },
+        "last": {
+          "never": "עוד לא רץ",
+          "done": "הושלמה {date}",
+          "doneNoDate": "הושלמה",
+          "open": "פתוחה, {done} מתוך {total}",
+          "openPlain": "פתוחה",
+          "checkedOk": "נבדק {date}, תקין",
+          "checkedIssue": "נבדק {date}, נמצאה בעיה"
+        },
+        "empty": "אין תהליכים בסינון הזה.",
+        "guides": "הוראות עבודה",
+        "guidesHint": "איך עושים דבר נכון. בלי קצב, בלי ריצות, ובלי \"לא ירוץ\".",
+        "version": "גרסה {version}",
+        "noProcedure": "בלי נוהל מאושר"
+      },
+      "page": {
+        "breadcrumb": "מיקום",
+        "processes": "תהליכים",
+        "guide": "הוראת עבודה",
+        "version": "גרסה {version}",
+        "runNow": "הרצה עכשיו",
+        "runNowTitle": "פתיחת ריצה",
+        "recordCheck": "רישום בדיקה",
+        "more": "פעולות נוספות",
+        "menu": {
+          "editWhat": "שם ומטרה",
+          "knowledge": "הגדרות ידע",
+          "toGuide": "להפוך להוראת עבודה",
+          "toProcess": "להפוך לתהליך שרץ",
+          "nowGuide": "התהליך הוא עכשיו הוראת עבודה",
+          "nowProcess": "זה עכשיו תהליך שרץ"
+        },
+        "actionFailed": "הפעולה לא הצליחה",
+        "when": "מתי",
+        "change": "שינוי",
+        "noRhythm": "עוד לא נקבע מתי התהליך רץ",
+        "earlier": "הוקדם",
+        "later": "נדחה",
+        "opensBefore": "הריצה נפתחת {days} ימי עסקים לפני כל מועד",
+        "opensOnDay": "הריצה נפתחת ביום המועד",
+        "who": "מי",
+        "edit": "עריכה",
+        "whoTitle": "מי עושה ומי מאשר",
+        "owner": "בעלים",
+        "backup": "מחליף",
+        "executor": "מבצע",
+        "approver": "מאשר",
+        "none": "לא נקבע",
+        "atClient": "אצל הלקוח",
+        "openRun": "ריצה פתוחה",
+        "openRunOn": "ריצה פתוחה · {date}",
+        "progress": "{done} מתוך {total} שלבים",
+        "waitingOn": "מחכה ל: {step}",
+        "toRun": "לריצה",
+        "noOpenRun": "אין ריצה פתוחה",
+        "lastRun": "ריצה אחרונה ב-{date}",
+        "neverRan": "עוד לא רץ",
+        "tabs": {
+          "steps": "שלבים",
+          "runs": "ריצות {count}",
+          "lessons": "הערות מהשטח {count}",
+          "work": "פרטים לעבודה",
+          "document": "מסמך הנוהל"
+        },
+        "stepsCount": "{count} שלבים",
+        "noSteps": "עוד אין שלבים",
+        "editSteps": "עריכת השלבים",
+        "writeSteps": "כתיבת השלבים",
+        "stepsTitle": "השלבים",
+        "draftWaits": "טיוטה {version} מחכה לאישור",
+        "approve": "אישור הנוהל",
+        "approved": "הנוהל אושר",
+        "needsApproval": "דורש אישור",
+        "needsApprovalBy": "דורש אישור של {name}",
+        "fromTheField": "הערה מהשטח",
+        "recentRuns": "ריצות אחרונות",
+        "runDone": "הושלמה",
+        "runOpenShort": "פתוחה",
+        "noLessons": "אין הערות מהשטח.",
+        "openDocument": "למסמך הנוהל המלא",
+        "docScore": "תיעוד: {score} מתוך {of}"
       }
     },
     "procedures": {

@@ -66,6 +66,9 @@ import type { PolicyKind } from "@prisma/client";
 const POLICY_KINDS: PolicyKind[] = ["DATA_HANDLING", "DISCLOSURE", "COMMUNICATION", "SEPARATION", "APPROVAL_REQUIRED", "THRESHOLD", "REQUIRED_STEP", "TIMING", "FORBIDDEN", "INFO"];
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { listProcesses, ruleWarnings } from "@/lib/app-domain/processes";
+import { stepsLeadOf, upcomingOfProcess } from "@/lib/app-domain/process-rhythm";
+import { ProcessList } from "./ProcessList";
+import { ProcessPage } from "./ProcessPage";
 import { listLessons } from "@/lib/app-domain/process-lessons";
 import { strangerPanel } from "@/lib/app-domain/stranger-tests";
 import { strangerPrompt } from "@/lib/stranger-test";
@@ -73,7 +76,6 @@ import { listProcessRuns } from "@/lib/app-domain/process-runs";
 import { listProcessChecks } from "@/lib/app-domain/process-checks";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { checkDueKey, checkEveryText, checkState, isRoutine } from "@/lib/process-checks";
-import { ProcessesPanel } from "./ProcessesPanel";
 import { canApproveForClient, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
 import { EXCEPTION_MAX_DAYS, ruleReviewDue } from "@/lib/client-policies";
 import { ruleInForce } from "@/lib/client-policies";
@@ -142,7 +144,7 @@ function serverNow(): number {
   return Date.now();
 }
 
-export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }>; searchParams?: Promise<{ tab?: string; section?: string; from?: string | string[]; fromApprovals?: string | string[] }> }) {
+export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }>; searchParams?: Promise<{ tab?: string; section?: string; from?: string | string[]; fromApprovals?: string | string[]; process?: string; rhythm?: string }> }) {
   const params = await props.params;
   // Two tabs (org-brain spec 6.1): the day-to-day work, and the client
   // file. The file has a dozen sections, and on one long page they would
@@ -385,6 +387,214 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   const part: FileSection = remembered === "pending" && pendingCount === 0 ? "all" : remembered;
   const show = (key: FileSectionKey) => showsSection(part, key);
 
+  // 13.11.2026 (processes redesign, stage 2): one shape for the list and
+  // for a process's own page (processes/[processId]).
+  const processForm = {
+    staff: staff.map((u) => ({ id: u.id, name: u.name })),
+    contacts: people.contacts.map((c) => ({ id: c.id, name: c.person.name ?? c.role ?? "" })),
+    systems: systems.map((x) => ({ id: x.id, name: x.systemName })),
+    rules: policies.filter((x) => x.status !== "RETIRED" && (x.kind === "THRESHOLD" || x.kind === "APPROVAL_REQUIRED")).map((x) => ({ id: x.id, name: x.title })),
+    entities: entityOptions,
+    sourceOptions,
+  };
+  const panelProcesses = processes.map((p) => ({
+                id: p.id,
+                code: p.code,
+                title: p.title,
+                purpose: p.purpose,
+                status: p.status,
+                triggerKinds: p.triggerKinds,
+                triggerText: p.triggerText,
+                ownerId: p.ownerId,
+                backupOwnerId: p.backupOwnerId,
+                slaText: p.slaText,
+                slaBusinessDays: p.slaBusinessDays,
+                externalPartyContactIds: p.externalPartyContactIds,
+                externalPartyText: p.externalPartyText,
+                requiredSystemIds: p.requiredSystemIds,
+                requiredSystemPermissions: permissionsOf(p.requiredSystemPermissions),
+                systemsLine: p.requiredSystemIds
+                  .map((id) => {
+                    const name = systems.find((x) => x.id === id)?.systemName;
+                    const perm = permissionsOf(p.requiredSystemPermissions)[id];
+                    return name ? (perm ? `${name} (${perm})` : name) : null;
+                  })
+                  .filter(Boolean)
+                  .join(", ") || null,
+                approverText: p.approverText,
+                approverUserId: p.approverUserId,
+                approverContactId: p.approverContactId,
+                approvalPolicyIds: p.approvalPolicyIds,
+                approvalText: p.approvalText,
+                exceptionPlaybook: p.exceptionPlaybook,
+                scope: p.scope,
+                definitions: p.definitions,
+                controlRefs: p.controlRefs,
+                classification: p.classification,
+                relatedDocs: p.relatedDocs,
+                entityId: p.entityId,
+                businessCalendar: p.businessCalendar,
+                executorText: p.executorText,
+                executorUserId: p.executorUserId,
+                executorContactId: p.executorContactId,
+                executorName: p.executorUserId
+                  ? staffName.get(p.executorUserId) ?? null
+                  : p.executorContactId
+                    ? (() => {
+                        const c = people.contacts.find((x) => x.id === p.executorContactId);
+                        return c ? c.person.name ?? c.role ?? null : null;
+                      })()
+                    : null,
+                transitionStatus: p.transitionStatus,
+                knowledgeStatus: effectiveStatus(p.knowledgeStatus, parseFieldStatus(p.fieldStatus)),
+                toResolve: p.toResolve, clientVisible: p.clientVisible, doNotDisclose: p.doNotDisclose,
+                externalRefs: refsText(p.externalRefs), refs: teamRefs(p.externalRefs).map(refLabel), audience: p.audience, audienceUserIds: p.audienceUserIds, verifiedAt: p.verifiedAt ? p.verifiedAt.toISOString() : null, lastRunAt: p.lastRunAt ? p.lastRunAt.toISOString() : null,
+                sources: readSourceRefs(p.sources).map(formatSourceRef),
+                score: p.completeness.score,
+                readiness: p.readiness,
+                doc: { score: p.documentation.score, of: p.documentation.of },
+                // Access has a row of its own (no_access).
+                docMissing: p.documentation.missing.filter((k) => k !== "permissions").map((k) => ({ field: k, label: FIELD_LABELS[k] })),
+                notApplicable: p.notApplicable.map((k) => ({ field: k, label: FIELD_LABELS[k] })),
+                suggestions: p.suggestions,
+                gaps: p.gaps,
+                nextDate: p.nextDate ? p.nextDate.toISOString() : null,
+                nextOpensAt: p.nextOpensAt ? p.nextOpensAt.toISOString() : null,
+                // 13.11.2026 (stage 1): the rhythm, for its sentence and its editor.
+                triggerNotes: p.triggerNotes,
+                rhythmStarts: p.starts.map((s) => ({
+                  kind: s.kind,
+                  schedule: s.schedule,
+                  description: s.description,
+                  checkEveryDays: s.checkEveryDays,
+                  checkText: s.checkText,
+                  externalWhere: s.externalWhere,
+                  externalWhen: s.externalWhen,
+                  externalRecipient: s.externalRecipient,
+                })),
+                rhythmDates: p.dates.map((d) => ({
+                  recurrence: d.recurrence,
+                  month: d.month,
+                  day: d.day,
+                  weekday: d.weekday,
+                  intervalMonths: d.intervalMonths,
+                  onceDate: d.onceDate ? d.onceDate.toISOString().slice(0, 10) : null,
+                  rollConvention: d.rollConvention,
+                })),
+                dateIds: p.dates.map((d) => d.id),
+                covered: covered.filter((c) => c.process.id === p.id).map((c) => ({ taskId: c.task.id, title: c.task.title, assignee: c.task.assignee })),
+                missing: p.completeness.missing.filter((k) => k !== "permissions" && k !== "next").map((k) => FIELD_LABELS[k]),
+                noAccess: p.noAccess,
+                dateCandidate: candidates.get(p.id)?.date ?? null,
+                latestVersion: p.latestVersion,
+                isFlow: p.isFlow,
+                current: p.current
+                  ? {
+                      version: p.current.version,
+                      steps: p.current.steps,
+                      highlights: p.current.highlights,
+                      outputs: p.current.outputs,
+                      approvedByName: p.current.approvedById ? staffName.get(p.current.approvedById) ?? null : null,
+                      checks: p.current.checks,
+                      approvedAt: p.current.approvedAt ? p.current.approvedAt.toISOString() : null,
+                      atApproval: approvalChecksOf(p.current.approvalChecks),
+                    }
+                  : null,
+                runs: (runsByProcess.get(p.id) ?? []).map((r) => ({
+                  id: r.id,
+                  title: r.title,
+                  status: r.status,
+                  dueDate: r.dueDate ? r.dueDate.toISOString() : null,
+                  stepsDone: r.subtasks.filter((x) => x.status === "DONE" || x.status === "ARCHIVED").length,
+                  stepsTotal: r.subtasks.length,
+                  waitingOn: r.subtasks.find((x) => x.status !== "DONE" && x.status !== "ARCHIVED")?.title ?? null,
+                })),
+                kind: p.kind,
+                checkEveryDays: p.checkEveryDays,
+                reviewReason: readReviewReason(p.reviewReason),
+                reviewEveryDays: p.reviewEveryDays,
+                reviewDueAt: p.status === "ACTIVE" || p.status === "PAUSED" ? reviewDueAt(p)?.toISOString() ?? null : null,
+                checkEvery: p.checkEveryDays ? checkEveryText(p.checkEveryDays) : null,
+                checkText: p.checkText,
+                routine: isRoutine(p),
+                checkDue: (() => {
+                  if (!isRoutine(p)) return null;
+                  const key = checkDueKey({ checkEveryDays: p.checkEveryDays, lastCheckedKey: p.lastCheckedAt ? localDateKey(p.lastCheckedAt, TIMEZONE) : null }, todayKey);
+                  return key ? { key, state: checkState(key, todayKey) } : null;
+                })(),
+                checks: (checksByProcess.get(p.id) ?? []).map((c) => ({
+                  id: c.id,
+                  outcome: c.outcome,
+                  note: c.note,
+                  createdAt: c.createdAt.toISOString(),
+                  checkedByName: c.checkedByName,
+                  taskId: c.taskId,
+                })),
+                draft: p.draft
+                  ? {
+                      version: p.draft.version,
+                      // 13.11.2026: whoever wrote it, or a manager.
+                      mayDiscard: p.draft.createdById === user.id || canManageClients(user.role),
+                      steps: p.draft.steps,
+                      highlights: p.draft.highlights,
+                      outputs: p.draft.outputs,
+                      changeNote: p.draft.changeNote,
+                      checks: p.draft.checks,
+                      // 31.10.2026: a manager or the client's account
+                      // manager, less the author under separation.
+                      mayApprove: mayApproveProcedure({
+                        userId: user.id,
+                        isManager: canManageClients(user.role),
+                        accountManagerId: client.accountManagerId,
+                        separation: client.procedureApprovalSeparation,
+                        authorId: p.draft.createdById,
+                      }),
+                    }
+                  : null,
+                // 31.10.2026: the stranger test, and the prompt that runs it.
+                stranger: {
+                  state: stranger.get(p.id)?.state ?? null,
+                  open: stranger.get(p.id)?.open ?? [],
+                  prompt: strangerPrompt(client.name, p.code, p.title),
+                },
+                lessons: lessons
+                  .filter((l) => l.processId === p.id)
+                  .map((l) => ({
+                    id: l.id,
+                    status: l.status,
+                    body: l.body,
+                    version: l.version,
+                    taskId: l.taskId,
+                    runTitle: l.runTitle,
+                    authorName: l.authorName,
+                    createdAt: l.createdAt.toISOString(),
+                    resolution: l.resolution,
+                    resolvedByName: l.resolvedByName,
+                  })),
+              }));
+
+  // 13.11.2026 (stage 2): a process's own page, at
+  // /app/clients/<client>/processes/<process> (processes/[processId]/page.tsx).
+  if (sp?.process) {
+    const shown = panelProcesses.find((x) => x.id === sp.process);
+    if (!shown) notFound();
+    const [upcoming, stepsLead] = await Promise.all([upcomingOfProcess(user, shown.id), stepsLeadOf(shown.id)]);
+    return (
+      <ProcessPage
+        clientId={client.id}
+        clientName={client.name}
+        process={shown}
+        form={processForm}
+        upcoming={upcoming}
+        stepsLead={stepsLead}
+        canApprove={can(user.role, "client.manage")}
+        openRhythm={sp.rhythm === "open"}
+        userId={user.id}
+        back={viaApprovals ? { href: viaApprovals.href, label: viaApprovals.label } : null}
+      />
+    );
+  }
+
   return (
     <>
       <div className="space-y-6">
@@ -623,186 +833,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
             {show("processes") && (
               <>
-            <ProcessesPanel
-              clientId={client.id}
-              userId={user.id}
-              canApprove={can(user.role, "client.manage")}
-              sourceOptions={sourceOptions}
-              entities={entityOptions}
-              staff={staff.map((u) => ({ id: u.id, name: u.name }))}
-              contacts={people.contacts.map((c) => ({ id: c.id, name: c.person.name ?? c.role ?? "" }))}
-              systems={systems.map((x) => ({ id: x.id, name: x.systemName }))}
-              rules={policies
-                .filter((x) => x.status !== "RETIRED" && (x.kind === "THRESHOLD" || x.kind === "APPROVAL_REQUIRED"))
-                .map((x) => ({ id: x.id, name: x.title }))}
-              dates={clientDates.map((d) => ({ id: d.id, name: d.title }))}
-              processes={processes.map((p) => ({
-                id: p.id,
-                code: p.code,
-                title: p.title,
-                purpose: p.purpose,
-                status: p.status,
-                triggerKinds: p.triggerKinds,
-                triggerText: p.triggerText,
-                ownerId: p.ownerId,
-                backupOwnerId: p.backupOwnerId,
-                slaText: p.slaText,
-                slaBusinessDays: p.slaBusinessDays,
-                externalPartyContactIds: p.externalPartyContactIds,
-                externalPartyText: p.externalPartyText,
-                requiredSystemIds: p.requiredSystemIds,
-                requiredSystemPermissions: permissionsOf(p.requiredSystemPermissions),
-                systemsLine: p.requiredSystemIds
-                  .map((id) => {
-                    const name = systems.find((x) => x.id === id)?.systemName;
-                    const perm = permissionsOf(p.requiredSystemPermissions)[id];
-                    return name ? (perm ? `${name} (${perm})` : name) : null;
-                  })
-                  .filter(Boolean)
-                  .join(", ") || null,
-                approverText: p.approverText,
-                approverUserId: p.approverUserId,
-                approverContactId: p.approverContactId,
-                approvalPolicyIds: p.approvalPolicyIds,
-                approvalText: p.approvalText,
-                exceptionPlaybook: p.exceptionPlaybook,
-                scope: p.scope,
-                definitions: p.definitions,
-                controlRefs: p.controlRefs,
-                classification: p.classification,
-                relatedDocs: p.relatedDocs,
-                entityId: p.entityId,
-                businessCalendar: p.businessCalendar,
-                executorText: p.executorText,
-                executorUserId: p.executorUserId,
-                executorContactId: p.executorContactId,
-                executorName: p.executorUserId
-                  ? staffName.get(p.executorUserId) ?? null
-                  : p.executorContactId
-                    ? (() => {
-                        const c = people.contacts.find((x) => x.id === p.executorContactId);
-                        return c ? c.person.name ?? c.role ?? null : null;
-                      })()
-                    : null,
-                transitionStatus: p.transitionStatus,
-                knowledgeStatus: effectiveStatus(p.knowledgeStatus, parseFieldStatus(p.fieldStatus)),
-                toResolve: p.toResolve, clientVisible: p.clientVisible, doNotDisclose: p.doNotDisclose,
-                externalRefs: refsText(p.externalRefs), refs: teamRefs(p.externalRefs).map(refLabel), audience: p.audience, audienceUserIds: p.audienceUserIds, verifiedAt: p.verifiedAt ? p.verifiedAt.toISOString() : null, lastRunAt: p.lastRunAt ? p.lastRunAt.toISOString() : null,
-                sources: readSourceRefs(p.sources).map(formatSourceRef),
-                score: p.completeness.score,
-                readiness: p.readiness,
-                doc: { score: p.documentation.score, of: p.documentation.of },
-                // Access has a row of its own (no_access).
-                docMissing: p.documentation.missing.filter((k) => k !== "permissions").map((k) => ({ field: k, label: FIELD_LABELS[k] })),
-                notApplicable: p.notApplicable.map((k) => ({ field: k, label: FIELD_LABELS[k] })),
-                suggestions: p.suggestions,
-                gaps: p.gaps,
-                nextDate: p.nextDate ? p.nextDate.toISOString() : null,
-                nextOpensAt: p.nextOpensAt ? p.nextOpensAt.toISOString() : null,
-                // 13.11.2026 (stage 1): the rhythm, for its sentence and its editor.
-                triggerNotes: p.triggerNotes,
-                rhythmStarts: p.starts.map((s) => ({
-                  kind: s.kind,
-                  schedule: s.schedule,
-                  description: s.description,
-                  checkEveryDays: s.checkEveryDays,
-                  checkText: s.checkText,
-                  externalWhere: s.externalWhere,
-                  externalWhen: s.externalWhen,
-                  externalRecipient: s.externalRecipient,
-                })),
-                rhythmDates: p.dates.map((d) => ({
-                  recurrence: d.recurrence,
-                  month: d.month,
-                  day: d.day,
-                  weekday: d.weekday,
-                  intervalMonths: d.intervalMonths,
-                  onceDate: d.onceDate ? d.onceDate.toISOString().slice(0, 10) : null,
-                  rollConvention: d.rollConvention,
-                })),
-                dateIds: p.dates.map((d) => d.id),
-                covered: covered.filter((c) => c.process.id === p.id).map((c) => ({ taskId: c.task.id, title: c.task.title, assignee: c.task.assignee })),
-                missing: p.completeness.missing.filter((k) => k !== "permissions" && k !== "next").map((k) => FIELD_LABELS[k]),
-                noAccess: p.noAccess,
-                dateCandidate: candidates.get(p.id)?.date ?? null,
-                latestVersion: p.latestVersion,
-                isFlow: p.isFlow,
-                current: p.current
-                  ? {
-                      version: p.current.version,
-                      steps: p.current.steps,
-                      highlights: p.current.highlights,
-                      outputs: p.current.outputs,
-                      approvedByName: p.current.approvedById ? staffName.get(p.current.approvedById) ?? null : null,
-                      checks: p.current.checks,
-                      approvedAt: p.current.approvedAt ? p.current.approvedAt.toISOString() : null,
-                      atApproval: approvalChecksOf(p.current.approvalChecks),
-                    }
-                  : null,
-                runs: (runsByProcess.get(p.id) ?? []).map((r) => ({ id: r.id, title: r.title, status: r.status, dueDate: r.dueDate ? r.dueDate.toISOString() : null })),
-                checkEveryDays: p.checkEveryDays,
-                reviewReason: readReviewReason(p.reviewReason),
-                reviewEveryDays: p.reviewEveryDays,
-                reviewDueAt: p.status === "ACTIVE" || p.status === "PAUSED" ? reviewDueAt(p)?.toISOString() ?? null : null,
-                checkEvery: p.checkEveryDays ? checkEveryText(p.checkEveryDays) : null,
-                checkText: p.checkText,
-                routine: isRoutine(p),
-                checkDue: (() => {
-                  if (!isRoutine(p)) return null;
-                  const key = checkDueKey({ checkEveryDays: p.checkEveryDays, lastCheckedKey: p.lastCheckedAt ? localDateKey(p.lastCheckedAt, TIMEZONE) : null }, todayKey);
-                  return key ? { key, state: checkState(key, todayKey) } : null;
-                })(),
-                checks: (checksByProcess.get(p.id) ?? []).map((c) => ({
-                  id: c.id,
-                  outcome: c.outcome,
-                  note: c.note,
-                  createdAt: c.createdAt.toISOString(),
-                  checkedByName: c.checkedByName,
-                  taskId: c.taskId,
-                })),
-                draft: p.draft
-                  ? {
-                      version: p.draft.version,
-                      // 13.11.2026: whoever wrote it, or a manager.
-                      mayDiscard: p.draft.createdById === user.id || canManageClients(user.role),
-                      steps: p.draft.steps,
-                      highlights: p.draft.highlights,
-                      outputs: p.draft.outputs,
-                      changeNote: p.draft.changeNote,
-                      checks: p.draft.checks,
-                      // 31.10.2026: a manager or the client's account
-                      // manager, less the author under separation.
-                      mayApprove: mayApproveProcedure({
-                        userId: user.id,
-                        isManager: canManageClients(user.role),
-                        accountManagerId: client.accountManagerId,
-                        separation: client.procedureApprovalSeparation,
-                        authorId: p.draft.createdById,
-                      }),
-                    }
-                  : null,
-                // 31.10.2026: the stranger test, and the prompt that runs it.
-                stranger: {
-                  state: stranger.get(p.id)?.state ?? null,
-                  open: stranger.get(p.id)?.open ?? [],
-                  prompt: strangerPrompt(client.name, p.code, p.title),
-                },
-                lessons: lessons
-                  .filter((l) => l.processId === p.id)
-                  .map((l) => ({
-                    id: l.id,
-                    status: l.status,
-                    body: l.body,
-                    version: l.version,
-                    taskId: l.taskId,
-                    runTitle: l.runTitle,
-                    authorName: l.authorName,
-                    createdAt: l.createdAt.toISOString(),
-                    resolution: l.resolution,
-                    resolvedByName: l.resolvedByName,
-                  })),
-              }))}
-            />
+            <ProcessList clientId={client.id} userId={user.id} processes={panelProcesses} form={processForm} />
               </>
             )}
 

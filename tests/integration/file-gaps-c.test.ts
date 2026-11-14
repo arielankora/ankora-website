@@ -43,7 +43,7 @@ describe("a process that runs by a date, with no date ahead", () => {
 
     const rows = (await processRows(ariel, client.id)).filter((r) => r.id.endsWith(":no_next_date"));
     expect(rows.map((r) => r.id)).toEqual([`${p.id}:no_next_date`]);
-    expect(rows[0]).toMatchObject({ href: `/app/clients/${client.id}?tab=file#item-${p.id}`, blocking: true });
+    expect(rows[0]).toMatchObject({ href: `/app/clients/${client.id}/processes/${p.id}`, blocking: true });
     expect(rows.map((r) => r.id)).not.toContain(`${draft.id}:no_next_date`);
     // The owner sees it too.
     expect((await processRows(anna, client.id)).some((r) => r.id.endsWith(":no_next_date"))).toBe(true);

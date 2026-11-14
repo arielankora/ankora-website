@@ -247,15 +247,21 @@ export function CenterDialog({
   title,
   children,
   triggerClassName = "",
+  defaultOpen = false,
+  triggerVariant = "link",
 }: {
   triggerLabel: string;
+  /// Open on arrival (a new process lands on its page with its rhythm open).
+  defaultOpen?: boolean;
+  /// "primary": the screen's one main button, as the drawer's.
+  triggerVariant?: "link" | "primary" | "secondary";
   eyebrow?: string;
   title: string;
   children: ReactNode;
   triggerClassName?: string;
 }) {
   const tShell = useTranslations("shell");
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const refresh = useRefreshAfterWrite();
   const dismiss = () => setOpen(false);
   const closeAfterWrite = () => {
@@ -279,7 +285,17 @@ export function CenterDialog({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={`text-xs font-medium text-app-text-accent hover:underline ${triggerClassName}`}>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={
+          triggerVariant === "primary"
+            ? `inline-flex min-h-[44px] items-center rounded-[10px] bg-app-surface-nav px-5 text-sm font-bold text-white ${triggerClassName}`
+            : triggerVariant === "secondary"
+              ? `inline-flex min-h-[44px] items-center rounded-[10px] border border-app-border-strong bg-white px-4 text-sm text-app-text-primary ${triggerClassName}`
+              : `text-xs font-medium text-app-text-accent hover:underline ${triggerClassName}`
+        }
+      >
         {triggerLabel}
       </button>
       {open && (

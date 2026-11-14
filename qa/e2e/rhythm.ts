@@ -6,6 +6,12 @@ import { expect, type Locator, type Page } from "@playwright/test";
 /// it, saves, and waits for the window to close.
 export async function setRhythm(page: Page, from: Locator, choose: (dialog: Locator) => Promise<void>) {
   await from.getByRole("button", { name: /^(לקבוע מתי הוא רץ|שינוי)$/ }).first().click();
+  await fillRhythm(page, choose);
+}
+
+/// 13.11.2026 (stage 2): a new process opens on its page with the rhythm
+/// editor already open. Fills the open editor, saves, and waits for it to close.
+export async function fillRhythm(page: Page, choose: (dialog: Locator) => Promise<void>) {
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByTestId("rhythm-editor")).toBeVisible({ timeout: 15_000 });
   await choose(dialog);

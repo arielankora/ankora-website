@@ -301,6 +301,18 @@ export async function setProcessStatus(actor: User, id: string, status: Exclude<
   return updated;
 }
 
+/// 13.11.2026 (processes redesign, stage 2): a process that runs, or a work
+/// instruction. A work instruction keeps its rhythm stored but opens no
+/// runs (the daily job skips it) and is never "will not run".
+export async function setProcessKind(actor: User, id: string, kind: "PROCESS" | "GUIDE") {
+  assertCan(actor.role, "time_entry.create_self");
+  const before = await findProcess(actor, id);
+  if (before.kind === kind) return before;
+  const updated = await prisma.process.update({ where: { id }, data: { kind } });
+  await recordAudit({ actorId: actor.id, action: "process.kind", entityType: "Process", entityId: id, clientId: before.clientId, before: { kind: before.kind }, after: { kind } });
+  return updated;
+}
+
 /// A process written by mistake, before any procedure was approved. One
 /// that ran is retired instead, so its history stays.
 export async function removeProcess(actor: User, id: string) {
