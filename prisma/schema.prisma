@@ -1032,6 +1032,11 @@ model Task {
   /// ClientContact.ownerId: a contact removed later keeps the record.
   approvalContactId String?
   approvalEvidence  Json?
+  /// 14.11.2026 (processes redesign, spec 4.5): for a client with audit
+  /// requirements, a link to what shows a run's step was done (a mail, a
+  /// file, a bank confirmation). Optional; counted in the readiness for an
+  /// audit ("ראיה מהריצות").
+  evidenceLink      String?
 
   // Tasks phase 5 ("חסימה פשוטה"), and the generalisation of a field
   // that has been here since portal phase 1.

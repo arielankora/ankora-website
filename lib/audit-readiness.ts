@@ -26,8 +26,8 @@ export type ReadinessInput = {
   /// Documentation fields still missing, less those marked not relevant.
   docMissing: { field: string; label: string }[];
   translation: "none" | "draft" | "approved";
-  /// Closed runs of the process, and those whose every approval was given
-  /// and written down.
+  /// The steps of the process's closed runs, and those with a link to
+  /// their evidence (spec 4.5). Named closed/withEvidence since stage 4.
   runs: { closed: number; withEvidence: number };
   strangerOpen: number;
 };

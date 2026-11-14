@@ -289,6 +289,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "task.create": "יצירת משימה",
   "task.status_change": "שינוי סטטוס משימה",
   "task.client_approval": "תיעוד אישור של הלקוח בשלב של ריצה",
+  "task.evidence_link": "קישור לראיה בשלב של ריצה",
   "task.process_link": "סימון משימה כריצה של תהליך",
   "task.approve": "אישור משימה",
   "task.comment": "הערה על משימה",

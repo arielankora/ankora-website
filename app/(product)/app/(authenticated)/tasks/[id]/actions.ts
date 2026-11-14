@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
-import { addTaskComment, applyTaskTemplate, createTask, deleteTaskComment, recordClientApproval, setStepDone, setTaskProcess, updateTask } from "@/lib/app-domain/tasks";
+import { addTaskComment, applyTaskTemplate, createTask, deleteTaskComment, recordClientApproval, setStepDone, setStepEvidenceLink, setTaskProcess, updateTask } from "@/lib/app-domain/tasks";
 import { procedureReminderForScreen } from "@/lib/app-domain/procedure-to-file";
 import { addClientDocument, MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-documents";
 import {
@@ -445,6 +445,18 @@ export async function recordClientApprovalAction(input: { stepId: string; parent
     revalidatePath(`/app/tasks/${input.parentId}`);
     revalidatePath(`/app/tasks/${input.stepId}`);
     revalidatePath("/app/tasks");
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: await friendlyError(err) };
+  }
+}
+
+/// Spec 4.5 (14.11.2026): a link to the evidence that a run's step was done.
+export async function setStepEvidenceLinkAction(input: { stepId: string; parentId: string; link: string | null }) {
+  const user = await requireUser();
+  try {
+    await setStepEvidenceLink(user, input.stepId, input.link);
+    revalidatePath(`/app/tasks/${input.parentId}`);
     return { ok: true as const };
   } catch (err) {
     return { ok: false as const, error: await friendlyError(err) };

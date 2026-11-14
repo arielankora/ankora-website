@@ -792,7 +792,13 @@
           "SIGNED": "בחתימה על מסמך"
         },
         "approvedClientLine": "אושר על ידי {name} {how}, {date}",
-        "approvedByLine": "אושר על ידי {name}, {date}"
+        "approvedByLine": "אושר על ידי {name}, {date}",
+        "evidence": "ראיה",
+        "evidenceChange": "החלפה",
+        "evidenceAdd": "+ קישור לראיה",
+        "evidenceAria": "קישור לראיה של השלב {title}",
+        "evidencePlaceholder": "קישור למייל, לקובץ או לאישור מהבנק",
+        "evidenceSave": "שמירה"
       },
       "advance": {
         "plan": "קדם עם קלוד",
@@ -1299,6 +1305,8 @@
       "stepAwaitingApproval": "השלב \"{title}\" מחכה לאישור של {supervisor}. אחרי שהוא מאושר, אפשר לסגור.",
       "stepAwaitingApprovalNoSupervisor": "השלב \"{title}\" מחכה לאישור. אחרי שהוא מאושר, אפשר לסגור.",
       "clientApprovalUndocumented": "כדי לסמן את השלב כבוצע, מתעדים מתי ואיך הלקוח אישר.",
+      "evidenceNotHere": "קישור לראיה נשמר רק בשלב של ריצה, בלקוח עם דרישות ביקורת.",
+      "badEvidenceLink": "הקישור צריך להתחיל ב-https://.",
       "stepNotRun": "שלב שייך לריצה של המשימה שלו, ולא מסומן בנפרד.",
       "processNotOfClient": "התהליך לא נמצא בתיק של הלקוח.",
       "stepAwaitingClientApproval": "השלב \"{title}\" מחכה לתיעוד של אישור הלקוח. אחרי שמתעדים מתי ואיך אושר, אפשר לסגור.",
@@ -2038,6 +2046,7 @@
       "taskCreate": "יצירת משימה",
       "taskStatusChange": "שינוי סטטוס משימה",
       "taskClientApproval": "תיעוד אישור של הלקוח בשלב של ריצה",
+      "taskEvidenceLink": "קישור לראיה בשלב של ריצה",
       "taskProcessLink": "סימון משימה כריצה של תהליך",
       "taskApprove": "אישור משימה",
       "taskComment": "הערה על משימה",
@@ -4146,7 +4155,7 @@
           "translationDraft": "תרגום לאנגלית מחכה לאישור",
           "translationMissing": "תרגום לאנגלית",
           "strangerOpen": "מבחן הזר: {count} שאלות פתוחות",
-          "runs": "ראיה מהריצות: {done} מתוך {total}"
+          "runs": "ראיה מהריצות: {done} מתוך {total} שלבים"
         }
       }
     },

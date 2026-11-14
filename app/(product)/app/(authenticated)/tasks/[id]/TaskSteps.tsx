@@ -6,7 +6,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { Plus } from "lucide-react";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
-import { addTaskStepAction, applyTaskTemplateAction, recordClientApprovalAction, setTaskStepDoneAction } from "./actions";
+import { addTaskStepAction, applyTaskTemplateAction, recordClientApprovalAction, setStepEvidenceLinkAction, setTaskStepDoneAction } from "./actions";
 import type { TaskStatus } from "@prisma/client";
 import { CenterDialog } from "@/components/app/Drawer";
 import { MessageClient, type ComposerProps } from "@/components/app/MessageClient";
@@ -46,6 +46,8 @@ export type Step = {
   /// contact at the client approves, and how they did, once written down.
   clientApprover?: string | null;
   clientApproval?: { at: string; how: string; link: string | null } | null;
+  /// Spec 4.5: a link to what shows the step was done (an audited client).
+  evidenceLink?: string | null;
 };
 
 /// The message composer the run's page already has, opened as a reminder
@@ -64,8 +66,11 @@ export function TaskSteps({
   templates,
   listQuery = "",
   reminder = null,
+  evidence = false,
 }: {
   reminder?: Reminder | null;
+  /// An audited client's run: each step takes a link to its evidence.
+  evidence?: boolean;
   /// The list this task was opened from, handed on to each step so the
   /// way back from a step still leads to that list.
   listQuery?: string;
@@ -96,7 +101,7 @@ export function TaskSteps({
       ) : (
         <ul className="mt-3 divide-y divide-app-border">
           {steps.map((step, i) => (
-            <StepRow key={step.id} step={step} n={i + 1} parentId={taskId} listQuery={listQuery} reminder={reminder} />
+            <StepRow key={step.id} step={step} n={i + 1} parentId={taskId} listQuery={listQuery} reminder={reminder} evidence={evidence} />
           ))}
         </ul>
       )}
@@ -114,7 +119,7 @@ export function TaskSteps({
   );
 }
 
-function StepRow({ step, n, parentId, listQuery, reminder }: { step: Step; n: number; parentId: string; listQuery: string; reminder: Reminder | null }) {
+function StepRow({ step, n, parentId, listQuery, reminder, evidence }: { step: Step; n: number; parentId: string; listQuery: string; reminder: Reminder | null; evidence: boolean }) {
   const t = useTranslations("tasks.detail.steps");
   const format = useFormatter();
   const isDone = !OPEN.includes(step.status);
@@ -200,6 +205,7 @@ function StepRow({ step, n, parentId, listQuery, reminder }: { step: Step; n: nu
             </div>
           </div>
         )}
+        {evidence && <EvidenceLink step={step} parentId={parentId} />}
         {recording && <ClientApprovalDialog step={step} n={n} parentId={parentId} onClose={() => setRecording(false)} />}
         {(step.assignedToName || step.dueDate) && (
           <p className="mt-0.5 text-[11.5px] text-app-text-tertiary">
@@ -266,6 +272,60 @@ function ClientApprovalDialog({ step, n, parentId, onClose }: { step: Step; n: n
         <p className="text-[13px] text-app-text-secondary">{t("recordNote")}</p>
       </div>
     </CenterDialog>
+  );
+}
+
+/// Spec 4.5 (14.11.2026): the link to a step's evidence, for an audited
+/// client's run. Shown, replaced, or added in one line.
+function EvidenceLink({ step, parentId }: { step: Step; parentId: string }) {
+  const t = useTranslations("tasks.detail.steps");
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(step.evidenceLink ?? "");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function save() {
+    setPending(true);
+    setError(null);
+    const r = await setStepEvidenceLinkAction({ stepId: step.id, parentId, link: value.trim() || null });
+    setPending(false);
+    if (!r.ok) return setError(r.error);
+    setEditing(false);
+  }
+  if (!editing)
+    return (
+      <p className="mt-1 flex flex-wrap gap-2 text-[11.5px]" data-testid="step-evidence">
+        {step.evidenceLink ? (
+          <>
+            <a href={step.evidenceLink} target="_blank" rel="noopener noreferrer" className="font-medium text-app-text-accent hover:underline">
+              {t("evidence")} ↗
+            </a>
+            <button type="button" onClick={() => setEditing(true)} className="text-app-text-tertiary hover:underline">
+              {t("evidenceChange")}
+            </button>
+          </>
+        ) : (
+          <button type="button" onClick={() => setEditing(true)} className="text-app-text-accent hover:underline">
+            {t("evidenceAdd")}
+          </button>
+        )}
+      </p>
+    );
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+      <input
+        type="url"
+        dir="ltr"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        aria-label={t("evidenceAria", { title: step.title })}
+        placeholder={t("evidencePlaceholder")}
+        className="min-w-0 flex-1 rounded-[8px] border border-app-border px-2.5 py-1.5 text-[12.5px] text-app-text-primary"
+      />
+      <button type="button" disabled={pending} onClick={save} className="rounded-full border border-app-border px-3 py-1 text-[12px] font-medium text-app-text-primary disabled:opacity-50">
+        {pending ? t("saving") : t("evidenceSave")}
+      </button>
+      {error && <p className="w-full text-[11.5px] text-app-error">{error}</p>}
+    </div>
   );
 }
 

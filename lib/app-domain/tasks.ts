@@ -299,7 +299,7 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
       // The two flags taskAiExclusion reads besides the task's own, so a
       // screen can keep a "בלי AI" row from the browser's translator
       // (ADR 0006). The MCP tools filter with `forAi` and never show them.
-      client: { select: { id: true, name: true, aiExcluded: true } },
+      client: { select: { id: true, name: true, aiExcluded: true, auditRequirements: true } },
       parent: { select: { aiExcluded: true } },
       category: { select: { id: true, name: true } },
       assignedTo: { select: { id: true, name: true } },
@@ -1920,7 +1920,7 @@ export async function getTaskDetail(actor: User, taskId: string) {
   const task = await prisma.task.findFirst({
     where: { id: taskId, deletedAt: null },
     include: {
-      client: { select: { id: true, name: true, aiExcluded: true } },
+      client: { select: { id: true, name: true, aiExcluded: true, auditRequirements: true } },
       // 28.10.2026: a step inherits its task's "בלי AI" (lib/ai-exclusion.ts).
       parent: { select: { aiExcluded: true } },
       category: { select: { id: true, name: true } },
@@ -2029,6 +2029,7 @@ export async function getTaskDetail(actor: User, taskId: string) {
         // Stage 3 (spec 4.5): a step approved by a contact at the client.
         approvalContactId: true,
         approvalEvidence: true,
+        evidenceLink: true,
       },
     }),
   ]);
@@ -2227,4 +2228,22 @@ export async function setTaskProcess(actor: User, taskId: string, processId: str
     before: { processId: task.processId },
     after: { processId },
   });
+}
+
+/// 14.11.2026 (processes redesign, spec 4.5): a link to what shows a run's
+/// step was done, for a client with audit requirements. Null takes it off.
+export async function setStepEvidenceLink(actor: User, stepId: string, link: string | null) {
+  assertCan(actor.role, "time_entry.create_self");
+  const step = await prisma.task.findFirst({
+    where: { id: stepId, deletedAt: null },
+    select: { id: true, clientId: true, parentId: true, processId: true, evidenceLink: true, client: { select: { auditRequirements: true } } },
+  });
+  if (!step) throw new DomainError("tasks.notFound", "Task not found.");
+  const accessible = await listAccessibleClients(actor);
+  if (!accessible.some((c) => c.id === step.clientId)) throw new ForbiddenError("You are not assigned to this client.");
+  if (!step.parentId || !step.processId || !step.client.auditRequirements) throw new DomainError("tasks.evidenceNotHere", "קישור לראיה נשמר רק בשלב של ריצה, בלקוח עם דרישות ביקורת.");
+  const value = link?.trim() || null;
+  if (value && (!/^https:\/\//i.test(value) || value.length > 1000)) throw new DomainError("tasks.badEvidenceLink", "הקישור צריך להתחיל ב-https://.");
+  await prisma.task.update({ where: { id: step.id }, data: { evidenceLink: value } });
+  await recordAudit({ actorId: actor.id, action: "task.evidence_link", entityType: "Task", entityId: step.id, clientId: step.clientId, before: { evidenceLink: step.evidenceLink }, after: { evidenceLink: value } });
 }
