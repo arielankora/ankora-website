@@ -591,6 +591,49 @@ export async function saveProcedureDraft(actor: User, processId: string, steps: 
   return { version: row.version, steps: clean.length };
 }
 
+/// "להכין לביקורת" (14.11.2026, processes redesign, stage 4): what Claude
+/// drafted for an audited client's procedure. "איך יודעים שבוצע" for the
+/// steps named goes into a new draft version of the latest steps, a person
+/// approves it; the steps themselves are not changed. Scope and controls
+/// are filled only where the process has none, and reach the document with
+/// that approval.
+export async function saveAuditDraft(
+  actor: User,
+  processId: string,
+  input: { scope?: string | null; controlRefs?: string[] | null; evidence?: { step: number; text: string }[] }
+) {
+  const process = await findProcess(actor, processId);
+  const client = await prisma.client.findUnique({ where: { id: process.clientId }, select: { auditRequirements: true } });
+  if (!client?.auditRequirements) throw new DomainError("processes.notAudited", "ללקוח הזה אין דרישות ביקורת.");
+  const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" } });
+  const flow = latest ? readFlow(latest.flow) : null;
+  if (flow) throw new DomainError("processes.auditDraftFlow", "הנוהל בנוי כתרשים. משלימים בו \"איך יודעים שבוצע\" בעורך השלבים.");
+  const steps = latest ? readSteps(latest.steps) : [];
+  let version: number | null = null;
+  const filled: number[] = [];
+  if (input.evidence?.length && steps.length) {
+    const next = steps.map((st, i) => {
+      const e = input.evidence!.find((x) => x.step === i + 1)?.text?.trim().slice(0, 500);
+      if (!e || st.evidence?.trim()) return st;
+      filled.push(i + 1);
+      return { ...st, evidence: e, ...(st.mode === "AUTOMATED" && !st.verification ? { verification: e } : {}) };
+    });
+    if (filled.length) {
+      const row = await saveProcessVersion(actor, processId, { steps: next, highlights: latest?.highlights ?? null, outputs: latest?.outputs ?? null, baseVersion: latest?.version ?? 0, changeNote: "הכנה לביקורת: איך יודעים שבוצע" });
+      version = row.version;
+    }
+  }
+  const data: Prisma.ProcessUpdateInput = {};
+  if (input.scope?.trim() && !process.scope?.trim()) data.scope = input.scope.trim().slice(0, 2000);
+  const refs = (input.controlRefs ?? []).map((r) => r.trim()).filter(Boolean).slice(0, 30);
+  if (refs.length && !process.controlRefs.length) data.controlRefs = refs;
+  if (Object.keys(data).length) {
+    await prisma.process.update({ where: { id: processId }, data });
+    await recordAudit({ actorId: actor.id, action: "process.audit_prep", entityType: "Process", entityId: processId, clientId: process.clientId, after: { ...data, version } });
+  }
+  return { version, evidenceSteps: filled, scope: !!data.scope, controls: !!data.controlRefs };
+}
+
 /// 14.11.2026 (processes redesign, stage 3, "Steps.dc.html"): what the one
 /// steps editor needs. The procedure as a list, or as a flow when it has a
 /// condition; the people a step may name (who does it, who approves it);

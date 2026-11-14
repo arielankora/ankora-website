@@ -134,6 +134,9 @@ export const TOOL_ANNOTATIONS = {
   // 14.11.2026 (stage 3): a draft of steps for a process with none yet.
   // A second call is refused once the process has steps.
   save_procedure_draft: WRITES,
+  // 14.11.2026 (stage 4, "להכין לביקורת"): a draft with how each step is
+  // known to be done, and scope and controls where the process has none.
+  save_procedure_audit_draft: WRITES,
   // The answer about a run's procedure (spec 5.4). One per run: a second
   // call is refused, not applied twice.
   record_run_lesson: WRITES,
@@ -206,6 +209,7 @@ export const WRITE_TOOLS = [
   "record_process_check",
   "save_procedure_translation",
   "save_procedure_draft",
+  "save_procedure_audit_draft",
   "record_run_lesson",
   "record_stranger_test",
   "answer_stranger_question",

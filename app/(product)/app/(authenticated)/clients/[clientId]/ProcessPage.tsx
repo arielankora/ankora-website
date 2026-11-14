@@ -27,6 +27,8 @@ import {
 import { CheckLines, Lessons, ProcedureEditor, ProcessForm, StartRunForm, StrangerBlock, type FormOptions, type PanelProcess } from "./ProcessesPanel";
 import { ProcessCheckForm } from "./ProcessCheckForm";
 import { RhythmEditor } from "./RhythmEditor";
+import { DocumentTab } from "./DocumentTab";
+import type { DocumentTab as DocumentTabData } from "@/lib/app-domain/procedure-audit";
 
 type Tx = (key: string, values?: Record<string, string | number>) => string;
 type Tab = "steps" | "runs" | "lessons" | "work" | "document";
@@ -50,7 +52,10 @@ export function ProcessPage({
   openRhythm,
   userId,
   back = null,
+  docTab,
 }: {
+  /// 14.11.2026 (stage 4): the procedure document's tab.
+  docTab: DocumentTabData;
   /// From the approvals screen: the way back to it (22.10.2026).
   back?: { href: string; label: string } | null;
   userId: string;
@@ -434,20 +439,7 @@ export function ProcessPage({
           </div>
         )}
 
-        {tab === "document" && (
-          <div className="flex max-w-3xl flex-col gap-5" data-testid="process-document">
-            {p.latestVersion > 0 && (
-              <Link href={`/app/clients/${clientId}/processes/${p.id}/document`} className="self-start text-sm font-bold text-app-text-accent hover:underline" data-testid="procedure-document-link">
-                {t("openDocument")}
-              </Link>
-            )}
-            {p.doc && <p className="text-sm text-app-text-secondary">{t("docScore", { score: p.doc.score, of: p.doc.of })}</p>}
-            {p.stranger && <StrangerBlock stranger={p.stranger} />}
-            <div className="rounded-[14px] border border-app-border bg-white px-5 py-6 sm:px-8">
-              <ProcessForm clientId={clientId} existing={p} {...form} only={["document"]} />
-            </div>
-          </div>
-        )}
+        {tab === "document" && <DocumentTab clientId={clientId} process={p} data={docTab} onTab={setTab} />}
       </div>
     </div>
   );

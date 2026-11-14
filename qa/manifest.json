@@ -2296,6 +2296,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-14",
       "riskReason": "The one steps editor (processes redesign, stage 3): a list that becomes a flow, each step's approver at Ankora or at the client, and save as a draft or save and approve through the same checks and second pair of eyes"
+    },
+    "domain:procedure-audit": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-14",
+      "riskReason": "The procedure document's tab (processes redesign, stage 4): why an approved document is out of date, an audited client's readiness list, and Claude's audit draft that fills evidence in a new draft version and scope and controls only where empty"
     }
   },
   "waivers": {},

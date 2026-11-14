@@ -96,6 +96,8 @@ export async function updateClientAction(_prev: FormState | undefined, formData:
       aiExcluded: formData.get("aiExcluded") === "on",
       // 31.10.2026: separation in approving procedures. Always on the form.
       procedureApprovalSeparation: formData.get("procedureApprovalSeparation") === "on",
+      // 14.11.2026 (stage 4): an audited client. Always on the form.
+      auditRequirements: formData.get("auditRequirements") === "on",
       // 12.11.2026: the language for the client's people without an
       // account (ADR 0006). An unknown value leaves it untouched.
       communicationLocale: parseCommunicationLocale(formData.get("communicationLocale")),

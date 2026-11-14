@@ -129,6 +129,8 @@ const PART_FIELDS: Record<string, string[]> = {
   work: ["slaText", "slaBusinessDays", "requiredSystemIds", "requiredSystemPermissions", "externalPartyContactIds", "externalPartyText", "approvalPolicyIds", "approvalText", "exceptionPlaybook"],
   knowledge: ["transitionStatus", "knowledgeStatus", "toResolve", "entityId", "sources", "manualConfirm"],
   document: ["scope", "definitions", "controlRefs", "classification", "relatedDocs", "reviewEveryDays"],
+  // 14.11.2026 (stage 4): the compliance fields of the document's tab.
+  compliance: ["scope", "definitions", "controlRefs", "classification", "relatedDocs"],
   sources: ["sources", "manualConfirm", "knowledgeStatus", "toResolve"],
 };
 
@@ -208,6 +210,13 @@ export async function runProcessStepAction(op: StepOp, clientId: string): Promis
     revalidatePath("/app", "layout");
   }
   return r.ok ? { ...r, done } : r;
+}
+
+/// 14.11.2026 (stage 4): marks a documentation field "לא רלוונטי" from the
+/// readiness list of the procedure document's tab.
+export async function markProcessFieldNotApplicableAction(processId: string, field: string, clientId: string): Promise<FormState> {
+  const user = await requireUser();
+  return run(clientId, () => setProcessFieldNotApplicable(user, processId, field, true));
 }
 
 /// 25.10.2026: takes the "לא רלוונטי" mark off a documentation field.

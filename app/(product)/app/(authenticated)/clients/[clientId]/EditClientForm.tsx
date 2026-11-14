@@ -176,6 +176,22 @@ export function EditClientForm({
         </span>
       </label>
 
+      {/* 14.11.2026 (processes redesign, stage 4, "Document.dc.html"): the
+          client is audited. A switch, as the board draws it. */}
+      <label id="audit-requirements" className="flex scroll-mt-24 items-center justify-between gap-4 rounded-[14px] border border-app-border bg-white px-5 py-4 sm:col-span-2" data-testid="audit-requirements">
+        <span>
+          <span className="block text-base font-bold text-app-text-primary">{t("auditRequirements")}</span>
+          <span className="block text-sm text-app-text-secondary">{t("auditRequirementsHint")}</span>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          name="auditRequirements"
+          defaultChecked={client.auditRequirements}
+          className="relative h-7 w-12 shrink-0 cursor-pointer appearance-none rounded-full bg-app-border-strong transition-colors before:absolute before:start-[3px] before:top-[3px] before:h-[22px] before:w-[22px] before:rounded-full before:bg-white before:transition-transform checked:bg-app-success checked:before:translate-x-5 rtl:checked:before:-translate-x-5"
+        />
+      </label>
+
       {/* 3.11.2026: P8 step 8. Whether this client's own contract commits
           Ankora to tell it by email about a new sub-processor. Internal:
           the client does not see it on the portal. */}

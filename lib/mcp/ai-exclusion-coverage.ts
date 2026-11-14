@@ -58,6 +58,7 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   get_procedure_for_translation: "lookupClient",
   save_procedure_translation: "lookupClient",
   save_procedure_draft: "lookupClient",
+  save_procedure_audit_draft: "lookupClient",
   list_policies: "lookupClient",
   start_process: "lookupClient",
   record_run_lesson: "findTask",

@@ -29,7 +29,7 @@ import { clientBrief, clientFileChanges } from "@/lib/app-domain/client-file-liv
 import { readSince } from "@/lib/client-file-live";
 import { appBaseUrl } from "@/lib/email-templates";
 import { saveProcedureTranslation, translationSource } from "@/lib/app-domain/procedure-documents";
-import { saveProcedureDraft } from "@/lib/app-domain/processes";
+import { saveAuditDraft, saveProcedureDraft } from "@/lib/app-domain/processes";
 import { DomainError } from "@/lib/domain-error";
 import { listSubprocessorRecipients, type SubprocessorRecipient } from "@/lib/app-domain/subprocessor-recipients";
 import { updateClient } from "@/lib/app-domain/clients";
@@ -690,6 +690,52 @@ export function registerClientFileTools(server: McpServer): void {
         // Said to Claude as it is: the process has steps, or the draft is empty.
         if (err instanceof DomainError) return toolText(err.message);
         console.error("[mcp] save_procedure_draft failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  // 14.11.2026 (processes redesign, stage 4, "להכין לביקורת"): Claude's
+  // drafting of what an audited client's procedure lacks. Never approved
+  // here; a person approves the new version on the process's page.
+  server.registerTool(
+    "save_procedure_audit_draft",
+    {
+      title: "Save a procedure's preparation for an audit",
+      description:
+        "For a client with audit requirements: saves what Claude drafted for a procedure's audit. `evidence` (how we know each step was done, by step number) goes into a new draft version of the procedure, approved by a person; a step that has it already is left as it is, and the steps themselves never change. `scope` and `controlRefs` are written only where the process has none, and reach the document with the next approval. Read the process first (get_process) and the client's file, draft from them, show the user, and save only after they said so. Never invent a control or evidence the file does not support. Answers with `link`, the process's page: give it to the user.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, as the user said it."),
+        process: z.string().describe('The process code ("P3") or its title.'),
+        scope: z.string().nullable().optional().describe("Whom and what the procedure covers, in Hebrew."),
+        controlRefs: z.array(z.string()).max(30).nullable().optional().describe('Controls of the client\'s standard, e.g. ["CC6.2", "CC6.3"].'),
+        evidence: z
+          .array(z.object({ step: z.number().int().min(1).max(40), text: z.string().describe("How we know the step was done, in one sentence, in Hebrew.") }))
+          .max(40)
+          .optional(),
+      }),
+      annotations: TOOL_ANNOTATIONS.save_procedure_audit_draft,
+    },
+    async (args: { client: string; process: string; scope?: string | null; controlRefs?: string[] | null; evidence?: { step: number; text: string }[] }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const process = await resolveProcess(client.value, args.process);
+        if (!process.ok) return toolText(process.message);
+        const saved = await saveAuditDraft(actor, process.id, { scope: args.scope, controlRefs: args.controlRefs, evidence: args.evidence });
+        return toolJson({
+          saved: true,
+          draftVersion: saved.version,
+          evidenceSteps: saved.evidenceSteps,
+          scopeWritten: saved.scope,
+          controlsWritten: saved.controls,
+          next: saved.version ? "A draft. A person approves it on the process's page." : "Nothing new to approve.",
+          link: `${appBaseUrl()}/app/clients/${client.value.id}/processes/${process.id}`,
+        });
+      } catch (err) {
+        if (err instanceof DomainError) return toolText(err.message);
+        console.error("[mcp] save_procedure_audit_draft failed", err);
         return toolFailure(err);
       }
     }
