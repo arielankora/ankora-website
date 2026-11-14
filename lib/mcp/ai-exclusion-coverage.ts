@@ -94,6 +94,8 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
 
   // lib/mcp/hour-bank-tools.ts
   get_hours_bank: "lookupClient; entries of marked tasks count only as minutes in the totals, no titles or notes",
+  list_client_communications: "lookupClient; a number that also belongs to a marked client is left out (lib/comms/client-comms.ts scopeFor)",
+  get_client_communication: "lookupClient; the conversation or call must be one list_client_communications would list, so a marked client's number is never read",
 
   // lib/mcp/approval-tools.ts
   list_approvals: "lookupClient; rows of a marked client, and tasks and plans of a marked task, are left out (listApprovalsForAi); auto-applied items of a marked client are left out (listAutoReview forAi)",
