@@ -27,7 +27,7 @@ describe("audit readiness", () => {
       ["runs", true],
     ]);
     expect(r.missing).toBe(4);
-    expect(r.items.find((i) => i.key === "evidence")?.text).toEqual({ key: "evidenceMissing", values: { steps: "2, 4 ו-5" } });
+    expect(r.items.find((i) => i.key === "evidence")?.text).toEqual({ key: "evidenceMissing", values: { list: "2, 4 ו-5", form: "other" } });
     expect(r.items.find((i) => i.key === "doc:approval")).toMatchObject({ action: "work", field: "approval" });
   });
 

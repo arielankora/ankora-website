@@ -56,6 +56,8 @@ export async function newProcess(page: Page, title: string, opts: { owner?: bool
 /// Writes one step in the steps editor (stage 3: a page of its own) of the
 /// open process page, saves a draft, and is back on the process page.
 export async function writeStep(page: Page, step: string) {
+  // The steps are under their own tab, which may not be the one open.
+  if (await page.getByTestId("process-tab-steps").count()) await page.getByTestId("process-tab-steps").click();
   await page.getByTestId("process-edit-steps").click({ timeout: 15_000 });
   await expect(page.getByTestId("steps-editor")).toBeVisible({ timeout: 15_000 });
   if (await page.getByTestId("steps-empty").count()) await page.getByTestId("steps-empty").getByRole("button", { name: "+ שלב" }).click();

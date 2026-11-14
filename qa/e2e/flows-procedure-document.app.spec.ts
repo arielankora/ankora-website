@@ -9,11 +9,23 @@ import { approveDraft, CLIENT, newProcess, tag, writeStep } from "./process-page
 // Screens: /app/clients/[clientId]/processes/[processId]/document
 //          /app/clients/[clientId]/procedures
 
-test.describe.configure({ timeout: 120_000 });
+test.describe.configure({ timeout: 150_000 });
 
 test("an approved procedure reads as a document and downloads as PDF and Word", async ({ page }) => {
   const title = tag("[E2E] נוהל");
 
+  // 14.11.2026 (stage 4): the compliance fields are a client's with audit
+  // requirements, switched on in the client's details.
+  await test.step("the client is audited", async () => {
+    await page.goto(`/app/clients/${CLIENT}?tab=work`);
+    const toggle = page.getByTestId("audit-requirements").getByRole("switch");
+    await expect(toggle).toBeVisible({ timeout: 15_000 });
+    if (!(await toggle.isChecked())) {
+      await toggle.check();
+      await page.getByRole("button", { name: "שמירת שינויים" }).click();
+      await expect(page.getByText("נשמר בהצלחה.").first()).toBeVisible({ timeout: 15_000 });
+    }
+  });
   // 13.11.2026 (stage 2): added from the list, then the document's fields in
   // the process page's "מסמך הנוהל" tab.
   await test.step("a process", async () => {
@@ -22,13 +34,18 @@ test("an approved procedure reads as a document and downloads as PDF and Word", 
   });
   await test.step("its document's fields", async () => {
     await page.getByTestId("process-tab-document").click();
-    const doc = page.getByTestId("process-document");
-    await doc.locator('textarea[name="scope"]').fill("כל העובדים בישראל");
-    await doc.locator('input[name="controlRefs"]').fill("CC6.2, CC6.3");
-    const saved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400, { timeout: 30_000 });
-    await doc.getByRole("button", { name: "שמירה" }).click();
-    await saved;
+    await expect(page.getByTestId("readiness-scope")).toHaveAttribute("data-ok", "false");
+    const form = page.getByTestId("compliance-form");
+    await form.locator('textarea[name="scope"]').fill("כל העובדים בישראל");
+    await form.locator('input[name="controlRefs"]').fill("CC6.2, CC6.3");
+    await page.waitForLoadState("networkidle");
+    await form.getByRole("button", { name: "שמירה" }).click();
+    await expect(page.getByText("שדות הציות נשמרו").first()).toBeVisible({ timeout: 30_000 });
     await page.reload();
+    await page.getByTestId("process-tab-document").click();
+    await expect(page.getByTestId("readiness-scope")).toHaveAttribute("data-ok", "true", { timeout: 15_000 });
+    await expect(page.getByTestId("readiness-controls")).toContainText("CC6.2, CC6.3");
+    await expect(page.getByTestId("prepare-for-audit")).toBeVisible();
   });
   await test.step("write and approve the procedure", async () => {
     await writeStep(page, "אוספים את פרטי הבקשה");
@@ -38,6 +55,7 @@ test("an approved procedure reads as a document and downloads as PDF and Word", 
   });
 
   await page.getByTestId("process-tab-document").click();
+  await expect(page.getByTestId("process-document")).toContainText("מסמך הנוהל, גרסה 1");
   await page.getByTestId("procedure-document-link").click({ timeout: 15_000 });
   await expect(page).toHaveURL(/\/processes\/[^/]+\/document/, { timeout: 15_000 });
   const paper = page.getByTestId("procedure-paper");

@@ -4139,7 +4139,7 @@
           "classificationMissing": "Classification",
           "scopeOk": "Scope",
           "scopeMissing": "Scope",
-          "evidenceMissing": "How we know it was done: steps {steps}",
+          "evidenceMissing": "How we know it was done, {form, select, one {in step} other {in steps}} {list}",
           "evidenceOk": "How we know it was done: every step",
           "docMissing": "{label}",
           "translationOk": "English translation approved",

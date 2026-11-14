@@ -184,7 +184,7 @@ export function DocumentTab({ clientId, process: p, data, onTab }: { clientId: s
         {!data.audit && (
           <p className="text-sm text-app-text-secondary" data-testid="no-audit">
             {t("noAudit")}{" "}
-            <Link href={`/app/clients/${clientId}`} className="font-bold text-app-text-accent hover:underline">
+            <Link href={`/app/clients/${clientId}?tab=work#audit-requirements`} className="font-bold text-app-text-accent hover:underline">
               {t("enableAudit")}
             </Link>
           </p>

@@ -51,7 +51,7 @@ export function auditReadiness(input: ReadinessInput): { items: ReadinessItem[];
   if (input.steps.length) {
     items.push(
       noEvidence.length
-        ? { key: "evidence", ok: false, text: { key: "evidenceMissing", values: { steps: listNumbers(noEvidence) } }, action: "steps" }
+        ? { key: "evidence", ok: false, text: { key: "evidenceMissing", values: { list: listNumbers(noEvidence), form: noEvidence.length === 1 ? "one" : "other" } }, action: "steps" }
         : { key: "evidence", ok: true, text: { key: "evidenceOk" }, action: null }
     );
   }

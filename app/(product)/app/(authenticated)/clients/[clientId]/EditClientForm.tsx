@@ -178,7 +178,7 @@ export function EditClientForm({
 
       {/* 14.11.2026 (processes redesign, stage 4, "Document.dc.html"): the
           client is audited. A switch, as the board draws it. */}
-      <label className="flex items-center justify-between gap-4 rounded-[14px] border border-app-border bg-white px-5 py-4 sm:col-span-2" data-testid="audit-requirements">
+      <label id="audit-requirements" className="flex scroll-mt-24 items-center justify-between gap-4 rounded-[14px] border border-app-border bg-white px-5 py-4 sm:col-span-2" data-testid="audit-requirements">
         <span>
           <span className="block text-base font-bold text-app-text-primary">{t("auditRequirements")}</span>
           <span className="block text-sm text-app-text-secondary">{t("auditRequirementsHint")}</span>

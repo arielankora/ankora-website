@@ -4139,7 +4139,7 @@
           "classificationMissing": "סיווג",
           "scopeOk": "תחולה",
           "scopeMissing": "תחולה",
-          "evidenceMissing": "איך יודעים שבוצע: שלבים {steps}",
+          "evidenceMissing": "איך יודעים שבוצע: {form, select, one {שלב} other {שלבים}} {list}",
           "evidenceOk": "איך יודעים שבוצע: בכל השלבים",
           "docMissing": "{label}",
           "translationOk": "תרגום לאנגלית מאושר",
