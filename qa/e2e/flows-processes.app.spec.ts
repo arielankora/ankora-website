@@ -1,6 +1,6 @@
 import { test, expect } from "./fixtures";
 import { fillRhythm, onceInThePast, ongoing, whenSomethingHappens } from "./rhythm";
-import { CLIENT, newProcess, submit, tag } from "./process-page";
+import { CLIENT, newProcess, saveDraft, submit, tag, writeStep } from "./process-page";
 
 // Org brain, phase 1 (16.10.2026): a process and its procedure on the
 // client screen, submitted for real, as the seeded admin. Same prose rule
@@ -40,29 +40,30 @@ test.describe("clients/process-actions", () => {
     // Only what stops a run is said on top, in one line.
     await expect(page.getByTestId("process-blocker")).toHaveText("לא ירוץ: אין נוהל מאושר");
 
-    await page.getByRole("button", { name: "כתיבת השלבים" }).click();
-    const editor = page.getByRole("dialog");
-    await expect(editor).toBeVisible();
-    await editor.getByLabel("שלב 1: מה עושים").fill("מעבירים תשלום לספק");
-    await editor.getByLabel("שלב 1: איך").selectOption("AUTOMATED");
-    await editor.getByRole("checkbox", { name: "תשלום" }).check();
-    await submit(page, "שמירת טיוטה");
+    // 14.11.2026 (stage 3): the steps editor is a page of its own.
+    await page.getByTestId("process-edit-steps").click();
+    await expect(page.getByTestId("steps-editor")).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId("steps-empty").getByRole("button", { name: "+ שלב" }).click();
+    await page.getByLabel("שלב 1: מה עושים").fill("מעבירים תשלום לספק");
+    await page.getByRole("radiogroup", { name: "שלב 1: איך" }).getByRole("radio", { name: "אוטומטי" }).click();
+    await page.getByRole("group", { name: "סוג הפעולה" }).getByRole("button", { name: "תשלום", exact: true }).click();
+    await saveDraft(page);
 
     const draft = page.getByTestId("process-draft");
     await expect(draft).toContainText("טיוטה 1 מחכה לאישור", { timeout: 15_000 });
     await expect(draft).toContainText("לא נעשה אוטומטית");
     await expect(draft.getByRole("button", { name: "אישור הנוהל" })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "עריכת השלבים" }).click();
-    const fix = page.getByRole("dialog");
-    await expect(fix).toBeVisible();
+    await page.getByTestId("process-edit-steps").click();
+    await expect(page.getByTestId("steps-editor")).toBeVisible({ timeout: 15_000 });
     // 28.10.2026: the editor says what holds the approval, and where.
-    await expect(fix.getByTestId("procedure-issues")).toContainText("לא נעשה אוטומטית");
-    await expect(fix.getByTestId("procedure-issues")).toContainText("איך אדם מוודא שזה קרה");
-    await expect(fix.getByLabel("אימות של שלב 1")).toHaveAttribute("aria-invalid", "true");
-    await fix.getByLabel("שלב 1: איך").selectOption("MANUAL");
-    await expect(fix.getByTestId("procedure-issues")).toHaveCount(0);
-    await submit(page, "שמירת טיוטה");
+    await expect(page.getByTestId("procedure-issues")).toContainText("לא נעשה אוטומטית");
+    await expect(page.getByTestId("procedure-issues")).toContainText("איך אדם מוודא שזה קרה");
+    await expect(page.getByLabel("שלב 1: איך יודעים שבוצע")).toHaveAttribute("aria-invalid", "true");
+    await page.getByRole("radiogroup", { name: "שלב 1: איך" }).getByRole("radio", { name: "ידני" }).click();
+    await expect(page.getByTestId("procedure-issues")).toHaveCount(0);
+    await expect(page.getByTestId("steps-passed")).toBeVisible();
+    await saveDraft(page);
     await expect(draft).toContainText("טיוטה 2 מחכה לאישור", { timeout: 15_000 });
 
     const approved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
@@ -104,11 +105,7 @@ test.describe("clients/process-actions", () => {
     // A draft does not run anyway: no run is said to be stopped yet.
     await expect(page.getByTestId("process-blocker")).not.toContainText("לא ירוץ: תהליך לפי מועד");
 
-    await page.getByRole("button", { name: "כתיבת השלבים" }).click();
-    const editor = page.getByRole("dialog");
-    await expect(editor).toBeVisible();
-    await editor.getByLabel("שלב 1: מה עושים").fill("מכינים את קובץ התשלומים");
-    await submit(page, "שמירת טיוטה");
+    await writeStep(page, "מכינים את קובץ התשלומים");
     const approved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
     await page.getByTestId("process-draft").getByRole("button", { name: "אישור הנוהל" }).click();
     await approved;

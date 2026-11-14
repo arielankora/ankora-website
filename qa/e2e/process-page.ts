@@ -53,14 +53,22 @@ export async function newProcess(page: Page, title: string, opts: { owner?: bool
   return new URL(page.url()).pathname;
 }
 
-/// Writes one step in the steps editor of the open process page, and saves
-/// a draft.
+/// Writes one step in the steps editor (stage 3: a page of its own) of the
+/// open process page, saves a draft, and is back on the process page.
 export async function writeStep(page: Page, step: string) {
-  await page.getByRole("button", { name: /^(כתיבת השלבים|עריכת השלבים)$/ }).click({ timeout: 15_000 });
-  const editor = page.getByRole("dialog");
-  await expect(editor).toBeVisible();
-  await editor.getByLabel("שלב 1: מה עושים").fill(step, { timeout: 15_000 });
-  await submit(page, "שמירת טיוטה");
+  await page.getByTestId("process-edit-steps").click({ timeout: 15_000 });
+  await expect(page.getByTestId("steps-editor")).toBeVisible({ timeout: 15_000 });
+  if (await page.getByTestId("steps-empty").count()) await page.getByTestId("steps-empty").getByRole("button", { name: "+ שלב" }).click();
+  await page.getByLabel("שלב 1: מה עושים").fill(step, { timeout: 15_000 });
+  await saveDraft(page);
+}
+
+/// "שמירת טיוטה" in the steps editor; back on the process page.
+export async function saveDraft(page: Page) {
+  const from = page.url();
+  await page.getByTestId("steps-save").click();
+  await expect(page).not.toHaveURL(from, { timeout: 30_000 });
+  await expect(page.getByTestId("process-page")).toBeVisible({ timeout: 15_000 });
 }
 
 /// Approves the draft waiting on the open process page.

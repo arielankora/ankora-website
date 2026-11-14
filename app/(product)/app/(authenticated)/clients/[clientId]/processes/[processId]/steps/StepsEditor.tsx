@@ -128,7 +128,9 @@ export function StepsEditor({ data }: { data: StepsEditorData }) {
     setView("list");
   };
   const toFlow = () => {
-    setFlow(withPositions(flowFromSteps(steps.filter((s) => s.title.trim()))));
+    const kept = steps.filter((s) => s.title.trim());
+    // Nothing yet: an empty canvas, as the flow editor always opened.
+    setFlow(kept.length ? withPositions(flowFromSteps(kept)) : { v: 1, start: null, nodes: [] });
     setNode(null);
     setView("flow");
   };
