@@ -376,10 +376,18 @@ export function describeLegacyDates(dates: LegacyDate[], lang: RhythmLang = "he"
         return describeRule({ ...rule, frequency: "DAILY" }, lang);
       case "WEEKLY":
         return describeRule({ ...rule, frequency: "WEEKLY", weekdays: d.weekday === null ? [] : [d.weekday] }, lang);
-      case "MONTHLY":
-        return d.intervalMonths === 3
-          ? describeRule({ ...rule, frequency: "QUARTERLY", monthDays: [d.day], quarterMonth: ((d.month - 1) % 3) + 1 }, lang)
-          : describeRule({ ...rule, frequency: "MONTHLY", monthDays: [d.day] }, lang);
+      case "MONTHLY": {
+        const every = d.intervalMonths ?? 1;
+        if (every === 3) return describeRule({ ...rule, frequency: "QUARTERLY", monthDays: [d.day], quarterMonth: ((d.month - 1) % 3) + 1 }, lang);
+        const monthly = describeRule({ ...rule, frequency: "MONTHLY", monthDays: [d.day] }, lang);
+        if (every <= 1) return monthly;
+        // 13.11.2026: a date every N months (Ankora's P23, every two) was
+        // said to be monthly. Its months are named when they repeat each year.
+        const months = 12 % every === 0 ? Array.from({ length: 12 / every }, (_, i) => ((d.month - 1 + i * every) % 12) + 1).sort((a, b) => a - b) : [];
+        const names = months.map((m) => MONTH_NAMES[lang][m - 1]).join(", ");
+        const head = lang === "he" ? (every === 2 ? "כל חודשיים" : `כל ${every} חודשים`) : `Every ${every} months`;
+        return monthly.replace(lang === "he" ? /^פעם בחודש/ : /^once a month/i, head).replace(/^([^.]*?)\./, (_, first) => (names ? `${first} (${names}).` : `${first}.`));
+      }
       case "ANNUAL":
         return describeRule({ ...rule, frequency: "YEARLY", yearDates: [{ month: d.month, day: d.day }] }, lang);
       case "ONCE": {
