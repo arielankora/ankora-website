@@ -117,6 +117,10 @@ export type ProcessStep = {
   approverContactId?: string | null;
   /// "איך יודעים שבוצע": what shows the step was done (spec 4.4).
   evidence?: string | null;
+  /// "מי עושה" (spec 5.4): who does this step, when not the process's
+  /// executor. An Ankora user gets the run's step; a contact or free text
+  /// is named. The same shape as a flow node's owner.
+  owner?: { userId: string | null; contactId: string | null; text: string | null } | null;
   /// The most this step moves, in minor units, with its currency. Unknown
   /// is read as "may be above any threshold" (R2).
   amountMaxMinor: number | null;
@@ -147,6 +151,15 @@ function approverOf(v: Record<string, unknown>): Pick<ProcessStep, "requiresAppr
   return { requiresApproval: v.requiresApproval === true || !!userId || !!contactId, ...(userId ? { approverUserId: userId } : {}), ...(contactId ? { approverContactId: contactId } : {}) };
 }
 
+/// A step's own doer, when one is named.
+function ownerOf(value: unknown): Pick<ProcessStep, "owner"> {
+  if (!value || typeof value !== "object") return {};
+  const v = value as Record<string, unknown>;
+  const id = (x: unknown) => (typeof x === "string" && x.trim() ? x.trim() : null);
+  const owner = { userId: id(v.userId), contactId: id(v.contactId), text: s(v.text, 200) };
+  return owner.userId || owner.contactId || owner.text ? { owner } : {};
+}
+
 /// Whatever was stored or sent, as steps. Unknown tags and modes are
 /// dropped rather than trusted.
 export function readSteps(value: unknown): ProcessStep[] {
@@ -164,6 +177,7 @@ export function readSteps(value: unknown): ProcessStep[] {
       verification: s(v.verification, 500),
       ...approverOf(v),
       ...(s(v.evidence, 500) ? { evidence: s(v.evidence, 500) } : {}),
+      ...ownerOf(v.owner),
       amountMaxMinor:
         typeof v.amountMaxMinor === "number" && Number.isInteger(v.amountMaxMinor) && v.amountMaxMinor >= 0 && v.amountMaxMinor <= 1e13 ? v.amountMaxMinor : null,
       currency: typeof v.currency === "string" && /^[A-Za-z]{3}$/.test(v.currency.trim()) ? v.currency.trim().toUpperCase() : null,
@@ -201,7 +215,7 @@ export function blockingChecks(
     if (st.mode === "AUTOMATED" && !st.fixedMessage && st.actionTags.some((t) => HUMAN_REVIEWED_TAGS.includes(t))) {
       out.push({ code: "R1", step: n, message: `שלב ${n}: הודעה ללקוח עוברת בדיקה של אדם לפני שהיא יוצאת, ולכן לא נשלחת אוטומטית.`, keyed: { key: "clientMessageAutomated", step: n } });
     }
-    if (st.mode === "AUTOMATED" && !st.verification) {
+    if (st.mode === "AUTOMATED" && !st.verification && !st.evidence) {
       out.push({ code: "R3", step: n, message: `שלב ${n} אוטומטי: צריך לכתוב איך אדם מוודא שזה קרה.`, keyed: { key: "automatedNoVerification", step: n } });
     }
   });

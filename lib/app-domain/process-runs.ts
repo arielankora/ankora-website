@@ -132,7 +132,7 @@ export async function openProcessRun(input: OpenRunInput) {
   // 14.11.2026 (stage 3, spec 4.4): each step names its own approver. A
   // step that asks for an approval and names none falls back to the
   // process's, as before.
-  const stepUserIds = [...new Set(steps.map((st) => st.approverUserId).filter((x): x is string => !!x))];
+  const stepUserIds = [...new Set(steps.flatMap((st) => [st.approverUserId, st.owner?.userId]).filter((x): x is string => !!x))];
   const stepContactIds = [...new Set(steps.map((st) => st.approverContactId).filter((x): x is string => !!x))];
   const [stepUsers, stepContacts] = await Promise.all([
     stepUserIds.length ? prisma.user.findMany({ where: { id: { in: stepUserIds }, deletedAt: null, status: "ACTIVE" }, select: { id: true, name: true } }) : [],
@@ -207,7 +207,8 @@ export async function openProcessRun(input: OpenRunInput) {
         clientId: process.clientId,
         parentId: run.id,
         title: stepTitle(step, approver?.name ?? null),
-        assignedToId: assignee,
+        // "מי עושה" (stage 3): a step's own doer at Ankora gets it.
+        assignedToId: (step.owner?.userId && userById.get(step.owner.userId)?.id) || assignee,
         dueDate: dayAt(dueKeys[i]),
         stepMode: step.mode as ProcessStepMode,
         processId: process.id,

@@ -85,7 +85,7 @@ function stepText(t: Tx, x: StepText | undefined, fallback: string): string {
 /// A check lib/process-rules names by key, in the reader's language; the
 /// client's own rules (and anything stored before keys existed) keep their
 /// message.
-function checkText(t: Tx, c: { message: string; keyed?: KeyedCheck }): string {
+export function checkText(t: Tx, c: { message: string; keyed?: KeyedCheck }): string {
   const k = c.keyed;
   if (!k) return c.message;
   return t(`checks.${k.key}`, {

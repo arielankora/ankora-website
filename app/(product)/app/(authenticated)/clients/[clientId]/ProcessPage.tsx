@@ -103,6 +103,7 @@ export function ProcessPage({
   const approver = p.approverUserId ? staffName.get(p.approverUserId) : p.approverContactId ? `${contactName.get(p.approverContactId) ?? ""}, ${t("atClient")}` : p.approverText;
   const executor = p.executorUserId ? staffName.get(p.executorUserId) : p.executorContactId ? contactName.get(p.executorContactId) : p.executorText;
   const version = p.current?.version ?? null;
+  const stepDoer = (s: ProcessStep) => (s.owner?.userId ? staffName.get(s.owner.userId) : s.owner?.contactId ? contactName.get(s.owner.contactId) : s.owner?.text || executor) ?? "";
 
   const card = "flex flex-col gap-2.5 rounded-[14px] bg-app-surface-sunken px-5 py-4";
   const label = "text-[13px] font-bold text-app-text-secondary";
@@ -334,17 +335,9 @@ export function ProcessPage({
             <div className="flex flex-col">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-xl font-extrabold text-app-text-primary">{steps.length ? t("stepsCount", { count: steps.length }) : t("noSteps")}</h2>
-                {p.isFlow ? (
-                  <Link href={`/app/clients/${clientId}/processes/${p.id}/flow`} className="inline-flex min-h-[40px] items-center rounded-[9px] border border-app-border-strong bg-white px-4 text-sm text-app-text-primary">
-                    {t("editSteps")}
-                  </Link>
-                ) : (
-                  <CenterDialog triggerLabel={steps.length ? t("editSteps") : t("writeSteps")} triggerVariant="secondary" eyebrow={`${p.code} ${p.title}`} title={t("stepsTitle")}>
-                    <div className="px-5 py-6 sm:px-8">
-                      <ProcedureEditor clientId={clientId} process={p} systems={form.systems} />
-                    </div>
-                  </CenterDialog>
-                )}
+                <Link href={`/app/clients/${clientId}/processes/${p.id}/steps`} className="inline-flex min-h-[40px] items-center rounded-[9px] border border-app-border-strong bg-white px-4 text-sm text-app-text-primary" data-testid="process-edit-steps">
+                  {steps.length ? t("editSteps") : t("writeSteps")}
+                </Link>
               </div>
               {p.draft && (
                 <div className="mb-4 flex flex-col gap-2 rounded-xl bg-app-info-soft px-4 py-3 text-sm" data-testid="process-draft">
@@ -361,7 +354,7 @@ export function ProcessPage({
                 {steps.map((s, i) => (
                   <li key={i} className="grid grid-cols-[44px_minmax(0,1fr)] gap-4">
                     <div className="flex flex-col items-center">
-                      <span className={`flex h-9 w-9 items-center justify-center rounded-full text-[15px] font-extrabold ${s.requiresApproval ? "bg-app-accent text-white" : "bg-app-surface-nav text-white"}`}>{i + 1}</span>
+                      <span className={`flex h-9 w-9 items-center justify-center rounded-full text-[15px] font-extrabold ${s.approverContactId ? "bg-app-accent text-white" : "bg-app-surface-nav text-white"}`}>{i + 1}</span>
                       {i < steps.length - 1 && <span className="mb-3.5 min-h-5 w-0.5 flex-1 bg-app-border" aria-hidden="true" />}
                     </div>
                     <div className="mb-3.5 flex flex-col gap-2 rounded-xl border border-app-border bg-white px-5 py-4">
@@ -370,13 +363,20 @@ export function ProcessPage({
                         {s.offsetBusinessDays !== null && s.offsetBusinessDays !== undefined && <span className="shrink-0 text-sm text-app-text-secondary">{tp("steps.days", { days: s.offsetBusinessDays >= 0 ? `+${s.offsetBusinessDays}` : String(s.offsetBusinessDays) })}</span>}
                       </div>
                       <div className="flex flex-wrap gap-2 text-[13px]">
+                        {stepDoer(s) && <span className="rounded-md bg-app-neutral-soft px-2 py-0.5">{stepDoer(s)}</span>}
                         <span className="rounded-md bg-app-neutral-soft px-2 py-0.5">{tp(`labels.stepModes.${s.mode}`)}</span>
                         {s.systemIds.map((id) => (
                           <span key={id} className="rounded-md bg-app-neutral-soft px-2 py-0.5">
                             {systemName.get(id) ?? ""}
                           </span>
                         ))}
-                        {s.requiresApproval && <span className="rounded-md bg-app-warning-soft px-2 py-0.5 font-bold text-app-warning">{approver ? t("needsApprovalBy", { name: approver }) : t("needsApproval")}</span>}
+                        {s.approverContactId ? (
+                          <span className="rounded-md bg-app-warning-soft px-2 py-0.5 font-bold text-app-warning">{t("gateClient")}</span>
+                        ) : s.approverUserId ? (
+                          <span className="rounded-md bg-app-warning-soft px-2 py-0.5 font-bold text-app-warning">{t("needsApprovalBy", { name: staffName.get(s.approverUserId) ?? "" })}</span>
+                        ) : (
+                          s.requiresApproval && <span className="rounded-md bg-app-warning-soft px-2 py-0.5 font-bold text-app-warning">{approver ? t("needsApprovalBy", { name: approver }) : t("needsApproval")}</span>
+                        )}
                       </div>
                     </div>
                   </li>

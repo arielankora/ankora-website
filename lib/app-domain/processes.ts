@@ -577,6 +577,68 @@ export async function flowForEditor(actor: User, processId: string): Promise<Flo
   };
 }
 
+/// 14.11.2026 (processes redesign, stage 3, "Steps.dc.html"): what the one
+/// steps editor needs. The procedure as a list, or as a flow when it has a
+/// condition; the people a step may name (who does it, who approves it);
+/// the client's systems; and whether this person may save and approve at
+/// once ("שמירה ואישור", Ariel 14.11.2026).
+export type StepsEditorData = FlowEditorData & {
+  clientName: string;
+  purpose: string | null;
+  /// The version being edited: the draft when there is one, else the
+  /// approved one; and the approved one that keeps running meanwhile.
+  editing: { version: number; status: "DRAFT" | "APPROVED" | "SUPERSEDED" } | null;
+  runningVersion: number | null;
+  steps: ProcessStep[];
+  /// The saved version is a flow that a list cannot hold.
+  isFlow: boolean;
+  executor: string | null;
+  staff: { id: string; name: string }[];
+  /// The client's contacts, with whether they left (spec 4.6).
+  people: { id: string; name: string; ended: boolean }[];
+  systems: { id: string; name: string }[];
+  mayApprove: boolean;
+  /// The client's rules' checks on the saved version, as the server read
+  /// them (the steps' own checks run in the editor as you type).
+  ruled: { code: string; message: string; step?: number }[];
+};
+
+export async function stepsForEditor(actor: User, processId: string): Promise<StepsEditorData> {
+  const base = await flowForEditor(actor, processId);
+  const process = await findProcess(actor, processId);
+  const [latest, running, staff, contacts, systems, client] = await Promise.all([
+    prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" } }),
+    prisma.processVersion.findFirst({ where: { processId, status: "APPROVED" }, select: { version: true } }),
+    prisma.user.findMany({ where: { deletedAt: null, status: "ACTIVE", role: { not: "CLIENT_USER" } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.clientContact.findMany({ where: { clientId: process.clientId, deletedAt: null }, select: { id: true, role: true, endedAt: true, person: { select: { name: true } } }, take: 200 }),
+    prisma.systemAccess.findMany({ where: { clientId: process.clientId, deletedAt: null }, select: { id: true, systemName: true }, orderBy: { systemName: "asc" } }),
+    prisma.client.findUnique({ where: { id: process.clientId }, select: { accountManagerId: true, name: true } }),
+  ]);
+  const saved = latest ? readFlow(latest.flow) : null;
+  const executorUser = process.executorUserId ? staff.find((u) => u.id === process.executorUserId)?.name : null;
+  const executorContact = process.executorContactId ? contacts.find((c) => c.id === process.executorContactId) : null;
+  const checks = latest ? await checkProcessVersion(process, latest) : [];
+  return {
+    ...base,
+    clientName: client?.name ?? "",
+    purpose: process.purpose,
+    editing: latest ? { version: latest.version, status: latest.status } : null,
+    runningVersion: running?.version ?? null,
+    steps: latest ? (saved ? flowSteps(saved) : readSteps(latest.steps)) : [],
+    isFlow: !!saved && saved.nodes.some((n) => n.kind === "CONDITION" || n.kind === "WAIT" || !!n.send),
+    executor: executorUser ?? executorContact?.person.name ?? process.executorText ?? (process.ownerId ? staff.find((u) => u.id === process.ownerId)?.name ?? null : null),
+    staff,
+    people: contacts
+      .map((c) => ({ id: c.id, name: [c.person.name, c.role].filter(Boolean).join(", ") || "איש קשר בלי שם", ended: !!c.endedAt }))
+      .sort((a, b) => a.name.localeCompare(b.name, "he")),
+    systems: systems.map((x) => ({ id: x.id, name: x.systemName })),
+    mayApprove: approvesProceduresOf({ userId: actor.id, isManager: canManageClients(actor.role), accountManagerId: client?.accountManagerId ?? null }),
+    ruled: checks
+      .filter((c) => !c.excepted && !["R1", "R3", "R4"].includes(c.code) && c.severity === "BLOCK")
+      .map((c) => ({ code: c.code, message: c.message, ...(c.step ? { step: c.step } : {}) })),
+  };
+}
+
 /// "שמור והפעל" (task cmvtivumj000pjs08q9qj4t67, step 3 decisions, Ariel
 /// 4.11.2026): the account manager saves and the version goes live at once,
 /// through the same approval, checks, snapshot and audit as any approval.
