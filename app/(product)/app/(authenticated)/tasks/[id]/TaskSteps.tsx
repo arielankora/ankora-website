@@ -48,6 +48,10 @@ export type Step = {
   clientApproval?: { at: string; how: string; link: string | null } | null;
   /// Spec 4.5: a link to what shows the step was done (an audited client).
   evidenceLink?: string | null;
+  /// A run's step: how it is done when not by hand, and an approver the
+  /// procedure names only in words (no gate, no contact).
+  mode?: "ASSISTED" | "AUTOMATED" | null;
+  namedApprover?: string | null;
 };
 
 /// The message composer the run's page already has, opened as a reminder
@@ -169,6 +173,11 @@ function StepRow({ step, n, parentId, listQuery, reminder, evidence }: { step: S
         >
           {step.title}
         </Link>
+        {(step.mode || step.namedApprover) && (
+          <p className="mt-0.5 text-[11.5px] text-app-text-tertiary" data-testid="step-how">
+            {[step.mode ? t(`mode.${step.mode}`) : null, step.namedApprover ? t("namedApprover", { name: step.namedApprover }) : null].filter(Boolean).join(" · ")}
+          </p>
+        )}
         {step.approverName && (
           <p className={`mt-0.5 text-[11.5px] ${step.status === "PENDING_APPROVAL" ? "font-medium text-app-warning" : "text-app-text-tertiary"}`}>
             {step.status === "PENDING_APPROVAL"

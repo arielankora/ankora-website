@@ -9,6 +9,7 @@ import { lookupClient, lookupTask, lookupTaskById } from "@/lib/mcp/lookup";
 import { describeResolveFailure, resolveByName } from "@/lib/mcp/resolve";
 import { addTaskComment, createTask, getTaskDetail, recordClientApproval, removeTaskSteps, setStepEvidenceLink, setTaskProcess, updateTask } from "@/lib/app-domain/tasks";
 import { APPROVAL_HOWS, readApprovalEvidence } from "@/lib/step-approval";
+import { readRunBrief, runBriefText } from "@/lib/process-runs";
 import { canSendToAi } from "@/lib/knowledge";
 import { createDecision, listDecisionsForClient } from "@/lib/app-domain/decisions";
 import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
@@ -216,6 +217,8 @@ export function registerTaskExtraTools(server: McpServer): void {
           approvedBy: task.approvedBy?.name ?? null,
           dueDate: task.dueDate ? localDateKey(task.dueDate, tz) : null,
           details: task.description,
+          // A run's procedure (runs opened since 14.11.2026), as text.
+          procedure: readRunBrief(task.runBrief) ? runBriefText(readRunBrief(task.runBrief)!) : null,
           clientVisible: task.clientVisible,
           clientTitle: task.clientTitle,
           clientRequest: task.clientRequest,

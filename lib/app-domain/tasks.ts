@@ -2030,6 +2030,7 @@ export async function getTaskDetail(actor: User, taskId: string) {
         approvalContactId: true,
         approvalEvidence: true,
         evidenceLink: true,
+        stepMode: true,
       },
     }),
   ]);

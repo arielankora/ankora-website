@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readRunBrief } from "@/lib/process-runs";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
 import { addClientSource } from "@/lib/app-domain/client-sources";
@@ -43,7 +44,7 @@ describe("the approval step of a run", () => {
     const run = await startProcessRun(hadas, process.id, new Date("2026-11-10T00:00:00Z"));
     const [, approval] = await stepsOf(run.id);
     expect(approval).toMatchObject({ requiresApproval: true, supervisorId: ariel.id });
-    expect(approval.title).toContain(`דורש אישור של ${ariel.name}`);
+    expect(readRunBrief((await prisma.task.findUniqueOrThrow({ where: { id: run.id } })).runBrief)!.steps[1].approver).toBe(ariel.name);
 
     await expect(updateTask(hadas, run.id, { status: "DONE" })).rejects.toThrow("מחכה לאישור");
 
@@ -65,7 +66,7 @@ describe("the approval step of a run", () => {
     await updateProcess(hadas, process.id, { approverContactId: oren.id });
     const run = await startProcessRun(hadas, process.id, new Date("2026-11-10T00:00:00Z"));
     const [, approval] = await stepsOf(run.id);
-    expect(approval.title).toContain("דורש אישור של אורן");
+    expect(readRunBrief((await prisma.task.findUniqueOrThrow({ where: { id: run.id } })).runBrief)!.steps[1].approver).toBe("אורן");
     expect(approval.requiresApproval).toBe(false);
     expect(await setStepDone(hadas, approval.id, true)).toBe("done");
   });

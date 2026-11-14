@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readRunBrief, runBriefText } from "@/lib/process-runs";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
 import { addClientSource } from "@/lib/app-domain/client-sources";
@@ -57,7 +58,7 @@ describe("rescan when a rule changes", () => {
 
     // A run opened now says the procedure needs review.
     const later = await startProcessRun(hadas, process.id, new Date("2026-11-20T00:00:00Z"));
-    expect((await prisma.task.findUniqueOrThrow({ where: { id: later.id } })).description).toContain("דורש סקירה");
+    expect(runBriefText(readRunBrief((await prisma.task.findUniqueOrThrow({ where: { id: later.id } })).runBrief)!)).toContain("דורש סקירה");
 
     // Approving the same rule changes nothing more: one comment, one notice.
     await approveClientPolicy(ariel, rule.id);
