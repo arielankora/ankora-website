@@ -11,6 +11,7 @@ import {
   linkProcessDates,
   removeProcess,
   setProcessKind,
+  reconfirmProcedure,
   discardProcessVersion,
   saveAndActivateProcessVersion,
   saveProcessVersion,
@@ -354,6 +355,12 @@ export async function setProcessStatusAction(processId: string, status: "ACTIVE"
 export async function discardProcessVersionAction(processId: string, version: number, clientId: string): Promise<FormState> {
   const user = await requireUser();
   return run(clientId, () => discardProcessVersion(user, processId, version));
+}
+
+/// "המסמך עדיין נכון" (14.11.2026): reconfirm the approved document.
+export async function reconfirmProcedureAction(processId: string, clientId: string): Promise<FormState> {
+  const user = await requireUser();
+  return run(clientId, () => reconfirmProcedure(user, processId));
 }
 
 export async function setProcessKindAction(processId: string, kind: "PROCESS" | "GUIDE", clientId: string): Promise<FormState> {

@@ -184,6 +184,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "process.remove": "הסרת תהליך מתיק הלקוח",
   "process.dates": "קישור מועדים לתהליך",
   "process.rhythm": "עריכת הקצב של תהליך",
+  "process.reconfirmed": "אישור שמסמך הנוהל עדיין נכון",
   "process.audit_prep": "הכנה לביקורת של נוהל",
   "process.kind": "שינוי סוג של תהליך (תהליך שרץ או הוראת עבודה)",
   "process.version_save": "שמירת טיוטה של נוהל",

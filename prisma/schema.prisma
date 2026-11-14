@@ -4354,6 +4354,11 @@ model ProcessVersion {
   createdAt      DateTime  @default(now())
   approvedById   String?
   approvedAt     DateTime?
+  /// 14.11.2026: a person who approves procedures said the approved
+  /// document is still right after something changed around it (the
+  /// rhythm, a rule). "לעדכן" counts from here, not from approvedAt.
+  reconfirmedAt   DateTime?
+  reconfirmedById String?
   /// Spec 3.9: the checks against the client's rules at the moment it was
   /// approved, as they were: [{ code, message, severity, policyId?,
   /// excepted? }]. The live checks may say otherwise later; this says what

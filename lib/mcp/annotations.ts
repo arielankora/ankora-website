@@ -143,6 +143,7 @@ export const TOOL_ANNOTATIONS = {
   set_contact_ended: WRITES,
   update_date: { ...WRITES, idempotentHint: true },
   set_client_audit_requirements: { ...WRITES, idempotentHint: true },
+  confirm_procedure_still_right: { ...WRITES, idempotentHint: true },
   // 14.11.2026 (stage 4, "להכין לביקורת"): a draft with how each step is
   // known to be done, and scope and controls where the process has none.
   save_procedure_audit_draft: WRITES,
@@ -227,6 +228,7 @@ export const WRITE_TOOLS = [
   "set_contact_ended",
   "update_date",
   "set_client_audit_requirements",
+  "confirm_procedure_still_right",
   "save_procedure_audit_draft",
   "record_run_lesson",
   "record_stranger_test",

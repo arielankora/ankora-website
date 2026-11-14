@@ -771,6 +771,24 @@ export async function checkProcessVersion(
   return processChecks({ steps: readSteps(v.steps), highlights: v.highlights, outputs: v.outputs }, process, await ruleContext(process.clientId));
 }
 
+/// "המסמך עדיין נכון" (14.11.2026): the approved document is still right
+/// after the rhythm or a rule changed. Whoever approves the client's
+/// procedures says so, and "לעדכן" counts from now. A contact who left is
+/// not cleared this way: that step needs a new approver.
+export async function reconfirmProcedure(actor: User, processId: string) {
+  const process = await findProcess(actor, processId);
+  const client = await prisma.client.findUnique({ where: { id: process.clientId }, select: { accountManagerId: true } });
+  if (!approvesProceduresOf({ userId: actor.id, isManager: canManageClients(actor.role), accountManagerId: client?.accountManagerId ?? null })) {
+    throw new DomainError("processes.notApprover", NOT_APPROVER);
+  }
+  const approved = await prisma.processVersion.findFirst({ where: { processId, status: "APPROVED" }, select: { id: true, version: true } });
+  if (!approved) throw new DomainError("processes.noApprovedProcedure", "לתהליך עוד אין נוהל מאושר.");
+  const now = new Date();
+  await prisma.processVersion.update({ where: { id: approved.id }, data: { reconfirmedAt: now, reconfirmedById: actor.id } });
+  await recordAudit({ actorId: actor.id, action: "process.reconfirmed", entityType: "Process", entityId: processId, clientId: process.clientId, after: { version: approved.version } });
+  return { version: approved.version };
+}
+
 export async function approveProcessVersion(actor: User, processId: string, version: number) {
   const process = await findProcess(actor, processId);
   // 31.10.2026: a manager, or the client's account manager; with the

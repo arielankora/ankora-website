@@ -112,6 +112,17 @@ describe("get_process and the new process tools", () => {
     expect(detail.json.audit.missing.map((m: { item: string }) => m.item)).toContain("controls");
   });
 
+  it("clears \"לעדכן\" after the rhythm changed, once a procedure approver says the document is still right", async () => {
+    const { hadas, ariel, p } = await setup();
+    await call(hadas, "set_process_rhythm", { client: "NUX", process: p.code, starts: [{ kind: "SCHEDULE", schedule: { frequency: "MONTHLY", monthDays: [1] } }] });
+    expect((await call(hadas, "get_process", { client: "NUX", process: p.code })).json.staleReasons).toEqual(["הקצב השתנה אחרי שהנוהל אושר"]);
+    // An employee who does not approve procedures cannot.
+    expect((await call(hadas, "confirm_procedure_still_right", { client: "NUX", process: p.code })).text).not.toMatch(/"saved": true/);
+    const ok = await call(ariel, "confirm_procedure_still_right", { client: "NUX", process: p.code });
+    expect(ok.json).toMatchObject({ saved: true, version: 1 });
+    expect((await call(hadas, "get_process", { client: "NUX", process: p.code })).json.staleReasons).toEqual([]);
+  });
+
   it("drafts a new version of a procedure with an approver and systems, only from the version read", async () => {
     const { client, hadas, p } = await setup();
     await prisma.systemAccess.create({ data: { clientId: client.id, systemName: "Mercury" } });

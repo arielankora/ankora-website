@@ -2160,6 +2160,7 @@
       "clientCommunicationLocale": "Client communication language changed",
       "processVersionDiscard": "Discard a draft of a procedure",
       "processRhythm": "Edit the rhythm of a process",
+      "processReconfirmed": "Confirm the procedure document is still right",
       "processAuditPrep": "Prepare a procedure for an audit",
       "processKind": "Change the kind of a process (one that runs, or a work instruction)"
     },
@@ -4056,7 +4057,8 @@
         "waitingForApproval": "Waiting for {name}'s approval",
         "remindTo": "Remind {name}",
         "runOnTime": "Done on time",
-        "runLate": "{days, plural, one {One day late} other {# days late}}"
+        "runLate": "{days, plural, one {One day late} other {# days late}}",
+        "documentStale": "The procedure document needs updating: why"
       },
       "approverLeft": "Step {step} needs a new approver: {name} left",
       "approverLeftProcess": "Needs a new approver: {name} left",
@@ -4136,7 +4138,10 @@
           "approverLeft": "{name}, the approver of step {step}, left.",
           "processApproverLeft": "{name}, the process's approver, left.",
           "rhythmChanged": "The rhythm changed after version {version} was approved.",
-          "ruleChanged": "The rule \"{title}\" changed on {date}."
+          "ruleChanged": "The rule \"{title}\" changed on {date}.",
+          "stillRight": "The document is still right",
+          "stillRightDone": "Recorded that the document is still right",
+          "stillRightHint": "The steps did not change. Version {version} is reconfirmed and this notice goes away."
         },
         "docTitle": "The procedure document, version {version}",
         "approvedOnBy": "Approved {date} by {name}",
