@@ -4611,6 +4611,17 @@ model CommsChannel {
 /// app. Overrides ALOHA_LINE_OWNERS for the lines it names. A row with no
 /// user says "nobody in particular", so an owner set in the environment
 /// can be taken off too.
+/// A recording email not stored because its number is blocked on the
+/// line's owner's WhatsApp (14.11.2026). Only the email id: nothing of the
+/// call is kept. It tells the nightly reconcile the email was handled, so
+/// it is not fetched again every night.
+model CallRecordingSkip {
+  emailId   String   @id
+  createdAt DateTime @default(now())
+
+  @@map("call_recording_skips")
+}
+
 model CommsLineOwner {
   /// The line, E.164 (one of ALOHA_LINE_NUMBER).
   line      String   @id

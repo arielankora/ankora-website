@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { matchPhones } from "@/lib/whatsapp-poc/clients-by-phone";
 import { canSeeCall, type CommsAccess } from "./access";
 import { storedCallLine } from "./call-lines";
+import { loadCallBlockIndex } from "./call-blocks";
 
 /// Whether this person may hear (or transcribe) one recording. The full
 /// viewers and the call viewers may hear any, including one not stored yet
@@ -16,6 +17,8 @@ export async function mayHearCall(
   stored: Pick<CallRecording, "otherPhone" | "direction" | "fromPhone" | "toPhone"> | null,
 ): Promise<boolean> {
   if (!access.allowed) return false;
+  // 14.11.2026: a call waiting for a block decision is heard by nobody.
+  if (stored && (await loadCallBlockIndex()).stateFor(storedCallLine(stored), stored.otherPhone) !== "none") return false;
   if (access.allCalls) return true;
   if (!stored) return false;
   const ids = ((await matchPhones([stored.otherPhone])).get(stored.otherPhone)?.clients ?? []).map((c) => c.id);

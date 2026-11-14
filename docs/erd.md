@@ -1537,6 +1537,11 @@ erDiagram
 | `CommsBlockKind` | `PHONE`, `CHAT` |
 | `CommsBlockStatus` | `PENDING`, `APPROVED`, `REJECTED`, `REVOKED` |
 
+`CallRecordingSkip` (table `call_recording_skips`, columns `emailId` PK and
+`createdAt`, 14.11.2026) holds the id of each recording email left out
+because its number is blocked on the line owner's WhatsApp. Nothing else of
+the call is kept; it tells the nightly reconcile the email was handled.
+
 A `Transcript` belongs to exactly one of `recordingId` and `attachmentId`;
 this is an application-level invariant, not a database constraint.
 `CommsConversation.groupClientId`, `CommsBlock.requestedById` and
