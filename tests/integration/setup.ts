@@ -23,6 +23,7 @@ const TABLES = [
   // recordings they belong to. No foreign keys to anything else.
   "transcripts",
   "call_recordings",
+  "call_recording_skips",
   // Stage 3: messages before conversations before channels.
   "comms_attachments",
   "comms_messages",

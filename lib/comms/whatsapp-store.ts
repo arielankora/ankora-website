@@ -1,4 +1,5 @@
 import "server-only";
+import { purgeBlockedCalls } from "./call-blocks";
 import { Prisma, type CommsChannel, type User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { DomainError } from "@/lib/domain-error";
@@ -426,15 +427,19 @@ export async function requestBlock(
   });
 
   let deleted = 0;
-  if (manager) deleted = await purge(channel.id, input);
-  else await setHeld(channel.id, input, true);
+  let deletedCalls = 0;
+  if (manager) {
+    deleted = await purge(channel.id, input);
+    // 14.11.2026: the same number's calls on the owner's Aloha line go too.
+    if (input.kind === "PHONE") deletedCalls = await purgeBlockedCalls(channel.ownerUserId, input.value);
+  } else await setHeld(channel.id, input, true);
 
   await recordAudit({
     actorId: actor.id,
     action: manager ? "comms_block.approved" : "comms_block.requested",
     entityType: "CommsBlock",
     entityId: block.id,
-    after: { kind: input.kind, value: input.kind === "PHONE" ? maskPhone(input.value) : "group", deletedMessages: deleted },
+    after: { kind: input.kind, value: input.kind === "PHONE" ? maskPhone(input.value) : "group", deletedMessages: deleted, deletedCalls },
   });
   return { block, deleted };
 }
@@ -455,13 +460,18 @@ export async function decideBlock(actor: Actor, blockId: string, approve: boolea
     data: { status: approve ? "APPROVED" : "REJECTED", decidedById: actor.id, decidedAt: new Date() },
   });
   const deleted = approve ? await purge(block.channelId, block) : 0;
+  let deletedCalls = 0;
+  if (approve && block.kind === "PHONE") {
+    const channel = await prisma.commsChannel.findUnique({ where: { id: block.channelId }, select: { ownerUserId: true } });
+    if (channel) deletedCalls = await purgeBlockedCalls(channel.ownerUserId, block.value);
+  }
   if (!approve) await setHeld(block.channelId, block, false);
   await recordAudit({
     actorId: actor.id,
     action: approve ? "comms_block.approved" : "comms_block.rejected",
     entityType: "CommsBlock",
     entityId: blockId,
-    after: { deletedMessages: deleted },
+    after: { deletedMessages: deleted, deletedCalls },
   });
 }
 

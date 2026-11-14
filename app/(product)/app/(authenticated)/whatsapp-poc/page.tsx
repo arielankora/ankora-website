@@ -17,6 +17,7 @@ import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { canReplyTo } from "@/lib/whatsapp-poc/access";
 import { canSeeCall, commsAccess } from "@/lib/comms/access";
 import { storedCallLine } from "@/lib/comms/call-lines";
+import { loadCallBlockIndex } from "@/lib/comms/call-blocks";
 import { lineOwnerEmails as lineOwnerEmailsFromGrants } from "@/lib/comms/grants";
 import {
   chatsWithPhone,
@@ -749,7 +750,7 @@ export default async function CommunicationsPage(props: {
 
   // WhatsApp: every connected number the person may see (lib/comms/inbox-loader.ts).
   // 5.11.2026: the WhatsApp lists and the stored calls are read side by side.
-  const [wa, stored] = await Promise.all([
+  const [wa, storedAll, callBlocks] = await Promise.all([
     loadWhatsapp(user, access),
     // The transcripts' text is read below, only for the calls on screen:
     // reading all 300 on every click was a large part of each load.
@@ -758,7 +759,11 @@ export default async function CommunicationsPage(props: {
       take: 300,
       include: { transcript: { select: { id: true, status: true } } },
     }),
+    loadCallBlockIndex(),
   ]);
+  // 14.11.2026: a call whose number waits for a manager's block decision on
+  // the line owner's WhatsApp is not shown, as its messages are not.
+  const stored = storedAll.filter((r) => callBlocks.stateFor(storedCallLine(r), r.otherPhone) === "none");
   const chats = wa.chats;
   let waError: string | null = await errorText(wa.error);
   const waReady = Boolean(config.apiKey);

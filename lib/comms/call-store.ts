@@ -7,6 +7,8 @@ import { callSide, fetchRecording, fetchRecordingAudio, listRecordingPage, type 
 import { NO_SPEECH_TRANSCRIPT, TranscriptionError, transcribeHebrew } from "@/lib/whatsapp-poc/transcribe";
 import { UnipileError, readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { mp3DurationSeconds } from "./mp3-duration";
+import { loadCallBlockIndex } from "./call-blocks";
+import { storedCallLine } from "./call-lines";
 import { fetchVoiceNote } from "@/lib/whatsapp-poc/voice-notes";
 
 // Communications storage, stage 2 (1.11.2026, spec "שמירת שיחות, הקלטות
@@ -57,7 +59,9 @@ function driveName(rec: Recording, side: { other: string }): string {
   return `${rec.callAt.slice(0, 19).replace(/[:T]/g, "-")}_${side.other.replace(/\D/g, "")}.mp3`;
 }
 
-export type StoreResult = "stored" | "exists" | "not-a-recording";
+/// "blocked": the number is blocked on the line owner's WhatsApp, so nothing
+/// of the call is kept (lib/comms/call-block-rules.ts).
+export type StoreResult = "stored" | "exists" | "not-a-recording" | "blocked";
 
 /// Store one recording email. Safe to call twice for the same email: the
 /// second call finds the row and stops, and two calls racing meet on the
@@ -71,6 +75,10 @@ export async function storeRecording(emailId: string): Promise<StoreResult> {
   if (!found) return "not-a-recording";
   const { recording, audio } = found;
   const side = callSide(recording, lines);
+  if ((await loadCallBlockIndex()).stateFor(side.line, side.other) === "blocked") {
+    await prisma.callRecordingSkip.upsert({ where: { emailId }, create: { emailId }, update: {} });
+    return "blocked";
+  }
 
   let driveFileId: string | null = null;
   if (driveFolder) {
@@ -148,7 +156,9 @@ export async function storedVoiceAudio(a: {
   );
 }
 
-export type TranscribeOutcome = "done" | "failed" | "retry" | "capped" | "skipped" | "unavailable";
+/// "held": waits for a manager's decision on a block request, and the queue
+/// moves on to the next one.
+export type TranscribeOutcome = "done" | "failed" | "retry" | "capped" | "skipped" | "unavailable" | "held";
 
 /// Transcribe one queued recording. A 429 from OpenAI (the monthly cap, or
 /// a burst limit) leaves it waiting without using up an attempt.
@@ -163,7 +173,9 @@ export async function transcribeRecording(transcriptId: string): Promise<Transcr
   if (!t || (!t.recording && !t.attachment) || (t.status !== "PENDING" && t.status !== "FAILED")) return "unavailable";
   if (!process.env.OPENAI_API_KEY?.trim()) return "unavailable";
   // Stage 3: a voice message held by a block request waits for the decision.
-  if (t.attachment?.message.held) return "unavailable";
+  // 14.11.2026: "held", not "unavailable", which stopped the whole queue.
+  if (t.attachment?.message.held) return "held";
+  if (t.recording && (await loadCallBlockIndex()).stateFor(storedCallLine(t.recording), t.recording.otherPhone) !== "none") return "held";
 
   const phone = t.recording?.otherPhone ?? t.attachment?.message.conversation.otherPhone ?? null;
   if (phone && (await isAiExcludedNumber(phone))) {
@@ -201,7 +213,7 @@ export async function transcribeRecording(transcriptId: string): Promise<Transcr
 export async function transcribePending(options: { budgetMs: number; max?: number; now?: () => number }) {
   const now = options.now ?? Date.now;
   const start = now();
-  const counts: Record<TranscribeOutcome, number> = { done: 0, failed: 0, retry: 0, capped: 0, skipped: 0, unavailable: 0 };
+  const counts: Record<TranscribeOutcome, number> = { done: 0, failed: 0, retry: 0, capped: 0, skipped: 0, unavailable: 0, held: 0 };
   const queue = await prisma.transcript.findMany({
     where: { status: "PENDING", attempts: { lt: TRANSCRIBE_MAX_ATTEMPTS } },
     orderBy: { createdAt: "asc" },
@@ -238,9 +250,11 @@ export async function reconcileRecordings(options: { budgetMs: number; maxPages?
     }
     result.pages += 1;
     const ids = listed.recordings.map((r) => r.emailId);
-    const known = new Set(
-      (await prisma.callRecording.findMany({ where: { emailId: { in: ids } }, select: { emailId: true } })).map((r) => r.emailId),
-    );
+    const known = new Set([
+      ...(await prisma.callRecording.findMany({ where: { emailId: { in: ids } }, select: { emailId: true } })).map((r) => r.emailId),
+      // Emails left out on purpose (a blocked number) count as handled.
+      ...(await prisma.callRecordingSkip.findMany({ where: { emailId: { in: ids } }, select: { emailId: true } })).map((r) => r.emailId),
+    ]);
     const missing = ids.filter((id) => !known.has(id));
     for (const id of missing) {
       if (now() - start > options.budgetMs) return { ...result, stoppedBy: "budget" as const };

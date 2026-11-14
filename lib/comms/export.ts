@@ -2,6 +2,8 @@ import "server-only";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { engagementDeletesOn } from "./engagement";
+import { loadCallBlockIndex } from "./call-blocks";
+import { storedCallLine } from "./call-lines";
 import type { CommsExport, ExportMessage } from "./export-render";
 
 const EVENT_LABEL: Record<number, string> = {
@@ -61,13 +63,16 @@ export async function gatherCommsExport(
     },
   });
 
-  const calls = phones.length
-    ? await prisma.callRecording.findMany({
-        where: { otherPhone: { in: phones } },
-        orderBy: { callAt: "asc" },
-        include: { transcript: { select: { status: true, text: true } } },
-      })
-    : [];
+  const callBlocks = await loadCallBlockIndex();
+  const calls = (
+    phones.length
+      ? await prisma.callRecording.findMany({
+          where: { otherPhone: { in: phones } },
+          orderBy: { callAt: "asc" },
+          include: { transcript: { select: { status: true, text: true } } },
+        })
+      : []
+  ).filter((r) => callBlocks.stateFor(storedCallLine(r), r.otherPhone) === "none");
 
   return {
     clientName: client.name,
