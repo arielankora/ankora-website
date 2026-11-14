@@ -53,21 +53,32 @@ export async function newProcess(page: Page, title: string, opts: { owner?: bool
   return new URL(page.url()).pathname;
 }
 
-/// Writes one step in the steps editor of the open process page, and saves
-/// a draft.
+/// Writes one step in the steps editor (stage 3: a page of its own) of the
+/// open process page, saves a draft, and is back on the process page.
 export async function writeStep(page: Page, step: string) {
-  await page.getByRole("button", { name: /^(כתיבת השלבים|עריכת השלבים)$/ }).click({ timeout: 15_000 });
-  const editor = page.getByRole("dialog");
-  await expect(editor).toBeVisible();
-  await editor.getByLabel("שלב 1: מה עושים").fill(step, { timeout: 15_000 });
-  await submit(page, "שמירת טיוטה");
+  await page.getByTestId("process-edit-steps").click({ timeout: 15_000 });
+  await expect(page.getByTestId("steps-editor")).toBeVisible({ timeout: 15_000 });
+  if (await page.getByTestId("steps-empty").count()) await page.getByTestId("steps-empty").getByRole("button", { name: "+ שלב" }).click();
+  await page.getByLabel("שלב 1: מה עושים").fill(step, { timeout: 15_000 });
+  await saveDraft(page);
 }
 
-/// Approves the draft waiting on the open process page.
+/// "שמירת טיוטה" in the steps editor; back on the process page.
+export async function saveDraft(page: Page) {
+  const from = page.url();
+  await page.getByTestId("steps-save").click();
+  await expect(page).not.toHaveURL(from, { timeout: 30_000 });
+  await expect(page.getByTestId("process-page")).toBeVisible({ timeout: 15_000 });
+}
+
+/// Approves the draft waiting on the open process page. 14.11.2026: the
+/// page is let settle first. A refresh still in flight from the move here
+/// aborted the approval's write in CI (PR 503: "WHILE NAVIGATING"), and
+/// the draft stayed. The success toast says the write landed.
 export async function approveDraft(page: Page) {
-  const approved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400, { timeout: 30_000 });
+  await page.waitForLoadState("networkidle");
   await page.getByTestId("process-draft").getByRole("button", { name: "אישור הנוהל" }).click({ timeout: 15_000 });
-  await approved;
+  await expect(page.getByText("הנוהל אושר").first()).toBeVisible({ timeout: 30_000 });
   await page.reload();
   await expect(page.getByTestId("process-draft")).toHaveCount(0, { timeout: 15_000 });
 }

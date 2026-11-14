@@ -1019,6 +1019,14 @@ model Task {
   requiresApproval Boolean   @default(false)
   approvedById     String?
   approvedAt       DateTime?
+  /// 14.11.2026 (processes redesign, stage 3, spec 4.5): a run's step
+  /// approved by a contact at the client. Not a gate like `supervisorId`:
+  /// the run goes on, but the step reaches done only with
+  /// `approvalEvidence` ({ at, how, link, byUserId, recordedAt }): when and
+  /// how the contact approved, and who wrote it down. A plain id, like
+  /// ClientContact.ownerId: a contact removed later keeps the record.
+  approvalContactId String?
+  approvalEvidence  Json?
 
   // Tasks phase 5 ("חסימה פשוטה"), and the generalisation of a field
   // that has been here since portal phase 1.
@@ -3037,6 +3045,11 @@ model ClientContact {
   verifiedAt      DateTime?
   supersededById  String?
   supersededAt    DateTime?
+  /// 14.11.2026 (processes redesign, stage 3, spec 4.6): left the client
+  /// or the role. A process step this contact approves then needs a new
+  /// approver, and says so under "צריך טיפול". Kept, not deleted: past
+  /// runs still name them.
+  endedAt         DateTime?
 
   createdById String?
   createdAt   DateTime  @default(now())

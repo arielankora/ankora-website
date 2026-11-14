@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Background, Controls, Handle, MiniMap, Position, ReactFlow, type Connection, type Edge, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -19,8 +19,7 @@ import {
 } from "@/lib/process-flow";
 import { STEP_MODE_LABELS, type ProcessStep, type StepModeLike } from "@/lib/process-rules";
 import { intlTag } from "@/lib/i18n/config";
-import { saveAndActivateFlowAction } from "../../../../process-actions";
-import { autoPositions, newId, NODE_W } from "./flow-layout";
+import { newId, NODE_W } from "./flow-layout";
 
 // The procedure flow editor (task cmvtivumj000pjs08q9qj4t67, design
 // https://claude.ai/artifact/CjzpzkxiB8xRvpaZNBWkAr, Ariel 4.11.2026): a
@@ -28,18 +27,18 @@ import { autoPositions, newId, NODE_W } from "./flow-layout";
 // flow under both. "שמור והפעל" puts it live, unless it needs a second
 // pair of eyes.
 
+/// 14.11.2026 (processes redesign, stage 3, "Steps.dc.html"): the flow
+/// view of the one steps editor (StepsEditor). It owns no state of its
+/// own: the editor holds the flow and the selection, and an action's side
+/// panel is the editor's step panel, the same one the list view uses.
 type Props = {
   clientId: string;
-  processId: string;
-  code: string;
-  title: string;
-  triggerText: string | null;
-  latestVersion: number;
-  latestStatus: "DRAFT" | "APPROVED" | "SUPERSEDED" | null;
-  initial: ProcessFlow;
-  fromList: boolean;
-  highlights: string | null;
-  outputs: string | null;
+  flow: ProcessFlow;
+  setFlow: Dispatch<SetStateAction<ProcessFlow>>;
+  selected: string | null;
+  setSelected: (id: string | null) => void;
+  /// The step panel for an action node (not a send-mail one).
+  stepPanel: (node: FlowNode) => ReactNode;
   contacts: { id: string; name: string }[];
   connections: { id: string; kind: "GOOGLE_OAUTH" | "MAIL_APP_PASSWORD" | "MANAGER_SEND"; account: string }[];
 };
@@ -65,7 +64,7 @@ function useRtl(): boolean {
 const kindLabel = (t: Tx, n: FlowNode) => (n.send ? t("labels.nodeKinds.MAIL") : t(`labels.nodeKinds.${n.kind}`));
 
 /// A flow issue (lib/process-flow) in the reader's language.
-function issueText(t: Tx, i: FlowIssue): string {
+export function issueText(t: Tx, i: FlowIssue): string {
   if (!i.keyed) return i.message;
   const node = i.keyed.title ? `"${i.keyed.title}"` : t("flow.unnamedNode");
   return t(`flow.issues.${i.keyed.key}`, { ...i.keyed.values, node });
@@ -87,7 +86,7 @@ const emptyStep = (title: string): ProcessStep => ({
 
 /// A new node, titled in the language of whoever adds it: the title is the
 /// author's text from then on, like any other they type.
-function blankNode(t: Tx, id: string, kind: FlowNodeKind, opts: { mail?: boolean } = {}): FlowNode {
+export function blankNode(t: Tx, id: string, kind: FlowNodeKind, opts: { mail?: boolean } = {}): FlowNode {
   const title = t(`labels.nodeKinds.${opts.mail && kind === "ACTION" ? "MAIL" : kind}`);
   return {
     id,
@@ -193,14 +192,7 @@ function useIsDesktop(): boolean {
 
 export function FlowEditor(props: Props) {
   const t = useTx();
-  const [flow, setFlow] = useState<ProcessFlow>(() => {
-    const pos = autoPositions(props.initial);
-    return { ...props.initial, nodes: props.initial.nodes.map((n) => ({ ...n, position: n.position ?? pos.get(n.id) ?? { x: 0, y: 0 } })) };
-  });
-  const [selected, setSelected] = useState<string | null>(null);
-  const [base, setBase] = useState(props.latestVersion);
-  const [message, setMessage] = useState<{ tone: "ok" | "wait" | "error"; text: string } | null>(null);
-  const [pending, start] = useTransition();
+  const { flow, setFlow, selected, setSelected } = props;
   const desktop = useIsDesktop();
 
   const issues = useMemo(() => flowIssues(flow), [flow]);
@@ -210,8 +202,7 @@ export function FlowEditor(props: Props) {
 
   const update = useCallback((id: string, patch: Partial<FlowNode>) => {
     setFlow((f) => ({ ...f, nodes: f.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)) }));
-    setMessage(null);
-  }, []);
+  }, [setFlow]);
 
   const addNode = (kind: FlowNodeKind, opts: { mail?: boolean } = {}) => {
     setFlow((f) => {
@@ -231,7 +222,6 @@ export function FlowEditor(props: Props) {
       }
       return { ...f, start: f.start ?? id, nodes };
     });
-    setMessage(null);
   };
 
   const removeNode = (id: string) => {
@@ -282,23 +272,6 @@ export function FlowEditor(props: Props) {
     } else update(from.id, { next: c.target });
   };
 
-  const save = () => {
-    setMessage(null);
-    start(async () => {
-      const res = await saveAndActivateFlowAction({ clientId: props.clientId, processId: props.processId, flow, baseVersion: base, highlights: props.highlights, outputs: props.outputs });
-      if (res.error || !res.result) {
-        setMessage({ tone: "error", text: res.error ?? t("flow.saveFailed") });
-        return;
-      }
-      setBase(res.result.version);
-      setMessage(
-        res.result.live
-          ? { tone: "ok", text: t("flow.live", { version: String(res.result.version) }) }
-          : { tone: "wait", text: t("flow.waiting", { version: String(res.result.version), reason: res.result.reason }) }
-      );
-    });
-  };
-
   const others = flow.nodes.filter((n) => n.id !== sel?.id);
   const nextSelect = (value: string | null, onChange: (v: string | null) => void, label: string) => (
     <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
@@ -316,53 +289,6 @@ export function FlowEditor(props: Props) {
 
   return (
     <div className="flex flex-col gap-4" data-testid="flow-editor">
-      <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-app-border bg-white px-4 py-3">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-app-text-secondary">
-            {props.code} · {props.triggerText ? t("flow.start", { text: props.triggerText }) : t("flow.noTrigger")}
-          </span>
-          <h1 dir="auto" className="text-lg font-medium text-app-text-primary">
-            {props.title}
-          </h1>
-          <a href={`/app/clients/${props.clientId}/connections`} className="text-xs text-app-text-accent hover:underline" data-testid="flow-connections-link">
-            {t("flow.connections", { count: props.connections.length })}
-          </a>
-          {props.fromList && <span className="text-xs text-app-text-tertiary">{t("flow.fromList")}</span>}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={`text-xs ${issues.length ? "text-app-error" : "text-app-success"}`}>{issues.length ? t("flow.issuesCount", { count: issues.length }) : t("flow.allPassed")}</span>
-          <button type="button" onClick={save} disabled={pending || issues.length > 0} className="h-11 rounded-[10px] bg-app-surface-nav px-5 text-sm font-medium text-app-surface-page disabled:opacity-50" data-testid="flow-save">
-            {pending ? t("common.saving") : t("flow.saveActivate")}
-          </button>
-        </div>
-      </header>
-
-      {message && (
-        <p
-          role="status"
-          data-testid="flow-message"
-          className={`rounded-[10px] px-3 py-2 text-sm ${message.tone === "ok" ? "bg-app-success-soft text-app-success" : message.tone === "wait" ? "bg-app-warning-soft text-app-warning" : "bg-app-error-soft text-app-error"}`}
-        >
-          {message.text}
-        </p>
-      )}
-
-      {issues.length > 0 && (
-        <ul className="flex flex-col gap-1 rounded-[10px] border border-app-error/30 bg-app-error-soft px-3 py-2" data-testid="flow-issues">
-          {issues.map((i, k) => (
-            <li key={k} className="text-xs text-app-error">
-              {i.node ? (
-                <button type="button" onClick={() => setSelected(i.node!)} className="text-start hover:underline">
-                  {issueText(t, i)}
-                </button>
-              ) : (
-                issueText(t, i)
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
       <div className="flex flex-wrap gap-4">
         <section className="min-w-0 flex-[999_1_560px]">
           {desktop ? (
@@ -424,7 +350,9 @@ export function FlowEditor(props: Props) {
                 </span>
               </div>
 
-              {sel.kind !== "CONDITION" && (
+              {sel.kind === "ACTION" && sel.step && !sel.send && props.stepPanel(sel)}
+
+              {sel.kind !== "CONDITION" && !(sel.kind === "ACTION" && sel.step && !sel.send) && (
                 <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
                   {t("flow.whatDone")}
                   <input dir="auto" value={sel.title} onChange={(e) => update(sel.id, { title: e.target.value, step: sel.step ? { ...sel.step, title: e.target.value } : null })} className={INPUT} />
@@ -447,26 +375,6 @@ export function FlowEditor(props: Props) {
                     onChange={(e) => update(sel.id, { waitBusinessDays: /^\d{1,2}$/.test(e.target.value) ? Number(e.target.value) : null })}
                     className={INPUT}
                   />
-                </label>
-              )}
-
-              {sel.kind === "ACTION" && sel.step && !sel.send && (
-                <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-                  {t("flow.how")}
-                  <select value={sel.step.mode} onChange={(e) => update(sel.id, { step: { ...sel.step!, mode: e.target.value as StepModeLike } })} className={INPUT}>
-                    {(Object.keys(STEP_MODE_LABELS) as StepModeLike[]).map((m) => (
-                      <option key={m} value={m}>
-                        {t(`labels.stepModes.${m}`)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-
-              {sel.kind === "ACTION" && (
-                <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-                  {t("flow.ownerIfNot")}
-                  <input value={sel.owner?.text ?? ""} onChange={(e) => update(sel.id, { owner: e.target.value ? { userId: null, contactId: null, text: e.target.value } : null })} placeholder={t("flow.ownerPlaceholder")} className={INPUT} />
                 </label>
               )}
 

@@ -69,6 +69,7 @@ import { listProcesses, ruleWarnings } from "@/lib/app-domain/processes";
 import { stepsLeadOf, upcomingOfProcess } from "@/lib/app-domain/process-rhythm";
 import { ProcessList } from "./ProcessList";
 import { ProcessPage } from "./ProcessPage";
+import { stepsNeedingApprover } from "@/lib/step-approval";
 import { listLessons } from "@/lib/app-domain/process-lessons";
 import { strangerPanel } from "@/lib/app-domain/stranger-tests";
 import { strangerPrompt } from "@/lib/stranger-test";
@@ -397,8 +398,12 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     entities: entityOptions,
     sourceOptions,
   };
+  // 14.11.2026 (stage 3, spec 4.6): contacts who left, by id, and the
+  // approved steps they approve: the process needs a new approver.
+  const leftContacts = new Map(people.contacts.filter((c) => c.endedAt).map((c) => [c.id, c.person.name ?? c.role ?? ""]));
   const panelProcesses = processes.map((p) => ({
                 id: p.id,
+                approverLeft: leftContacts.size ? stepsNeedingApprover(p.current?.steps ?? [], leftContacts, p.approverContactId) : [],
                 code: p.code,
                 title: p.title,
                 purpose: p.purpose,
@@ -790,6 +795,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 isPrimary: c.isPrimary,
                 isDecisionMaker: c.isDecisionMaker,
                 clientSideAddress: c.clientSideAddress,
+                endedAt: c.endedAt ? c.endedAt.toISOString().slice(0, 10) : null,
                 userId: c.userId,
                 status: effectiveStatus(c.knowledgeStatus, parseFieldStatus(c.fieldStatus)),
                 toResolve: c.toResolve, clientVisible: c.clientVisible, ownerId: c.ownerId,

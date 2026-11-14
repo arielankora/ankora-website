@@ -249,8 +249,17 @@ export function CenterDialog({
   triggerClassName = "",
   defaultOpen = false,
   triggerVariant = "link",
+  hideTrigger = false,
+  onDismiss,
+  size = "wide",
 }: {
   triggerLabel: string;
+  /// Opened by its caller (with defaultOpen), with no button of its own;
+  /// `onDismiss` hears it close.
+  hideTrigger?: boolean;
+  onDismiss?: () => void;
+  /// "small": a short form, such as "איך {name} אישר/ה?" (Run.dc.html).
+  size?: "wide" | "small";
   /// Open on arrival (a new process lands on its page with its rhythm open).
   defaultOpen?: boolean;
   /// "primary": the screen's one main button, as the drawer's.
@@ -261,7 +270,11 @@ export function CenterDialog({
   triggerClassName?: string;
 }) {
   const tShell = useTranslations("shell");
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpenState] = useState(defaultOpen);
+  const setOpen = (v: boolean) => {
+    setOpenState(v);
+    if (!v) onDismiss?.();
+  };
   const refresh = useRefreshAfterWrite();
   const dismiss = () => setOpen(false);
   const closeAfterWrite = () => {
@@ -285,7 +298,8 @@ export function CenterDialog({
 
   return (
     <>
-      <button
+      {!hideTrigger && (
+        <button
         type="button"
         onClick={() => setOpen(true)}
         className={
@@ -297,7 +311,8 @@ export function CenterDialog({
         }
       >
         {triggerLabel}
-      </button>
+        </button>
+      )}
       {open && (
         <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-label={eyebrow ? `${eyebrow}: ${title}` : title}>
           <button type="button" aria-label={tShell("close")} onClick={dismiss} className="fixed inset-0 bg-app-surface-nav/60" />
@@ -305,7 +320,7 @@ export function CenterDialog({
             <div
               ref={(el) => el?.focus()}
               tabIndex={-1}
-              className="relative flex min-h-screen w-full max-w-[1100px] flex-col overflow-hidden bg-white outline-none sm:min-h-0 sm:rounded-[18px] sm:shadow-xl"
+              className={`relative flex min-h-screen w-full ${size === "small" ? "max-w-[560px]" : "max-w-[1100px]"} flex-col overflow-hidden bg-white outline-none sm:min-h-0 sm:rounded-[18px] sm:shadow-xl`}
             >
               <div className="flex items-center justify-between gap-4 border-b border-app-border px-5 py-5 sm:px-8 sm:py-6">
                 <div className="flex flex-col gap-1">

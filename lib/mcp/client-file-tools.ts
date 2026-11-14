@@ -29,6 +29,8 @@ import { clientBrief, clientFileChanges } from "@/lib/app-domain/client-file-liv
 import { readSince } from "@/lib/client-file-live";
 import { appBaseUrl } from "@/lib/email-templates";
 import { saveProcedureTranslation, translationSource } from "@/lib/app-domain/procedure-documents";
+import { saveProcedureDraft } from "@/lib/app-domain/processes";
+import { DomainError } from "@/lib/domain-error";
 import { listSubprocessorRecipients, type SubprocessorRecipient } from "@/lib/app-domain/subprocessor-recipients";
 import { updateClient } from "@/lib/app-domain/clients";
 import { SUBPROCESSOR_NOTICE_FILE_LINE, SUBPROCESSOR_NOTICE_SOURCE_REQUIRED, SUBPROCESSOR_NOTICE_VALUES } from "@/lib/subprocessor-notice";
@@ -636,6 +638,58 @@ export function registerClientFileTools(server: McpServer): void {
         });
       } catch (err) {
         console.error("[mcp] save_procedure_translation failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  // 14.11.2026 (processes redesign, stage 3, "קלוד מנסח שלבים"): Claude's
+  // draft of the steps of a process that has none. Saved as a draft
+  // version, never approved here; a person edits it in the steps editor
+  // and approves it.
+  server.registerTool(
+    "save_procedure_draft",
+    {
+      title: "Save a draft of a procedure's steps",
+      description:
+        "Saves Claude's draft of the steps of a client's process that has no steps yet, as a draft version: it is not live until a person approves it in the steps editor. Read the process first (get_process), draft from its purpose, rhythm, executor and exception playbook and the client's file, show the user the draft, and save only after they said so. Never invent an approver, a system or an amount the file does not state. Refused when the process already has steps. Answers with `link`, the steps editor: give it to the user.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, as the user said it."),
+        process: z.string().describe('The process code ("P3") or its title.'),
+        steps: z
+          .array(
+            z.object({
+              title: z.string().describe("What is done, in one sentence, in Hebrew."),
+              mode: z.enum(["MANUAL", "ASSISTED", "AUTOMATED"]).optional().describe("MANUAL by a person, ASSISTED Claude prepares and a person checks, AUTOMATED runs by itself."),
+              offsetBusinessDays: z.number().int().min(-60).max(60).nullable().optional().describe("The business day from the run's date."),
+              evidence: z.string().nullable().optional().describe("How we know it was done."),
+              output: z.string().nullable().optional().describe("What the step produces."),
+            })
+          )
+          .min(1)
+          .max(15),
+      }),
+      annotations: TOOL_ANNOTATIONS.save_procedure_draft,
+    },
+    async (args: { client: string; process: string; steps: { title: string; mode?: string; offsetBusinessDays?: number | null; evidence?: string | null; output?: string | null }[] }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const process = await resolveProcess(client.value, args.process);
+        if (!process.ok) return toolText(process.message);
+        const saved = await saveProcedureDraft(actor, process.id, args.steps);
+        return toolJson({
+          saved: true,
+          version: saved.version,
+          steps: saved.steps,
+          next: "A draft. The user edits it and approves it in the steps editor.",
+          link: `${appBaseUrl()}/app/clients/${client.value.id}/processes/${process.id}/steps`,
+        });
+      } catch (err) {
+        // Said to Claude as it is: the process has steps, or the draft is empty.
+        if (err instanceof DomainError) return toolText(err.message);
+        console.error("[mcp] save_procedure_draft failed", err);
         return toolFailure(err);
       }
     }

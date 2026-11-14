@@ -200,6 +200,7 @@ export function flowFromSteps(steps: ProcessStep[]): ProcessFlow {
   steps.forEach((st, i) => {
     const node = emptyNode(`s${i + 1}`, "ACTION", st.title);
     node.step = st;
+    node.owner = st.owner ?? null;
     if (st.offsetBusinessDays !== null) {
       node.waitBusinessDays = Math.max(0, st.offsetBusinessDays - lastDay);
       lastDay = Math.max(lastDay, st.offsetBusinessDays);
@@ -260,7 +261,7 @@ export function flowSteps(flow: ProcessFlow): ProcessStep[] {
   return order
     .filter((n) => n.kind === "ACTION" && n.step)
     .map((n) => {
-      const st = { ...(n.step as ProcessStep), title: n.title || (n.step as ProcessStep).title };
+      const st = { ...(n.step as ProcessStep), title: n.title || (n.step as ProcessStep).title, ...(n.owner ? { owner: n.owner } : {}) };
       const hasCondition = flow.nodes.some((x) => x.kind === "CONDITION");
       const offset = hasCondition || n.waitBusinessDays !== null ? day.get(n.id) ?? null : st.offsetBusinessDays;
       if (n.send) {

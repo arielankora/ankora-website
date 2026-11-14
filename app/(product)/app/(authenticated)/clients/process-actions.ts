@@ -287,6 +287,48 @@ export async function saveAndActivateFlowAction(input: {
   }
 }
 
+/// 14.11.2026 (processes redesign, stage 3, "Steps.dc.html"): the steps
+/// editor's two buttons. "שמירת טיוטה" saves a draft; "שמירה ואישור", for
+/// whoever approves procedures of the client, saves and approves through
+/// the same checks and second pair of eyes as "שמור והפעל" did (Ariel,
+/// 14.11.2026). A list is saved as steps, a flow as a flow; the version's
+/// highlights and outputs are carried as they were.
+export async function saveStepsAction(input: {
+  clientId: string;
+  processId: string;
+  baseVersion: number;
+  steps?: unknown;
+  flow?: unknown;
+  approve: boolean;
+  highlights?: string | null;
+  outputs?: string | null;
+}): Promise<{ error?: string; version?: number; live?: boolean; reason?: string }> {
+  const user = await requireUser();
+  const version = { steps: input.steps ?? [], flow: input.flow ?? undefined, highlights: input.highlights ?? null, outputs: input.outputs ?? null, baseVersion: input.baseVersion };
+  try {
+    if (!input.approve) {
+      const row = await saveProcessVersion(user, input.processId, version);
+      revalidatePath(`/app/clients/${input.clientId}`);
+      return { version: row.version, live: false };
+    }
+    const result = await saveAndActivateProcessVersion(user, input.processId, version);
+    revalidatePath(`/app/clients/${input.clientId}`);
+    if (result.live) return { version: result.version, live: true };
+    const t = await getTranslations("clients.processes.flow.reasons");
+    const reason =
+      result.reasonKey === "waitingSecondEye"
+        ? t("waitingSecondEye", { titles: result.secondEye.map((x) => `"${x}"`).join(", ") })
+        : result.reasonKey
+          ? t(result.reasonKey)
+          : result.reasonError
+            ? await friendlyError(result.reasonError)
+            : result.reason;
+    return { version: result.version, live: false, reason };
+  } catch (err) {
+    return { error: await friendlyError(err) };
+  }
+}
+
 export async function approveProcessVersionAction(processId: string, version: number, clientId: string): Promise<FormState> {
   const user = await requireUser();
   return run(clientId, () => approveProcessVersion(user, processId, version));

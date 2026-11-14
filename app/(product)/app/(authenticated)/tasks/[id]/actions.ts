@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
-import { addTaskComment, applyTaskTemplate, createTask, deleteTaskComment, setStepDone, updateTask } from "@/lib/app-domain/tasks";
+import { addTaskComment, applyTaskTemplate, createTask, deleteTaskComment, recordClientApproval, setStepDone, setTaskProcess, updateTask } from "@/lib/app-domain/tasks";
 import { procedureReminderForScreen } from "@/lib/app-domain/procedure-to-file";
 import { addClientDocument, MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-documents";
 import {
@@ -431,6 +431,33 @@ export async function setTaskStepDoneAction(input: { stepId: string; parentId: s
     revalidatePath(`/app/tasks/${input.stepId}`);
     revalidatePath("/app/tasks");
     return { ok: true as const, outcome };
+  } catch (err) {
+    return { ok: false as const, error: await friendlyError(err) };
+  }
+}
+
+/// 14.11.2026 (processes redesign, stage 3, "Run.dc.html"): when and how a
+/// contact at the client approved a run's step; the step is then done.
+export async function recordClientApprovalAction(input: { stepId: string; parentId: string; at: string; how: string; link?: string | null }) {
+  const user = await requireUser();
+  try {
+    await recordClientApproval(user, input.stepId, { at: input.at, how: input.how, link: input.link ?? null });
+    revalidatePath(`/app/tasks/${input.parentId}`);
+    revalidatePath(`/app/tasks/${input.stepId}`);
+    revalidatePath("/app/tasks");
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: await friendlyError(err) };
+  }
+}
+
+/// "זו ריצה של..." (stage 3): mark this task as a run of a process, or not.
+export async function setTaskProcessAction(input: { taskId: string; processId: string | null }) {
+  const user = await requireUser();
+  try {
+    await setTaskProcess(user, input.taskId, input.processId);
+    revalidatePath(`/app/tasks/${input.taskId}`);
+    return { ok: true as const };
   } catch (err) {
     return { ok: false as const, error: await friendlyError(err) };
   }

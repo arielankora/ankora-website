@@ -131,6 +131,9 @@ export const TOOL_ANNOTATIONS = {
   // again replaces the draft, so a retry does no harm.
   get_procedure_for_translation: READ_ONLY,
   save_procedure_translation: { ...WRITES, idempotentHint: true },
+  // 14.11.2026 (stage 3): a draft of steps for a process with none yet.
+  // A second call is refused once the process has steps.
+  save_procedure_draft: WRITES,
   // The answer about a run's procedure (spec 5.4). One per run: a second
   // call is refused, not applied twice.
   record_run_lesson: WRITES,
@@ -202,6 +205,7 @@ export const WRITE_TOOLS = [
   "start_process",
   "record_process_check",
   "save_procedure_translation",
+  "save_procedure_draft",
   "record_run_lesson",
   "record_stranger_test",
   "answer_stranger_question",

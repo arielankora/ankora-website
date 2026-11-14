@@ -2288,8 +2288,16 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-13",
       "riskReason": "A process's own page (processes redesign, stage 2): its rhythm, owner and open run, the draft approved in place, a run opened by hand, pause, retire and remove; the approvals screen and the daily runs link here"
+    },
+    "screen:/app/clients/[clientId]/processes/[processId]/steps": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-14",
+      "riskReason": "The one steps editor (processes redesign, stage 3): a list that becomes a flow, each step's approver at Ankora or at the client, and save as a draft or save and approve through the same checks and second pair of eyes"
     }
   },
   "waivers": {},
-  "lastScan": "2026-11-13"
+  "lastScan": "2026-11-14"
 }

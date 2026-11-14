@@ -9,6 +9,7 @@ import { newProcess, tag } from "./process-page";
 //
 // @covers action:(product)/app/(authenticated)/clients/process-actions
 // @covers screen:/app/clients/[clientId]/processes/[processId]/flow
+// @covers screen:/app/clients/[clientId]/processes/[processId]/steps
 
 test.describe.configure({ timeout: 180_000 });
 
@@ -16,10 +17,12 @@ test("a flow with a condition goes live with one click; an automatic mail waits 
   const title = tag("[E2E] זרימה");
   // 13.11.2026 (stage 2): the process is added from the list and opens on
   // its page; what starts it is set in the rhythm editor, open on arrival.
-  // Until stage 3 joins the two editors, the flow editor is at its address.
+  // 14.11.2026 (stage 3): the flow is the steps editor's "תרשים" view.
   const href = await newProcess(page, title, { owner: false });
   await fillRhythm(page, whenSomethingHappens("בקשת לקוח"));
-  await page.goto(`${href}/flow`);
+  await page.getByTestId("process-edit-steps").click();
+  await expect(page.getByTestId("steps-editor")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("group", { name: "תצוגה" }).getByRole("button", { name: "תרשים" }).click();
   await expect(page.getByTestId("flow-editor")).toBeVisible({ timeout: 15_000 });
 
   const side = page.locator("aside");
@@ -41,13 +44,17 @@ test("a flow with a condition goes live with one click; an automatic mail waits 
   await nextSelects.nth(0).selectOption({ label: "סיום" });
   await nextSelects.nth(1).selectOption({ label: "סיום" });
 
-  await expect(page.getByTestId("flow-issues")).toHaveCount(0);
-  const saved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-  await page.getByTestId("flow-save").click();
-  await saved;
-  await expect(page.getByTestId("flow-message")).toContainText("הנוהל פעיל", { timeout: 15_000 });
+  await expect(page.getByTestId("steps-passed")).toBeVisible();
+  // 14.11.2026 (stage 3): "שמירה ואישור" for whoever approves procedures of
+  // the client; live, it goes back to the process.
+  await page.getByTestId("steps-save-approve").click();
+  await expect(page).toHaveURL(new RegExp(`${href}$`), { timeout: 15_000 });
+  await expect(page.getByTestId("process-page")).toContainText("גרסה 1", { timeout: 15_000 });
+  await expect(page.getByTestId("process-draft")).toHaveCount(0);
 
   // An automatic mail on the else branch: saved, not live.
+  await page.getByTestId("process-edit-steps").click();
+  await expect(page.getByTestId("flow-editor")).toBeVisible({ timeout: 15_000 });
   await page.locator(".react-flow__node").nth(1).click();
   await side.getByRole("button", { name: "שליחת מייל", exact: true }).click();
   const mail = page.locator(".react-flow__node", { hasText: "שליחת מייל" }).last();
@@ -57,9 +64,7 @@ test("a flow with a condition goes live with one click; an automatic mail waits 
   await inspector.getByLabel("ממשיך ל").selectOption({ label: "סיום" });
   await page.locator(".react-flow__node").nth(1).click();
   await inspector.getByLabel("ממשיך ל").nth(1).selectOption({ label: "שליחת מייל" });
-  await expect(page.getByTestId("flow-issues")).toHaveCount(0);
-  const again = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-  await page.getByTestId("flow-save").click();
-  await again;
-  await expect(page.getByTestId("flow-message")).toContainText("עין שנייה", { timeout: 15_000 });
+  await expect(page.getByTestId("steps-passed")).toBeVisible();
+  await page.getByTestId("steps-save-approve").click();
+  await expect(page.getByTestId("steps-message")).toContainText("עין שנייה", { timeout: 15_000 });
 });

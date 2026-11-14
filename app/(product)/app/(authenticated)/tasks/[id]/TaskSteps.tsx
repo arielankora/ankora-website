@@ -6,8 +6,11 @@ import { useFormatter, useTranslations } from "next-intl";
 import { Plus } from "lucide-react";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
-import { addTaskStepAction, applyTaskTemplateAction, setTaskStepDoneAction } from "./actions";
+import { addTaskStepAction, applyTaskTemplateAction, recordClientApprovalAction, setTaskStepDoneAction } from "./actions";
 import type { TaskStatus } from "@prisma/client";
+import { CenterDialog } from "@/components/app/Drawer";
+import { MessageClient, type ComposerProps } from "@/components/app/MessageClient";
+import { APPROVAL_HOWS, type ApprovalHow } from "@/lib/step-approval";
 
 // Tasks phase 5: the steps of a task.
 //
@@ -36,7 +39,18 @@ export type Step = {
   assignedToName: string | null;
   /// Spec 5.3: a step that waits for a signature, and whose.
   approverName?: string | null;
+  /// Who signed it and when, once signed.
+  approvedByName?: string | null;
+  approvedAt?: string | null;
+  /// 14.11.2026 (processes redesign, stage 3, "Run.dc.html"): a step a
+  /// contact at the client approves, and how they did, once written down.
+  clientApprover?: string | null;
+  clientApproval?: { at: string; how: string; link: string | null } | null;
 };
+
+/// The message composer the run's page already has, opened as a reminder
+/// to the contact who approves (a draft; a person presses send).
+export type Reminder = { clientId: string; taskId: string; composer: ComposerProps };
 
 const OPEN: TaskStatus[] = ["OPEN", "IN_PROGRESS", "PENDING_APPROVAL"];
 
@@ -49,7 +63,9 @@ export function TaskSteps({
   parentIsClosed,
   templates,
   listQuery = "",
+  reminder = null,
 }: {
+  reminder?: Reminder | null;
   /// The list this task was opened from, handed on to each step so the
   /// way back from a step still leads to that list.
   listQuery?: string;
@@ -79,8 +95,8 @@ export function TaskSteps({
         </p>
       ) : (
         <ul className="mt-3 divide-y divide-app-border">
-          {steps.map((step) => (
-            <StepRow key={step.id} step={step} parentId={taskId} listQuery={listQuery} />
+          {steps.map((step, i) => (
+            <StepRow key={step.id} step={step} n={i + 1} parentId={taskId} listQuery={listQuery} reminder={reminder} />
           ))}
         </ul>
       )}
@@ -98,7 +114,7 @@ export function TaskSteps({
   );
 }
 
-function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; listQuery: string }) {
+function StepRow({ step, n, parentId, listQuery, reminder }: { step: Step; n: number; parentId: string; listQuery: string; reminder: Reminder | null }) {
   const t = useTranslations("tasks.detail.steps");
   const format = useFormatter();
   const isDone = !OPEN.includes(step.status);
@@ -106,8 +122,16 @@ function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; 
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [recording, setRecording] = useState(false);
+  // Stage 3: a client's approval is written down, not ticked.
+  const waitsForClient = !!step.clientApprover && !step.clientApproval && !isDone;
+
   async function toggle() {
     if (pending) return;
+    if (waitsForClient) {
+      setRecording(true);
+      return;
+    }
     setPending(true);
     setError(null);
     const result = await setTaskStepDoneAction({ stepId: step.id, parentId, done: !isDone });
@@ -149,6 +173,34 @@ function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; 
                 : t("requiresApprovalOf", { name: step.approverName })}
           </p>
         )}
+        {step.approverName && isDone && step.approvedByName && step.approvedAt && (
+          <p className="mt-0.5 text-[11.5px] font-medium text-app-success">{t("approvedByLine", { name: step.approvedByName, date: formatDay(format, step.approvedAt) })}</p>
+        )}
+        {step.clientApprover && step.clientApproval && (
+          <p className="mt-0.5 text-[11.5px] font-medium text-app-success" data-testid="step-client-approved">
+            {t("approvedClientLine", { name: step.clientApprover, how: t(`hows.${step.clientApproval.how as ApprovalHow}`), date: formatDay(format, `${step.clientApproval.at}T12:00:00Z`) })}
+            {step.clientApproval.link && (
+              <a href={step.clientApproval.link} target="_blank" rel="noopener noreferrer" className="ms-1.5 text-app-text-accent hover:underline">
+                ↗
+              </a>
+            )}
+          </p>
+        )}
+        {waitsForClient && (
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-[10px] bg-app-warning-soft px-3.5 py-3" data-testid="step-awaiting-client">
+            <div className="flex flex-col gap-0.5">
+              <p className="text-[14px] font-bold text-app-warning">{t("awaitingClient", { name: step.clientApprover! })}</p>
+              <p className="text-[12.5px] text-app-warning">{t("clientNeedsRecord")}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {reminder && <MessageClient clientId={reminder.clientId} taskId={reminder.taskId} {...reminder.composer} buttonLabel={t("remind", { name: step.clientApprover! })} preselectKind="decision_waiting" />}
+              <button type="button" onClick={() => setRecording(true)} className="h-[38px] rounded-[9px] bg-app-surface-nav px-3.5 text-[14px] font-bold text-white">
+                {t("clientApproved", { name: step.clientApprover! })}
+              </button>
+            </div>
+          </div>
+        )}
+        {recording && <ClientApprovalDialog step={step} n={n} parentId={parentId} onClose={() => setRecording(false)} />}
         {(step.assignedToName || step.dueDate) && (
           <p className="mt-0.5 text-[11.5px] text-app-text-tertiary">
             {[step.assignedToName, step.dueDate ? formatDay(format, step.dueDate) : null].filter(Boolean).join(" · ")}
@@ -157,6 +209,63 @@ function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; 
         {error && <p className="mt-1 text-[11.5px] text-app-error">{error}</p>}
       </div>
     </li>
+  );
+}
+
+/// "איך {name} אישר/ה?" (Run.dc.html): when, how, and a link if there is
+/// one. Saved, the step is done.
+function ClientApprovalDialog({ step, n, parentId, onClose }: { step: Step; n: number; parentId: string; onClose: () => void }) {
+  const t = useTranslations("tasks.detail.steps");
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
+  const [at, setAt] = useState(today);
+  const [how, setHow] = useState<string>("EMAIL");
+  const [link, setLink] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const field = "w-full rounded-[9px] border border-app-border bg-white px-3 py-2.5 text-[15px] text-app-text-primary";
+  async function save() {
+    setPending(true);
+    setError(null);
+    const r = await recordClientApprovalAction({ stepId: step.id, parentId, at, how, link: link.trim() || null });
+    setPending(false);
+    if (!r.ok) return setError(r.error);
+    onClose();
+  }
+  return (
+    <CenterDialog triggerLabel="" defaultOpen eyebrow={t("dialogEyebrow", { n, title: step.title })} title={t("dialogTitle", { name: step.clientApprover ?? "" })} onDismiss={onClose} hideTrigger size="small">
+      <div className="flex flex-col gap-4 px-5 py-6 sm:px-8" data-testid="client-approval-dialog">
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1.5 text-sm font-bold text-app-text-primary">
+            {t("when")}
+            <input type="date" value={at} max={today} onChange={(e) => setAt(e.target.value)} className={`${field} font-normal`} />
+          </label>
+          <label className="flex flex-col gap-1.5 text-sm font-bold text-app-text-primary">
+            {t("how")}
+            <select value={how} onChange={(e) => setHow(e.target.value)} className={`${field} font-normal`}>
+              {APPROVAL_HOWS.map((h) => (
+                <option key={h} value={h}>
+                  {t(`hows.${h}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <label className="flex flex-col gap-1.5 text-sm font-bold text-app-text-primary">
+          {t("link")}
+          <input type="url" dir="ltr" value={link} onChange={(e) => setLink(e.target.value)} placeholder={t("linkPlaceholder")} className={`${field} font-normal`} />
+        </label>
+        {error && <p className="text-sm text-app-error">{error}</p>}
+        <div className="flex flex-wrap gap-2.5">
+          <button type="button" disabled={pending || !at} onClick={save} className="h-[42px] rounded-[10px] bg-app-surface-nav px-5 text-[15px] font-bold text-white disabled:opacity-50">
+            {pending ? t("saving") : t("saveApproval")}
+          </button>
+          <button type="button" onClick={onClose} className="h-[42px] rounded-[10px] border border-app-border-strong bg-white px-4 text-[15px] text-app-text-primary">
+            {t("cancel")}
+          </button>
+        </div>
+        <p className="text-[13px] text-app-text-secondary">{t("recordNote")}</p>
+      </div>
+    </CenterDialog>
   );
 }
 

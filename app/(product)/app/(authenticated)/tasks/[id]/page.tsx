@@ -16,6 +16,9 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { NotFound } from "@/components/app/states/NotFound";
 import { TaskDetail } from "./TaskDetail";
 import { TaskThread } from "./TaskThread";
+import { RunOfPicker } from "./RunOfPicker";
+import { readApprovalEvidence } from "@/lib/step-approval";
+import { matchDateToProcess } from "@/lib/next-steps";
 import { TaskSteps } from "./TaskSteps";
 import { TASK_TEMPLATES } from "@/lib/app-domain/sop-templates";
 import { MessageClient } from "@/components/app/MessageClient";
@@ -228,6 +231,20 @@ export default async function TaskDetailPage(props: {
     ? await prisma.process.findUnique({ where: { id: task.processId }, select: { id: true, code: true, title: true, clientId: true, deletedAt: true } })
     : null;
   const runVersion = runOf && task.processVersionId ? await prisma.processVersion.findUnique({ where: { id: task.processVersionId }, select: { version: true } }) : null;
+  // 14.11.2026 (stage 3, "Run.dc.html"): the run's steps approved at the
+  // client, by name; and for a task opened by hand, the client's
+  // processes it could be a run of, the one its title names first.
+  const clientApproverIds = [...new Set(subtasks.map((s) => s.approvalContactId).filter((x): x is string => !!x))];
+  const clientApprovers = clientApproverIds.length
+    ? new Map(
+        (await prisma.clientContact.findMany({ where: { id: { in: clientApproverIds } }, select: { id: true, role: true, person: { select: { name: true } } } })).map((c) => [c.id, c.person.name ?? c.role ?? ""])
+      )
+    : new Map<string, string>();
+  const runChoices =
+    !isStep && !task.processId && !isClosed
+      ? await prisma.process.findMany({ where: { clientId: task.clientId, deletedAt: null, kind: "PROCESS", status: { in: ["ACTIVE", "DRAFT", "PAUSED"] } }, select: { id: true, code: true, title: true, purpose: true, seq: true }, orderBy: { seq: "asc" } })
+      : [];
+  const runSuggestion = runChoices.find((p) => matchDateToProcess(p, [{ id: task.id, title: task.title }])) ?? null;
   const lessonProcess =
     task.processId && asksForLesson(task, !!(await runLesson(task.id)))
       ? await prisma.process.findUnique({ where: { id: task.processId }, select: { code: true, title: true } })
@@ -291,14 +308,15 @@ export default async function TaskDetailPage(props: {
         <span dir="auto" className="truncate text-app-text-secondary">{task.client.name}</span>
       </nav>
       {runOf && !runOf.deletedAt && (
-        <p className="text-[13px] text-app-text-secondary" data-testid="task-run-of">
-          <a href={`/app/clients/${runOf.clientId}/processes/${runOf.id}`} className="font-medium text-app-text-accent hover:underline">
-            {runVersion
-              ? t("runOfVersion", { code: runOf.code, title: runOf.title, version: runVersion.version })
-              : t("runOf", { code: runOf.code, title: runOf.title })}
+        <p className="flex flex-wrap items-center gap-1.5 rounded-xl bg-app-surface-sunken px-[18px] py-3 text-[15px]" data-testid="task-run-of">
+          <span className="text-app-text-secondary">{t("runOfLead")}</span>
+          <a href={`/app/clients/${runOf.clientId}/processes/${runOf.id}`} className="font-bold text-app-text-accent hover:underline">
+            {runOf.code} {runOf.title}
           </a>
+          {runVersion && <span className="text-app-text-secondary">{t("runOfVersionTail", { version: runVersion.version })}</span>}
         </p>
       )}
+      {runChoices.length > 0 && <RunOfPicker taskId={task.id} processes={runChoices.map(({ id, code, title }) => ({ id, code, title }))} suggested={runSuggestion ? { id: runSuggestion.id, code: runSuggestion.code, title: runSuggestion.title } : null} />}
 
       <TaskDetail
         task={{
@@ -439,7 +457,12 @@ export default async function TaskDetailPage(props: {
           dueDate: s.dueDate?.toISOString() ?? null,
           assignedToName: s.assignedTo?.name ?? null,
           approverName: s.requiresApproval ? (s.supervisor?.name ?? null) : null,
+          approvedByName: s.approvedBy?.name ?? null,
+          approvedAt: s.approvedAt?.toISOString() ?? null,
+          clientApprover: s.approvalContactId ? clientApprovers.get(s.approvalContactId) ?? null : null,
+          clientApproval: readApprovalEvidence(s.approvalEvidence),
         }))}
+        reminder={composer ? { clientId: task.clientId, taskId: task.id, composer } : null}
       />
 
       {credentials.length > 0 && (
