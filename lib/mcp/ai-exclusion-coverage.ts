@@ -57,6 +57,7 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   get_process: "lookupClient; marked runs are left out of recentRuns",
   get_procedure_for_translation: "lookupClient",
   save_procedure_translation: "lookupClient",
+  save_procedure_draft: "lookupClient",
   list_policies: "lookupClient",
   start_process: "lookupClient",
   record_run_lesson: "findTask",

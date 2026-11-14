@@ -34,6 +34,7 @@ import { isBusinessCalendarKey } from "@/lib/business-calendar";
 import { readControlRefs } from "@/lib/procedure-document";
 import { buildSnapshot } from "@/lib/app-domain/procedure-documents";
 import { runReadiness } from "@/lib/process-readiness";
+import { stepsDraftPrompt } from "@/lib/stranger-test";
 import { runLeadBusinessDays } from "@/lib/process-runs";
 import { attachLinkedDates, syncStartsFromKinds } from "@/lib/app-domain/process-rhythm";
 import { describeRhythm } from "@/lib/process-rhythm";
@@ -577,6 +578,19 @@ export async function flowForEditor(actor: User, processId: string): Promise<Flo
   };
 }
 
+/// "קלוד מנסח שלבים" (14.11.2026, stage 3): Claude's draft of the steps of
+/// a process that has none, saved as a draft version. Refused once the
+/// process has steps, so it never writes over a person's procedure.
+export async function saveProcedureDraft(actor: User, processId: string, steps: unknown[]) {
+  const process = await findProcess(actor, processId);
+  const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" } });
+  if (latest && readSteps(latest.steps).length > 0) throw new DomainError("processes.draftHasSteps", "לתהליך כבר יש שלבים. עורכים אותם בעורך השלבים.");
+  const clean = readSteps(steps);
+  if (!clean.length) throw new DomainError("processes.draftEmpty", "הטיוטה ריקה.");
+  const row = await saveProcessVersion(actor, processId, { steps: clean, baseVersion: latest?.version ?? 0, changeNote: "טיוטה שקלוד ניסח" });
+  return { version: row.version, steps: clean.length };
+}
+
 /// 14.11.2026 (processes redesign, stage 3, "Steps.dc.html"): what the one
 /// steps editor needs. The procedure as a list, or as a flow when it has a
 /// condition; the people a step may name (who does it, who approves it);
@@ -584,6 +598,9 @@ export async function flowForEditor(actor: User, processId: string): Promise<Flo
 /// once ("שמירה ואישור", Ariel 14.11.2026).
 export type StepsEditorData = FlowEditorData & {
   clientName: string;
+  /// "קלוד מנסח שלבים": the prompt to copy, or null for a client marked
+  /// "בלי AI" (lib/ai-exclusion.ts).
+  draftPrompt: string | null;
   purpose: string | null;
   /// The version being edited: the draft when there is one, else the
   /// approved one; and the approved one that keeps running meanwhile.
@@ -612,7 +629,7 @@ export async function stepsForEditor(actor: User, processId: string): Promise<St
     prisma.user.findMany({ where: { deletedAt: null, status: "ACTIVE", role: { not: "CLIENT_USER" } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.clientContact.findMany({ where: { clientId: process.clientId, deletedAt: null }, select: { id: true, role: true, endedAt: true, person: { select: { name: true } } }, take: 200 }),
     prisma.systemAccess.findMany({ where: { clientId: process.clientId, deletedAt: null }, select: { id: true, systemName: true }, orderBy: { systemName: "asc" } }),
-    prisma.client.findUnique({ where: { id: process.clientId }, select: { accountManagerId: true, name: true } }),
+    prisma.client.findUnique({ where: { id: process.clientId }, select: { accountManagerId: true, name: true, aiExcluded: true } }),
   ]);
   const saved = latest ? readFlow(latest.flow) : null;
   const executorUser = process.executorUserId ? staff.find((u) => u.id === process.executorUserId)?.name : null;
@@ -621,6 +638,7 @@ export async function stepsForEditor(actor: User, processId: string): Promise<St
   return {
     ...base,
     clientName: client?.name ?? "",
+    draftPrompt: client && !client.aiExcluded ? stepsDraftPrompt(client.name, process.code, process.title) : null,
     purpose: process.purpose,
     editing: latest ? { version: latest.version, status: latest.status } : null,
     runningVersion: running?.version ?? null,

@@ -93,3 +93,11 @@ export function strangerLine(s: StrangerState | null): string {
 export function strangerPrompt(clientName: string, code: string, title: string): string {
   return `הרץ מבחן זר על התהליך ${code} "${title}" של ${clientName}: קרא את התהליך, את תיק הלקוח, את המסמכים ואת הלקחים מריצות קודמות, עבור על כל שלב כאילו אתה מישהו שמעולם לא עשה את זה, ורשום עם record_stranger_test כל מקום שבו היית נתקע. אחר כך שאל אותי את השאלות אחת אחת, ורשום כל תשובה עם answer_stranger_question.`;
 }
+
+/// 14.11.2026 (processes redesign, stage 3, "Steps.dc.html"): the prompt
+/// behind "קלוד מנסח שלבים", for a process with no steps yet. Claude reads
+/// the process and the client's file, drafts, shows the person, and saves a
+/// draft with save_procedure_draft; a person edits and approves it.
+export function stepsDraftPrompt(clientName: string, code: string, title: string): string {
+  return `נסח טיוטת שלבים לתהליך ${code} "${title}" של ${clientName}: קרא את התהליך עם get_process (המטרה, הקצב, המבצע ונוהל החריגים) ואת תיק הלקוח, ונסח שלבים ממוספרים, כל אחד במשפט אחד: מה עושים, איך (ידני, Claude מכין ואדם בודק, או אוטומטי), באיזה יום עסקים, ואיך יודעים שבוצע. אל תמציא מאשר, מערכת או סכום שלא כתובים בתיק. הראה לי את הטיוטה, ורק אחרי שאישרתי שמור אותה עם save_procedure_draft.`;
+}

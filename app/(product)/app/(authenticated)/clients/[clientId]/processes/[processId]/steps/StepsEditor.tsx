@@ -482,6 +482,23 @@ export function StepsEditor({ data }: { data: StepsEditorData }) {
           <h2 className="text-[17px] font-bold text-app-text-primary">{t("emptyTitle")}</h2>
           <p className="text-[15px] leading-relaxed text-app-text-secondary">{t("emptyText")}</p>
           <div className="flex flex-wrap gap-2.5">
+            {data.draftPrompt && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(data.draftPrompt!);
+                    setMessage({ tone: "ok", text: t("promptCopied") });
+                  } catch {
+                    setMessage({ tone: "error", text: t("promptNotCopied") });
+                  }
+                }}
+                className="h-[42px] rounded-[10px] bg-app-surface-nav px-[18px] text-[15px] font-bold text-white"
+                data-testid="steps-claude-drafts"
+              >
+                {t("claudeDrafts")}
+              </button>
+            )}
             <button type="button" onClick={addStep} className="h-[42px] rounded-[10px] border border-dashed border-app-border-strong bg-white px-4 text-[15px] text-app-text-primary">
               {t("addStep")}
             </button>

@@ -1455,6 +1455,8 @@
       "removeApproved": "A process that had an approved procedure is not deleted. Retire it, and it stays in the history.",
       "dateNotFound": "A chosen date is not at this client.",
       "flowUnread": "The flow could not be read. Refresh and try again.",
+      "draftHasSteps": "The process already has steps. Edit them in the steps editor.",
+      "draftEmpty": "The draft is empty.",
       "noSteps": "A procedure needs at least one step.",
       "tooManySteps": "Up to {max} steps. A procedure longer than that is several processes.",
       "stepSystemNotFound": "A system chosen in a step is not in the client's system map.",
@@ -4071,7 +4073,9 @@
         "channel": "Channel",
         "channelAria": "Step {n}: channel",
         "channelNone": "Not chosen",
-        "contactLeft": "{name} (left)"
+        "contactLeft": "{name} (left)",
+        "promptCopied": "The prompt was copied. Paste it into a chat with Claude; the draft shows here once you approve it there.",
+        "promptNotCopied": "The browser did not allow copying. Try again."
       }
     },
     "procedures": {
