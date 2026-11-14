@@ -8,12 +8,14 @@
 //   was first switched on and in the 7 days after a new extraction guide
 //   version was approved, and a fixed 20% sample otherwise;
 // - what an error is: an auto-applied item taken out again ("ביטול"), or
-//   changed, removed or replaced in the file within 30 days;
+//   changed, removed or replaced in the file within 30 days (autoError,
+//   with its type and the names of the fields that were fixed);
 // - when a kind or a client goes back to a person: 3 errors in the last 30
 //   auto-applied proposals of a kind, or 2 errors of one client within 14
 //   days.
 
 import { revertBlocker } from "@/lib/knowledge-proposals";
+import { proposalEditDiff } from "@/lib/proposal-edits";
 
 export const AUTO_REVIEW_ALL_DAYS = 14;
 export const GUIDE_REVIEW_DAYS = 7;
@@ -104,22 +106,159 @@ export function autoReviewReasonCode(
   return null;
 }
 
-/// When an auto-applied item turned out wrong, or null: taken out again,
-/// or changed in the file within ERROR_WINDOW_DAYS of entering.
-export function autoErrorAt(p: { decidedAt: Date; revertedAt: Date | null }, changes: Date[]): Date | null {
-  const until = p.decidedAt.getTime() + ERROR_WINDOW_DAYS * DAY;
-  const times = [...(p.revertedAt ? [p.revertedAt.getTime()] : []), ...changes.map((d) => d.getTime()).filter((t) => t >= p.decidedAt.getTime() && t <= until)];
-  return times.length ? new Date(Math.min(...times)) : null;
+/// What kind of error an auto-applied item turned out to be: taken out
+/// again ("ביטול"), or, within ERROR_WINDOW_DAYS of entering, replaced by a
+/// new version, contradicted, changed or removed in the file.
+export type AutoErrorType = "REVERTED" | "SUPERSEDED" | "CONTRADICTED" | "UPDATED" | "REMOVED";
+export const AUTO_ERROR_TYPES: readonly AutoErrorType[] = ["REVERTED", "SUPERSEDED", "CONTRADICTED", "UPDATED", "REMOVED"];
+
+/// The error of one auto-applied item: what happened, when, and the names
+/// of the fields that changed (never their values; empty for a revert or
+/// a removal).
+export type AutoError = { type: AutoErrorType; at: Date; fields: string[] };
+
+/// One audit row on the item in the file: its action, when, and the item
+/// before and after, as recordAudit stored them.
+export type ItemChange = { action: string; at: Date; before?: unknown; after?: unknown };
+
+const TYPE_OF: Record<(typeof CHANGE_ACTIONS)[number], AutoErrorType> = {
+  "client_fact.supersede": "SUPERSEDED",
+  "client_fact.contradict": "CONTRADICTED",
+  "client_fact.remove": "REMOVED",
+  "client_contact.update": "UPDATED",
+  "client_contact.remove": "REMOVED",
+  "client_organization.update": "UPDATED",
+  "client_organization.remove": "REMOVED",
+  "client_entity.update": "UPDATED",
+  "client_entity.remove": "REMOVED",
+};
+
+/// "ביטול" takes the item out through the file's own removal, which
+/// writes its own audit row a moment after the proposal is marked. That
+/// row is the revert, not a second error.
+export const REVERT_SLACK_MS = 60_000;
+
+/// The row's own bookkeeping: never a field a person fixed.
+const ROW_FIELDS = new Set([
+  "id",
+  "clientId",
+  "personId",
+  "organizationId",
+  "createdById",
+  "createdAt",
+  "updatedAt",
+  "deletedAt",
+  "supersededById",
+  "supersededAt",
+  "verifiedAt",
+  "sources",
+]);
+
+/// A stored row as plain fields. A contact's person (name, emails, phones)
+/// is read as the contact's own fields; any other included relation is
+/// left out.
+function rowFields(row: unknown): Record<string, unknown> | null {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return null;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row as Record<string, unknown>)) {
+    if (ROW_FIELDS.has(k)) continue;
+    if (k === "person" && v && typeof v === "object" && !Array.isArray(v)) {
+      const person = v as Record<string, unknown>;
+      for (const f of ["name", "emails", "phones"]) if (f in person) out[f] = person[f];
+      continue;
+    }
+    out[k] = v;
+  }
+  return out;
+}
+
+/// The names of the fields that differ between an item before and after
+/// a change, by the same normalization as a proposal's edit
+/// (lib/proposal-edits.ts). Only fields both rows carry are compared: a
+/// relation stored on one side only (the contact's person, before
+/// 14.11.2026) says nothing about a change.
+export function changedFields(before: unknown, after: unknown): string[] {
+  const b = rowFields(before);
+  const a = rowFields(after);
+  if (!b || !a) return [];
+  const pick = (o: Record<string, unknown>, other: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([k]) => k in other));
+  return proposalEditDiff(pick(b, a), pick(a, b)).map((d) => d.field);
+}
+
+/// The error of one auto-applied item, or null. The single definition of
+/// an error: the pauses count these, and the stats and the approvals
+/// screen explain them. The first that happened counts: taken out again
+/// at any time, or a change in CHANGE_ACTIONS within ERROR_WINDOW_DAYS of
+/// entering. A removal that is the revert itself is not counted twice.
+export function autoError(p: { decidedAt: Date; revertedAt: Date | null }, changes: ItemChange[]): AutoError | null {
+  const from = p.decidedAt.getTime();
+  const until = from + ERROR_WINDOW_DAYS * DAY;
+  const found: AutoError[] = p.revertedAt ? [{ type: "REVERTED", at: p.revertedAt, fields: [] }] : [];
+  for (const c of changes) {
+    const type = TYPE_OF[c.action as keyof typeof TYPE_OF];
+    if (!type) continue;
+    const t = c.at.getTime();
+    if (t < from || t > until) continue;
+    if (type === "REMOVED" && p.revertedAt && t >= p.revertedAt.getTime() - REVERT_SLACK_MS) continue;
+    found.push({ type, at: c.at, fields: type === "REMOVED" ? [] : changedFields(c.before, c.after) });
+  }
+  if (found.length === 0) return null;
+  // Earliest first; at the same moment a revert says the most.
+  return found.sort((x, y) => x.at.getTime() - y.at.getTime() || (x.type === "REVERTED" ? -1 : y.type === "REVERTED" ? 1 : 0))[0];
+}
+
+/// The errors behind a pause, for the manager who decides to lift it:
+/// how many of each type, and per type and over all, which fields were
+/// fixed, most often first. Names and counts only.
+export type AutoErrorSummary = {
+  errors: number;
+  byType: Partial<Record<AutoErrorType, number>>;
+  topFields: { field: string; count: number }[];
+  types: { type: AutoErrorType; count: number; fields: { field: string; count: number }[] }[];
+};
+
+export const TOP_FIELDS = 5;
+
+function countFields(errors: { fields: string[] }[]): { field: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const e of errors) for (const f of new Set(e.fields)) counts.set(f, (counts.get(f) ?? 0) + 1);
+  return [...counts.entries()].map(([field, count]) => ({ field, count })).sort((a, b) => b.count - a.count || a.field.localeCompare(b.field)).slice(0, TOP_FIELDS);
+}
+
+export function summarizeAutoErrors(errors: { type: AutoErrorType; fields: string[] }[]): AutoErrorSummary {
+  const types = AUTO_ERROR_TYPES.flatMap((type) => {
+    const of = errors.filter((e) => e.type === type);
+    return of.length ? [{ type, count: of.length, fields: countFields(of) }] : [];
+  });
+  return {
+    errors: errors.length,
+    byType: Object.fromEntries(types.map((t) => [t.type, t.count])),
+    topFields: countFields(errors),
+    types,
+  };
+}
+
+/// The auto-applied proposals of a kind that its rule counts: its last
+/// KIND_WINDOW, decided after `since`, newest first.
+export function kindWindow<T extends { decidedAt: Date }>(rows: T[], since: Date | null): T[] {
+  return rows
+    .filter((r) => !since || r.decidedAt.getTime() > since.getTime())
+    .sort((a, b) => b.decidedAt.getTime() - a.decidedAt.getTime())
+    .slice(0, KIND_WINDOW);
+}
+
+/// The errors of a client its rule counts at `now`: within the last
+/// CLIENT_WINDOW_DAYS, after the latest lift of its pause.
+export function clientWindow<T extends { at: Date }>(errors: T[], now: Date, since: Date | null): T[] {
+  const from = Math.max(now.getTime() - CLIENT_WINDOW_DAYS * DAY, since ? since.getTime() + 1 : -Infinity);
+  return errors.filter((e) => e.at.getTime() >= from && e.at.getTime() <= now.getTime());
 }
 
 /// Whether a kind goes back to a person: of its last KIND_WINDOW
 /// auto-applied proposals since `since` (the latest guide approval or the
 /// latest lift of its pause), KIND_ERROR_LIMIT or more were errors.
 export function kindPauseDue(rows: { decidedAt: Date; error: boolean }[], since: Date | null): { due: boolean; errors: number; counted: number } {
-  const counted = rows
-    .filter((r) => !since || r.decidedAt.getTime() > since.getTime())
-    .sort((a, b) => b.decidedAt.getTime() - a.decidedAt.getTime())
-    .slice(0, KIND_WINDOW);
+  const counted = kindWindow(rows, since);
   const errors = counted.filter((r) => r.error).length;
   return { due: errors >= KIND_ERROR_LIMIT, errors, counted: counted.length };
 }
@@ -128,8 +267,7 @@ export function kindPauseDue(rows: { decidedAt: Date; error: boolean }[], since:
 /// its auto-applied items within the last CLIENT_WINDOW_DAYS, counted from
 /// the latest lift of its pause.
 export function clientPauseDue(errorTimes: Date[], now: Date, since: Date | null): { due: boolean; errors: number } {
-  const from = Math.max(now.getTime() - CLIENT_WINDOW_DAYS * DAY, since ? since.getTime() + 1 : -Infinity);
-  const errors = errorTimes.filter((t) => t.getTime() >= from && t.getTime() <= now.getTime()).length;
+  const errors = clientWindow(errorTimes.map((at) => ({ at })), now, since).length;
   return { due: errors >= CLIENT_ERROR_LIMIT, errors };
 }
 

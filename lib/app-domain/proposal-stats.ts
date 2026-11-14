@@ -5,7 +5,8 @@ import { canManageClients } from "@/lib/app-auth/permissions";
 import { readSourceRefs } from "@/lib/knowledge-sources";
 import { bulkApproveBlocker, reviewConfidence, type ProposalFlag, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { proposalKindKey } from "@/lib/knowledge-review-filters";
-import { activePauses, autoApplySetting } from "@/lib/app-domain/auto-apply";
+import { activePauses, autoApplySetting, autoErrors, pauseBreakdown } from "@/lib/app-domain/auto-apply";
+import type { AutoErrorType } from "@/lib/auto-apply";
 import { readEditKind, type ProposalEditKind } from "@/lib/proposal-edits";
 
 // 3.11.2026, Ariel: "לצמצם את ההצעות מהחילוץ שמחכות לאישור מנהל תיק, לפי
@@ -28,6 +29,10 @@ import { readEditKind, type ProposalEditKind } from "@/lib/proposal-edits";
 // the wording or to a fact (`editKind`, from the audit row of the
 // approval). Names and a kind only, never the values. Proposals approved
 // before then have `edited` and no fields.
+//
+// What went wrong with an auto-applied item (14.11.2026): its error type
+// and the names of the fields fixed in the file (`autoError`), and per
+// pause, the same over the errors that caused it (`byType`, `topFields`).
 
 export type ProposalStatRow = {
   id: string;
@@ -64,6 +69,12 @@ export type ProposalStatRow = {
   reverted: boolean;
   /// Auto-applied, and a person looked at it after and marked it right ("תקין").
   autoReviewed: boolean;
+  /// 14.11.2026: for an auto-applied proposal, the error it counted as,
+  /// or null: taken out again (REVERTED), or within 30 days its item was
+  /// SUPERSEDED, CONTRADICTED, UPDATED or REMOVED, with the names of the
+  /// fields that changed (lib/auto-apply.ts, autoError). Absent for a
+  /// proposal a person approved.
+  autoError?: { type: AutoErrorType; fields: string[] } | null;
   /// A date only: whether it opens a task before it (taskDaysBefore).
   autoTask?: boolean;
   /// Approved or rejected together with others, by the audit row.
@@ -89,6 +100,11 @@ export type ProposalStatGroup = {
 };
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
+
+/// An error as the stats give it: its type and field names, no values.
+function autoErrorOf(e: { type: AutoErrorType; fields: string[] } | null) {
+  return e ? { type: e.type, fields: e.fields } : null;
+}
 
 function bool(v: unknown): boolean {
   return v === true || (typeof v === "string" && v.trim().length > 0);
@@ -121,6 +137,7 @@ export async function proposalStatsForAi(
         edited: true,
         editedFields: true,
         attached: true,
+        resultId: true,
         autoApplied: true,
         revertedAt: true,
         autoReviewedAt: true,
@@ -151,6 +168,8 @@ export async function proposalStatsForAi(
       : Promise.resolve([]),
   ]);
   const sourceById = new Map(sources.map((s) => [s.id, s]));
+  // The same reader the pauses count with (lib/app-domain/auto-apply.ts).
+  const autoErrs = await autoErrors(proposals.filter((p) => p.autoApplied));
   const bulkIds = new Set(audits.filter((a) => (a.afterJson as { bulk?: unknown } | null)?.bulk === true).map((a) => a.entityId));
   const editKinds = new Map(audits.flatMap((a) => {
     const kind = readEditKind((a.afterJson as { editKind?: unknown } | null)?.editKind);
@@ -195,6 +214,7 @@ export async function proposalStatsForAi(
       autoApplied: p.autoApplied,
       reverted: p.revertedAt !== null,
       autoReviewed: p.autoReviewedAt !== null,
+      ...(p.autoApplied ? { autoError: autoErrorOf(autoErrs.get(p.id) ?? null) } : {}),
       ...(p.target === "DATE" ? { autoTask: payload.taskDaysBefore != null } : {}),
       bulk: bulkIds.has(p.id),
       rejected: p.state === "REJECTED",
@@ -225,7 +245,15 @@ export async function proposalStatsForAi(
   const autoApply = {
     enabled: setting.enabled,
     firstEnabledAt: iso(setting.firstEnabledAt),
-    pauses: pauses.map((p) => ({ scope: p.scope, key: p.scope === "CLIENT" ? keyOf(p.key) : p.key, errors: p.errors, since: p.createdAt.toISOString() })),
+    pauses: await Promise.all(
+      pauses.map(async (p) => {
+        // 14.11.2026: what the errors that caused it were, by type and by
+        // the fields fixed. Names and counts only; a marked client's
+        // errors are left out.
+        const b = await pauseBreakdown(p, { forAi: true });
+        return { scope: p.scope, key: p.scope === "CLIENT" ? keyOf(p.key) : p.key, errors: p.errors, since: p.createdAt.toISOString(), byType: b.byType, topFields: b.topFields };
+      })
+    ),
   };
 
   const limit = Math.min(Math.max(opts.limit ?? 200, 1), 500);

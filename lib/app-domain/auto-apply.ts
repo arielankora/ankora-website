@@ -15,12 +15,18 @@ import {
   CLIENT_WINDOW_DAYS,
   ERROR_WINDOW_DAYS,
   KIND_WINDOW,
-  autoErrorAt,
+  autoError,
   autoReviewReason,
   autoReviewReasonCode,
   clientPauseDue,
+  clientWindow,
   kindPauseDue,
+  kindWindow,
+  summarizeAutoErrors,
   wilsonLower,
+  type AutoError,
+  type AutoErrorSummary,
+  type ItemChange,
 } from "@/lib/auto-apply";
 
 // Auto-apply of proposals to a client file, the parts that read the
@@ -79,22 +85,106 @@ export async function activePauses() {
   return prisma.autoApplyPause.findMany({ where: { liftedAt: null }, orderBy: { createdAt: "asc" } });
 }
 
-async function lastLift(scope: AutoApplyScope, key: string): Promise<Date | null> {
-  const row = await prisma.autoApplyPause.findFirst({ where: { scope, key, liftedAt: { not: null } }, orderBy: { liftedAt: "desc" }, select: { liftedAt: true } });
+/// The latest lift of a pause on this kind or client, before `before`
+/// when given (a pause still open: the lift before it began).
+async function lastLift(scope: AutoApplyScope, key: string, before?: Date): Promise<Date | null> {
+  const row = await prisma.autoApplyPause.findFirst({
+    where: { scope, key, liftedAt: before ? { not: null, lte: before } : { not: null } },
+    orderBy: { liftedAt: "desc" },
+    select: { liftedAt: true },
+  });
   return row?.liftedAt ?? null;
 }
 
-/// When each auto-applied proposal turned out wrong, or null: taken out
-/// again, or its item changed, replaced or removed within 30 days
-/// (lib/auto-apply.ts, CHANGE_ACTIONS), read from the item's audit rows.
-async function errorTimes(rows: { id: string; resultId: string | null; decidedAt: Date | null; revertedAt: Date | null }[]): Promise<Map<string, Date | null>> {
+type AutoRow = { id: string; resultId: string | null; decidedAt: Date | null; revertedAt: Date | null };
+const AUTO_ROW = { id: true, resultId: true, decidedAt: true, revertedAt: true } as const;
+
+/// The error of each auto-applied proposal, or null (lib/auto-apply.ts,
+/// autoError): taken out again, or its item changed, replaced or removed
+/// within 30 days, read from the item's audit rows. The one reader of
+/// errors: the pauses count them, the stats and the approvals screen
+/// explain them.
+export async function autoErrors(rows: AutoRow[]): Promise<Map<string, AutoError | null>> {
   const resultIds = [...new Set(rows.flatMap((r) => (r.resultId ? [r.resultId] : [])))];
   const changes = resultIds.length
-    ? await prisma.auditEvent.findMany({ where: { entityId: { in: resultIds }, action: { in: [...CHANGE_ACTIONS] } }, select: { entityId: true, createdAt: true } })
+    ? await prisma.auditEvent.findMany({
+        where: { entityId: { in: resultIds }, action: { in: [...CHANGE_ACTIONS] } },
+        select: { entityId: true, action: true, createdAt: true, beforeJson: true, afterJson: true },
+      })
     : [];
-  const byItem = new Map<string, Date[]>();
-  for (const c of changes) byItem.set(c.entityId!, [...(byItem.get(c.entityId!) ?? []), c.createdAt]);
-  return new Map(rows.map((r) => [r.id, r.decidedAt ? autoErrorAt({ decidedAt: r.decidedAt, revertedAt: r.revertedAt }, r.resultId ? byItem.get(r.resultId) ?? [] : []) : null]));
+  const byItem = new Map<string, ItemChange[]>();
+  for (const c of changes) {
+    if (!c.entityId) continue;
+    byItem.set(c.entityId, [...(byItem.get(c.entityId) ?? []), { action: c.action, at: c.createdAt, before: c.beforeJson, after: c.afterJson }]);
+  }
+  return new Map(rows.map((r) => [r.id, r.decidedAt ? autoError({ decidedAt: r.decidedAt, revertedAt: r.revertedAt }, r.resultId ? byItem.get(r.resultId) ?? [] : []) : null]));
+}
+
+/// Leaves out the clients marked "בלי AI", for a read that Claude gets.
+const notAiExcluded: Prisma.KnowledgeProposalWhereInput = { batch: { client: { aiExcluded: false } } };
+
+/// The errors a client's rule counts at `now` (clientPauseDue), from its
+/// auto-applied proposals decided by then.
+async function clientErrors(clientId: string, now: Date, since: Date | null, opts: { upTo?: boolean; forAi?: boolean } = {}): Promise<AutoError[]> {
+  const rows = await prisma.knowledgeProposal.findMany({
+    where: {
+      clientId,
+      autoApplied: true,
+      decidedAt: { gte: new Date(now.getTime() - (CLIENT_WINDOW_DAYS + ERROR_WINDOW_DAYS) * DAY), ...(opts.upTo ? { lte: now } : {}) },
+      ...(opts.forAi ? notAiExcluded : {}),
+    },
+    select: AUTO_ROW,
+  });
+  const errors = [...(await autoErrors(rows)).values()].filter((e): e is AutoError => !!e);
+  return clientWindow(errors, now, since);
+}
+
+/// What a kind's rule counts (kindPauseDue): its last KIND_WINDOW
+/// auto-applied proposals after `since`, each with its error, if any, by
+/// `now` when read as of a past moment (`upTo`).
+async function kindErrors(key: string, now: Date, since: Date | null, opts: { upTo?: boolean; forAi?: boolean } = {}) {
+  const rows = await prisma.knowledgeProposal.findMany({
+    where: {
+      ...kindWhere(key),
+      autoApplied: true,
+      decidedAt: { ...(since ? { gt: since } : { not: null }), ...(opts.upTo ? { lte: now } : {}) },
+      ...(opts.forAi ? notAiExcluded : {}),
+    },
+    orderBy: { decidedAt: "desc" },
+    take: KIND_WINDOW,
+    select: AUTO_ROW,
+  });
+  const errs = await autoErrors(rows);
+  return kindWindow(
+    rows.map((r) => {
+      const e = errs.get(r.id) ?? null;
+      return { decidedAt: r.decidedAt!, error: e && (!opts.upTo || e.at.getTime() <= now.getTime()) ? e : null };
+    }),
+    since
+  );
+}
+
+/// When a kind's counters start: the latest guide approval or the latest
+/// lift of its pause, whichever is later, as of `at`.
+async function kindSince(key: string, at?: Date): Promise<Date | null> {
+  const guides = (await guideApprovals()).filter((g) => !at || g.getTime() <= at.getTime());
+  const lastGuide = guides.length ? guides[guides.length - 1] : null;
+  const lift = await lastLift("KIND", key, at);
+  return [lastGuide, lift].filter((d): d is Date => !!d).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+}
+
+/// The errors that caused a pause, by the same rule that made it, read
+/// as of the moment it began. `forAi` leaves out the clients marked
+/// "בלי AI".
+export async function pauseErrors(p: { scope: AutoApplyScope; key: string; createdAt: Date }, opts: { forAi?: boolean } = {}): Promise<AutoError[]> {
+  if (p.scope === "CLIENT") return clientErrors(p.key, p.createdAt, await lastLift("CLIENT", p.key, p.createdAt), { upTo: true, forAi: opts.forAi });
+  const counted = await kindErrors(p.key, p.createdAt, await kindSince(p.key, p.createdAt), { upTo: true, forAi: opts.forAi });
+  return counted.flatMap((r) => (r.error ? [r.error] : []));
+}
+
+/// pauseErrors, summed up: by type, and the fields that were fixed.
+export async function pauseBreakdown(p: { scope: AutoApplyScope; key: string; createdAt: Date }, opts: { forAi?: boolean } = {}): Promise<AutoErrorSummary> {
+  return summarizeAutoErrors(await pauseErrors(p, opts));
 }
 
 /// The auto-applied proposals of one kind, by its key (a target, or
@@ -150,12 +240,9 @@ export async function evaluateAutoPauses(scope: { clientId: string; kindKeys: st
   let clientPaused = active.some((p) => p.scope === "CLIENT" && p.key === scope.clientId);
 
   if (!clientPaused) {
-    const rows = await prisma.knowledgeProposal.findMany({
-      where: { clientId: scope.clientId, autoApplied: true, decidedAt: { gte: new Date(now.getTime() - (CLIENT_WINDOW_DAYS + ERROR_WINDOW_DAYS) * DAY) } },
-      select: { id: true, resultId: true, decidedAt: true, revertedAt: true },
-    });
-    const errors = [...(await errorTimes(rows)).values()].filter((d): d is Date => !!d);
-    const due = clientPauseDue(errors, now, await lastLift("CLIENT", scope.clientId));
+    const lift = await lastLift("CLIENT", scope.clientId);
+    const errors = (await clientErrors(scope.clientId, now, lift)).map((e) => e.at);
+    const due = clientPauseDue(errors, now, lift);
     if (due.due) {
       const client = await prisma.client.findUnique({ where: { id: scope.clientId }, select: { name: true } });
       await pause("CLIENT", scope.clientId, due.errors, `${due.errors} פריטים שנכנסו אוטומטית בוטלו או תוקנו בתוך ${CLIENT_WINDOW_DAYS} יום`, (t) => ({
@@ -166,20 +253,11 @@ export async function evaluateAutoPauses(scope: { clientId: string; kindKeys: st
     }
   }
 
-  const guides = await guideApprovals();
-  const lastGuide = guides.length ? guides[guides.length - 1] : null;
   for (const key of new Set(scope.kindKeys)) {
     if (pausedKinds.has(key)) continue;
-    const lift = await lastLift("KIND", key);
-    const since = [lastGuide, lift].filter((d): d is Date => !!d).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
-    const rows = await prisma.knowledgeProposal.findMany({
-      where: { ...kindWhere(key), autoApplied: true, decidedAt: since ? { gt: since } : { not: null } },
-      orderBy: { decidedAt: "desc" },
-      take: KIND_WINDOW,
-      select: { id: true, resultId: true, decidedAt: true, revertedAt: true },
-    });
-    const errs = await errorTimes(rows);
-    const due = kindPauseDue(rows.map((r) => ({ decidedAt: r.decidedAt!, error: !!errs.get(r.id) })), since);
+    const since = await kindSince(key);
+    const counted = await kindErrors(key, now, since);
+    const due = kindPauseDue(counted.map((r) => ({ decidedAt: r.decidedAt, error: !!r.error })), since);
     if (!due.due) continue;
     const label = proposalKindLabel(key);
     await pause("KIND", key, due.errors, `${due.errors} מתוך ${due.counted} הפריטים האחרונים מסוג ${label} שנכנסו אוטומטית בוטלו או תוקנו`, (t) => {
@@ -209,7 +287,7 @@ export async function liftAutoApplyPause(actor: User, id: string) {
 /// Beside each pause, the decisions people took on its proposals since it
 /// began, one at a time, and how many were approved as they came: the bar
 /// for lifting it (30 decisions, a lower bound of 85%) is checked by the
-/// manager.
+/// manager. With it, what the errors that caused it were (pauseBreakdown).
 export async function autoApplyOverview(actor: User) {
   if (!canManageClients(actor.role)) return null;
   const [setting, pauses] = await Promise.all([autoApplySetting(), activePauses()]);
@@ -254,6 +332,9 @@ export async function autoApplyOverview(actor: User) {
       decisions: alone.length,
       approvedAsIs: good,
       lowerBound: wilsonLower(good, alone.length),
+      /// 14.11.2026: the errors that caused it, by type and by the fields
+      /// that were fixed, so the manager knows what to fix before lifting.
+      breakdown: await pauseBreakdown(p),
     });
   }
   return { enabled: setting.enabled, firstEnabledAt: setting.firstEnabledAt, pauses: out };

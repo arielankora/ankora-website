@@ -4,8 +4,10 @@ import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { listClientFacts, removeClientFact } from "@/lib/app-domain/client-facts";
+import { updateClientContact } from "@/lib/app-domain/client-contacts";
+import { proposalStatsForAi } from "@/lib/app-domain/proposal-stats";
 import { approveProposal, proposeKnowledge, revertProposal, type ProposalItemInput } from "@/lib/app-domain/knowledge-proposals";
-import { AUTO_APPLY_PAUSED, autoApplySetting, liftAutoApplyPause, listAutoReview, markAutoReviewed, setAutoApply } from "@/lib/app-domain/auto-apply";
+import { AUTO_APPLY_PAUSED, autoApplyOverview, autoApplySetting, liftAutoApplyPause, listAutoReview, markAutoReviewed, setAutoApply } from "@/lib/app-domain/auto-apply";
 import { inAutoSample } from "@/lib/auto-apply";
 import { decideAutoAppliedForAi } from "@/lib/app-domain/mcp-approvals";
 import { countApprovals } from "@/lib/app-domain/approvals";
@@ -283,5 +285,63 @@ describe("the count beside אישורים, in the menu and the morning email", (
     expect(await countApprovals(user)).toBe(before + 1);
     await decideAutoAppliedForAi(user, r.autoApplied[1].proposalId, "revert");
     expect(await countApprovals(user)).toBe(before);
+  });
+});
+
+describe("what the errors behind a pause were (14.11.2026)", () => {
+  function contact(name: string, at: string): ProposalItemInput {
+    return { target: "CONTACT", reason: "נאמר", at, confidence: "HIGH", payload: { knowledgeStatus: "CONFIRMED", name, role: "CEO", emails: [`${at.replace(":", "")}@nux.example`] } };
+  }
+
+  it("an auto-applied contact edited after it entered is UPDATED with the field names, and shows in the pause's breakdown", async () => {
+    const { user, manager } = await setup("A");
+    const clients = [await anotherClient(user, "B"), await anotherClient(user, "C"), await anotherClient(user, "D")];
+    const applied = [];
+    for (const [i, c] of clients.entries()) applied.push((await propose(user, c.id, [contact(`איש ${i}`, `0${i + 1}:00`)])).autoApplied[0]);
+    expect(applied.map((a) => a.target)).toEqual(["CONTACT", "CONTACT", "CONTACT"]);
+
+    // Two fixed by hand in the file: a role and an email, then a role.
+    await updateClientContact(user, applied[0].resultId!, { role: "CTO", emails: ["fixed@nux.example"] });
+    await updateClientContact(user, applied[1].resultId!, { role: "CFO" });
+    // The third taken out: the kind's third error, read now.
+    await revertProposal(user, applied[2].proposalId);
+    const pause = await prisma.autoApplyPause.findFirstOrThrow({ where: { scope: "KIND", key: "CONTACT", liftedAt: null } });
+    expect(pause.errors).toBe(3);
+
+    // The approvals screen: the same breakdown beside the lift button.
+    const overview = await autoApplyOverview(manager);
+    const row = overview!.pauses.find((p) => p.id === pause.id)!;
+    expect(row.breakdown.errors).toBe(3);
+    expect(row.breakdown.byType).toEqual({ REVERTED: 1, UPDATED: 2 });
+    expect(row.breakdown.types.find((t) => t.type === "UPDATED")!.fields).toEqual([
+      { field: "role", count: 2 },
+      { field: "emails", count: 1 },
+    ]);
+
+    // get_proposal_stats: per row and per pause, names only.
+    const stats = await proposalStatsForAi(manager, { rows: true });
+    const byId = Object.fromEntries(stats.rows!.map((r) => [r.id, r]));
+    expect(byId[applied[0].proposalId].autoError).toEqual({ type: "UPDATED", fields: ["emails", "role"] });
+    expect(byId[applied[1].proposalId].autoError).toEqual({ type: "UPDATED", fields: ["role"] });
+    expect(byId[applied[2].proposalId].autoError).toEqual({ type: "REVERTED", fields: [] });
+    const statPause = stats.autoApply.pauses.find((p) => p.scope === "KIND" && p.key === "CONTACT")!;
+    expect(statPause).toMatchObject({ errors: 3, byType: { REVERTED: 1, UPDATED: 2 }, topFields: [{ field: "role", count: 2 }, { field: "emails", count: 1 }] });
+    const text = JSON.stringify(stats);
+    expect(text).not.toContain("CTO");
+    expect(text).not.toContain("fixed@nux.example");
+  });
+
+  it("a client's pause counts only the errors up to when it began, after its latest lift", async () => {
+    const { client, user, manager } = await setup();
+    const r = await propose(user, client.id, [contact("דנה", "01:00"), pref("ראשון", { at: "02:00" }), pref("שני", { at: "03:00" })]);
+    expect(r.autoApplied).toHaveLength(3);
+    await updateClientContact(user, r.autoApplied[0].resultId!, { role: "COO" });
+    await revertProposal(user, r.autoApplied[1].proposalId);
+    const pause = await prisma.autoApplyPause.findFirstOrThrow({ where: { scope: "CLIENT", key: client.id, liftedAt: null } });
+    // A later fix to another of its items does not rewrite why it was paused.
+    await removeClientFact(user, r.autoApplied[2].resultId!);
+    const row = (await autoApplyOverview(manager))!.pauses.find((p) => p.id === pause.id)!;
+    expect(row.breakdown.byType).toEqual({ REVERTED: 1, UPDATED: 1 });
+    expect(row.breakdown.topFields).toEqual([{ field: "role", count: 1 }]);
   });
 });

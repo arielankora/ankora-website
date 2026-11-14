@@ -167,6 +167,7 @@ export async function KnowledgeReview({ searchParams, mineOnly = false }: { sear
               approvedAsIs: p.approvedAsIs,
               lowerBoundPct: Math.floor(p.lowerBound * 100),
               barMet: liftBarMet(p.approvedAsIs, p.decisions),
+              errorTypes: p.breakdown.types.map((e) => ({ type: e.type, count: e.count, fields: e.fields.map((f) => f.field) })),
             })),
           }
         }

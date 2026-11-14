@@ -393,6 +393,9 @@ export async function updateClientContact(actor: User, id: string, input: Partia
       ...knowledgeData(input),
       ...sourced,
     },
+    // The person after the change too, so the audit row shows a changed
+    // name, email or phone (lib/auto-apply.ts, changedFields).
+    include: { person: true },
   });
   if (updated.isPrimary && !before.isPrimary) {
     await prisma.clientContact.updateMany({
