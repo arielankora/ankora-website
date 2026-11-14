@@ -1501,6 +1501,10 @@ exports[`propose_knowledge payloads, as tools/list publishes them > matches the 
     },
     "newSource": {
       "properties": {
+        "callId": {
+          "description": "For kind TRANSCRIPT: a recorded call's \`id\` from list_client_communications, instead of firefliesId.",
+          "type": "string",
+        },
         "clientConversation": {
           "description": "For kind ANKORA_DOCUMENT only: true when the document writes down what the client said in a conversation with them (an intake summary typed during the meeting). Its items are then not lowered to uncertain just because Ankora wrote them.",
           "type": "boolean",
@@ -1548,6 +1552,29 @@ exports[`propose_knowledge payloads, as tools/list publishes them > matches the 
         "topicsOnly": {
           "description": "True for a restricted meeting: topics only, no quotes.",
           "type": "boolean",
+        },
+        "whatsapp": {
+          "description": "For kind PERSON: the stretch of a stored WhatsApp conversation the items came from. The same stretch is one source, and get_extraction_brief tells the next run where to start.",
+          "properties": {
+            "conversationId": {
+              "description": "The conversation's \`id\` from list_client_communications.",
+              "type": "string",
+            },
+            "from": {
+              "description": "YYYY-MM-DD: the first day of messages read.",
+              "type": "string",
+            },
+            "to": {
+              "description": "YYYY-MM-DD: the last day of messages read.",
+              "type": "string",
+            },
+          },
+          "required": [
+            "conversationId",
+            "from",
+            "to",
+          ],
+          "type": "object",
         },
       },
       "required": [

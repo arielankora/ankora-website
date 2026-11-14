@@ -45,7 +45,10 @@ export async function assertClientAccess(actor: User, clientId: string) {
 // Sources
 // ---------------------------------------------------------------------------
 
-export type ExternalRef = { system: "FIREFLIES" | "DOCUMENT" | "TASK" | "GMAIL" | "OTHER"; id: string };
+/// WHATSAPP and CALL (14.11.2026): a stretch of a stored WhatsApp
+/// conversation ("<conversation id>:<from day>:<to day>") and a recorded call
+/// (its id). They tell the extraction what was already read.
+export type ExternalRef = { system: "FIREFLIES" | "DOCUMENT" | "TASK" | "GMAIL" | "WHATSAPP" | "CALL" | "OTHER"; id: string };
 
 /// What an external id on a source of this kind points at.
 export function externalSystemFor(kind: SourceKind): ExternalRef["system"] {
@@ -89,6 +92,9 @@ export interface ClientSourceInput {
   externalIds?: string[];
   restriction?: SourceRestriction;
   notes?: string | null;
+  /// What the external ids point at, when the kind alone does not say
+  /// (a WhatsApp stretch is a PERSON source, a call a TRANSCRIPT one).
+  externalSystem?: ExternalRef["system"];
 }
 
 export async function addClientSource(actor: User, input: ClientSourceInput) {
@@ -96,7 +102,7 @@ export async function addClientSource(actor: User, input: ClientSourceInput) {
   await assertClientAccess(actor, input.clientId);
   const title = input.title.trim();
   if (!title) throw new DomainError("clientSources.titleRequired", "צריך שם למקור.");
-  const system = externalSystemFor(input.kind);
+  const system = input.externalSystem ?? externalSystemFor(input.kind);
   const externalRefs: ExternalRef[] = [...new Set((input.externalIds ?? []).map((i) => i.trim()).filter(Boolean))].map(
     (id) => ({ system, id })
   );
