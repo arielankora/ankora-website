@@ -2304,6 +2304,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-14",
       "riskReason": "The procedure document's tab (processes redesign, stage 4): why an approved document is out of date, an audited client's readiness list, and Claude's audit draft that fills evidence in a new draft version and scope and controls only where empty"
+    },
+    "page:/[locale]/next-october": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "low",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-14",
+      "riskReason": "Static memorial page for Sgt. Nathanel Young (Next October): no form, no data, no auth; outbound links only"
     }
   },
   "waivers": {},
