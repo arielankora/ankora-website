@@ -289,8 +289,6 @@ export function ProcessPage({
                   <dd className="font-bold text-app-text-primary">{executor}</dd>
                 </>
               )}
-              <dt className="text-app-text-secondary">{t("approver")}</dt>
-              <dd className="font-bold text-app-text-primary">{approver || t("none")}</dd>
             </dl>
           </section>
           {!guide &&

@@ -3887,11 +3887,11 @@
         "new": "+ תהליך חדש",
         "newTitle": "תהליך חדש",
         "summary": {
-          "total": "{count} תהליכים",
-          "running": "{count} רצים",
-          "attention": "{count} צריכים טיפול",
-          "drafts": "{count} טיוטות",
-          "guides": "{count} הוראות עבודה"
+          "total": "{count, plural, one {תהליך אחד} other {# תהליכים}}",
+          "running": "{count, plural, one {אחד רץ} other {# רצים}}",
+          "attention": "{count, plural, one {אחד צריך טיפול} other {# צריכים טיפול}}",
+          "drafts": "{count, plural, one {טיוטה אחת} other {# טיוטות}}",
+          "guides": "{count, plural, one {הוראת עבודה אחת} other {# הוראות עבודה}}"
         },
         "attention": "צריך טיפול",
         "toProcess": "לתהליך",
@@ -3969,7 +3969,7 @@
         "opensOnDay": "הריצה נפתחת ביום המועד",
         "who": "מי",
         "edit": "עריכה",
-        "whoTitle": "מי עושה ומי מאשר",
+        "whoTitle": "מי עושה",
         "owner": "בעלים",
         "backup": "מחליף",
         "executor": "מבצע",
