@@ -102,6 +102,19 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
   const p = (await listProcesses(actor, clientId)).filter(visible(actor)).find((x) => x.id === processId);
   if (!p) return null;
   const [{ user, system }, stranger, questions] = await Promise.all([namesFor([p], clientId), strangerStates([p.id]), strangerQuestionsOf(p.id)]);
+  // 14.11.2026 (processes redesign, stage 5): each step's own approver and
+  // how we know it was done, by name, as the steps editor sets them.
+  const stepIds = [p.current, p.draft].flatMap((v) => v?.steps ?? []);
+  const contactIds = [...new Set(stepIds.map((s) => s.approverContactId).filter((x): x is string => !!x))];
+  const userIds = [...new Set(stepIds.map((s) => s.approverUserId).filter((x): x is string => !!x))];
+  const [stepContacts, stepUsers] = await Promise.all([
+    contactIds.length ? prisma.clientContact.findMany({ where: { id: { in: contactIds } }, select: { id: true, role: true, person: { select: { name: true } } } }) : [],
+    userIds.length ? prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } }) : [],
+  ]);
+  const contactName = new Map(stepContacts.map((c) => [c.id, c.person.name ?? c.role ?? ""]));
+  const userName = new Map(stepUsers.map((u) => [u.id, u.name]));
+  const approverOf = (s: ProcessStep) =>
+    s.approverUserId ? { atAnkora: userName.get(s.approverUserId) ?? null } : s.approverContactId ? { atClient: contactName.get(s.approverContactId) ?? null } : null;
   const step = (s: ProcessStep, i: number) => ({
     n: i + 1,
     title: s.title,
@@ -112,6 +125,8 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
     output: s.output,
     verification: s.verification,
     needsApproval: s.requiresApproval,
+    approver: approverOf(s),
+    evidence: s.evidence ?? null,
     amountMax: s.amountMaxMinor !== null ? `${(s.amountMaxMinor / 100).toLocaleString("en-US")} ${s.currency ?? ""}`.trim() : null,
     channel: s.channel,
   });
