@@ -1,6 +1,6 @@
 import { test, expect } from "./fixtures";
 import { fillRhythm, onceInThePast, ongoing, whenSomethingHappens } from "./rhythm";
-import { CLIENT, newProcess, saveDraft, submit, tag, writeStep } from "./process-page";
+import { approveDraft, CLIENT, newProcess, saveDraft, submit, tag, writeStep } from "./process-page";
 
 // Org brain, phase 1 (16.10.2026): a process and its procedure on the
 // client screen, submitted for real, as the seeded admin. Same prose rule
@@ -66,10 +66,7 @@ test.describe("clients/process-actions", () => {
     await saveDraft(page);
     await expect(draft).toContainText("טיוטה 2 מחכה לאישור", { timeout: 15_000 });
 
-    const approved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-    await draft.getByRole("button", { name: "אישור הנוהל" }).click();
-    await approved;
-    await page.reload();
+    await approveDraft(page);
     await expect(page.getByTestId("process-page")).toContainText("גרסה 2", { timeout: 15_000 });
     await expect(page.getByTestId("process-draft")).toHaveCount(0);
     await expect(page.getByTestId("process-blocker")).toHaveCount(0);
@@ -106,10 +103,7 @@ test.describe("clients/process-actions", () => {
     await expect(page.getByTestId("process-blocker")).not.toContainText("לא ירוץ: תהליך לפי מועד");
 
     await writeStep(page, "מכינים את קובץ התשלומים");
-    const approved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-    await page.getByTestId("process-draft").getByRole("button", { name: "אישור הנוהל" }).click();
-    await approved;
-    await page.reload();
+    await approveDraft(page);
 
     // It is what stops work, so it is the one line on top.
     await expect(page.getByTestId("process-blocker")).toHaveText("לא ירוץ: תהליך לפי מועד בלי מועד", { timeout: 15_000 });

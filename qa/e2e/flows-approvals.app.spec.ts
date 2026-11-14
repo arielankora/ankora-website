@@ -1,6 +1,6 @@
 import { test, expect } from "./fixtures";
 import { fillRhythm, whenSomethingHappens } from "./rhythm";
-import { newProcess, writeStep } from "./process-page";
+import { approveDraft, newProcess, writeStep } from "./process-page";
 
 // "אישורים" (20.10.2026): every manual approval on one screen, a tab per
 // kind. The Preview seed always leaves demo proposals pending on the
@@ -155,11 +155,7 @@ test.describe("approvals", () => {
     await expect(line).toContainText("טיוטה 1 של הנוהל מחכה לאישור", { timeout: 15_000 });
     await line.getByRole("link", { name: "לאישור" }).click();
     await expect(page).toHaveURL(new RegExp(`${href}$`), { timeout: 15_000 });
-    const approved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-    await page.getByTestId("process-draft").getByRole("button", { name: "אישור הנוהל" }).click();
-    await approved;
-    await page.reload();
-    await expect(page.getByTestId("process-draft")).toHaveCount(0, { timeout: 15_000 });
+    await approveDraft(page);
     await expect(page.getByText(step).first()).toBeVisible();
     await page.goto(`/app/clients/${CLIENT}?tab=file&section=processes`);
     await expect(page.getByTestId("process-list")).toContainText(title);
