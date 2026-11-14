@@ -171,7 +171,8 @@ const ProposedStep = z.object({
 export const ProcessPayload = z.object({
   title: z.string().min(1).max(200),
   purpose: z.string().max(500).nullish(),
-  triggerKinds: z.array(z.enum(["SCHEDULED", "EVENT", "ON_DEMAND", "CONTINUOUS"])).max(4).optional(),
+  // 14.11.2026: EXTERNAL, a process that runs by itself outside the app.
+  triggerKinds: z.array(z.enum(["SCHEDULED", "EVENT", "ON_DEMAND", "CONTINUOUS", "EXTERNAL"])).max(5).optional(),
   triggerText: z.string().max(500).nullish(),
   slaText: z.string().max(500).nullish(),
   externalPartyText: z.string().max(500).nullish(),

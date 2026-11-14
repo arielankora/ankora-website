@@ -487,6 +487,8 @@ export async function updateImportantDate(
 ) {
   const before = await requireDate(id);
   await assertClientAccess(actor, before.clientId);
+  // Spec 4.2: a date a process's rhythm made changes with the rhythm.
+  if (before.processStartId) throw new DomainError("importantDates.fromRhythm", "המועד נוצר מהקצב של תהליך. משנים אותו בעורך הקצב של התהליך.");
 
   if (input.expectedUpdatedAt && input.expectedUpdatedAt.getTime() !== before.updatedAt.getTime()) {
     throw new ConflictError(before);

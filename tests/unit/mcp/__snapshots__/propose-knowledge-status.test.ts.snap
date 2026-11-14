@@ -1027,7 +1027,7 @@ exports[`propose_knowledge payloads, as tools/list publishes them > matches the 
                 "type": "object",
               },
               {
-                "description": "When target is PROCESS. Something that recurs (a one-time project is a TASK). Enters as a draft; a manager approves the procedure. notApplicableFields only when it is clear a documentation field does not apply. steps when the procedure was described. On CREATE it needs title; on SUPERSEDE or CONTRADICT, only the fields that change.",
+                "description": "When target is PROCESS. Something that recurs (a one-time project is a TASK). Enters as a draft; a manager approves the procedure. notApplicableFields only when it is clear a documentation field does not apply. steps when the procedure was described. triggerKinds SCHEDULED needs its date in the same batch: a DATE item with processName set to this process's title, or the process enters scheduled with no date; EXTERNAL is a process that runs by itself outside the app (a scheduled Claude task), with where and when in triggerText. Once approved, set_process_rhythm sets the rhythm exactly. On CREATE it needs title; on SUPERSEDE or CONTRADICT, only the fields that change.",
                 "properties": {
                   "approvalPolicyTitles": {
                     "items": {
@@ -1260,10 +1260,11 @@ exports[`propose_knowledge payloads, as tools/list publishes them > matches the 
                         "EVENT",
                         "ON_DEMAND",
                         "CONTINUOUS",
+                        "EXTERNAL",
                       ],
                       "type": "string",
                     },
-                    "maxItems": 4,
+                    "maxItems": 5,
                     "type": "array",
                   },
                   "triggerText": {

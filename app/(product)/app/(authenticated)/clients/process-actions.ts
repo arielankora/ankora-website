@@ -164,6 +164,8 @@ export async function addProcessAction(_prev: FormState | undefined, f: FormData
   const created: { id?: string } = {};
   const r = await run(clientId, async () => {
     created.id = (await addProcess(user, { ...parsed.value!, clientId })).id;
+    // Spec 5.1: "+ הוראת עבודה" makes a work guide from the start.
+    if (f.get("kind") === "GUIDE") await setProcessKind(user, created.id, "GUIDE");
   });
   return created.id ? { ...r, id: created.id } : r;
 }

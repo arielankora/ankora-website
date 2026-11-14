@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { User } from "@prisma/client";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
-import { createImportantDate } from "@/lib/app-domain/important-dates";
+import { createImportantDate, updateImportantDate } from "@/lib/app-domain/important-dates";
 
 // update_date (14.11.2026): Guy's last day at NUX moved from 15.11 to
 // 30.11, and the connector could not move a date already in the file.
@@ -72,6 +72,8 @@ describe("update_date", () => {
     const r = await once(hadas, client.id, "P1 תשלומים", "2026-12-10");
     await prisma.importantDate.update({ where: { id: r.id }, data: { processId: p.id, processStartId: start.id } });
     expect((await call(hadas, "update_date", { client: "NUX", date: r.id, newDate: "2026-12-11" })).text).toContain("set_process_rhythm");
+    // The dates screen's save goes through the same domain: refused too.
+    await expect(updateImportantDate(hadas, r.id, { title: "x" })).rejects.toMatchObject({ code: "importantDates.fromRhythm" });
 
     await once(hadas, client.id, "בדיקה רפואית", "2026-12-20", { sensitivity: "SENSITIVE" });
     expect((await call(hadas, "update_date", { client: "NUX", date: "בדיקה רפואית", newDate: "2026-12-21" })).json).toBeNull();
