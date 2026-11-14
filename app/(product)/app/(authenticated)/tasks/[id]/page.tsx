@@ -461,7 +461,9 @@ export default async function TaskDetailPage(props: {
           approvedAt: s.approvedAt?.toISOString() ?? null,
           clientApprover: s.approvalContactId ? clientApprovers.get(s.approvalContactId) ?? null : null,
           clientApproval: readApprovalEvidence(s.approvalEvidence),
+          evidenceLink: s.evidenceLink ?? null,
         }))}
+        evidence={!!task.processId && !!task.client.auditRequirements}
         reminder={composer ? { clientId: task.clientId, taskId: task.id, composer } : null}
       />
 

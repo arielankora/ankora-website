@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { auditReadiness, staleReasons, type ReadinessItem, type StaleReason } from "@/lib/audit-readiness";
 import { auditPrepPrompt } from "@/lib/stranger-test";
+import { readApprovalEvidence } from "@/lib/step-approval";
 
 // The procedure document's tab (14.11.2026, processes redesign, stage 4,
 // "Document.dc.html"): the facts behind "לעדכן" (every client) and the
@@ -47,7 +48,7 @@ export async function documentTabOf(
     ctx.audit
       ? prisma.task.findMany({
           where: { processId: p.id, parentId: null, deletedAt: null, status: "DONE" },
-          select: { subtasks: { where: { deletedAt: null }, select: { requiresApproval: true, approvedAt: true, approvalContactId: true, approvalEvidence: true } } },
+          select: { subtasks: { where: { deletedAt: null }, select: { evidenceLink: true, approvalEvidence: true } } },
           take: 200,
         })
       : Promise.resolve([]),
@@ -67,10 +68,12 @@ export async function documentTabOf(
         steps: p.current?.steps ?? [],
         docMissing: p.docMissing ?? [],
         translation: approved?.translationEnApprovedAt ? "approved" : approved?.translationEn ? "draft" : "none",
-        runs: {
-          closed: runs.length,
-          withEvidence: runs.filter((r) => r.subtasks.every((s) => (!s.requiresApproval || !!s.approvedAt) && (!s.approvalContactId || !!s.approvalEvidence))).length,
-        },
+        // Spec 4.5: each step of a closed run, and those with a link to
+        // their evidence (the link itself, or the client approval's link).
+        runs: (() => {
+          const steps = runs.flatMap((r) => r.subtasks);
+          return { closed: steps.length, withEvidence: steps.filter((s) => !!s.evidenceLink || !!readApprovalEvidence(s.approvalEvidence)?.link).length };
+        })(),
         strangerOpen: p.stranger?.open.length ?? 0,
       })
     : null;

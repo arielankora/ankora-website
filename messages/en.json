@@ -792,7 +792,13 @@
           "SIGNED": "by signing a document"
         },
         "approvedClientLine": "Approved by {name} {how}, {date}",
-        "approvedByLine": "Approved by {name}, {date}"
+        "approvedByLine": "Approved by {name}, {date}",
+        "evidence": "Evidence",
+        "evidenceChange": "Replace",
+        "evidenceAdd": "+ Link to evidence",
+        "evidenceAria": "Link to the evidence of the step {title}",
+        "evidencePlaceholder": "A link to a mail, a file or a bank confirmation",
+        "evidenceSave": "Save"
       },
       "advance": {
         "plan": "Advance with Claude",
@@ -1299,6 +1305,8 @@
       "stepAwaitingApproval": "The step \"{title}\" is waiting for approval from {supervisor}. Once it's approved, the task can be closed.",
       "stepAwaitingApprovalNoSupervisor": "The step \"{title}\" is waiting for approval. Once it's approved, the task can be closed.",
       "clientApprovalUndocumented": "To mark the step done, write down when and how the client approved.",
+      "evidenceNotHere": "A link to evidence is kept only on a run step, for a client with audit requirements.",
+      "badEvidenceLink": "The link has to start with https://.",
       "stepNotRun": "A step belongs to its task's run and is not marked on its own.",
       "processNotOfClient": "The process is not in this client's file.",
       "stepAwaitingClientApproval": "The step \"{title}\" is waiting for the client's approval to be written down. Once it is, the task can be closed.",
@@ -2038,6 +2046,7 @@
       "taskCreate": "Task created",
       "taskStatusChange": "Task status changed",
       "taskClientApproval": "Client approval written down on a run step",
+      "taskEvidenceLink": "Link to evidence on a run step",
       "taskProcessLink": "Task marked as a run of a process",
       "taskApprove": "Task approved",
       "taskComment": "Comment on a task",
@@ -4146,7 +4155,7 @@
           "translationDraft": "English translation waiting for approval",
           "translationMissing": "English translation",
           "strangerOpen": "Stranger test: {count} open questions",
-          "runs": "Evidence from runs: {done} of {total}"
+          "runs": "Evidence from runs: {done} of {total} steps"
         }
       }
     },
