@@ -579,15 +579,29 @@ export async function flowForEditor(actor: User, processId: string): Promise<Flo
 }
 
 /// "קלוד מנסח שלבים" (14.11.2026, stage 3): Claude's draft of the steps of
-/// a process that has none, saved as a draft version. Refused once the
-/// process has steps, so it never writes over a person's procedure.
-export async function saveProcedureDraft(actor: User, processId: string, steps: unknown[]) {
-  const process = await findProcess(actor, processId);
+/// a process, saved as a draft version a person approves. For a process
+/// that has steps (14.11.2026, MCP), only as a new version of the one
+/// Claude read: `baseVersion` must be the latest, so it never writes over
+/// a version it did not see. A procedure built as a flow is edited in the
+/// steps editor.
+export async function saveProcedureDraft(actor: User, processId: string, steps: unknown[], options: { baseVersion?: number; changeNote?: string | null } = {}) {
+  await findProcess(actor, processId);
   const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" } });
-  if (latest && readSteps(latest.steps).length > 0) throw new DomainError("processes.draftHasSteps", "לתהליך כבר יש שלבים. עורכים אותם בעורך השלבים.");
+  const hasSteps = !!latest && readSteps(latest.steps).length > 0;
+  if (hasSteps) {
+    if (options.baseVersion === undefined) throw new DomainError("processes.draftHasSteps", "לתהליך כבר יש שלבים. עורכים אותם בעורך השלבים.");
+    if (options.baseVersion !== latest!.version) throw new DomainError("processes.draftStale", `מאז שהנוהל נקרא נשמרה גרסה ${latest!.version}. קוראים אותו שוב לפני שמנסחים.`, { version: latest!.version });
+    if (readFlow(latest!.flow)) throw new DomainError("processes.draftFlow", "הנוהל בנוי כתרשים עם תנאים. עורכים אותו בעורך השלבים.");
+  }
   const clean = readSteps(steps);
   if (!clean.length) throw new DomainError("processes.draftEmpty", "הטיוטה ריקה.");
-  const row = await saveProcessVersion(actor, processId, { steps: clean, baseVersion: latest?.version ?? 0, changeNote: "טיוטה שקלוד ניסח" });
+  const row = await saveProcessVersion(actor, processId, {
+    steps: clean,
+    highlights: hasSteps ? (latest?.highlights ?? null) : undefined,
+    outputs: hasSteps ? (latest?.outputs ?? null) : undefined,
+    baseVersion: latest?.version ?? 0,
+    changeNote: options.changeNote?.trim().slice(0, 500) || "טיוטה שקלוד ניסח",
+  });
   return { version: row.version, steps: clean.length };
 }
 
@@ -600,7 +614,7 @@ export async function saveProcedureDraft(actor: User, processId: string, steps: 
 export async function saveAuditDraft(
   actor: User,
   processId: string,
-  input: { scope?: string | null; controlRefs?: string[] | null; evidence?: { step: number; text: string }[] }
+  input: { scope?: string | null; controlRefs?: string[] | null; classification?: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | null; evidence?: { step: number; text: string }[] }
 ) {
   const process = await findProcess(actor, processId);
   const client = await prisma.client.findUnique({ where: { id: process.clientId }, select: { auditRequirements: true } });
@@ -627,11 +641,12 @@ export async function saveAuditDraft(
   if (input.scope?.trim() && !process.scope?.trim()) data.scope = input.scope.trim().slice(0, 2000);
   const refs = (input.controlRefs ?? []).map((r) => r.trim()).filter(Boolean).slice(0, 30);
   if (refs.length && !process.controlRefs.length) data.controlRefs = refs;
+  if (input.classification && !process.classification) data.classification = input.classification;
   if (Object.keys(data).length) {
     await prisma.process.update({ where: { id: processId }, data });
     await recordAudit({ actorId: actor.id, action: "process.audit_prep", entityType: "Process", entityId: processId, clientId: process.clientId, after: { ...data, version } });
   }
-  return { version, evidenceSteps: filled, scope: !!data.scope, controls: !!data.controlRefs };
+  return { version, evidenceSteps: filled, scope: !!data.scope, controls: !!data.controlRefs, classification: !!data.classification };
 }
 
 /// 14.11.2026 (processes redesign, stage 3, "Steps.dc.html"): what the one

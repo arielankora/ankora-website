@@ -7,7 +7,9 @@ import { actorFromAuthInfo } from "@/lib/mcp/auth";
 import { PortalUserOnStaffConnectorError, toolFailure, toolJson, toolText } from "@/lib/mcp/errors";
 import { lookupClient, lookupTask, lookupTaskById } from "@/lib/mcp/lookup";
 import { describeResolveFailure, resolveByName } from "@/lib/mcp/resolve";
-import { addTaskComment, createTask, getTaskDetail, removeTaskSteps, updateTask } from "@/lib/app-domain/tasks";
+import { addTaskComment, createTask, getTaskDetail, recordClientApproval, removeTaskSteps, setStepEvidenceLink, setTaskProcess, updateTask } from "@/lib/app-domain/tasks";
+import { APPROVAL_HOWS, readApprovalEvidence } from "@/lib/step-approval";
+import { canSendToAi } from "@/lib/knowledge";
 import { createDecision, listDecisionsForClient } from "@/lib/app-domain/decisions";
 import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
 import { READ_ONLY, TOOL_ANNOTATIONS, WRITES } from "@/lib/mcp/annotations";
@@ -106,6 +108,57 @@ function serializePlan(p: TaskPlanRow, timeZone: string) {
   };
 }
 
+type RunStep = {
+  id: string;
+  requiresApproval: boolean;
+  supervisor: { name: string } | null;
+  approvedBy: { name: string } | null;
+  approvalContactId: string | null;
+  approvalEvidence: unknown;
+  evidenceLink: string | null;
+};
+
+/// What get_task says about a run of a process: the process, whether its
+/// steps take a link to evidence (a client with audit requirements), and
+/// per step who approves it at Ankora or at the client and what was
+/// recorded. A step approved at the client closes only with
+/// set_task_step's clientApproval.
+async function runFacts(
+  actorId: string,
+  task: { processId: string | null; parentId: string | null; client: { auditRequirements: boolean } },
+  steps: RunStep[]
+) {
+  const process = task.processId
+    ? await prisma.process.findUnique({ where: { id: task.processId }, select: { code: true, title: true } })
+    : null;
+  const contactIds = [...new Set(steps.map((s) => s.approvalContactId).filter((x): x is string => !!x))];
+  const contacts = contactIds.length
+    ? await prisma.clientContact.findMany({ where: { id: { in: contactIds } }, select: { id: true, role: true, endedAt: true, sensitivity: true, audience: true, audienceUserIds: true, person: { select: { name: true } } } })
+    : [];
+  // A restricted contact's name stays out of the model, as in get_process.
+  const byId = new Map(contacts.map((c) => [c.id, { name: canSendToAi(c, actorId) ? (c.person.name ?? c.role ?? null) : null, endedAt: c.endedAt }]));
+  const evidenceLinks = !!process && !task.parentId && task.client.auditRequirements;
+  return {
+    runOf: process ? { code: process.code, title: process.title } : null,
+    evidenceLinks,
+    step(s: RunStep) {
+      const contact = s.approvalContactId ? byId.get(s.approvalContactId) : undefined;
+      const recorded = readApprovalEvidence(s.approvalEvidence);
+      return {
+        ...(s.requiresApproval ? { approverAtAnkora: s.supervisor?.name ?? null, approvedBy: s.approvedBy?.name ?? null } : {}),
+        ...(contact
+          ? {
+              approverAtClient: contact.name,
+              ...(contact.endedAt ? { approverLeftOn: contact.endedAt.toISOString().slice(0, 10) } : {}),
+              clientApproval: recorded ? { at: recorded.at, how: recorded.how, link: recorded.link ?? null } : null,
+            }
+          : {}),
+        ...(evidenceLinks ? { evidenceLink: s.evidenceLink } : {}),
+      };
+    },
+  };
+}
+
 /// A refusal the user should hear in the domain's own words. Anything else
 /// goes through toolFailure, which never echoes an unexpected error.
 function planRefusal(err: unknown) {
@@ -138,6 +191,8 @@ export function registerTaskExtraTools(server: McpServer): void {
         const tz = actor.timezone;
         const plans = task.parentId ? null : await getTaskPlans(actor, task.id);
 
+        const run = await runFacts(actor.id, task, subtasks);
+
         const comments = thread
           .filter((e) => e.kind === "comment")
           .slice(0, MAX_COMMENTS)
@@ -169,7 +224,17 @@ export function registerTaskExtraTools(server: McpServer): void {
           waitingOn: task.blockedOn,
           waitingReason: task.blockedReason,
           waitingSince: task.blockedSince ? localDateKey(task.blockedSince, tz) : null,
-          steps: subtasks.map((s) => ({ title: s.title, status: s.status, assignedTo: s.assignedTo?.name ?? null })),
+          // A run of a process (processes redesign, 14.11.2026): which
+          // process, and on each step who approves it and what was written
+          // down. Link a task to a process with set_task_process.
+          runOf: run.runOf,
+          evidenceLinks: run.evidenceLinks,
+          steps: subtasks.map((s) => ({
+            title: s.title,
+            status: s.status,
+            assignedTo: s.assignedTo?.name ?? null,
+            ...run.step(s),
+          })),
           stepsDone: subtasks.filter((s) => s.status === "DONE").length,
           stepsTotal: subtasks.filter((s) => s.status !== "ARCHIVED").length,
           comments,
@@ -480,15 +545,27 @@ export function registerTaskExtraTools(server: McpServer): void {
     {
       title: "Tick or untick a step",
       description:
-        "Marks one step of a task as done, or reopens it. Identify the task by its title and the step by its title within that task - step titles repeat across tasks, so the task is always required.",
+        "Marks one step of a task as done, or reopens it. Identify the task by its title and the step by its title within that task - step titles repeat across tasks, so the task is always required. On a run of a process, get_task shows each step's approver. A step whose approver is at the client (approverAtClient) is closed only with clientApproval: when and how that person approved, which the user tells you; never invent it. On a run whose evidenceLinks is true, evidenceLink keeps a link to what shows the step was done (an https link; null clears it), with or without done.",
       inputSchema: z.object({
         ...TASK_ARGS,
         step: z.string().describe("The step's title, or enough of it to identify it within this task."),
-        done: z.boolean().describe("true to mark it done, false to reopen it."),
+        done: z.boolean().optional().describe("true to mark it done, false to reopen it. Leave it out to only set evidenceLink."),
+        clientApproval: z
+          .object({
+            at: z.string().describe("The day the client's approver approved, YYYY-MM-DD, not in the future."),
+            how: z.enum(APPROVAL_HOWS).describe("How they approved."),
+            link: z.string().optional().describe("A link to the approval (the mail, the message), https."),
+          })
+          .optional()
+          .describe("Only for a step whose approver is at the client, with done true. Closes the step."),
+        evidenceLink: z.string().nullable().optional().describe("A link to the step's evidence, for a run whose evidenceLinks is true. null clears it."),
       }),
       annotations: { ...WRITES, idempotentHint: true },
     },
-    async (args: { task?: string; taskId?: string; client?: string; step: string; done: boolean }, ctx: ServerContext) => {
+    async (
+      args: { task?: string; taskId?: string; client?: string; step: string; done?: boolean; clientApproval?: { at: string; how: string; link?: string }; evidenceLink?: string | null },
+      ctx: ServerContext
+    ) => {
       try {
         const actor = actorOf(ctx);
         const found = await findTask(actor, args);
@@ -504,19 +581,71 @@ export function registerTaskExtraTools(server: McpServer): void {
         const step = resolveByName(args.step, candidates);
         if (step.status !== "ok") return toolText(describeResolveFailure(step, "step", candidates));
 
-        const updated = await updateTask(actor, step.match.id, { status: args.done ? "DONE" : "OPEN" });
-        const doneCount = detail.subtasks.filter((s) =>
-          s.id === step.match.id ? args.done : s.status === "DONE"
-        ).length;
+        if (args.done === undefined && args.evidenceLink === undefined) return toolText("Say done (true or false), evidenceLink, or both.");
+        if (args.clientApproval && args.done !== true) return toolText("clientApproval closes the step: send it with done true.");
+        if (args.evidenceLink !== undefined) await setStepEvidenceLink(actor, step.match.id, args.evidenceLink);
+        const current = detail.subtasks.find((s) => s.id === step.match.id);
+        let status = current?.status ?? "OPEN";
+        if (args.clientApproval) {
+          await recordClientApproval(actor, step.match.id, args.clientApproval);
+          status = "DONE";
+        } else if (args.done !== undefined) {
+          status = (await updateTask(actor, step.match.id, { status: args.done ? "DONE" : "OPEN" })).status;
+        }
+        const doneCount = detail.subtasks.filter((s) => (s.id === step.match.id ? status === "DONE" : s.status === "DONE")).length;
         return toolJson({
           task: found.value.name,
           step: step.match.name,
-          status: updated.status,
+          status,
+          ...(args.evidenceLink !== undefined ? { evidenceLink: args.evidenceLink?.trim() || null } : {}),
           stepsDone: doneCount,
           stepsTotal: candidates.length,
         });
       } catch (err) {
         console.error("[mcp] set_task_step failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "set_task_process",
+    {
+      title: "Mark a task as a run of a process",
+      description:
+        "Marks an existing task as a run of one of its client's processes (\"this is a run of P3\"), or clears it with process null. The run then counts in the process's runs. When a task the user is working on plainly is one of the client's processes (list_processes), suggest the link and ask before calling. A step of a task, and a work guide, cannot be a run.",
+      inputSchema: z.object({
+        ...TASK_ARGS,
+        process: z.string().nullable().describe('The process code ("P3") or its title, in the task\'s client. null clears the link.'),
+      }),
+      annotations: TOOL_ANNOTATIONS.set_task_process,
+    },
+    async (args: { task?: string; taskId?: string; client?: string; process: string | null }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const found = await findTask(actor, args);
+        if (!found.ok) return toolText(found.message);
+        const task = await prisma.task.findUnique({ where: { id: found.value.id }, select: { clientId: true } });
+        if (!task) return toolText("That task is not available to this user.");
+        let processId: string | null = null;
+        let shown: { code: string; title: string } | null = null;
+        if (args.process !== null) {
+          const processes = await prisma.process.findMany({
+            where: { clientId: task.clientId, deletedAt: null, kind: "PROCESS", status: { not: "RETIRED" } },
+            select: { id: true, code: true, title: true },
+          });
+          const byCode = processes.find((p) => p.code.toLowerCase() === args.process!.trim().toLowerCase());
+          const candidates = processes.map((p) => ({ id: p.id, name: `${p.code} ${p.title}` }));
+          const pick = byCode ? { status: "ok" as const, match: { id: byCode.id, name: `${byCode.code} ${byCode.title}` } } : resolveByName(args.process, candidates);
+          if (pick.status !== "ok") return toolText(describeResolveFailure(pick, "process", candidates));
+          processId = pick.match.id;
+          const p = processes.find((x) => x.id === processId)!;
+          shown = { code: p.code, title: p.title };
+        }
+        await setTaskProcess(actor, found.value.id, processId);
+        return toolJson({ task: found.value.name, runOf: shown, url: taskUrl(appBaseUrl(), found.value.id) });
+      } catch (err) {
+        console.error("[mcp] set_task_process failed", err);
         return toolFailure(err);
       }
     }

@@ -65,6 +65,7 @@ export const TOOL_ANNOTATIONS = {
   add_task_steps: WRITES,
   // Ticking a step that is already ticked leaves it ticked.
   set_task_step: { ...WRITES, idempotentHint: true },
+  set_task_process: { ...WRITES, idempotentHint: true },
   add_task_comment: WRITES,
   create_decision: WRITES,
   // P8 (3.11.2026): answers "is this a new vendor?". The answer opens a
@@ -134,6 +135,12 @@ export const TOOL_ANNOTATIONS = {
   // 14.11.2026 (stage 3): a draft of steps for a process with none yet.
   // A second call is refused once the process has steps.
   save_procedure_draft: WRITES,
+  set_process_rhythm: WRITES,
+  create_process: WRITES,
+  update_process: WRITES,
+  resolve_process_lesson: WRITES,
+  mark_process_reviewed: WRITES,
+  set_contact_ended: WRITES,
   // 14.11.2026 (stage 4, "להכין לביקורת"): a draft with how each step is
   // known to be done, and scope and controls where the process has none.
   save_procedure_audit_draft: WRITES,
@@ -195,6 +202,7 @@ export const WRITE_TOOLS = [
   "update_task",
   "add_task_steps",
   "set_task_step",
+  "set_task_process",
   "add_task_comment",
   "create_decision",
   "replace_task_steps",
@@ -209,6 +217,12 @@ export const WRITE_TOOLS = [
   "record_process_check",
   "save_procedure_translation",
   "save_procedure_draft",
+  "set_process_rhythm",
+  "create_process",
+  "update_process",
+  "resolve_process_lesson",
+  "mark_process_reviewed",
+  "set_contact_ended",
   "save_procedure_audit_draft",
   "record_run_lesson",
   "record_stranger_test",

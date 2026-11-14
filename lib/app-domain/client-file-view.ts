@@ -265,6 +265,9 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
           c.entityId ? entityName.get(c.entityId) : null,
           c.isPrimary ? "ראשי" : null,
           c.isDecisionMaker ? "מקבל החלטות" : null,
+          // Spec 4.6: left, or stopped being in the role. Not an approver
+          // any more.
+          c.endedAt ? `עזב ב-${c.endedAt.toISOString().slice(0, 10)}` : null,
           ai ? null : [...c.person.emails, ...c.person.phones].join(", ") || null,
           c.context,
         ],
