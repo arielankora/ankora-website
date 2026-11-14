@@ -29,7 +29,7 @@ function useRevealState(margin: string) {
     if (reduceMotion || !ref.current) return;
     if (ref.current.getBoundingClientRect().top > window.innerHeight) setDeferred(true);
     // Measured once, on mount: an element that started on screen never hides.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   return { ref, reduceMotion, hidden: deferred && !inView };

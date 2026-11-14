@@ -41,7 +41,7 @@ function sourceFiles(dir: string, acc: string[] = []): string[] {
 
 describe("tailwind colour tokens", () => {
   it("every colour utility in the source names a token that exists", () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const colors = (config as any).theme?.extend?.colors ?? {};
     const known = new Set(tokenNames(colors));
     // Tailwind's own palette and keywords, which the config extends rather than replaces.
