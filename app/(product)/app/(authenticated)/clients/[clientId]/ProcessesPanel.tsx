@@ -473,7 +473,7 @@ export function ProcessForm({
       <FormGroup
         title={t("form.groupWho")}
         open={gap("approvals")}
-        filled={filled(e?.backupOwnerId, e?.executorText, e?.approverUserId, e?.approverContactId, e?.approverText)}
+        filled={filled(e?.backupOwnerId, e?.executorText)}
         more={
           <>
             <div className="grid gap-3.5 lg:grid-cols-2">
@@ -491,29 +491,9 @@ export function ProcessForm({
                 <input name="executorText" defaultValue={e?.executorText ?? ""} placeholder={t("form.executorTextPlaceholder")} className={INPUT} />
               </Field>
             </div>
-            <div>
-              <span className={LABEL}>{t("form.approver")}</span>
-              <div className="grid grid-cols-2 gap-3">
-                <select name="approverUserId" defaultValue={e?.approverUserId ?? ""} aria-label={t("form.approverAnkoraAria")} className={INPUT}>
-                  <option value="">{t("form.noneAtAnkora")}</option>
-                  {staff.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {t("form.approverOption", { name: s.name })}
-                    </option>
-                  ))}
-                </select>
-                <select name="approverContactId" defaultValue={e?.approverContactId ?? ""} aria-label={t("form.approverClientAria")} className={INPUT}>
-                  <option value="">{t("form.noneAtClient")}</option>
-                  {contacts.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <p className="mt-1 text-[11px] text-app-text-tertiary">{t("form.approverHelp")}</p>
-              <input name="approverText" defaultValue={e?.approverText ?? ""} placeholder={t("form.approverTextPlaceholder")} className={INPUT} />
-            </div>
+            {/* 14.11.2026 (processes redesign, stage 5): the approver is each
+                step's, set in the steps editor. The process's own stays in the
+                data, read as the fallback for a step that names none. */}
           </>
         }
       >

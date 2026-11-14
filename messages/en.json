@@ -3887,11 +3887,11 @@
         "new": "+ New process",
         "newTitle": "New process",
         "summary": {
-          "total": "{count} processes",
+          "total": "{count, plural, one {# process} other {# processes}}",
           "running": "{count} running",
-          "attention": "{count} need attention",
-          "drafts": "{count} drafts",
-          "guides": "{count} work instructions"
+          "attention": "{count, plural, one {# needs attention} other {# need attention}}",
+          "drafts": "{count, plural, one {# draft} other {# drafts}}",
+          "guides": "{count, plural, one {# work instruction} other {# work instructions}}"
         },
         "attention": "Needs attention",
         "toProcess": "Open",
@@ -3969,7 +3969,7 @@
         "opensOnDay": "The run opens on the day",
         "who": "Who",
         "edit": "Edit",
-        "whoTitle": "Who does it and who approves",
+        "whoTitle": "Who does it",
         "owner": "Owner",
         "backup": "Backup",
         "executor": "Does it",

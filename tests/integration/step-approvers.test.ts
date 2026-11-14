@@ -10,6 +10,7 @@ import { addClientContact, updateClientContact } from "@/lib/app-domain/client-c
 
 import { recordClientApproval, updateTask } from "@/lib/app-domain/tasks";
 import { readSteps } from "@/lib/process-rules";
+import { mcpGetProcess } from "@/lib/app-domain/mcp-processes";
 import { stepsNeedingApprover } from "@/lib/step-approval";
 
 // An approver for each step (14.11.2026, processes redesign, stage 3, spec
@@ -85,6 +86,16 @@ describe("step approvers", () => {
     expect(done.status).toBe("DONE");
     expect(done.approvalEvidence).toMatchObject({ at: "2026-11-12", how: "EMAIL", link: "https://mail.example/1", byUserId: hadas.id });
     expect(await prisma.auditEvent.count({ where: { entityId: step.id, action: "task.client_approval" } })).toBe(1);
+  });
+
+  it("tells Claude each step's approver", async () => {
+    const { client, hadas, guy, p } = await setup();
+    const detail = await mcpGetProcess(hadas, client.id, p.id);
+    expect(detail?.procedure?.steps.map((s: { approver: unknown; evidence: unknown }) => [s.approver, s.evidence])).toEqual([
+      [null, null],
+      [{ atAnkora: guy.name }, null],
+      [{ atClient: "דנה כהן" }, "מייל מדנה"],
+    ]);
   });
 
   it("marks the steps a contact who left approves", async () => {

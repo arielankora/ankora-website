@@ -125,7 +125,8 @@ async function parseProcess(f: FormData, selfId?: string): Promise<{ error?: str
 /// "who" on the process page leaves the rest of the process as it was.
 const PART_FIELDS: Record<string, string[]> = {
   what: ["title", "purpose"],
-  who: ["ownerId", "backupOwnerId", "executorText", "executorUserId", "executorContactId", "approverText", "approverUserId", "approverContactId"],
+  // 14.11.2026 (stage 5): no approver here; it is each step's.
+  who: ["ownerId", "backupOwnerId", "executorText", "executorUserId", "executorContactId"],
   work: ["slaText", "slaBusinessDays", "requiredSystemIds", "requiredSystemPermissions", "externalPartyContactIds", "externalPartyText", "approvalPolicyIds", "approvalText", "exceptionPlaybook"],
   knowledge: ["transitionStatus", "knowledgeStatus", "toResolve", "entityId", "sources", "manualConfirm"],
   document: ["scope", "definitions", "controlRefs", "classification", "relatedDocs", "reviewEveryDays"],
