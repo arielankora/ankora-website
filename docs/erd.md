@@ -1467,6 +1467,7 @@ erDiagram
         string ownerUserId FK
         string excludedViewerIds "string[], never see this number"
         boolean excludeAllViewers "nobody but the owner sees this number, also people added later"
+        boolean extractionAllowed "automatic extraction reads it (14.11.2026)"
         boolean storeEnabled
         datetime storeStartedAt "nullable"
         datetime createdAt

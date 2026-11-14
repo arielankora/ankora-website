@@ -361,3 +361,28 @@ export async function keepAllNewChatsAction(_prev: SetupState | undefined, formD
   refresh();
   return { ok: w("keptAll", { count }) };
 }
+
+/// 14.11.2026: whether the automatic extraction (Ankora Ops) reads this
+/// number's conversations for the client files, even when people are kept
+/// out of it (lib/comms/extraction-account.ts). Managers only.
+export async function setExtractionAllowedAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const w = await words();
+  const user = await requireUser();
+  if (!canManageClients(user.role)) return { error: w("forbidden") };
+  const channel = await prisma.commsChannel.findUnique({ where: { id: String(formData.get("channelId") || "") } });
+  if (!channel) return { error: w("channelNotFound") };
+  const extractionAllowed = formData.get("extractionAllowed") === "on";
+  if (extractionAllowed !== channel.extractionAllowed) {
+    await prisma.commsChannel.update({ where: { id: channel.id }, data: { extractionAllowed } });
+    await recordAudit({
+      actorId: user.id,
+      action: "comms_channel.extraction_updated",
+      entityType: "CommsChannel",
+      entityId: channel.id,
+      before: { extractionAllowed: channel.extractionAllowed },
+      after: { extractionAllowed },
+    });
+  }
+  refresh();
+  return { ok: extractionAllowed ? w("extractionOn") : w("extractionOff") };
+}
