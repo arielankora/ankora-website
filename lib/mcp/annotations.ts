@@ -119,6 +119,9 @@ export const TOOL_ANNOTATIONS = {
   // The guidance, the clients' domains and what was already proposed, for
   // the daily extraction (spec 5.1). Reads only.
   get_extraction_brief: READ_ONLY,
+  // 14.11.2026: a new version of the guide, as a draft an admin approves
+  // on the screen. Each call adds a version.
+  propose_extraction_guide_version: WRITES,
   // A client's processes, one in full, and the rules that bind them (spec
   // 8). Assembled on each call; nothing is written.
   list_processes: READ_ONLY,
@@ -218,6 +221,7 @@ export const WRITE_TOOLS = [
   "start_document_upload",
   "set_document_kind",
   "propose_knowledge",
+  "propose_extraction_guide_version",
   "set_client_subprocessor_notice",
   "start_process",
   "record_process_check",

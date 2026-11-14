@@ -77,6 +77,7 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   list_my_routines: "routines of a marked client are left out",
   record_process_check: "lookupClient",
   get_extraction_brief: "a marked client is listed by name and domains only, with the instruction to skip its meetings; its recordings are left out",
+  propose_extraction_guide_version: "Ankora's own extraction guide, no client data; the guide it reads back is the same for every client",
 
   // lib/mcp/document-tools.ts
   list_documents: "findTask or lookupClient; listDocumentsForMcp leaves out marked documents",

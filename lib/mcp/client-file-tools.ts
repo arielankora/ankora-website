@@ -3,7 +3,7 @@ import { readClientCall, readClientConversation } from "@/lib/comms/client-comms
 import { whatsappRefId } from "@/lib/comms/extraction-refs";
 import { deniedText } from "@/lib/mcp/comms-tools";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
-import { batchUrl, fileItemUrl, proposalUrl } from "@/lib/approval-links";
+import { appUrl, batchUrl, fileItemUrl, proposalUrl } from "@/lib/approval-links";
 import { aiExcludedClientIds, isDocumentAiExcluded, isTaskAiExcluded } from "@/lib/app-domain/ai-exclusion-db";
 import { AI_EXCLUDED_TOOL_MESSAGE } from "@/lib/ai-exclusion";
 import { z } from "zod";
@@ -21,6 +21,9 @@ import { proposeKnowledge, type ProposalItemInput } from "@/lib/app-domain/knowl
 import { proposeAwaitingAssignment } from "@/lib/app-domain/batch-assignment";
 import { lookupContact } from "@/lib/app-domain/client-contacts";
 import { extractionBrief } from "@/lib/app-domain/extraction-brief";
+import { currentGuide, proposeGuide } from "@/lib/app-domain/extraction-guide";
+import { DEFAULT_EXTRACTION_GUIDE_LINES, guideLines } from "@/lib/extract-prompt";
+import { buildGuideRules, oneLine, sameRules } from "@/lib/extraction-guide-rules";
 import { SameDayRunError, startProcessRun } from "@/lib/app-domain/process-runs";
 import { listMyRoutines, recordProcessCheck } from "@/lib/app-domain/process-checks";
 import { mcpGetProcess, mcpListPolicies, mcpListProcesses } from "@/lib/app-domain/mcp-processes";
@@ -58,6 +61,9 @@ const MAX_PARTICIPANTS = 50;
 const MAX_ALSO_SOURCES = 20;
 const MAX_PROCEDURE_SYSTEMS = 50;
 const MAX_PROCEDURE_STEPS = 200;
+/// The guide has about a dozen rules; a version is capped at 20000
+/// characters by proposeGuide.
+const MAX_GUIDE_RULES = 100;
 
 /// A process of one client, by its code ("P3") or its title, the way the
 /// user says it. One match or a sentence saying why not.
@@ -1183,6 +1189,63 @@ export function registerClientFileTools(server: McpServer): void {
         return toolJson(await extractionBrief(actor));
       } catch (err) {
         console.error("[mcp] get_extraction_brief failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  // 14.11.2026: a new version of the extraction guide, proposed from
+  // Claude. The same proposeGuide the screen's "הצעת גרסה" calls, so every
+  // rule of the domain holds (not empty, not too long, no secret, anyone
+  // on the staff proposes). Approving stays with an admin: the guide is
+  // what every extraction follows from then on, and that is a person's
+  // decision.
+  server.registerTool(
+    "propose_extraction_guide_version",
+    {
+      title: "Propose a version of the extraction guide",
+      description: [
+        "Proposes a new version of Ankora's extraction guide (the rules get_extraction_brief returns under `guide`) as a pending draft, exactly as \"הצעת גרסה\" on the extraction guide screen does. Pass either `rules`, the whole new list, or `addRules`, rules to add to the version in use, with `afterRule` for where (the rule number to add after, counted from 1; 0 puts them first; omitted, at the end). Always a one-line `reason`: what changes and why.",
+        "This tool never approves. Nothing changes in what extractions follow until an Ankora admin approves the draft: the guide is what every extraction follows from then on, and changing it needs a person. Give the user the `url` and say it waits for an admin's approval.",
+        "Returns the draft's `draftId`, `version`, the full `rules` as proposed and `url` (the extraction guide screen, where drafts are listed). `otherDrafts` lists drafts already waiting; approving one older than another that was approved first is refused, so mention them to the user. Before calling, show the user the rules you will propose and call only after they said so.",
+      ].join(" "),
+      inputSchema: z.object({
+        rules: z.array(z.string().max(2000)).min(1).max(MAX_GUIDE_RULES).optional().describe("The whole new list of rules, one rule per item. Use this or addRules."),
+        addRules: z.array(z.string().max(2000)).min(1).max(MAX_GUIDE_RULES).optional().describe("Rules to add to the version in use, one per item. Use this or rules."),
+        afterRule: z.number().int().min(0).optional().describe("With addRules: the rule number (from 1, as get_extraction_brief lists them) to add after; 0 adds them first. Omitted: at the end."),
+        reason: z.string().min(1).max(500).describe("What changes and why, in one line. Shown with the draft to whoever approves it."),
+      }),
+      annotations: TOOL_ANNOTATIONS.propose_extraction_guide_version,
+    },
+    async (args: { rules?: string[]; addRules?: string[]; afterRule?: number; reason: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const reason = oneLine(args.reason);
+        if (!reason) return toolText("`reason` is empty. Ask the user what the change is for, in a line. Nothing was proposed.");
+        const inUse = await currentGuide();
+        const current = inUse ? guideLines(inUse.body) : DEFAULT_EXTRACTION_GUIDE_LINES;
+        const built = buildGuideRules(current, args);
+        if (!built.ok) return toolText(built.message);
+        if (sameRules(built.rules, current)) return toolText("These rules are the version in use, word for word. Nothing was proposed.");
+        const row = await proposeGuide(actor, { body: built.rules.join("\n"), note: reason });
+        const others = await prisma.extractionGuide.findMany({
+          where: { state: "DRAFT", id: { not: row.id }, version: { gt: inUse?.version ?? 0 } },
+          orderBy: { version: "asc" },
+          select: { version: true, note: true },
+        });
+        return toolJson({
+          proposed: true,
+          state: "pending: waits for an Ankora admin to approve it",
+          draftId: row.id,
+          version: row.version,
+          basedOnVersion: inUse?.version ?? null,
+          reason: row.note,
+          rules: guideLines(row.body),
+          otherDrafts: others.map((o) => ({ version: o.version, reason: o.note })),
+          url: appUrl(appBaseUrl(), "/app/extraction-guide"),
+        });
+      } catch (err) {
+        console.error("[mcp] propose_extraction_guide_version failed", err);
         return toolFailure(err);
       }
     }
