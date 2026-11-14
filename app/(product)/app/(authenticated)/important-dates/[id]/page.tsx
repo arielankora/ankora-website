@@ -112,6 +112,17 @@ export default async function ImportantDateDetailPage(props: {
                 <bdi>{date.client.name}</bdi> · {t(`category.${date.category}`)} · <bdi>{date.type}</bdi>
               </p>
             </div>
+            {/* Spec 4.2 (14.11.2026): a date a process's rhythm made is
+                edited from the process only, so the rhythm's sentence and
+                its dates never disagree. */}
+            {date.processStartId && date.processId ? (
+              <p className="flex flex-wrap items-center gap-2 text-sm text-app-text-secondary" data-testid="date-from-rhythm">
+                {t("detail.fromRhythm")}
+                <a href={`/app/clients/${date.clientId}/processes/${date.processId}?rhythm=open`} className="font-medium text-app-text-accent hover:underline">
+                  {t("detail.editRhythm")}
+                </a>
+              </p>
+            ) : (
             <Drawer triggerLabel={t("detail.edit")} title={t("detail.editTitle")}>
               {/* Mapped, not passed whole - same reason as the list screen:
                   this is a client component, and listUsers() rows carry
@@ -160,6 +171,7 @@ export default async function ImportantDateDetailPage(props: {
                 }}
               />
             </Drawer>
+            )}
           </div>
         </div>
 

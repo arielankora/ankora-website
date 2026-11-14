@@ -11,7 +11,9 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { processUrl } from "@/lib/approval-links";
 import { prisma } from "@/lib/prisma";
 import { canSendToAi } from "@/lib/knowledge";
-import { addProcess, setProcessKind, updateProcess } from "@/lib/app-domain/processes";
+import { addProcess, setProcessFieldNotApplicable, setProcessKind, updateProcess } from "@/lib/app-domain/processes";
+import { updateClient } from "@/lib/app-domain/clients";
+import { NOT_APPLICABLE_FIELDS } from "@/lib/process-rules";
 import { saveProcessRhythm } from "@/lib/app-domain/process-rhythm";
 import { resolveLesson } from "@/lib/app-domain/process-lessons";
 import { markProcessReviewed } from "@/lib/app-domain/process-review";
@@ -228,11 +230,13 @@ export function registerProcessTools(server: McpServer): void {
         client: CLIENT,
         process: PROCESS,
         kind: z.enum(["PROCESS", "GUIDE"]).optional().describe("Make it a work guide (GUIDE) or a process (PROCESS)."),
+        notApplicable: z.array(z.enum(NOT_APPLICABLE_FIELDS)).max(5).optional().describe("Documentation fields that do not apply to this process (\"לא רלוונטי\"): they stop counting as missing."),
+        applicableAgain: z.array(z.enum(NOT_APPLICABLE_FIELDS)).max(5).optional().describe("Fields marked not relevant that do apply after all."),
         ...FIELDS,
       }),
       annotations: TOOL_ANNOTATIONS.update_process,
     },
-    async (args: ProcessFields & { client: string; process: string; kind?: "PROCESS" | "GUIDE" }, ctx: ServerContext) => {
+    async (args: ProcessFields & { client: string; process: string; kind?: "PROCESS" | "GUIDE"; notApplicable?: string[]; applicableAgain?: string[] }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
         const client = await lookupClient(actor, args.client);
@@ -242,10 +246,16 @@ export function registerProcessTools(server: McpServer): void {
         const input = await processInput(actor, client.value.id, args);
         if (!input.ok) return toolText(input.message);
         const changed = Object.keys(input.value);
-        if (!changed.length && !args.kind) return toolText("Nothing to change: send at least one field.");
+        const marks = [...(args.notApplicable ?? []).map((f) => [f, true] as const), ...(args.applicableAgain ?? []).map((f) => [f, false] as const)];
+        if (!changed.length && !args.kind && !marks.length) return toolText("Nothing to change: send at least one field.");
         if (changed.length) await updateProcess(actor, process.id, input.value);
         if (args.kind) await setProcessKind(actor, process.id, args.kind);
-        return toolJson({ saved: true, changed: [...changed, ...(args.kind ? ["kind"] : [])], url: processUrl(appBaseUrl(), client.value.id, process.id) });
+        for (const [field, na] of marks) await setProcessFieldNotApplicable(actor, process.id, field, na);
+        return toolJson({
+          saved: true,
+          changed: [...changed, ...(args.kind ? ["kind"] : []), ...(marks.length ? ["notApplicable"] : [])],
+          url: processUrl(appBaseUrl(), client.value.id, process.id),
+        });
       } catch (err) {
         console.error("[mcp] update_process failed", err);
         return toolFailure(err);
@@ -305,6 +315,29 @@ export function registerProcessTools(server: McpServer): void {
         return toolJson({ saved: true, url: processUrl(appBaseUrl(), client.value.id, process.id) });
       } catch (err) {
         console.error("[mcp] mark_process_reviewed failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "set_client_audit_requirements",
+    {
+      title: "Turn a client's audit requirements on or off",
+      description:
+        "Turns on (or off) \"דרישות ביקורת\" for a client (SOC 2, ISO): each procedure then gets compliance fields, an audit readiness list, a link to evidence on each run step, and the preparation for an audit (save_procedure_audit_draft). A manager's setting, as on the client's settings. Only after the user asked for it.",
+      inputSchema: z.object({ client: CLIENT, on: z.boolean() }),
+      annotations: TOOL_ANNOTATIONS.set_client_audit_requirements,
+    },
+    async (args: { client: string; on: boolean }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        await updateClient(actor, client.value.id, { auditRequirements: args.on });
+        return toolJson({ saved: true, client: client.value.name, auditRequirements: args.on });
+      } catch (err) {
+        console.error("[mcp] set_client_audit_requirements failed", err);
         return toolFailure(err);
       }
     }

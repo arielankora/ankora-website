@@ -42,7 +42,7 @@ const PAYLOAD_NOTES: Record<ProposalTargetLike, string> = {
   ENTITY: "A legal entity of the client. parentName: an entity already in the file.",
   NARRATIVE: "One of the file's free texts. body is the WHOLE new text and replaces the current one; cite sources inside it as [S1 08:13]. No status.",
   PROCESS:
-    "Something that recurs (a one-time project is a TASK). Enters as a draft; a manager approves the procedure. notApplicableFields only when it is clear a documentation field does not apply. steps when the procedure was described.",
+    "Something that recurs (a one-time project is a TASK). Enters as a draft; a manager approves the procedure. notApplicableFields only when it is clear a documentation field does not apply. steps when the procedure was described. triggerKinds SCHEDULED needs its date in the same batch: a DATE item with processName set to this process's title, or the process enters scheduled with no date; EXTERNAL is a process that runs by itself outside the app (a scheduled Claude task), with where and when in triggerText. Once approved, set_process_rhythm sets the rhythm exactly.",
   DOMAIN: "An email domain of the client (CLIENT) or of a supplier (PARTNER, with organizationName). No status.",
   TASK:
     "Something someone has to DO (a document to send, a call to set up), as an action, never a fact or a question. Without dueDate it is due in 3 business days. Read by everyone on the client: nothing sensitive. Never enters the file. No status, ownerName or clientVisible.",

@@ -24,7 +24,7 @@ import {
   setProcessKindAction,
   setProcessStatusAction,
 } from "../process-actions";
-import { CheckLines, Lessons, ProcedureEditor, ProcessForm, StartRunForm, StrangerBlock, type FormOptions, type PanelProcess } from "./ProcessesPanel";
+import { CheckLines, Lessons, ProcessForm, StartRunForm, type FormOptions, type PanelProcess } from "./ProcessesPanel";
 import { ProcessCheckForm } from "./ProcessCheckForm";
 import { RhythmEditor } from "./RhythmEditor";
 import { DocumentTab } from "./DocumentTab";
@@ -47,7 +47,6 @@ export function ProcessPage({
   process: p,
   form,
   upcoming,
-  stepsLead,
   canApprove,
   openRhythm,
   userId,
@@ -64,7 +63,6 @@ export function ProcessPage({
   process: PanelProcess;
   form: FormOptions;
   upcoming: Upcoming[];
-  stepsLead: number;
   canApprove: boolean;
   openRhythm: boolean;
 }) {
@@ -84,9 +82,27 @@ export function ProcessPage({
     window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
   }, [openRhythm]);
   const guide = p.kind === "GUIDE";
+  const canRunNow = !guide && p.status === "ACTIVE" && p.triggerKinds.some((k) => k !== "CONTINUOUS" && k !== "EXTERNAL");
+  // "רישום בדיקה" for an ongoing process: a button, or a line in ⋯.
+  const checkDialog = (as: "secondary" | "menu") => (
+    <CenterDialog
+      triggerLabel={t("recordCheck")}
+      {...(as === "menu" ? { triggerClassName: "!text-sm !font-normal !text-app-text-primary" } : { triggerVariant: "secondary" as const })}
+      eyebrow={`${p.code} ${p.title}`}
+      title={t("recordCheck")}
+    >
+      <div className="px-5 py-6 sm:px-8">
+        <ProcessCheckForm clientId={clientId} processId={p.id} checkText={p.checkText} steps={steps.map((s) => s.title)} />
+      </div>
+    </CenterDialog>
+  );
   const staffName = new Map(form.staff.map((s) => [s.id, s.name]));
   const contactName = new Map(form.contacts.map((c) => [c.id, c.name]));
   const systemName = new Map(form.systems.map((s) => [s.id, s.name]));
+  // The board's "הושלמה בזמן" and "באיחור של יום": a run done on its day,
+  // or how many days after it.
+  const runOutcome = (r: { status: string; lateDays?: number | null }) =>
+    r.status === "DONE" && typeof r.lateDays === "number" ? (r.lateDays > 0 ? t("runLate", { days: r.lateDays }) : t("runOnTime")) : r.status === "DONE" || r.status === "ARCHIVED" ? t("runDone") : t("runOpenShort");
   const day = (key: string) => format.dateTime(new Date(`${key.slice(0, 10)}T12:00:00Z`), { weekday: "long", day: "numeric", month: "numeric" });
   const short = (key: string) => format.dateTime(new Date(`${key.slice(0, 10)}T12:00:00Z`), { day: "numeric", month: "numeric" });
 
@@ -169,25 +185,22 @@ export function ProcessPage({
             ))}
           </div>
           <div className="flex items-center gap-2.5">
-            {!guide && p.status === "ACTIVE" && p.triggerKinds.some((k) => k !== "CONTINUOUS" && k !== "EXTERNAL") && (
+            {canRunNow && (
               <CenterDialog triggerLabel={t("runNow")} triggerVariant="secondary" eyebrow={`${p.code} ${p.title}`} title={t("runNowTitle")}>
                 <div className="px-5 py-6 sm:px-8">
                   <StartRunForm clientId={clientId} process={p} />
                 </div>
               </CenterDialog>
             )}
-            {!guide && p.routine && (
-              <CenterDialog triggerLabel={t("recordCheck")} triggerVariant="secondary" eyebrow={`${p.code} ${p.title}`} title={t("recordCheck")}>
-                <div className="px-5 py-6 sm:px-8">
-                  <ProcessCheckForm clientId={clientId} processId={p.id} checkText={p.checkText} steps={steps.map((s) => s.title)} />
-                </div>
-              </CenterDialog>
-            )}
+            {/* Stage 2: at most two actions in sight. With "הרצה עכשיו" there,
+                "רישום בדיקה" moves into ⋯. */}
+            {!guide && p.routine && !canRunNow && checkDialog("secondary")}
             <details className="relative" data-testid="process-page-more">
               <summary aria-label={t("more")} className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-[10px] border border-app-border-strong bg-white text-xl text-app-text-primary">
                 ⋯
               </summary>
               <div className="absolute end-0 z-20 mt-1 flex min-w-[14rem] flex-col items-start gap-2.5 rounded-xl border border-app-border bg-white p-3 text-sm shadow-lg">
+                {!guide && p.routine && canRunNow && checkDialog("menu")}
                 <CenterDialog triggerLabel={t("menu.editWhat")} triggerClassName="!text-sm !font-normal !text-app-text-primary" eyebrow={`${p.code} ${p.title}`} title={t("menu.editWhat")}>
                   <div className="px-5 py-6 sm:px-8">
                     <ProcessForm clientId={clientId} existing={p} {...form} only={["what"]} />
@@ -266,7 +279,9 @@ export function ProcessPage({
                   ))}
                 </div>
               )}
-              {upcoming.length > 0 && <p className="text-sm text-app-text-secondary">{stepsLead > 0 ? t("opensBefore", { days: stepsLead }) : t("opensOnDay")}</p>}
+              {/* 14.11.2026: the day the next run opens, as the daily job opens it
+                  (runOpensOn), not a count of the steps' lead alone. */}
+              {upcoming.length > 0 && <p className="text-sm text-app-text-secondary">{upcoming[0].opens !== upcoming[0].date ? t("nextOpensOn", { date: day(upcoming[0].opens) }) : t("opensOnDay")}</p>}
             </section>
           )}
           <section className={card} data-testid="process-who">
@@ -303,9 +318,23 @@ export function ProcessPage({
                   </div>
                 )}
                 {openRun.waitingOn && <p className="text-base font-bold text-app-text-primary">{t("waitingOn", { step: openRun.waitingOn })}</p>}
-                <Link href={`/app/tasks/${openRun.id}`} className="text-sm font-bold text-app-warning hover:underline">
-                  {t("toRun")}
-                </Link>
+                {/* Spec 5.2: who it waits on, and a reminder to a client's
+                    approver, sent from the run's step. */}
+                {openRun.waitingFor && (
+                  <p className="text-sm text-app-text-primary" data-testid="open-run-waiting-for">
+                    {openRun.waitingClient ? t("waitingForApproval", { name: openRun.waitingFor }) : t("waitingFor", { name: openRun.waitingFor })}
+                  </p>
+                )}
+                <span className="flex flex-wrap gap-4">
+                  {openRun.waitingClient && openRun.waitingFor && (
+                    <Link href={`/app/tasks/${openRun.id}`} className="text-sm font-bold text-app-warning hover:underline" data-testid="open-run-remind">
+                      {t("remindTo", { name: openRun.waitingFor })}
+                    </Link>
+                  )}
+                  <Link href={`/app/tasks/${openRun.id}`} className="text-sm font-bold text-app-warning hover:underline">
+                    {t("toRun")}
+                  </Link>
+                </span>
               </section>
             ) : (
               <section className={card}>
@@ -400,7 +429,7 @@ export function ProcessPage({
                   {p.runs.slice(0, 3).map((r) => (
                     <Link key={r.id} href={`/app/tasks/${r.id}`} className="flex justify-between gap-3 text-[15px] hover:underline">
                       <span>{r.dueDate ? short(r.dueDate) : r.title}</span>
-                      <span className={r.status === "DONE" ? "font-bold text-app-success" : "font-bold text-app-warning"}>{r.status === "DONE" || r.status === "ARCHIVED" ? t("runDone") : t("runOpenShort")}</span>
+                      <span className={r.status === "DONE" && !r.lateDays ? "font-bold text-app-success" : "font-bold text-app-warning"}>{runOutcome(r)}</span>
                     </Link>
                   ))}
                 </section>
@@ -417,7 +446,7 @@ export function ProcessPage({
                 <Link href={`/app/tasks/${r.id}`} className="flex flex-wrap justify-between gap-3 rounded-xl border border-app-border bg-white px-5 py-3 text-[15px] hover:border-app-border-strong">
                   <span className="font-bold text-app-text-primary">{r.dueDate ? day(r.dueDate) : r.title}</span>
                   <span className="text-app-text-secondary">
-                    {r.status === "DONE" || r.status === "ARCHIVED" ? t("runDone") : r.stepsTotal ? t("progress", { done: r.stepsDone ?? 0, total: r.stepsTotal }) : t("runOpenShort")}
+                    {r.status === "DONE" || r.status === "ARCHIVED" ? runOutcome(r) : r.stepsTotal ? t("progress", { done: r.stepsDone ?? 0, total: r.stepsTotal }) : t("runOpenShort")}
                   </span>
                 </Link>
               </li>

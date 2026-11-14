@@ -141,5 +141,19 @@ describe("get_process and the new process tools", () => {
     const decided = await call(ariel, "resolve_process_lesson", { client: "NUX", lessonId: lesson.id, decision: "DISMISSED", resolution: "נבדק כבר בשלב 1" });
     expect(decided.json).toMatchObject({ saved: true });
     expect((await prisma.processLesson.findUniqueOrThrow({ where: { id: lesson.id } })).status).toBe("DISMISSED");
+
+    const na = await call(hadas, "update_process", { client: "NUX", process: p.code, notApplicable: ["sla"] });
+    expect(na.json.changed).toContain("notApplicable");
+    expect((await prisma.process.findUniqueOrThrow({ where: { id: p.id } })).notApplicableFields).toContain("sla");
+
+    const reviewed = await call(ariel, "mark_process_reviewed", { client: "NUX", process: p.code });
+    expect(reviewed.json).toMatchObject({ saved: true });
+    expect((await prisma.process.findUniqueOrThrow({ where: { id: p.id } })).lastReviewedAt).not.toBeNull();
+    // A manager's call: refused for an employee, in the domain's words.
+    expect((await call(hadas, "mark_process_reviewed", { client: "NUX", process: p.code })).text).toContain("רק מנהל");
+
+    const off = await call(ariel, "set_client_audit_requirements", { client: "NUX", on: false });
+    expect(off.json).toMatchObject({ saved: true, auditRequirements: false });
+    expect((await prisma.client.findUniqueOrThrow({ where: { id: client.id } })).auditRequirements).toBe(false);
   });
 });

@@ -327,7 +327,15 @@ export async function listProcessRuns(actor: User, processId: string, take = 5) 
       dueDate: true,
       // 13.11.2026 (stage 2): how far a run is, and what it waits on, for
       // the process page's "ריצה פתוחה".
-      subtasks: { where: { deletedAt: null }, orderBy: { createdAt: "asc" }, select: { title: true, status: true } },
+      // 14.11.2026: who the open step waits on (its assignee, its approver
+      // at Ankora, or its approver at the client), and when the run closed,
+      // for "בזמן" or "באיחור".
+      completedAt: true,
+      subtasks: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "asc" },
+        select: { title: true, status: true, requiresApproval: true, approvalContactId: true, approvalEvidence: true, assignedTo: { select: { name: true } }, supervisor: { select: { name: true } } },
+      },
     },
   });
 }

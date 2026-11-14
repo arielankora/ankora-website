@@ -1808,6 +1808,7 @@
       "notFound": "המועד לא נמצא.",
       "notesForbiddenData": "הערות לא יכולות לכלול מספרי דרכון/מסמך. אנא הסירו את המספר מהטקסט (מדיניות המערכת: לעולם לא לשמור מספרי מסמכים או פרטים רפואיים מפורטים).",
       "weeklyGregorianOnly": "מועד שבועי נקבע לפי הלוח הלועזי.",
+      "fromRhythm": "המועד נוצר מהקצב של תהליך. משנים אותו בעורך הקצב של התהליך.",
       "weeklyNeedsWeekday": "במועד שבועי צריך לבחור יום בשבוע.",
       "businessDailyGregorianOnly": "מועד של כל יום עסקים נקבע לפי הלוח הלועזי.",
       "intervalMonthsMonthlyOnly": "\"כל כמה חודשים\" רלוונטי רק למועד חודשי בלוח הלועזי.",
@@ -3548,7 +3549,9 @@
         "relatedDocs": "מסמכים קשורים",
         "relatedDocsPlaceholder": "מדיניות בקרת גישה, נוהל קליטת עובד",
         "addToFile": "הוספה לתיק",
-        "groupDocument": "מסמך הנוהל"
+        "groupDocument": "מסמך הנוהל",
+        "executor": "מי מבצע היום",
+        "executorOther": "אחר, במילים"
       },
       "editor": {
         "savedAs": "נשמר כגרסה {version}, טיוטה. מנהל מאשר, והבדיקות רצות לפני האישור.",
@@ -3978,7 +3981,9 @@
         "guides": "הוראות עבודה",
         "guidesHint": "איך עושים דבר נכון. בלי קצב, בלי ריצות, ובלי \"לא ירוץ\".",
         "version": "גרסה {version}",
-        "noProcedure": "בלי נוהל מאושר"
+        "noProcedure": "בלי נוהל מאושר",
+        "newGuide": "+ הוראת עבודה",
+        "newGuideTitle": "הוראת עבודה חדשה"
       },
       "page": {
         "breadcrumb": "מיקום",
@@ -4003,8 +4008,8 @@
         "noRhythm": "עוד לא נקבע מתי התהליך רץ",
         "earlier": "הוקדם",
         "later": "נדחה",
-        "opensBefore": "הריצה נפתחת {days} ימי עסקים לפני כל מועד",
         "opensOnDay": "הריצה נפתחת ביום המועד",
+        "nextOpensOn": "הריצה הבאה נפתחת ב-{date}",
         "who": "מי",
         "edit": "עריכה",
         "whoTitle": "מי עושה",
@@ -4046,7 +4051,12 @@
         "runOpenShort": "פתוחה",
         "noLessons": "אין הערות מהשטח.",
         "openDocument": "למסמך הנוהל המלא",
-        "docScore": "תיעוד: {score} מתוך {of}"
+        "docScore": "תיעוד: {score} מתוך {of}",
+        "waitingFor": "מחכה ל{name}",
+        "waitingForApproval": "מחכה לאישור של {name}",
+        "remindTo": "תזכורת ל{name}",
+        "runOnTime": "הושלמה בזמן",
+        "runLate": "{days, plural, one {באיחור של יום} other {באיחור של # ימים}}"
       },
       "approverLeft": "צריך מאשר חדש לשלב {step}: {name} עזב",
       "approverLeftProcess": "צריך מאשר חדש: {name} עזב",
@@ -6507,7 +6517,9 @@
       "snoozeButton": "דחייה",
       "delete": "מחיקה",
       "deleteHint": "מעביר לארכיון רך - ניתן לשחזר דרך בסיס הנתונים אם צריך.",
-      "deleteButton": "מחיקת מועד"
+      "deleteButton": "מחיקת מועד",
+      "fromRhythm": "המועד נוצר מהקצב של התהליך.",
+      "editRhythm": "שינוי בעורך הקצב"
     },
     "form": {
       "client": "לקוח *",

@@ -162,7 +162,7 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
     where: { processId: p.id, parentId: null, deletedAt: null, aiExcluded: false },
     orderBy: { createdAt: "desc" },
     take: 5,
-    select: { id: true, title: true, status: true, dueDate: true },
+    select: { id: true, title: true, status: true, dueDate: true, completedAt: true },
   });
   const [rhythm, upcoming, client, contacts, policies] = await Promise.all([
     getProcessRhythm(actor, p.id),
@@ -277,7 +277,15 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
     // 3.11.2026: the version waiting for approval, step by step, and what
     // holds it back, so Claude can see why it is blocked and fix it.
     draft: p.draft ? version(p.draft) : null,
-    recentRuns: runs.map((r) => ({ taskId: r.id, title: r.title, status: r.status, due: day(r.dueDate) })),
+    // 14.11.2026: a closed run says whether it closed on its day, as the
+    // process's page does ("בזמן", "באיחור של N ימים").
+    recentRuns: runs.map((r) => ({
+      taskId: r.id,
+      title: r.title,
+      status: r.status,
+      due: day(r.dueDate),
+      ...(r.status === "DONE" && r.completedAt && r.dueDate ? { daysLate: Math.max(0, Math.round((Date.parse(day(r.completedAt)!) - Date.parse(day(r.dueDate)!)) / 86_400_000)) } : {}),
+    })),
     // Spec 5.4: what people who closed runs said, still waiting for the
     // next version. Read them before drafting one.
     // 31.10.2026: the stranger test. Open questions to ask (answer them

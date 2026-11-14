@@ -1808,6 +1808,7 @@
       "notFound": "Date not found.",
       "notesForbiddenData": "Notes can't include passport or document numbers. Please remove the number from the text (we never store document numbers or detailed medical information).",
       "weeklyGregorianOnly": "A weekly date follows the Gregorian calendar.",
+      "fromRhythm": "This date comes from a process's rhythm. Change it in the process's rhythm editor.",
       "weeklyNeedsWeekday": "A weekly date needs a day of the week.",
       "businessDailyGregorianOnly": "An every-business-day date follows the Gregorian calendar.",
       "intervalMonthsMonthlyOnly": "\"Every how many months\" applies only to a monthly date on the Gregorian calendar.",
@@ -3548,7 +3549,9 @@
         "relatedDocs": "Related documents",
         "relatedDocsPlaceholder": "Access control policy, employee onboarding procedure",
         "addToFile": "Add to the file",
-        "groupDocument": "The procedure document"
+        "groupDocument": "The procedure document",
+        "executor": "Who does it today",
+        "executorOther": "Someone else, in words"
       },
       "editor": {
         "savedAs": "Saved as version {version}, a draft. A manager approves it, and the checks run before approval.",
@@ -3978,7 +3981,9 @@
         "guides": "Work instructions",
         "guidesHint": "How to do something right. No rhythm, no runs, and never \"will not run\".",
         "version": "Version {version}",
-        "noProcedure": "No approved procedure"
+        "noProcedure": "No approved procedure",
+        "newGuide": "+ Work guide",
+        "newGuideTitle": "New work guide"
       },
       "page": {
         "breadcrumb": "Location",
@@ -4003,8 +4008,8 @@
         "noRhythm": "When it runs is not set yet",
         "earlier": "moved earlier",
         "later": "moved later",
-        "opensBefore": "The run opens {days} business days before each date",
         "opensOnDay": "The run opens on the day",
+        "nextOpensOn": "The next run opens on {date}",
         "who": "Who",
         "edit": "Edit",
         "whoTitle": "Who does it",
@@ -4046,7 +4051,12 @@
         "runOpenShort": "Open",
         "noLessons": "No notes from the field.",
         "openDocument": "The full procedure document",
-        "docScore": "Documentation: {score} of {of}"
+        "docScore": "Documentation: {score} of {of}",
+        "waitingFor": "Waiting for {name}",
+        "waitingForApproval": "Waiting for {name}'s approval",
+        "remindTo": "Remind {name}",
+        "runOnTime": "Done on time",
+        "runLate": "{days, plural, one {One day late} other {# days late}}"
       },
       "approverLeft": "Step {step} needs a new approver: {name} left",
       "approverLeftProcess": "Needs a new approver: {name} left",
@@ -6507,7 +6517,9 @@
       "snoozeButton": "Snooze",
       "delete": "Delete",
       "deleteHint": "Moves the date to a soft archive. It can be restored from the database if needed.",
-      "deleteButton": "Delete date"
+      "deleteButton": "Delete date",
+      "fromRhythm": "This date comes from the process's rhythm.",
+      "editRhythm": "Change it in the rhythm editor"
     },
     "form": {
       "client": "Client *",

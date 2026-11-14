@@ -109,7 +109,7 @@ export function ProcessList({ clientId, userId, processes, form }: { clientId: s
           </Link>
           <CenterDialog triggerLabel={t("new")} triggerVariant="primary" title={t("newTitle")}>
             <div className="px-5 py-6 sm:px-8">
-              <ProcessForm clientId={clientId} {...form} only={["what", "who"]} withSources onCreated={(id) => router.push(`${processHref(clientId, id)}?rhythm=open`)} />
+              <ProcessForm clientId={clientId} {...form} only={["what", "who"]} withSources creating onCreated={(id) => router.push(`${processHref(clientId, id)}?rhythm=open`)} />
             </div>
           </CenterDialog>
         </div>
@@ -193,11 +193,18 @@ export function ProcessList({ clientId, userId, processes, form }: { clientId: s
         </table>
       </div>
 
-      {guides.length > 0 && (
+      {/* Spec 5.1: the work guides as cards, with "+ הוראת עבודה" (14.11.2026:
+          shown also before the first one exists). */}
+      {(
         <section className="mt-3 flex flex-col gap-3.5" data-testid="process-guides">
           <div className="flex flex-wrap items-baseline gap-3.5">
             <h3 className="text-2xl font-extrabold text-app-text-primary">{t("guides")}</h3>
             <span className="text-[15px] text-app-text-secondary">{t("guidesHint")}</span>
+            <CenterDialog triggerLabel={t("newGuide")} triggerVariant="secondary" title={t("newGuideTitle")}>
+              <div className="px-5 py-6 sm:px-8">
+                <ProcessForm clientId={clientId} {...form} only={["what", "who"]} withSources creating guide onCreated={(id) => router.push(processHref(clientId, id))} />
+              </div>
+            </CenterDialog>
           </div>
           <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
             {guides.map((g) => (

@@ -76,8 +76,9 @@ describe("a date on its process's calendar", () => {
     expect(await dayOf(date.id)).toEqual({ calendar: "US", day: friday.key });
     expect(await prisma.auditEvent.count({ where: { action: "important_date.calendar", entityId: date.id } })).toBe(1);
 
-    // The date's own form sends Israel; the process decides.
-    await updateImportantDate(user, date.id, { businessCalendar: "IL" });
+    // The date's own form cannot change it at all (spec 4.2, 14.11.2026):
+    // a date of a process's rhythm changes from the process.
+    await expect(updateImportantDate(user, date.id, { businessCalendar: "IL" })).rejects.toMatchObject({ code: "importantDates.fromRhythm" });
     expect((await dayOf(date.id)).calendar).toBe("US");
 
     // Set on the process, it wins over the entity.

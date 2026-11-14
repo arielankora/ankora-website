@@ -66,7 +66,7 @@ import type { PolicyKind } from "@prisma/client";
 const POLICY_KINDS: PolicyKind[] = ["DATA_HANDLING", "DISCLOSURE", "COMMUNICATION", "SEPARATION", "APPROVAL_REQUIRED", "THRESHOLD", "REQUIRED_STEP", "TIMING", "FORBIDDEN", "INFO"];
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { listProcesses, ruleWarnings } from "@/lib/app-domain/processes";
-import { stepsLeadOf, upcomingOfProcess } from "@/lib/app-domain/process-rhythm";
+import { upcomingOfProcess } from "@/lib/app-domain/process-rhythm";
 import { ProcessList } from "./ProcessList";
 import { ProcessPage } from "./ProcessPage";
 import { stepsNeedingApprover } from "@/lib/step-approval";
@@ -514,6 +514,24 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                   stepsDone: r.subtasks.filter((x) => x.status === "DONE" || x.status === "ARCHIVED").length,
                   stepsTotal: r.subtasks.length,
                   waitingOn: r.subtasks.find((x) => x.status !== "DONE" && x.status !== "ARCHIVED")?.title ?? null,
+                  // Spec 5.2: who the open step waits on, and whether it is
+                  // an approval at the client (the card offers a reminder).
+                  ...(() => {
+                    const open = r.subtasks.find((x) => x.status !== "DONE" && x.status !== "ARCHIVED");
+                    if (!open) return { waitingFor: null, waitingClient: false };
+                    if (open.approvalContactId && !open.approvalEvidence) {
+                      const c = people.contacts.find((x) => x.id === open.approvalContactId);
+                      return { waitingFor: c ? (c.person.name ?? c.role ?? null) : null, waitingClient: true };
+                    }
+                    if (open.requiresApproval && open.status === "PENDING_APPROVAL") return { waitingFor: open.supervisor?.name ?? null, waitingClient: false };
+                    return { waitingFor: open.assignedTo?.name ?? null, waitingClient: false };
+                  })(),
+                  // Done on its day or after it (the board's "הושלמה בזמן",
+                  // "באיחור של יום"), in whole days in Israel.
+                  lateDays:
+                    r.status === "DONE" && r.completedAt && r.dueDate
+                      ? Math.max(0, Math.round((Date.parse(localDateKey(r.completedAt, TIMEZONE)) - Date.parse(localDateKey(r.dueDate, TIMEZONE))) / 86_400_000))
+                      : null,
                 })),
                 kind: p.kind,
                 checkEveryDays: p.checkEveryDays,
@@ -584,9 +602,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   if (sp?.process) {
     const shown = panelProcesses.find((x) => x.id === sp.process);
     if (!shown) notFound();
-    const [upcoming, stepsLead, docTab] = await Promise.all([
+    const [upcoming, docTab] = await Promise.all([
       upcomingOfProcess(user, shown.id),
-      stepsLeadOf(shown.id),
       documentTabOf(shown, {
         clientId: client.id,
         clientName: client.name,
@@ -604,7 +621,6 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         process={shown}
         form={processForm}
         upcoming={upcoming}
-        stepsLead={stepsLead}
         canApprove={can(user.role, "client.manage")}
         openRhythm={sp.rhythm === "open"}
         userId={user.id}
