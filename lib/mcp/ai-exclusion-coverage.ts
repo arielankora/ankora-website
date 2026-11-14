@@ -65,6 +65,7 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   resolve_process_lesson: "lookupClient",
   mark_process_reviewed: "lookupClient",
   set_contact_ended: "lookupClient",
+  update_date: "lookupClient; a sensitive date is not a candidate",
   save_procedure_audit_draft: "lookupClient",
   list_policies: "lookupClient",
   start_process: "lookupClient",

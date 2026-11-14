@@ -141,6 +141,7 @@ export const TOOL_ANNOTATIONS = {
   resolve_process_lesson: WRITES,
   mark_process_reviewed: WRITES,
   set_contact_ended: WRITES,
+  update_date: { ...WRITES, idempotentHint: true },
   // 14.11.2026 (stage 4, "להכין לביקורת"): a draft with how each step is
   // known to be done, and scope and controls where the process has none.
   save_procedure_audit_draft: WRITES,
@@ -223,6 +224,7 @@ export const WRITE_TOOLS = [
   "resolve_process_lesson",
   "mark_process_reviewed",
   "set_contact_ended",
+  "update_date",
   "save_procedure_audit_draft",
   "record_run_lesson",
   "record_stranger_test",

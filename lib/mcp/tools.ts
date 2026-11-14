@@ -58,6 +58,7 @@ import { registerTaskExtraTools } from "@/lib/mcp/task-extra-tools";
 import { registerDocumentTools } from "@/lib/mcp/document-tools";
 import { registerClientFileTools } from "@/lib/mcp/client-file-tools";
 import { registerProcessTools } from "@/lib/mcp/process-tools";
+import { registerDateTools } from "@/lib/mcp/date-tools";
 import { registerEmployeeTools } from "@/lib/mcp/employee-tools";
 import { registerHourBankTools } from "@/lib/mcp/hour-bank-tools";
 import { registerApprovalTools } from "@/lib/mcp/approval-tools";
@@ -1525,6 +1526,7 @@ export function registerAnkoraTools(server: McpServer): void {
   registerDocumentTools(server);
   registerClientFileTools(server);
   registerProcessTools(server);
+  registerDateTools(server);
   registerEmployeeTools(server);
   registerHourBankTools(server);
   registerApprovalTools(server);
