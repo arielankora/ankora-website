@@ -70,6 +70,7 @@ function parseContactFields(formData: FormData, t: KnowledgeErrorT, selfId?: str
       isPrimary: formData.get("isPrimary") === "on",
       isDecisionMaker: formData.get("isDecisionMaker") === "on",
       clientSideAddress: text(formData, "clientSideAddress"),
+      ...(formData.has("endedAt") ? { endedAt: text(formData, "endedAt") } : {}),
       ...(formData.has("userId") ? { userId: text(formData, "userId") } : {}),
       knowledgeStatus: pick(formData.get("knowledgeStatus"), STATUSES),
       toResolve: text(formData, "toResolve"),

@@ -2024,6 +2024,11 @@ export async function getTaskDetail(actor: User, taskId: string) {
         assignedTo: { select: { id: true, name: true } },
         requiresApproval: true,
         supervisor: { select: { id: true, name: true } },
+        approvedBy: { select: { name: true } },
+        approvedAt: true,
+        // Stage 3 (spec 4.5): a step approved by a contact at the client.
+        approvalContactId: true,
+        approvalEvidence: true,
       },
     }),
   ]);
@@ -2194,4 +2199,32 @@ export async function recordClientApproval(actor: User, stepId: string, input: C
   // close (its audit, its run's progress).
   if (step.status !== "DONE") await updateTask(actor, step.id, { status: "DONE" });
   return evidence;
+}
+
+/// "זו ריצה של..." (processes redesign, stage 3, spec 4.5 and 5.6): a task
+/// opened by hand is marked as a run of one of its client's processes, or
+/// unmarked. A step is never one: its run is its task's.
+export async function setTaskProcess(actor: User, taskId: string, processId: string | null) {
+  assertCan(actor.role, "time_entry.create_self");
+  const task = await prisma.task.findFirst({ where: { id: taskId, deletedAt: null }, select: { id: true, clientId: true, parentId: true, processId: true } });
+  if (!task) throw new DomainError("tasks.notFound", "Task not found.");
+  const accessible = await listAccessibleClients(actor);
+  if (!accessible.some((c) => c.id === task.clientId)) throw new ForbiddenError("You are not assigned to this client.");
+  if (task.parentId) throw new DomainError("tasks.stepNotRun", "שלב שייך לריצה של המשימה שלו, ולא מסומן בנפרד.");
+  let versionId: string | null = null;
+  if (processId) {
+    const process = await prisma.process.findFirst({ where: { id: processId, clientId: task.clientId, deletedAt: null, kind: "PROCESS" }, select: { id: true } });
+    if (!process) throw new DomainError("tasks.processNotOfClient", "התהליך לא נמצא בתיק של הלקוח.");
+    versionId = (await prisma.processVersion.findFirst({ where: { processId, status: "APPROVED" }, select: { id: true } }))?.id ?? null;
+  }
+  await prisma.task.update({ where: { id: task.id }, data: { processId, processVersionId: processId ? versionId : null } });
+  await recordAudit({
+    actorId: actor.id,
+    action: "task.process_link",
+    entityType: "Task",
+    entityId: task.id,
+    clientId: task.clientId,
+    before: { processId: task.processId },
+    after: { processId },
+  });
 }

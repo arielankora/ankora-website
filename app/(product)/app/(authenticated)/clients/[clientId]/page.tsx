@@ -795,6 +795,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 isPrimary: c.isPrimary,
                 isDecisionMaker: c.isDecisionMaker,
                 clientSideAddress: c.clientSideAddress,
+                endedAt: c.endedAt ? c.endedAt.toISOString().slice(0, 10) : null,
                 userId: c.userId,
                 status: effectiveStatus(c.knowledgeStatus, parseFieldStatus(c.fieldStatus)),
                 toResolve: c.toResolve, clientVisible: c.clientVisible, ownerId: c.ownerId,

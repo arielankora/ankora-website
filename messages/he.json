@@ -769,7 +769,30 @@
         "add": "הוספה",
         "fromBook": "מתוך ספר הנהלים",
         "close": "סגירה",
-        "bookHint": "השלבים נוספים למה שכבר יש כאן, ולא במקומו."
+        "bookHint": "השלבים נוספים למה שכבר יש כאן, ולא במקומו.",
+        "awaitingClient": "מחכה לאישור של {name}, אצל הלקוח",
+        "clientNeedsRecord": "כדי לסמן כבוצע מתעדים מתי ואיך אושר.",
+        "remind": "תזכורת ל{name}",
+        "clientApproved": "{name} אישר/ה",
+        "dialogTitle": "איך {name} אישר/ה?",
+        "dialogEyebrow": "שלב {n} · {title}",
+        "when": "מתי",
+        "how": "איך",
+        "link": "קישור (לא חובה)",
+        "linkPlaceholder": "קישור למייל או למסמך",
+        "saveApproval": "שמירה וסימון כבוצע",
+        "cancel": "ביטול",
+        "saving": "שומר...",
+        "recordNote": "נשמר עם השם של מי שמילא, ומופיע בריצה.",
+        "hows": {
+          "EMAIL": "במייל",
+          "WHATSAPP": "בוואטסאפ",
+          "PHONE": "בטלפון",
+          "MEETING": "בפגישה",
+          "SIGNED": "בחתימה על מסמך"
+        },
+        "approvedClientLine": "אושר על ידי {name} {how}, {date}",
+        "approvedByLine": "אושר על ידי {name}, {date}"
       },
       "advance": {
         "plan": "קדם עם קלוד",
@@ -832,7 +855,16 @@
         "running": "{count, plural, one {טיימר אחד רץ על המשימה הזו כרגע, והזמן שלו ייספר בעצירה.} other {# טיימרים רצים על המשימה הזו כרגע, והזמן שלהם ייספר בעצירה.}}"
       },
       "runOf": "ריצה של {code} {title}",
-      "runOfVersion": "ריצה של {code} {title}, גרסה {version}"
+      "runOfVersion": "ריצה של {code} {title}, גרסה {version}",
+      "runOfLead": "ריצה של",
+      "runOfVersionTail": ", גרסה {version}",
+      "runOfPicker": {
+        "question": "זו ריצה של תהליך?",
+        "choose": "לבחור תהליך",
+        "suggested": "מוצע:",
+        "link": "לקשר",
+        "no": "לא"
+      }
     },
     "list": {
       "title": "משימות",
@@ -1267,6 +1299,8 @@
       "stepAwaitingApproval": "השלב \"{title}\" מחכה לאישור של {supervisor}. אחרי שהוא מאושר, אפשר לסגור.",
       "stepAwaitingApprovalNoSupervisor": "השלב \"{title}\" מחכה לאישור. אחרי שהוא מאושר, אפשר לסגור.",
       "clientApprovalUndocumented": "כדי לסמן את השלב כבוצע, מתעדים מתי ואיך הלקוח אישר.",
+      "stepNotRun": "שלב שייך לריצה של המשימה שלו, ולא מסומן בנפרד.",
+      "processNotOfClient": "התהליך לא נמצא בתיק של הלקוח.",
       "stepAwaitingClientApproval": "השלב \"{title}\" מחכה לתיעוד של אישור הלקוח. אחרי שמתעדים מתי ואיך אושר, אפשר לסגור.",
       "commentEmpty": "אין מה לשמור: ההערה ריקה.",
       "commentTooLong": "ההערה ארוכה מ-{max} תווים. אפשר לפצל אותה לשתיים.",
@@ -2000,6 +2034,7 @@
       "taskCreate": "יצירת משימה",
       "taskStatusChange": "שינוי סטטוס משימה",
       "taskClientApproval": "תיעוד אישור של הלקוח בשלב של ריצה",
+      "taskProcessLink": "סימון משימה כריצה של תהליך",
       "taskApprove": "אישור משימה",
       "taskComment": "הערה על משימה",
       "taskCommentDelete": "מחיקת הערה על משימה",
@@ -4022,7 +4057,6 @@
         "approver": "מאשר",
         "approverAria": "שלב {n}: מאשר",
         "noApprover": "בלי מאשר",
-        "left": "{name} (עזב)",
         "approverClientNote": "מאשר אצל הלקוח לא עוצר את הריצה. כדי לסמן את השלב כבוצע, מתעדים מתי ואיך אושר.",
         "approverAnkoraNote": "מאשר באנקורה: השלב לא נסגר בלי האישור שלו במערכת.",
         "evidence": "איך יודעים שבוצע",
@@ -4036,7 +4070,8 @@
         "currencyAria": "שלב {n}: מטבע",
         "channel": "ערוץ",
         "channelAria": "שלב {n}: ערוץ",
-        "channelNone": "לא נבחר"
+        "channelNone": "לא נבחר",
+        "contactLeft": "{name} (עזב)"
       }
     },
     "procedures": {
@@ -5318,6 +5353,8 @@
         "clientSideAddress": "הכתובת שלו אצל הלקוח",
         "isPrimary": "איש קשר ראשי",
         "isDecisionMaker": "מקבל החלטות",
+        "endedAt": "עזב את הלקוח או את התפקיד, בתאריך",
+        "endedOn": "עזב ב-{date}",
         "sensitive": "רגיש (לא עובר ל-Claude)",
         "toResolvePlaceholder": "לבקש מגיא את המייל"
       },

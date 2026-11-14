@@ -56,6 +56,8 @@ export type PanelContact = {
   isPrimary: boolean;
   isDecisionMaker: boolean;
   clientSideAddress: string | null;
+  /// 14.11.2026 (stage 3, spec 4.6): the day they left, "YYYY-MM-DD".
+  endedAt?: string | null;
   /// Ankora people only: their user in the product.
   userId?: string | null;
   status: KnowledgeStatusLike;
@@ -179,6 +181,11 @@ function ContactForm({
             <input name="clientSideAddress" dir="ltr" defaultValue={existing?.clientSideAddress ?? ""} placeholder="office@client.com" className={INPUT} />
           </Field>
         </>
+      )}
+      {existing && (
+        <Field label={t("contact.endedAt")}>
+          <input type="date" name="endedAt" defaultValue={existing.endedAt ?? ""} className={INPUT} />
+        </Field>
       )}
       <div className="flex flex-wrap gap-4 text-sm text-app-text-primary">
         <label className="flex items-center gap-2">
@@ -360,6 +367,11 @@ export function PeoplePanel({
                     <p className="text-xs text-app-text-secondary">
                       {[c.name ? c.role : null, t(`relationships.${c.relationship}`), c.organizationName, c.entityName].filter(Boolean).join(" · ")}
                     </p>
+                    {c.endedAt && (
+                      <p className="text-xs font-bold text-app-error" data-testid="contact-ended">
+                        {t("contact.endedOn", { date: c.endedAt.split("-").reverse().join(".") })}
+                      </p>
+                    )}
                     {(c.emails.length > 0 || c.phones.length > 0 || c.clientSideAddress) && (
                       <p className="mt-1 text-xs text-app-text-secondary" dir="ltr">
                         {[...c.emails, ...c.phones, c.clientSideAddress].filter(Boolean).join("  ·  ")}

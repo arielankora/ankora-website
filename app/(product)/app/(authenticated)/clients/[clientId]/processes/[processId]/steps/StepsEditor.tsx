@@ -221,7 +221,7 @@ export function StepsEditor({ data }: { data: StepsEditorData }) {
               <optgroup label={t("groupClient")}>
                 {data.people.map((c) => (
                   <option key={c.id} value={`c:${c.id}`}>
-                    {c.ended ? t("left", { name: c.name }) : c.name}
+                    {c.ended ? t("contactLeft", { name: c.name }) : c.name}
                   </option>
                 ))}
               </optgroup>
@@ -306,7 +306,7 @@ export function StepsEditor({ data }: { data: StepsEditorData }) {
               <optgroup label={t("groupClient")}>
                 {data.people.map((c) => (
                   <option key={c.id} value={`c:${c.id}`} disabled={c.ended && approverValue !== `c:${c.id}`}>
-                    {c.ended ? t("left", { name: c.name }) : c.name}
+                    {c.ended ? t("contactLeft", { name: c.name }) : c.name}
                   </option>
                 ))}
               </optgroup>

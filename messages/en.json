@@ -769,7 +769,30 @@
         "add": "Add",
         "fromBook": "From the procedures book",
         "close": "Close",
-        "bookHint": "The steps are added to what's already here, not instead of it."
+        "bookHint": "The steps are added to what's already here, not instead of it.",
+        "awaitingClient": "Waiting for {name}'s approval, at the client",
+        "clientNeedsRecord": "To mark it done, write down when and how it was approved.",
+        "remind": "Remind {name}",
+        "clientApproved": "{name} approved",
+        "dialogTitle": "How did {name} approve?",
+        "dialogEyebrow": "Step {n} · {title}",
+        "when": "When",
+        "how": "How",
+        "link": "Link (optional)",
+        "linkPlaceholder": "A link to the mail or the document",
+        "saveApproval": "Save and mark done",
+        "cancel": "Cancel",
+        "saving": "Saving...",
+        "recordNote": "Saved with the name of who wrote it, and shown on the run.",
+        "hows": {
+          "EMAIL": "by email",
+          "WHATSAPP": "on WhatsApp",
+          "PHONE": "by phone",
+          "MEETING": "in a meeting",
+          "SIGNED": "by signing a document"
+        },
+        "approvedClientLine": "Approved by {name} {how}, {date}",
+        "approvedByLine": "Approved by {name}, {date}"
       },
       "advance": {
         "plan": "Advance with Claude",
@@ -832,7 +855,16 @@
         "running": "{count, plural, one {One timer is running on this task now, and its time will count when it stops.} other {# timers are running on this task now, and their time will count when they stop.}}"
       },
       "runOf": "Run of {code} {title}",
-      "runOfVersion": "Run of {code} {title}, version {version}"
+      "runOfVersion": "Run of {code} {title}, version {version}",
+      "runOfLead": "A run of",
+      "runOfVersionTail": ", version {version}",
+      "runOfPicker": {
+        "question": "Is this a run of a process?",
+        "choose": "Choose a process",
+        "suggested": "Suggested:",
+        "link": "Link",
+        "no": "No"
+      }
     },
     "list": {
       "title": "Tasks",
@@ -1267,6 +1299,8 @@
       "stepAwaitingApproval": "The step \"{title}\" is waiting for approval from {supervisor}. Once it's approved, the task can be closed.",
       "stepAwaitingApprovalNoSupervisor": "The step \"{title}\" is waiting for approval. Once it's approved, the task can be closed.",
       "clientApprovalUndocumented": "To mark the step done, write down when and how the client approved.",
+      "stepNotRun": "A step belongs to its task's run and is not marked on its own.",
+      "processNotOfClient": "The process is not in this client's file.",
       "stepAwaitingClientApproval": "The step \"{title}\" is waiting for the client's approval to be written down. Once it is, the task can be closed.",
       "commentEmpty": "Nothing to save: the comment is empty.",
       "commentTooLong": "The comment is longer than {max} characters. You can split it in two.",
@@ -2000,6 +2034,7 @@
       "taskCreate": "Task created",
       "taskStatusChange": "Task status changed",
       "taskClientApproval": "Client approval written down on a run step",
+      "taskProcessLink": "Task marked as a run of a process",
       "taskApprove": "Task approved",
       "taskComment": "Comment on a task",
       "taskCommentDelete": "Task comment deleted",
@@ -4022,7 +4057,6 @@
         "approver": "Approver",
         "approverAria": "Step {n}: approver",
         "noApprover": "No approver",
-        "left": "{name} (left)",
         "approverClientNote": "An approver at the client does not stop the run. To mark the step done, write down when and how they approved.",
         "approverAnkoraNote": "An approver at Ankora: the step is not closed without their approval in the system.",
         "evidence": "How we know it was done",
@@ -4036,7 +4070,8 @@
         "currencyAria": "Step {n}: currency",
         "channel": "Channel",
         "channelAria": "Step {n}: channel",
-        "channelNone": "Not chosen"
+        "channelNone": "Not chosen",
+        "contactLeft": "{name} (left)"
       }
     },
     "procedures": {
@@ -5318,6 +5353,8 @@
         "clientSideAddress": "Their address at the client",
         "isPrimary": "Primary contact",
         "isDecisionMaker": "Decision maker",
+        "endedAt": "Left the client or the role, on",
+        "endedOn": "Left on {date}",
         "sensitive": "Sensitive (not sent to Claude)",
         "toResolvePlaceholder": "Ask Guy for the email"
       },
