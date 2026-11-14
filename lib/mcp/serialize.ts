@@ -112,6 +112,8 @@ export type TaskLike = {
   priority: string;
   dueDate: Date | null;
   createdAt: Date;
+  /// A run of a process (processes redesign): get_task says which.
+  processId?: string | null;
   client?: { name: string } | null;
   category?: { name: string } | null;
   assignedTo?: { name: string } | null;
@@ -152,6 +154,8 @@ export type SerializedTask = {
   /// it. Null only when the caller did not pass a base URL.
   url: string | null;
   createdAt: string;
+  /// Only when the task is a run of a process; get_task says which one.
+  runOfProcess?: true;
 };
 
 /// The address of one task's screen in the Ankora app.
@@ -211,6 +215,7 @@ export function serializeTask(
     waitingOn: task.blockedOn ?? null,
     url: opts.baseUrl ? taskUrl(opts.baseUrl, task.id) : null,
     createdAt: task.createdAt.toISOString(),
+    ...(task.processId ? { runOfProcess: true } : {}),
   };
 }
 

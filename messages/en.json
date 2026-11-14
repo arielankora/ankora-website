@@ -1467,6 +1467,8 @@
       "notAudited": "This client has no audit requirements.",
       "auditDraftFlow": "The procedure is a flow. Add \"how we know it was done\" in the steps editor.",
       "draftEmpty": "The draft is empty.",
+      "draftStale": "Version {version} was saved since the procedure was read. Read it again before drafting.",
+      "draftFlow": "The procedure is a flow with conditions. Edit it in the steps editor.",
       "noSteps": "A procedure needs at least one step.",
       "tooManySteps": "Up to {max} steps. A procedure longer than that is several processes.",
       "stepSystemNotFound": "A system chosen in a step is not in the client's system map.",

@@ -23,6 +23,9 @@ import { listMyRoutines, recordProcessCheck } from "@/lib/app-domain/process-che
 import { mcpGetProcess, mcpListPolicies, mcpListProcesses } from "@/lib/app-domain/mcp-processes";
 import { prisma } from "@/lib/prisma";
 import { canSendToAi } from "@/lib/knowledge";
+import { describeResolveFailure, resolveByName } from "@/lib/mcp/resolve";
+import { ACTION_TAGS, CHANNELS } from "@/lib/process-rules";
+import type { User } from "@prisma/client";
 import { answerStrangerQuestion, recordStrangerTest, RULE_CHANGE_NEEDS_YES } from "@/lib/app-domain/stranger-tests";
 import { STRANGER_ASK_WHO_LABELS, STRANGER_SEVERITY_LABELS, strangerLine, type AnswerFactKind } from "@/lib/stranger-test";
 import { clientBrief, clientFileChanges } from "@/lib/app-domain/client-file-live";
@@ -55,10 +58,82 @@ const MAX_PROCEDURE_STEPS = 200;
 
 /// A process of one client, by its code ("P3") or its title, the way the
 /// user says it. One match or a sentence saying why not.
-async function resolveProcess(client: { id: string; name: string }, query: string): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+const MAX_DRAFT_STEPS = 25;
+
+type DraftStepArg = {
+  title: string;
+  mode?: string;
+  offsetBusinessDays?: number | null;
+  evidence?: string | null;
+  output?: string | null;
+  verification?: string | null;
+  approver?: string | null;
+  requiresApproval?: boolean;
+  systems?: string[];
+  actions?: string[];
+  amountMax?: number | null;
+  currency?: string | null;
+  channel?: string | null;
+};
+
+/// Claude's steps in the stored shape (lib/process-rules.ts readSteps): an
+/// approver and systems by name become ids, an amount becomes minor units.
+/// A name that matches nobody, or more than one, is said back rather than
+/// guessed.
+async function draftSteps(actor: User, clientId: string, args: DraftStepArg[]): Promise<{ ok: true; steps: Record<string, unknown>[] } | { ok: false; message: string }> {
+  const needsPeople = args.some((s) => s.approver?.trim());
+  const needsSystems = args.some((s) => s.systems?.length);
+  const [users, contacts, systems] = await Promise.all([
+    needsPeople ? prisma.user.findMany({ where: { deletedAt: null, status: "ACTIVE", OR: [{ clientAccess: { some: { clientId } } }, { role: "ANKORA_ADMIN" }] }, select: { id: true, name: true } }) : [],
+    needsPeople
+      ? prisma.clientContact.findMany({ where: { clientId, deletedAt: null, endedAt: null }, select: { id: true, role: true, sensitivity: true, audience: true, audienceUserIds: true, person: { select: { name: true } } } })
+      : [],
+    needsSystems ? prisma.systemAccess.findMany({ where: { clientId, deletedAt: null }, select: { id: true, systemName: true } }) : [],
+  ]);
+  const people = [
+    ...users.map((u) => ({ id: `u:${u.id}`, name: u.name })),
+    ...contacts.filter((c) => canSendToAi(c, actor.id) && (c.person.name || c.role)).map((c) => ({ id: `c:${c.id}`, name: (c.person.name ?? c.role)! })),
+  ];
+  const systemCandidates = systems.map((x) => ({ id: x.id, name: x.systemName }));
+  const out: Record<string, unknown>[] = [];
+  for (const [i, s] of args.entries()) {
+    const step: Record<string, unknown> = {
+      title: s.title,
+      mode: s.mode,
+      offsetBusinessDays: s.offsetBusinessDays ?? null,
+      evidence: s.evidence ?? null,
+      output: s.output ?? null,
+      verification: s.verification ?? null,
+      requiresApproval: s.requiresApproval ?? false,
+      actionTags: s.actions ?? [],
+      amountMaxMinor: typeof s.amountMax === "number" ? Math.round(s.amountMax * 100) : null,
+      currency: s.currency ?? null,
+      channel: s.channel ?? null,
+    };
+    if (s.approver?.trim()) {
+      const who = resolveByName(s.approver, people);
+      if (who.status !== "ok") return { ok: false, message: `Step ${i + 1}: ${describeResolveFailure(who, "approver", people)}` };
+      if (who.match.id.startsWith("u:")) step.approverUserId = who.match.id.slice(2);
+      else step.approverContactId = who.match.id.slice(2);
+    }
+    if (s.systems?.length) {
+      const ids: string[] = [];
+      for (const name of s.systems) {
+        const sys = resolveByName(name, systemCandidates);
+        if (sys.status !== "ok") return { ok: false, message: `Step ${i + 1}: ${describeResolveFailure(sys, "system", systemCandidates)} Add it to the client's system map first (propose_knowledge, SYSTEM).` };
+        ids.push(sys.match.id);
+      }
+      step.systemIds = ids;
+    }
+    out.push(step);
+  }
+  return { ok: true, steps: out };
+}
+
+export async function resolveProcess(client: { id: string; name: string }, query: string, options: { includeRetired?: boolean } = {}): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   const q = query.trim();
   const candidates = await prisma.process.findMany({
-    where: { clientId: client.id, deletedAt: null, status: { not: "RETIRED" } },
+    where: { clientId: client.id, deletedAt: null, ...(options.includeRetired ? {} : { status: { not: "RETIRED" } }) },
     select: { id: true, code: true, title: true },
   });
   const exact = candidates.filter((p) => p.code.toLowerCase() === q.toLowerCase() || p.title === q);
@@ -502,16 +577,19 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "List a client's processes",
       description:
-        "The client's processes (P1, P2...), one line each: what it is for, its triggers, `rhythm` (when it runs, in one sentence built from what starts it and its dates; quote it rather than `trigger` when asked how often a process runs), owner (and backup, only when one is set), where it stands in the handover, whether it runs (\"רץ\", or the first reason it will not: no owner, no trigger, no approved procedure, or a scheduled process with no date), every reason it will not run (`notRunningBecause`, empty when it runs; tell the user all of them), how well it is documented (the documentation fields, less those marked not relevant), whether it needs review and why, the approved procedure's version, the next date, the last run, and `url`, a direct link to the process in the client's file. Use get_process for the steps. Sensitive processes, and restricted ones the user is not named on, are left out.",
-      inputSchema: z.object({ client: z.string().describe("Client name, as the user said it.") }),
+        "The client's processes (P1, P2...), one line each: what it is for, its triggers, `rhythm` (when it runs, in one sentence built from what starts it and its dates; quote it rather than `trigger` when asked how often a process runs), owner (and backup, only when one is set), where it stands in the handover, whether it runs (\"רץ\", or the first reason it will not: no owner, no trigger, no approved procedure, or a scheduled process with no date), every reason it will not run (`notRunningBecause`, empty when it runs; tell the user all of them), how well it is documented (the documentation fields, less those marked not relevant), whether it needs review and why, the approved procedure's version, the next date, the last run, and `url`, a direct link to the process in the client's file. `kind` is PROCESS, or GUIDE for a work guide (\"הוראת עבודה\": how to do something, with steps, and no rhythm, runs or blockers). Retired processes are left out unless includeRetired. Use get_process for the steps. Sensitive processes, and restricted ones the user is not named on, are left out.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, as the user said it."),
+        includeRetired: z.boolean().optional().describe("Also list retired processes (status RETIRED)."),
+      }),
       annotations: TOOL_ANNOTATIONS.list_processes,
     },
-    async (args: { client: string }, ctx: ServerContext) => {
+    async (args: { client: string; includeRetired?: boolean }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
         const client = await lookupClient(actor, args.client);
         if (!client.ok) return toolText(client.message);
-        const processes = await mcpListProcesses(actor, client.value.id);
+        const processes = await mcpListProcesses(actor, client.value.id, { includeRetired: args.includeRetired });
         return toolJson({ client: client.value.name, count: processes.length, processes });
       } catch (err) {
         console.error("[mcp] list_processes failed", err);
@@ -525,7 +603,7 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "Get a process and its procedure",
       description:
-        "One of a client's processes in full: everything list_processes says, plus the SLA, who executes it today, the approver, the external party, the exception playbook, the gaps, the approved procedure step by step (mode, business day, actions, systems, output, how a person verifies an automated step, whether it needs approval, the most it moves, the channel), what in it fails the client's rules today, the last five runs, and the open lessons people left when closing runs (read them before drafting a new version). Follow the approved procedure; a step marked as needing approval waits for a person. If the procedure fails a rule, say so before acting. `procedure` is null when no version is approved; a version waiting for approval is under `draft`, in the same shape, with what holds it back in `failsRules`.",
+        "One of a client's processes in full: everything list_processes says, plus the SLA, who executes it today, the approver, the external party, the exception playbook, the gaps, the approved procedure step by step (mode, business day, actions, systems, output, how a person verifies an automated step, whether it needs approval, the most it moves, the channel), what in it fails the client's rules today, the last five runs, and the open lessons people left when closing runs (read them before drafting a new version). Each step names its own `approver` (atAnkora or atClient; `leftOn` when that contact left, and the step needs a new approver) and `evidence`. A procedure with conditions also has `flow`. `rhythmDetail`: each start and the next three dates with the day each run opens. `staleReasons`: why the approved document is out of date. `audit`, for a client with audit requirements: scope, controls, classification and what an audit still misses (fill it with save_procedure_audit_draft). Follow the approved procedure; a step marked as needing approval waits for a person. If the procedure fails a rule, say so before acting. `procedure` is null when no version is approved; a version waiting for approval is under `draft`, in the same shape, with what holds it back in `failsRules`.",
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it."),
         process: z.string().describe('The process code ("P3") or its title.'),
@@ -537,7 +615,7 @@ export function registerClientFileTools(server: McpServer): void {
         const actor = actorOf(ctx);
         const client = await lookupClient(actor, args.client);
         if (!client.ok) return toolText(client.message);
-        const process = await resolveProcess(client.value, args.process);
+        const process = await resolveProcess(client.value, args.process, { includeRetired: true });
         if (!process.ok) return toolText(process.message);
         const detail = await mcpGetProcess(actor, client.value.id, process.id);
         if (!detail) return toolText(`No process "${args.process}" for ${client.value.name}.`);
@@ -652,7 +730,7 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "Save a draft of a procedure's steps",
       description:
-        "Saves Claude's draft of the steps of a client's process that has no steps yet, as a draft version: it is not live until a person approves it in the steps editor. Read the process first (get_process), draft from its purpose, rhythm, executor and exception playbook and the client's file, show the user the draft, and save only after they said so. Never invent an approver, a system or an amount the file does not state. Refused when the process already has steps. Answers with `link`, the steps editor: give it to the user.",
+        "Saves Claude's draft of a client's process's steps as a draft version: it is not live until a person approves it in the steps editor. Read the process first (get_process), draft from its purpose, rhythm, executor and exception playbook, its open lessons and the client's file, show the user the draft, and save only after they said so. For a process that has steps, send the whole new list with `baseVersion`, the latest version you read (the draft's number when there is one, else the approved one): it saves a new draft version and is refused when someone saved since. A procedure with conditions (get_process shows `flow`) is edited in the steps editor. Never invent an approver, a system or an amount the file does not state: `approver` is a person at Ankora on the client or a contact in the client's file, by name; `systems` are names in the client's system map. Answers with `link`, the steps editor: give it to the user.",
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it."),
         process: z.string().describe('The process code ("P3") or its title.'),
@@ -664,21 +742,33 @@ export function registerClientFileTools(server: McpServer): void {
               offsetBusinessDays: z.number().int().min(-60).max(60).nullable().optional().describe("The business day from the run's date."),
               evidence: z.string().nullable().optional().describe("How we know it was done."),
               output: z.string().nullable().optional().describe("What the step produces."),
+              verification: z.string().nullable().optional().describe("How a person verifies an AUTOMATED step happened. Required for AUTOMATED."),
+              approver: z.string().nullable().optional().describe("Who approves the step, by name: a person at Ankora on this client, or a contact in the client's file. The step then waits for that approval."),
+              requiresApproval: z.boolean().optional().describe("The step needs an approval and nobody is named yet. Implied by approver."),
+              systems: z.array(z.string()).max(10).optional().describe("Names of systems in the client's system map the step uses."),
+              actions: z.array(z.enum(ACTION_TAGS)).max(8).optional().describe("What kind of action it is (a payment, a message to the client...): decides which of Ankora's checks apply."),
+              amountMax: z.number().min(0).nullable().optional().describe("The most money the step moves, in the currency."),
+              currency: z.string().length(3).nullable().optional().describe("ISO currency of amountMax, e.g. ILS or USD."),
+              channel: z.enum(CHANNELS).nullable().optional().describe("How the step reaches someone."),
             })
           )
           .min(1)
-          .max(15),
+          .max(MAX_DRAFT_STEPS),
+        baseVersion: z.number().int().min(0).optional().describe("For a process that has steps: the latest version you read with get_process."),
+        changeNote: z.string().max(500).optional().describe("What changed and why, in Hebrew, for the person who approves it."),
       }),
       annotations: TOOL_ANNOTATIONS.save_procedure_draft,
     },
-    async (args: { client: string; process: string; steps: { title: string; mode?: string; offsetBusinessDays?: number | null; evidence?: string | null; output?: string | null }[] }, ctx: ServerContext) => {
+    async (args: { client: string; process: string; steps: DraftStepArg[]; baseVersion?: number; changeNote?: string }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
         const client = await lookupClient(actor, args.client);
         if (!client.ok) return toolText(client.message);
         const process = await resolveProcess(client.value, args.process);
         if (!process.ok) return toolText(process.message);
-        const saved = await saveProcedureDraft(actor, process.id, args.steps);
+        const steps = await draftSteps(actor, client.value.id, args.steps);
+        if (!steps.ok) return toolText(steps.message);
+        const saved = await saveProcedureDraft(actor, process.id, steps.steps, { baseVersion: args.baseVersion, changeNote: args.changeNote });
         return toolJson({
           saved: true,
           version: saved.version,
@@ -703,12 +793,13 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "Save a procedure's preparation for an audit",
       description:
-        "For a client with audit requirements: saves what Claude drafted for a procedure's audit. `evidence` (how we know each step was done, by step number) goes into a new draft version of the procedure, approved by a person; a step that has it already is left as it is, and the steps themselves never change. `scope` and `controlRefs` are written only where the process has none, and reach the document with the next approval. Read the process first (get_process) and the client's file, draft from them, show the user, and save only after they said so. Never invent a control or evidence the file does not support. Answers with `link`, the process's page: give it to the user.",
+        "For a client with audit requirements: saves what Claude drafted for a procedure's audit. `evidence` (how we know each step was done, by step number) goes into a new draft version of the procedure, approved by a person; a step that has it already is left as it is, and the steps themselves never change. `scope`, `controlRefs` and `classification` are written only where the process has none, and reach the document with the next approval. Read the process first (get_process) and the client's file, draft from them, show the user, and save only after they said so. Never invent a control or evidence the file does not support. Answers with `link`, the process's page: give it to the user.",
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it."),
         process: z.string().describe('The process code ("P3") or its title.'),
         scope: z.string().nullable().optional().describe("Whom and what the procedure covers, in Hebrew."),
         controlRefs: z.array(z.string()).max(30).nullable().optional().describe('Controls of the client\'s standard, e.g. ["CC6.2", "CC6.3"].'),
+        classification: z.enum(["PUBLIC", "INTERNAL", "CONFIDENTIAL"]).nullable().optional().describe("How the procedure document is classified."),
         evidence: z
           .array(z.object({ step: z.number().int().min(1).max(40), text: z.string().describe("How we know the step was done, in one sentence, in Hebrew.") }))
           .max(40)
@@ -716,20 +807,24 @@ export function registerClientFileTools(server: McpServer): void {
       }),
       annotations: TOOL_ANNOTATIONS.save_procedure_audit_draft,
     },
-    async (args: { client: string; process: string; scope?: string | null; controlRefs?: string[] | null; evidence?: { step: number; text: string }[] }, ctx: ServerContext) => {
+    async (
+      args: { client: string; process: string; scope?: string | null; controlRefs?: string[] | null; classification?: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | null; evidence?: { step: number; text: string }[] },
+      ctx: ServerContext
+    ) => {
       try {
         const actor = actorOf(ctx);
         const client = await lookupClient(actor, args.client);
         if (!client.ok) return toolText(client.message);
         const process = await resolveProcess(client.value, args.process);
         if (!process.ok) return toolText(process.message);
-        const saved = await saveAuditDraft(actor, process.id, { scope: args.scope, controlRefs: args.controlRefs, evidence: args.evidence });
+        const saved = await saveAuditDraft(actor, process.id, { scope: args.scope, controlRefs: args.controlRefs, classification: args.classification, evidence: args.evidence });
         return toolJson({
           saved: true,
           draftVersion: saved.version,
           evidenceSteps: saved.evidenceSteps,
           scopeWritten: saved.scope,
           controlsWritten: saved.controls,
+          classificationWritten: saved.classification,
           next: saved.version ? "A draft. A person approves it on the process's page." : "Nothing new to approve.",
           link: `${appBaseUrl()}/app/clients/${client.value.id}/processes/${process.id}`,
         });

@@ -146,6 +146,17 @@ export function toMcpToolError(err: unknown): McpToolError {
   const name = err instanceof Error ? err.name : "";
   const known = KNOWN[name];
   if (known) return known;
+  // A rule of the domain said no (lib/domain-error.ts). Its message is
+  // written for the person and names what to do ("record when and how
+  // the client approved"), so it goes back as is, with its code. Never
+  // an unexpected error: those stay vague below.
+  if (name === "DomainError" && err instanceof Error) {
+    const code = (err as Error & { code?: unknown }).code;
+    return {
+      message: `Ankora refused this action: ${err.message}${typeof code === "string" ? ` (${code})` : ""}. Tell the user why in their words, and fix the call or do the missing step first if you can.`,
+      recoverable: true,
+    };
+  }
 
   return {
     message:

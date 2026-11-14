@@ -17,6 +17,11 @@ import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
 import { BUSINESS_CALENDAR_LABELS } from "@/lib/business-calendar";
 import { calendarOfProcess } from "@/lib/app-domain/date-calendars";
 import { strangerQuestionsOf, strangerStates } from "@/lib/app-domain/stranger-tests";
+import { getProcessRhythm, upcomingOfProcess } from "@/lib/app-domain/process-rhythm";
+import { documentTabOf } from "@/lib/app-domain/procedure-audit";
+import { stepsNeedingApprover } from "@/lib/step-approval";
+import { readFlow, BRANCH_SOURCE_LABELS, type ProcessFlow } from "@/lib/process-flow";
+import { readRule } from "@/lib/process-rhythm";
 import { STRANGER_ASK_WHO_LABELS, STRANGER_SEVERITY_LABELS, strangerLine } from "@/lib/stranger-test";
 
 // Org brain (claude/org-brain-spec-2026-10-12.md, 8): a client's processes
@@ -53,6 +58,10 @@ function summary(p: Processes[number], user: Map<string, string>, stranger: Stra
   return {
     code: p.code,
     title: p.title,
+    // 14.11.2026 (processes redesign): a process runs; a work guide
+    // ("הוראת עבודה") is how to do something, with steps and no rhythm,
+    // runs or blockers.
+    kind: p.kind,
     purpose: p.purpose,
     status: p.status,
     triggers: p.triggerKinds.map((t) => TRIGGER_LABELS[t]),
@@ -89,8 +98,8 @@ function summary(p: Processes[number], user: Map<string, string>, stranger: Stra
 
 const visible = (actor: User) => (r: Parameters<typeof canSendToAi>[0]) => canSendToAi(r, actor.id);
 
-export async function mcpListProcesses(actor: User, clientId: string) {
-  const processes = (await listProcesses(actor, clientId)).filter(visible(actor));
+export async function mcpListProcesses(actor: User, clientId: string, options: { includeRetired?: boolean } = {}) {
+  const processes = (await listProcesses(actor, clientId, { includeRetired: options.includeRetired })).filter(visible(actor));
   const [{ user }, stranger] = await Promise.all([namesFor(processes, clientId), strangerStates(processes.map((p) => p.id))]);
   return processes.map((p) => summary(p, user, stranger));
 }
@@ -99,7 +108,7 @@ export async function mcpListProcesses(actor: User, clientId: string) {
 /// procedure step by step, what it is missing, what it fails among the
 /// client's rules today, and its last runs.
 export async function mcpGetProcess(actor: User, clientId: string, processId: string) {
-  const p = (await listProcesses(actor, clientId)).filter(visible(actor)).find((x) => x.id === processId);
+  const p = (await listProcesses(actor, clientId, { includeRetired: true })).filter(visible(actor)).find((x) => x.id === processId);
   if (!p) return null;
   const [{ user, system }, stranger, questions] = await Promise.all([namesFor([p], clientId), strangerStates([p.id]), strangerQuestionsOf(p.id)]);
   // 14.11.2026 (processes redesign, stage 5): each step's own approver and
@@ -108,13 +117,20 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
   const contactIds = [...new Set(stepIds.map((s) => s.approverContactId).filter((x): x is string => !!x))];
   const userIds = [...new Set(stepIds.map((s) => s.approverUserId).filter((x): x is string => !!x))];
   const [stepContacts, stepUsers] = await Promise.all([
-    contactIds.length ? prisma.clientContact.findMany({ where: { id: { in: contactIds } }, select: { id: true, role: true, person: { select: { name: true } } } }) : [],
+    contactIds.length ? prisma.clientContact.findMany({ where: { id: { in: contactIds } }, select: { id: true, role: true, endedAt: true, sensitivity: true, audience: true, audienceUserIds: true, person: { select: { name: true } } } }) : [],
     userIds.length ? prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } }) : [],
   ]);
-  const contactName = new Map(stepContacts.map((c) => [c.id, c.person.name ?? c.role ?? ""]));
+  // A restricted contact is not named; one who left says since when, so
+  // Claude knows the step needs a new approver (spec 4.6).
+  const contactName = new Map(stepContacts.map((c) => [c.id, canSendToAi(c, actor.id) ? (c.person.name ?? c.role ?? "") : null]));
+  const contactLeft = new Map(stepContacts.filter((c) => c.endedAt).map((c) => [c.id, c.endedAt!.toISOString().slice(0, 10)]));
   const userName = new Map(stepUsers.map((u) => [u.id, u.name]));
   const approverOf = (s: ProcessStep) =>
-    s.approverUserId ? { atAnkora: userName.get(s.approverUserId) ?? null } : s.approverContactId ? { atClient: contactName.get(s.approverContactId) ?? null } : null;
+    s.approverUserId
+      ? { atAnkora: userName.get(s.approverUserId) ?? null }
+      : s.approverContactId
+        ? { atClient: contactName.get(s.approverContactId) ?? null, ...(contactLeft.has(s.approverContactId) ? { leftOn: contactLeft.get(s.approverContactId) } : {}) }
+        : null;
   const step = (s: ProcessStep, i: number) => ({
     n: i + 1,
     title: s.title,
@@ -131,9 +147,12 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
     channel: s.channel,
   });
   // The same R3 note on several steps is one line naming them.
-  const version = (v: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; checks: { code: string; message: string; step?: number; excepted?: boolean }[] }) => ({
+  const version = (v: { version: number; steps: ProcessStep[]; flow?: unknown; highlights: string | null; outputs: string | null; checks: { code: string; message: string; step?: number; excepted?: boolean }[] }) => ({
     version: v.version,
     steps: v.steps.map(step),
+    // A procedure with conditions: the steps above are its actions in
+    // order; the flow says what follows what, and on which answer.
+    flow: flowOf(readFlow(v.flow)),
     highlights: v.highlights,
     outputs: v.outputs,
     failsRules: mergeStepChecks(v.checks.filter((c) => !c.excepted)).map((c) => c.message),
@@ -145,8 +164,81 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
     take: 5,
     select: { id: true, title: true, status: true, dueDate: true },
   });
+  const [rhythm, upcoming, client, contacts, policies] = await Promise.all([
+    getProcessRhythm(actor, p.id),
+    p.kind === "GUIDE" ? Promise.resolve([]) : upcomingOfProcess(actor, p.id, 3),
+    prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, aiExcluded: true, auditRequirements: true } }),
+    prisma.clientContact.findMany({ where: { clientId, deletedAt: null, endedAt: { not: null } }, select: { id: true, role: true, endedAt: true, person: { select: { name: true } } } }),
+    listClientPolicies(actor, clientId),
+  ]);
+  const left = new Map(contacts.map((c) => [c.id, c.person.name ?? c.role ?? ""]));
+  const approverLeft = left.size ? stepsNeedingApprover(p.current?.steps ?? [], left, p.approverContactId) : [];
+  // The procedure document's tab, as the screen builds it (stage 4): why
+  // the approved document is out of date ("לעדכן"), and for a client with
+  // audit requirements what an audit still needs.
+  const doc = await documentTabOf(
+    {
+      id: p.id,
+      code: p.code,
+      title: p.title,
+      scope: p.scope,
+      controlRefs: p.controlRefs,
+      classification: p.classification,
+      current: p.current ? { steps: p.current.steps } : null,
+      docMissing: p.documentation.missing.filter((k) => k !== "permissions").map((k) => ({ field: k, label: FIELD_LABELS[k] })),
+      approverLeft,
+      stranger: { open: questions.open },
+    },
+    {
+      clientId,
+      clientName: client.name,
+      audit: client.auditRequirements,
+      aiExcluded: client.aiExcluded,
+      rules: policies.filter((x) => x.status !== "RETIRED" && (x.kind === "THRESHOLD" || x.kind === "APPROVAL_REQUIRED")).map((x) => ({ title: x.title, updatedAt: x.updatedAt })),
+      endedAt: new Map(contacts.map((c) => [c.person.name ?? c.role ?? "", c.endedAt!.toISOString().slice(0, 10)])),
+    }
+  );
   return {
     ...summary(p, user, stranger),
+    // 14.11.2026: the rhythm as data. Each start, a schedule's rule, and
+    // the next three dates with the day each run opens. Change it with
+    // set_process_rhythm.
+    rhythmDetail:
+      p.kind === "GUIDE"
+        ? null
+        : {
+            starts: rhythm.starts.map((st) => ({
+              kind: st.kind,
+              ...(st.kind === "SCHEDULE" ? { schedule: st.legacy ? "linked dates from before the rhythm editor; set a schedule to replace them" : readRule(st.schedule) } : {}),
+              ...(st.kind === "EVENT" ? { description: st.description } : {}),
+              ...(st.kind === "CONTINUOUS" ? { checkEveryDays: st.checkEveryDays, checkText: st.checkText } : {}),
+              ...(st.kind === "EXTERNAL" ? { where: st.externalWhere, when: st.externalWhen, recipient: st.externalRecipient } : {}),
+            })),
+            nextDates: upcoming.map((u) => ({ date: u.date, runOpens: u.opens, movedFrom: u.movedFrom })),
+          },
+    // Spec 4.6: steps whose approver at the client left. The process needs
+    // a new approver for each.
+    approverLeft,
+    // Spec 5.5, every client: why the approved document is out of date.
+    staleReasons: doc.stale.map((r) =>
+      r.key === "approverLeft"
+        ? `המאשר בשלב ${r.step}, ${r.name}, עזב${r.at ? ` ב-${r.at}` : ""}`
+        : r.key === "rhythmChanged"
+          ? "הקצב השתנה אחרי שהנוהל אושר"
+          : `הכלל "${r.title}" השתנה אחרי שהנוהל אושר`
+    ),
+    // Spec 4.7 and 5.5: for a client with audit requirements, the
+    // compliance fields and what is still missing for an audit. Fill the
+    // missing with save_procedure_audit_draft.
+    audit: client.auditRequirements
+      ? {
+          scope: p.scope ?? null,
+          controlRefs: p.controlRefs ?? [],
+          classification: p.classification ?? null,
+          ready: doc.readiness?.missing === 0,
+          missing: (doc.readiness?.items ?? []).filter((i) => !i.ok).map((i) => ({ item: i.key, ...(i.text.values ? { values: i.text.values } : {}) })),
+        }
+      : null,
     sla: p.slaText,
     // Decision 6: business days are counted on this calendar, for its
     // steps and for the dates that start it.
@@ -195,10 +287,37 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
       open: questions.open.map((q) => ({ id: q.id, step: q.step, severity: STRANGER_SEVERITY_LABELS[q.severity], askWho: STRANGER_ASK_WHO_LABELS[q.askWho], question: q.question })),
       answered: questions.answered.map((q) => ({ step: q.step, question: q.question, answer: q.answer })),
     },
-    openLessons: (await prisma.processLesson.findMany({ where: { processId: p.id, status: "OPEN" }, orderBy: { createdAt: "asc" }, select: { body: true, version: true, createdAt: true } })).map((l) => ({
+    openLessons: (await prisma.processLesson.findMany({ where: { processId: p.id, status: "OPEN" }, orderBy: { createdAt: "asc" }, select: { id: true, body: true, version: true, createdAt: true } })).map((l) => ({
+      // Decide it with resolve_process_lesson.
+      id: l.id,
       lesson: l.body,
       fromVersion: l.version,
       on: day(l.createdAt),
+    })),
+  };
+}
+
+/// A flow for Claude: what follows what, and on which answer. Positions
+/// and ids of the canvas are left out; nodes are named by title.
+function flowOf(flow: ProcessFlow | null) {
+  if (!flow) return null;
+  const title = new Map(flow.nodes.map((n) => [n.id, n.title]));
+  const to = (id: string | null) => (id ? (title.get(id) ?? null) : "סוף");
+  return {
+    start: flow.start ? (title.get(flow.start) ?? null) : null,
+    nodes: flow.nodes.map((n) => ({
+      title: n.title,
+      kind: n.kind,
+      ...(n.waitBusinessDays ? { waitBusinessDays: n.waitBusinessDays } : {}),
+      ...(n.kind === "CONDITION"
+        ? {
+            question: n.question,
+            branches: n.branches.map((b) => ({ answer: b.label, decidedBy: BRANCH_SOURCE_LABELS[b.source], then: to(b.next) })),
+            otherwise: { label: n.elseLabel, afterBusinessDays: n.elseAfterBusinessDays, then: to(n.elseNext) },
+          }
+        : n.kind === "END"
+          ? {}
+          : { then: to(n.next) }),
     })),
   };
 }
