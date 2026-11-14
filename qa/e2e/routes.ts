@@ -254,6 +254,10 @@ export const DYNAMIC_SWEEP: { route: string; optional?: string }[] = [
     optional: "needs a process with an approved version on the first client; the approval flow creates one, and spec order is not guaranteed",
   },
   {
+    route: "/app/clients/[clientId]/processes/[processId]/steps",
+    optional: "needs a process on the first client; the seed's client may have none, and the specs that add one run in no guaranteed order",
+  },
+  {
     route: "/app/clients/[clientId]/processes/[processId]/flow",
     optional: "needs a process on the first client; the seed's client may have none, and the specs that add one run in no guaranteed order",
   },
