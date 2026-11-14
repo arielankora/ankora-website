@@ -129,6 +129,8 @@ export async function updateClient(
     aiExcluded?: boolean;
     /// Client.procedureApprovalSeparation.
     procedureApprovalSeparation?: boolean;
+    /// 14.11.2026 (stage 4): Client.auditRequirements.
+    auditRequirements?: boolean;
     /// 12.11.2026: Client.communicationLocale, the language its people
     /// without an account are written to (ADR 0006).
     communicationLocale?: AppLocale;
@@ -195,6 +197,7 @@ export async function updateClient(
       isInternal: input.isInternal,
       aiExcluded: input.aiExcluded,
       procedureApprovalSeparation: input.procedureApprovalSeparation,
+      auditRequirements: input.auditRequirements,
       communicationLocale: input.communicationLocale,
       kind: input.kind,
       industry: input.industry === null ? null : input.industry?.trim() || undefined,

@@ -534,6 +534,11 @@ model Client {
   /// procedures does not approve it (lib/procedure-approval.ts). For a
   /// client whose auditor asks for it; off by default.
   procedureApprovalSeparation Boolean @default(false)
+  /// 14.11.2026 (processes redesign, stage 4, spec 4.7): the client is
+  /// audited (SOC 2, ISO). Adds to each procedure the compliance fields,
+  /// the readiness for an audit and "להכין לביקורת". On for NUX and
+  /// Ankora's own file.
+  auditRequirements Boolean @default(false)
 
   /// 12.11.2026 (ADR 0006, outgoing channels, part B): the language Ankora
   /// writes to this client's people who have no account in the app (its

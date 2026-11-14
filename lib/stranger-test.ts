@@ -101,3 +101,11 @@ export function strangerPrompt(clientName: string, code: string, title: string):
 export function stepsDraftPrompt(clientName: string, code: string, title: string): string {
   return `נסח טיוטת שלבים לתהליך ${code} "${title}" של ${clientName}: קרא את התהליך עם get_process (המטרה, הקצב, המבצע ונוהל החריגים) ואת תיק הלקוח, ונסח שלבים ממוספרים, כל אחד במשפט אחד: מה עושים, איך (ידני, Claude מכין ואדם בודק, או אוטומטי), באיזה יום עסקים, ואיך יודעים שבוצע. אל תמציא מאשר, מערכת או סכום שלא כתובים בתיק. הראה לי את הטיוטה, ורק אחרי שאישרתי שמור אותה עם save_procedure_draft.`;
 }
+
+/// 14.11.2026 (processes redesign, stage 4, "להכין לביקורת"): the prompt for
+/// a client with audit requirements. Claude drafts what the document lacks,
+/// shows the person, and saves it with save_procedure_audit_draft: a new
+/// draft version a person approves.
+export function auditPrepPrompt(clientName: string, code: string, title: string): string {
+  return `הכן לביקורת את הנוהל ${code} "${title}" של ${clientName}: קרא אותו עם get_process ואת תיק הלקוח, ונסח את מה שחסר: תחולה (על מי ועל מה הנוהל חל), בקרות לפי התקן שהלקוח עובר (למשל SOC 2), ולכל שלב "איך יודעים שבוצע". אל תשנה את השלבים עצמם, ואל תמציא בקרה או ראיה שלא נובעות מהתיק. הראה לי את הניסוח, ורק אחרי שאישרתי שמור אותו עם save_procedure_audit_draft.`;
+}

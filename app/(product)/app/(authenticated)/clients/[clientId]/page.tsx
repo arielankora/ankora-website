@@ -70,6 +70,7 @@ import { stepsLeadOf, upcomingOfProcess } from "@/lib/app-domain/process-rhythm"
 import { ProcessList } from "./ProcessList";
 import { ProcessPage } from "./ProcessPage";
 import { stepsNeedingApprover } from "@/lib/step-approval";
+import { documentTabOf } from "@/lib/app-domain/procedure-audit";
 import { listLessons } from "@/lib/app-domain/process-lessons";
 import { strangerPanel } from "@/lib/app-domain/stranger-tests";
 import { strangerPrompt } from "@/lib/stranger-test";
@@ -583,9 +584,21 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   if (sp?.process) {
     const shown = panelProcesses.find((x) => x.id === sp.process);
     if (!shown) notFound();
-    const [upcoming, stepsLead] = await Promise.all([upcomingOfProcess(user, shown.id), stepsLeadOf(shown.id)]);
+    const [upcoming, stepsLead, docTab] = await Promise.all([
+      upcomingOfProcess(user, shown.id),
+      stepsLeadOf(shown.id),
+      documentTabOf(shown, {
+        clientId: client.id,
+        clientName: client.name,
+        audit: client.auditRequirements,
+        aiExcluded: client.aiExcluded,
+        rules: policies.filter((x) => x.status !== "RETIRED" && (x.kind === "THRESHOLD" || x.kind === "APPROVAL_REQUIRED")).map((x) => ({ title: x.title, updatedAt: x.updatedAt })),
+        endedAt: new Map(people.contacts.filter((c) => c.endedAt).map((c) => [c.person.name ?? c.role ?? "", c.endedAt!.toISOString().slice(0, 10)])),
+      }),
+    ]);
     return (
       <ProcessPage
+        docTab={docTab}
         clientId={client.id}
         clientName={client.name}
         process={shown}
