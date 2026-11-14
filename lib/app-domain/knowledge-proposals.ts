@@ -127,6 +127,8 @@ export type BatchSourceInput =
       /// An Ankora document that writes down what the client said
       /// (21.10.2026): registered with the primary weight.
       weight?: SourceWeight;
+      /// A WhatsApp stretch or a recorded call (14.11.2026).
+      externalSystem?: "WHATSAPP" | "CALL";
     };
 
 export type ProposeInput = {
@@ -228,6 +230,7 @@ async function registerPlanned(actor: User, clientId: string, planned: PlannedSo
     externalIds: s.externalIds,
     restriction: s.restriction,
     weight: s.weight,
+    externalSystem: s.externalSystem,
   });
   return { id: created.id, code: created.code, created: true };
 }

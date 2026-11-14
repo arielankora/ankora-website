@@ -8,6 +8,7 @@ import { currentGuide } from "@/lib/app-domain/extraction-guide";
 import { DEFAULT_EXTRACTION_GUIDE_LINES, guideLines } from "@/lib/extract-prompt";
 import { policiesInForce } from "@/lib/app-domain/client-policies";
 import { ruleLine } from "@/lib/client-policies";
+import { processedComms } from "@/lib/comms/extraction-refs";
 
 // Org brain, phase 2: what an unattended extraction needs before it reads
 // a single meeting (claude/org-brain-spec-2026-10-12.md, 5.1).
@@ -44,6 +45,13 @@ export async function extractionBrief(actor: User, now = new Date()) {
     // DATA_HANDLING): the run applies them to that client's meetings only.
     policiesInForce(actor, clients, ["DATA_HANDLING"]),
   ]);
+  // 14.11.2026: what was already read of stored WhatsApp conversations and
+  // recorded calls, from the sources registered for them (all time: a
+  // conversation goes on, and the next run starts the day after).
+  const commsSources = await prisma.clientSource.findMany({
+    where: { clientId: { in: ids }, deletedAt: null, kind: { in: ["PERSON", "TRANSCRIPT"] } },
+    select: { clientId: true, externalRefs: true },
+  });
 
   const nameOf = new Map(clients.map((c) => [c.id, c.name]));
   const marked = new Set(clients.filter((c) => c.aiExcluded).map((c) => c.id));
@@ -89,5 +97,41 @@ export async function extractionBrief(actor: User, now = new Date()) {
     },
     processedRecordings: processed,
     processedWindowDays: PROCESSED_WINDOW_DAYS,
+    communications: communicationsBrief(clients, nameOf, marked, commsSources),
+  };
+}
+
+/// The stored WhatsApp conversations and recorded calls (14.11.2026): what
+/// was already read, per client, and how to read the rest.
+function communicationsBrief(
+  clients: { id: string; isInternal?: boolean }[],
+  nameOf: Map<string, string>,
+  marked: Set<string>,
+  sources: { clientId: string; externalRefs: unknown }[],
+) {
+  const byClient = new Map<string, { system?: unknown; id?: unknown }[]>();
+  for (const s of sources) {
+    if (marked.has(s.clientId) || !Array.isArray(s.externalRefs)) continue;
+    byClient.set(s.clientId, [...(byClient.get(s.clientId) ?? []), ...(s.externalRefs as { system?: unknown; id?: unknown }[])]);
+  }
+  const alreadyRead = [];
+  for (const c of clients) {
+    const refs = byClient.get(c.id);
+    if (!refs) continue;
+    const p = processedComms(refs);
+    if (p.whatsappReadThrough.size === 0 && p.calls.size === 0) continue;
+    alreadyRead.push({
+      client: nameOf.get(c.id) ?? "",
+      whatsapp: [...p.whatsappReadThrough].map(([conversationId, readThrough]) => ({ conversationId, readThrough })),
+      calls: [...p.calls],
+    });
+  }
+  return {
+    instruction: [
+      "Ankora also keeps its WhatsApp conversations and recorded phone calls with clients. For a client, list_client_communications lists them and get_client_communication reads one.",
+      "A conversation is read from the day after its `readThrough` below (all of it when it has none), and each stretch read is one source: newSource of kind PERSON with `whatsapp` {conversationId, from, to}, `to` being the last day read. A recorded call whose id is under `calls` below was already read; any other is one source: newSource of kind TRANSCRIPT with `callId`. Read a call only when its transcript is ready.",
+      "Only what the client's people wrote or said is the client's word: Ankora's own messages give context, and an item they alone support is UNCERTAIN. Leave out greetings, scheduling and small talk. The client's dataHandlingRules apply as to meetings.",
+    ].join(" "),
+    alreadyRead,
   };
 }

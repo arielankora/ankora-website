@@ -1,4 +1,7 @@
 import "server-only";
+import { readClientCall, readClientConversation } from "@/lib/comms/client-comms";
+import { whatsappRefId } from "@/lib/comms/extraction-refs";
+import { deniedText } from "@/lib/mcp/comms-tools";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { batchUrl, fileItemUrl, proposalUrl } from "@/lib/approval-links";
 import { aiExcludedClientIds, isDocumentAiExcluded, isTaskAiExcluded } from "@/lib/app-domain/ai-exclusion-db";
@@ -184,6 +187,15 @@ const PROPOSE_INPUT = z.object({
           .boolean()
           .optional()
           .describe("For kind ANKORA_DOCUMENT only: true when the document writes down what the client said in a conversation with them (an intake summary typed during the meeting). Its items are then not lowered to uncertain just because Ankora wrote them."),
+        whatsapp: z
+          .object({
+            conversationId: z.string().describe("The conversation's `id` from list_client_communications."),
+            from: z.string().describe("YYYY-MM-DD: the first day of messages read."),
+            to: z.string().describe("YYYY-MM-DD: the last day of messages read."),
+          })
+          .optional()
+          .describe("For kind PERSON: the stretch of a stored WhatsApp conversation the items came from. The same stretch is one source, and get_extraction_brief tells the next run where to start."),
+        callId: z.string().optional().describe("For kind TRANSCRIPT: a recorded call's `id` from list_client_communications, instead of firefliesId."),
       })
       .optional(),
     note: z.string().optional().describe("One line: what was read, what was left out."),
@@ -229,12 +241,34 @@ const PROPOSE_INPUT = z.object({
 /// the payloads). The fields and their values are in the schema; only what
 /// the schema cannot say is here. tests/unit/mcp/propose-knowledge-status
 /// holds the length.
+/// The register ref of a WhatsApp stretch or a recorded call named as a
+/// source, once it is checked to be one the user may read for this client.
+async function commsSourceRef(
+  actor: User,
+  clientId: string,
+  ns: { kind: string; whatsapp?: { conversationId: string; from: string; to: string }; callId?: string },
+): Promise<{ system: "WHATSAPP" | "CALL"; id: string } | { refusal: string }> {
+  if (ns.whatsapp && ns.callId) return { refusal: "newSource names one source: `whatsapp` or `callId`, not both." };
+  if (ns.whatsapp) {
+    if (ns.kind !== "PERSON") return { refusal: "A WhatsApp conversation is a source of kind PERSON." };
+    const { conversationId, from, to } = ns.whatsapp;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) return { refusal: "newSource.whatsapp needs `from` and `to` as YYYY-MM-DD, from not after to." };
+    const read = await readClientConversation(actor, clientId, conversationId.trim().slice(0, 100), { since: null, before: null, limit: 1 });
+    if ("denied" in read) return { refusal: deniedText(read) };
+    return { system: "WHATSAPP", id: whatsappRefId(read.conversation.id, from, to) };
+  }
+  if (ns.kind !== "TRANSCRIPT") return { refusal: "A recorded call is a source of kind TRANSCRIPT." };
+  const call = await readClientCall(actor, clientId, ns.callId!.trim().slice(0, 100));
+  if ("denied" in call) return { refusal: deniedText(call) };
+  return { system: "CALL", id: call.call.id };
+}
+
 export const PROPOSE_KNOWLEDGE_DESCRIPTION = [
   "Sends proposed items for a client's file, from ONE source (a meeting, a document, an email thread). Nothing enters the file until a person approves it on Ankora's review screen, except AUTO.",
   "STATUS, on each item as `status`: CONFIRMED (the client or their supplier said or showed it explicitly), UNCERTAIN (said unclearly, or only by Ankora) or MISSING (needed, and we do not have it). With UNCERTAIN or MISSING add payload.toResolve: what would close it. Left out, HIGH confidence is CONFIRMED and anything else UNCERTAIN. Not used on NARRATIVE, DOMAIN, TASK, DATE or a QUESTION fact.",
   "FIELDS: each item's `payload` is described in the schema per target (payload.anyOf, titled by target), with every closed list. For example FACT.kind (SCOPE_IN, SCOPE_OUT, PREFERENCE, REQUIREMENT, LOCATION, FINANCE, TEMPORARY, ONE_OFF_DECISION, QUESTION, NOTE) and FACT.topic (COMMUNICATION, REPORTING, DOCUMENTS, AUTOMATION, ADMINS, PAYMENTS, SUPPLIERS, OTHER). A value outside a list drops that item, and the reply says where (items[0].payload.topic).",
   "Each item needs `reason` (one sentence: why it is true and where it was said) and `confidence` (the review screen orders by it), and should have `at` (minute in the recording, \"08:13\"). `quote` is optional and short, never from a topics-only source.",
-  "SOURCE: `sourceCode` (\"S3\") for a source in the client's register (get_client_file lists it), or `newSource` to register one; it is registered only when at least one item is kept. A recording is found again by firefliesId and an email thread (kind EMAIL) by gmailThreadId, so sending it twice makes no second source. An email thread is a source only when it is this client's; quote only what the client or their supplier wrote.",
+  "SOURCE: `sourceCode` (\"S3\") for a source in the client's register (get_client_file lists it), or `newSource` to register one; it is registered only when at least one item is kept. A source is found again by firefliesId, gmailThreadId (EMAIL), callId or whatsapp (see get_extraction_brief), so sending it twice makes no second source. An email thread is a source only when it is this client's; quote only what the client or their supplier wrote.",
   "CHANGES: to change an item already in the file, action SUPERSEDE with `targetId` (the id after the item in get_client_file) and only the fields that change. When someone said otherwise and it is not clear who is right, CONTRADICT with its targetId: nothing is overwritten. Never propose a second item for something in the file: names vary between meetings (\"Washington DOR\" and \"Washington Department of Revenue\"), so look for one first. The reply's `possibleMatches` lists new items that may already exist; resend them as SUPERSEDE or leave them to the reviewer.",
   "NAMES (entityName, routeToNames, systemNames and the like) link to the item in the file with that name on approval; name only what is in the file or in the same batch. Every payload except NARRATIVE, DOMAIN, TASK and DATE may carry externalRefs, ownerName (the person at Ankora who keeps it right) and clientVisible (true only when it is the client's to see; never with sensitivity SENSITIVE or doNotDisclose).",
   "Fill interimStatement (APPROVAL_REQUIRED/THRESHOLD rules) and verification (AUTOMATED steps).",
@@ -423,7 +457,7 @@ export function registerClientFileTools(server: McpServer): void {
       args: {
         client: string;
         sourceCode?: string;
-        newSource?: { kind: "TRANSCRIPT" | "CLIENT_DOCUMENT" | "TASK" | "PERSON" | "ANKORA_DOCUMENT" | "EMAIL"; title: string; date?: string; participants?: string[]; firefliesId?: string; gmailThreadId?: string; documentId?: string; taskId?: string; topicsOnly?: boolean; clientConversation?: boolean };
+        newSource?: { kind: "TRANSCRIPT" | "CLIENT_DOCUMENT" | "TASK" | "PERSON" | "ANKORA_DOCUMENT" | "EMAIL"; title: string; date?: string; participants?: string[]; firefliesId?: string; gmailThreadId?: string; documentId?: string; taskId?: string; topicsOnly?: boolean; clientConversation?: boolean; whatsapp?: { conversationId: string; from: string; to: string }; callId?: string };
         note?: string;
         uncertain?: { candidates: string[]; reason: string };
         items: (ProposalItemInput & { client?: string })[];
@@ -442,13 +476,22 @@ export function registerClientFileTools(server: McpServer): void {
         if (ns?.documentId && (await isDocumentAiExcluded(ns.documentId))) return toolText(AI_EXCLUDED_TOOL_MESSAGE);
         if (ns?.date && !/^\d{4}-\d{2}-\d{2}$/.test(ns.date)) return toolText("newSource.date must be YYYY-MM-DD.");
         if (ns?.kind === "EMAIL" && !ns.gmailThreadId) return toolText("newSource of kind EMAIL needs `gmailThreadId`, so the same thread is never registered twice.");
+        // 14.11.2026: a stretch of a stored WhatsApp conversation, or a
+        // recorded call, must be one the user may read for this client
+        // (lib/comms/client-comms.ts), and is found again by its ref.
+        const comms = ns?.whatsapp || ns?.callId ? await commsSourceRef(actor, client.value.id, ns) : null;
+        if (comms && "refusal" in comms) return toolText(comms.refusal);
+        if (comms && args.items.some((i) => i.client && i.client.trim() !== args.client.trim())) {
+          return toolText("A WhatsApp conversation or a call is one client's: send its items under `client` only.");
+        }
         const newSource = ns
           ? {
               kind: ns.kind,
               title: ns.title,
               occurredAt: ns.date ? new Date(`${ns.date}T00:00:00Z`) : null,
               participants: ns.participants,
-              externalIds: [ns.firefliesId, ns.gmailThreadId, ns.documentId, ns.taskId].filter((v): v is string => !!v),
+              externalIds: comms ? [comms.id] : [ns.firefliesId, ns.gmailThreadId, ns.documentId, ns.taskId].filter((v): v is string => !!v),
+              ...(comms ? { externalSystem: comms.system } : {}),
               restriction: ns.topicsOnly ? ("TOPICS_ONLY" as const) : ("NONE" as const),
               ...(ns.kind === "ANKORA_DOCUMENT" && ns.clientConversation ? { weight: "PRIMARY" as const } : {}),
             }
@@ -1127,7 +1170,7 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "Get the extraction brief",
       description: [
-        "Everything an extraction run needs before reading a meeting: Ankora's approved extraction guidance (follow it), the user's clients with the email domains that identify their meetings and each client's own data-handling rules, and the Fireflies recordings already turned into proposals in the last 30 days (skip those).",
+        "Everything an extraction run needs before reading a meeting: Ankora's approved extraction guidance (follow it), the user's clients with the email domains that identify their meetings and each client's own data-handling rules, and the Fireflies recordings already turned into proposals in the last 30 days (skip those). `communications` says how to extract from the stored WhatsApp conversations and recorded calls, and what of them was already read.",
         "A client's `dataHandlingRules` bind every item proposed for that client, on top of Ankora's guidance: what they do not allow is not proposed at all. A rule marked as an interim rule applies as written until its proposed rule is approved.",
         "Matching a meeting to a client: a participant from a CLIENT domain decides it. A PARTNER domain decides it only when that partner appears under one client; if it appears under several, decide from the title and content and say why in the batch note. A meeting about several clients is split: each item goes to its own client's batch. A meeting with no client participant and no client named is internal: skip it.",
       ].join(" "),
