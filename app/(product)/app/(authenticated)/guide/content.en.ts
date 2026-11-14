@@ -484,6 +484,10 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "For a date-based process: \"Key dates\" opens a panel. \"New key date for the process\" creates a key date and links it, with \"How often\": \"Every business day\" (Sunday to Thursday, without holidays), \"Once a week\", \"Once a month\" or \"Once\", then click \"Create the date and link it\". Below that, \"or link a key date already in the file\" links an existing key date of the client.",
           "A process triggered when something happens or on request: \"Open a run\" and choose the day. Each process has one run per day: if there is already an unfinished run for that day, a second one is not opened, and the message points to the existing run. A run that has finished or was archived does not block.",
           "An ongoing process: when editing, fill in \"Check every (days)\" and \"What is checked\". Record the check with \"Record a check\", from the card or from \"Routine work\" on the home screen.",
+          "A procedure with conditions and branches is built in the \"Flow editor\" (a link on the process card). The nodes are \"Action\", \"Wait\", \"Condition\", \"Send email\" and \"End\". On a computer, drag a node to move it and pull a line from its bottom point to another node to connect them; on a phone, tap a node to edit it. A procedure saved as a list is converted to a flow when the editor opens, and nothing is saved until \"Save and activate\".",
+          "In a \"Condition\" node you write the question and add branches (\"+ Another branch\"). Branches are checked in order and the first that holds wins; if none does, the procedure goes to \"Otherwise\" after the number of business days you set. A branch can check for a reply to an email sent in an earlier node, or for files in a Drive folder, and for that you pick a \"Client connection\".",
+          "A \"Send email\" node goes out from the account manager's mailbox. An automatic send needs a fixed wording that a person wrote in the editor, and passes a \"Second review\" once. Until it is approved, the previous version keeps running.",
+          "\"Save and activate\" checks the flow and shows the blocking problems (for example a node that leads nowhere, a loop, or a node that cannot be reached). Only a manager or the client's account manager activates a procedure, and for a client that separates the author from the approver the version waits for a \"Second review\". Runs that already started continue on the previous version.",
         ],
         notes: [
           "Two people editing the procedure at the same time do not overwrite each other: whoever saves second is asked to refresh and check what changed.",
@@ -517,6 +521,26 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "Claude can propose a rule from a meeting. After approval on the \"Extracted knowledge\" tab of the \"Approvals\" screen, the rule enters the file as proposed, and a manager approves it separately, on the \"Rules\" tab of the same screen or in the client file.",
         ],
         images: [{ src: "/guide/en/client-rules.png", alt: "The rules area in the client file", caption: "\"Client rules\" on the client file tab" }],
+      },
+      {
+        id: "client-connections",
+        title: "Client connections",
+        roles: ["SUPER_ADMIN", "ANKORA_ADMIN"],
+        summary: "The client's systems (mail and Drive) that its procedures read from or write to, and the mailbox the procedures' emails go out from.",
+        description: [
+          "The \"Connections\" screen opens from the link in the processes area of the client file. Every use of a connection is written to the log. Only a manager or the client's account manager connects and disconnects.",
+          "Each connection card shows its kind, who connected it, \"Used in N procedures\" or \"Not used in a procedure yet\", and \"Consent not recorded\" if nobody wrote down who at the client gave the access.",
+        ],
+        steps: [
+          "\"Connect through Google (recommended)\": the client approves on Google's screen. The connection gives mail (only whether a reply arrived) and Drive (sees files in the folder, and writes files the procedure creates). If Google is not set up in the environment, the screen says so.",
+          "\"Username and app password\": mail only. Fill in \"Email address\", \"App password\" and \"Who at the client gave the access, and when\", then press \"Save the connection\". The password is stored in the vault, and needs two-step verification on the client's account.",
+          "\"Test connection\" sends a test and shows how many threads are visible, without reading any content, and, if you entered a folder ID, how many files are in it. A connection by app password is only tested on the first run that reads mail.",
+          "\"Disconnect\" asks for confirmation (\"Yes, disconnect\") and also revokes the permission in Google. If the connection is used in procedures, they stop at the node that uses it.",
+          "\"Sending\": emails the client's procedures send go out from the account manager's mailbox. \"Connect my mailbox for sending\" connects yours.",
+        ],
+        notes: [
+          "A client marked \"No AI\": simple checks (a reply arrived, a file exists) still run, but Claude does not read through the connections.",
+        ],
       },
       {
         id: "approvals",
