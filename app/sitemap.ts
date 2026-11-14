@@ -21,6 +21,8 @@ const routes: { path: string; priority: number; changeFrequency: MetadataRoute.S
   { path: "/coverage", priority: 0.7, changeFrequency: "monthly" },
   { path: "/blog", priority: 0.7, changeFrequency: "weekly" },
   { path: "/contact", priority: 0.6, changeFrequency: "yearly" },
+  // In memory of Sgt. Nathanel Young, within the Next October initiative.
+  { path: "/next-october", priority: 0.4, changeFrequency: "yearly" },
   { path: "/solutions", priority: 0.75, changeFrequency: "monthly" },
   { path: "/solutions/executives", priority: 0.7, changeFrequency: "monthly" },
   { path: "/solutions/founders", priority: 0.7, changeFrequency: "monthly" },
