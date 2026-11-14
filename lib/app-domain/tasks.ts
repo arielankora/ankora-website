@@ -15,6 +15,8 @@ import type {
   TaskStatus,
   UserRole,
 } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { APPROVAL_HOWS, type ApprovalHow, type ClientApprovalEvidence } from "@/lib/step-approval";
 import { findTemplate } from "@/lib/app-domain/sop-templates";
 import { notifyTaskPeople } from "@/lib/app-domain/notifications";
 import { alertIfUrgentComment, alertIfUrgentLanded } from "@/lib/app-domain/urgent-tasks";
@@ -1001,9 +1003,11 @@ export async function createTask(
 export async function completeStepAsSystem(stepId: string, reason: string): Promise<boolean> {
   const step = await prisma.task.findFirst({
     where: { id: stepId, deletedAt: null },
-    select: { id: true, parentId: true, clientId: true, clientVisible: true, status: true },
+    select: { id: true, parentId: true, clientId: true, clientVisible: true, status: true, approvalContactId: true, approvalEvidence: true },
   });
   if (!step || !step.parentId || step.clientVisible || !OPEN_STATUSES.includes(step.status)) return false;
+  // A client's approval is written down by a person (stage 3, spec 4.5).
+  if (step.approvalContactId && !step.approvalEvidence) return false;
 
   const now = new Date();
   await prisma.task.update({ where: { id: step.id }, data: { status: "DONE", completedAt: now } });
@@ -1425,6 +1429,23 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     data.status !== undefined &&
     !OPEN_STATUSES.includes(data.status) &&
     OPEN_STATUSES.includes(task.status);
+
+  // 14.11.2026 (processes redesign, stage 3, spec 4.5): a step approved by
+  // a contact at the client is closed only with when and how they
+  // approved (recordClientApproval), and closing the run does not close it
+  // for them.
+  if (closing && data.status === "DONE" && task.approvalContactId && !task.approvalEvidence) {
+    throw new DomainError("tasks.clientApprovalUndocumented", "כדי לסמן את השלב כבוצע, מתעדים מתי ואיך הלקוח אישר.");
+  }
+  if (closing && data.status === "DONE" && !task.parentId) {
+    const undocumented = await prisma.task.findFirst({
+      where: { parentId: taskId, deletedAt: null, approvalContactId: { not: null }, approvalEvidence: { equals: Prisma.DbNull }, status: { in: OPEN_STATUSES } },
+      select: { title: true },
+    });
+    if (undocumented) {
+      throw new DomainError("tasks.stepAwaitingClientApproval", `השלב "${undocumented.title}" מחכה לתיעוד של אישור הלקוח. אחרי שמתעדים מתי ואיך אושר, אפשר לסגור.`, { title: undocumented.title });
+    }
+  }
 
   // Closing work closes its steps, except one that waits for a
   // signature: closing the run around it would sign it for nobody (org
@@ -2129,4 +2150,48 @@ export async function countOpenTasksByClient(clientIds: string[]): Promise<Map<s
     _count: { _all: true },
   });
   return new Map(rows.map((r) => [r.clientId, r._count._all]));
+}
+
+// A run's step approved by a contact at the client (processes redesign,
+// stage 3, spec 4.5, "Run.dc.html"). Not a gate: the run goes on while it
+// waits. The step is closed with when and how the contact approved, an
+// optional link, and who wrote it down. Here, with every other write to a
+// task (tests/unit/task-close-rule.test.ts).
+
+export type ClientApprovalInput = { at: string; how: string; link?: string | null };
+
+export async function recordClientApproval(actor: User, stepId: string, input: ClientApprovalInput, now = new Date()) {
+  assertCan(actor.role, "time_entry.create_self");
+  const step = await prisma.task.findFirst({
+    where: { id: stepId, deletedAt: null },
+    select: { id: true, clientId: true, parentId: true, status: true, approvalContactId: true, approvalEvidence: true },
+  });
+  if (!step) throw new DomainError("stepApprovals.notFound", "השלב לא נמצא.");
+  const accessible = await listAccessibleClients(actor);
+  if (!accessible.some((c) => c.id === step.clientId)) throw new DomainError("stepApprovals.notFound", "השלב לא נמצא.");
+  if (!step.approvalContactId) throw new DomainError("stepApprovals.notClientApproval", "לשלב הזה אין מאשר אצל הלקוח.");
+
+  const at = (input.at ?? "").trim();
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(at) ? new Date(`${at}T12:00:00Z`) : new Date(NaN);
+  if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== at) throw new DomainError("stepApprovals.badDate", "צריך את התאריך שבו הלקוח אישר.");
+  if (at > localDateKey(now)) throw new DomainError("stepApprovals.futureDate", "תאריך האישור עוד לא הגיע.");
+  if (!(APPROVAL_HOWS as readonly string[]).includes(input.how)) throw new DomainError("stepApprovals.badHow", "צריך לבחור איך הלקוח אישר.");
+  const link = input.link?.trim() || null;
+  if (link && (!/^https?:\/\//i.test(link) || link.length > 1000)) throw new DomainError("stepApprovals.badLink", "הקישור צריך להתחיל ב-https://.");
+
+  const evidence: ClientApprovalEvidence = { at, how: input.how as ApprovalHow, link, byUserId: actor.id, recordedAt: now.toISOString() };
+  await prisma.task.update({ where: { id: step.id }, data: { approvalEvidence: evidence } });
+  await recordAudit({
+    actorId: actor.id,
+    action: "task.client_approval",
+    entityType: "Task",
+    entityId: step.id,
+    clientId: step.clientId,
+    before: { approvalEvidence: step.approvalEvidence ?? null },
+    after: { approvalEvidence: evidence, approvalContactId: step.approvalContactId },
+  });
+  // Written down, the step is done, through the same path as any other
+  // close (its audit, its run's progress).
+  if (step.status !== "DONE") await updateTask(actor, step.id, { status: "DONE" });
+  return evidence;
 }

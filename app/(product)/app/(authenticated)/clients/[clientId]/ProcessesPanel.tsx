@@ -181,6 +181,9 @@ export type PanelProcess = {
   /// `mayApprove`: whether the viewer may approve it (lib/procedure-approval.ts).
   draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: PanelCheck[]; mayApprove?: boolean; mayDiscard?: boolean } | null;
   runs: { id: string; title: string; status: string; dueDate: string | null; stepsDone?: number; stepsTotal?: number; waitingOn?: string | null }[];
+  /// 14.11.2026 (stage 3, spec 4.6): approved steps whose approver at the
+  /// client has left (step 0: the process's own approver, before stage 3).
+  approverLeft?: { step: number; name: string }[];
   /// 13.11.2026 (stage 2): a process that runs, or a work instruction.
   kind?: "PROCESS" | "GUIDE";
   /// An ongoing process: its check, when the next one is due, and the last ones.

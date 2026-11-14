@@ -287,6 +287,7 @@ export const ACTION_LABEL: Record<string, string> = {
   // Phase 9 gap-fix (spec §11): Tasks/Profile self-service actions.
   "task.create": "יצירת משימה",
   "task.status_change": "שינוי סטטוס משימה",
+  "task.client_approval": "תיעוד אישור של הלקוח בשלב של ריצה",
   "task.approve": "אישור משימה",
   "task.comment": "הערה על משימה",
   "task.comment_delete": "מחיקת הערה על משימה",

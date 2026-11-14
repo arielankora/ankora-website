@@ -1266,6 +1266,8 @@
       "aiExclusionOnStep": "A step inherits the \"No AI\" mark from its task. To mark it, mark the task.",
       "stepAwaitingApproval": "The step \"{title}\" is waiting for approval from {supervisor}. Once it's approved, the task can be closed.",
       "stepAwaitingApprovalNoSupervisor": "The step \"{title}\" is waiting for approval. Once it's approved, the task can be closed.",
+      "clientApprovalUndocumented": "To mark the step done, write down when and how the client approved.",
+      "stepAwaitingClientApproval": "The step \"{title}\" is waiting for the client's approval to be written down. Once it is, the task can be closed.",
       "commentEmpty": "Nothing to save: the comment is empty.",
       "commentTooLong": "The comment is longer than {max} characters. You can split it in two.",
       "commentNotFound": "Comment not found.",
@@ -1434,6 +1436,14 @@
       "discardNotDraft": "Only the latest draft can be discarded, before it is approved.",
       "discardNotAuthor": "Only whoever wrote the draft, or a manager, can discard it.",
       "rhythmInvalid": "The rhythm is not valid. Check the fields and try again."
+    },
+    "stepApprovals": {
+      "notFound": "The step was not found.",
+      "notClientApproval": "This step has no approver at the client.",
+      "badDate": "Enter the day the client approved.",
+      "futureDate": "The approval date has not come yet.",
+      "badHow": "Choose how the client approved.",
+      "badLink": "The link should start with https://."
     },
     "processRuns": {
       "sameDay": "There is already an open run of {code} for this day: \"{title}\" ({id}). Work on it, or close it and then open a new one.",
@@ -1641,6 +1651,7 @@
       "contactInFile": "{hasName, select, yes {{name} is} other {This contact is}} already in the client's file.",
       "contactNotFound": "Contact not found.",
       "emailTaken": "This email address already belongs to another contact.",
+      "badEndedAt": "The date they left is not valid.",
       "emailOrPhoneRequired": "Enter an email address or a phone number."
     },
     "clientQuestions": {
@@ -1988,6 +1999,7 @@
       "reportScheduleSent": "Scheduled report sent",
       "taskCreate": "Task created",
       "taskStatusChange": "Task status changed",
+      "taskClientApproval": "Client approval written down on a run step",
       "taskApprove": "Task approved",
       "taskComment": "Comment on a task",
       "taskCommentDelete": "Task comment deleted",
@@ -3956,7 +3968,9 @@
         "noLessons": "No notes from the field.",
         "openDocument": "The full procedure document",
         "docScore": "Documentation: {score} of {of}"
-      }
+      },
+      "approverLeft": "Step {step} needs a new approver: {name} left",
+      "approverLeftProcess": "Needs a new approver: {name} left"
     },
     "procedures": {
       "title": "Procedures: {name}",

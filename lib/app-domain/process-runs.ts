@@ -129,6 +129,30 @@ export async function openProcessRun(input: OpenRunInput) {
     process.approverContactId ? prisma.clientContact.findFirst({ where: { id: process.approverContactId, deletedAt: null }, select: { role: true, person: { select: { name: true } } } }) : null,
   ]);
   const approverText = approverUser?.name ?? approverContact?.person.name ?? approverContact?.role ?? process.approverText;
+  // 14.11.2026 (stage 3, spec 4.4): each step names its own approver. A
+  // step that asks for an approval and names none falls back to the
+  // process's, as before.
+  const stepUserIds = [...new Set(steps.map((st) => st.approverUserId).filter((x): x is string => !!x))];
+  const stepContactIds = [...new Set(steps.map((st) => st.approverContactId).filter((x): x is string => !!x))];
+  const [stepUsers, stepContacts] = await Promise.all([
+    stepUserIds.length ? prisma.user.findMany({ where: { id: { in: stepUserIds }, deletedAt: null, status: "ACTIVE" }, select: { id: true, name: true } }) : [],
+    stepContactIds.length
+      ? prisma.clientContact.findMany({ where: { id: { in: stepContactIds }, clientId: process.clientId, deletedAt: null }, select: { id: true, role: true, person: { select: { name: true } } } })
+      : [],
+  ]);
+  const userById = new Map(stepUsers.map((u) => [u.id, u]));
+  const contactById = new Map(stepContacts.map((c) => [c.id, c]));
+  const approverOfStep = (st: (typeof steps)[number]) => {
+    if (st.approverUserId) {
+      const u = userById.get(st.approverUserId);
+      return { userId: u?.id ?? null, contactId: null, name: u?.name ?? null };
+    }
+    if (st.approverContactId) {
+      const c = contactById.get(st.approverContactId);
+      return { userId: null, contactId: c?.id ?? null, name: c ? (c.person.name ?? c.role ?? null) : null };
+    }
+    return { userId: approverUser?.id ?? null, contactId: null, name: approverText };
+  };
 
   const assignee = process.ownerId ?? input.fallbackAssigneeId ?? null;
   const description = runDescription({
@@ -177,11 +201,12 @@ export async function openProcessRun(input: OpenRunInput) {
       })
     : await prisma.task.create({ data: runData });
   for (const [i, step] of steps.entries()) {
+    const approver = step.requiresApproval ? approverOfStep(step) : null;
     await prisma.task.create({
       data: {
         clientId: process.clientId,
         parentId: run.id,
-        title: stepTitle(step, approverText),
+        title: stepTitle(step, approver?.name ?? null),
         assignedToId: assignee,
         dueDate: dayAt(dueKeys[i]),
         stepMode: step.mode as ProcessStepMode,
@@ -189,7 +214,10 @@ export async function openProcessRun(input: OpenRunInput) {
         processVersionId: version.id,
         // An approval step with an approver at Ankora: it reaches done only
         // through their signature (the task gate, assertApprovable).
-        ...(step.requiresApproval && approverUser ? { requiresApproval: true, supervisorId: approverUser.id } : {}),
+        ...(approver?.userId ? { requiresApproval: true, supervisorId: approver.userId } : {}),
+        // A contact at the client: not a gate, but the step is closed only
+        // with when and how they approved (recordClientApproval).
+        ...(approver?.contactId ? { approvalContactId: approver.contactId } : {}),
       },
     });
   }

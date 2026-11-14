@@ -1266,6 +1266,8 @@
       "aiExclusionOnStep": "שלב יורש את הסימון \"בלי AI\" מהמשימה שלו. כדי לסמן, מסמנים את המשימה.",
       "stepAwaitingApproval": "השלב \"{title}\" מחכה לאישור של {supervisor}. אחרי שהוא מאושר, אפשר לסגור.",
       "stepAwaitingApprovalNoSupervisor": "השלב \"{title}\" מחכה לאישור. אחרי שהוא מאושר, אפשר לסגור.",
+      "clientApprovalUndocumented": "כדי לסמן את השלב כבוצע, מתעדים מתי ואיך הלקוח אישר.",
+      "stepAwaitingClientApproval": "השלב \"{title}\" מחכה לתיעוד של אישור הלקוח. אחרי שמתעדים מתי ואיך אושר, אפשר לסגור.",
       "commentEmpty": "אין מה לשמור: ההערה ריקה.",
       "commentTooLong": "ההערה ארוכה מ-{max} תווים. אפשר לפצל אותה לשתיים.",
       "commentNotFound": "ההערה לא נמצאה.",
@@ -1434,6 +1436,14 @@
       "discardNotDraft": "אפשר לוותר רק על הטיוטה האחרונה, לפני שאושרה.",
       "discardNotAuthor": "רק מי שכתב את הטיוטה, או מנהל, מוותר עליה.",
       "rhythmInvalid": "הקצב לא תקין. בדקו את השדות ונסו שוב."
+    },
+    "stepApprovals": {
+      "notFound": "השלב לא נמצא.",
+      "notClientApproval": "לשלב הזה אין מאשר אצל הלקוח.",
+      "badDate": "צריך את התאריך שבו הלקוח אישר.",
+      "futureDate": "תאריך האישור עוד לא הגיע.",
+      "badHow": "צריך לבחור איך הלקוח אישר.",
+      "badLink": "הקישור צריך להתחיל ב-https://."
     },
     "processRuns": {
       "sameDay": "כבר יש ריצה פתוחה של {code} ליום הזה: \"{title}\" ({id}). אפשר לעבוד עליה, או לסגור אותה ואז לפתוח חדשה.",
@@ -1641,6 +1651,7 @@
       "contactInFile": "{hasName, select, yes {{name}} other {איש הקשר}} כבר בתיק של הלקוח.",
       "contactNotFound": "איש הקשר לא נמצא.",
       "emailTaken": "כתובת המייל כבר שייכת לאיש קשר אחר.",
+      "badEndedAt": "תאריך העזיבה לא תקין.",
       "emailOrPhoneRequired": "צריך כתובת מייל או מספר טלפון."
     },
     "clientQuestions": {
@@ -1988,6 +1999,7 @@
       "reportScheduleSent": "שליחת דוח מתוזמן",
       "taskCreate": "יצירת משימה",
       "taskStatusChange": "שינוי סטטוס משימה",
+      "taskClientApproval": "תיעוד אישור של הלקוח בשלב של ריצה",
       "taskApprove": "אישור משימה",
       "taskComment": "הערה על משימה",
       "taskCommentDelete": "מחיקת הערה על משימה",
@@ -3956,7 +3968,9 @@
         "noLessons": "אין הערות מהשטח.",
         "openDocument": "למסמך הנוהל המלא",
         "docScore": "תיעוד: {score} מתוך {of}"
-      }
+      },
+      "approverLeft": "צריך מאשר חדש לשלב {step}: {name} עזב",
+      "approverLeftProcess": "צריך מאשר חדש: {name} עזב"
     },
     "procedures": {
       "title": "נהלים: {name}",

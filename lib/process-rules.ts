@@ -105,7 +105,18 @@ export type ProcessStep = {
   output: string | null;
   /// For an automated step: how a person makes sure it happened (R3).
   verification: string | null;
+  /// Derived since 14.11.2026 (stage 3, spec 4.4): the step names an
+  /// approver. Kept as a field so every reader of a stored step goes on
+  /// working; a step stored before then may say true with no approver.
   requiresApproval: boolean;
+  /// 14.11.2026 (processes redesign, stage 3, spec 4.4): who approves this
+  /// step. An Ankora user is a gate (the run's step reaches done only with
+  /// their signature); a contact at the client is not, but the step is
+  /// closed only with when and how they approved. At most one of the two.
+  approverUserId?: string | null;
+  approverContactId?: string | null;
+  /// "איך יודעים שבוצע": what shows the step was done (spec 4.4).
+  evidence?: string | null;
   /// The most this step moves, in minor units, with its currency. Unknown
   /// is read as "may be above any threshold" (R2).
   amountMaxMinor: number | null;
@@ -126,6 +137,16 @@ const s = (v: unknown, max: number): string | null => {
   return t ? t.slice(0, max) : null;
 };
 
+/// A step's approver as stored: a user or a contact, never both (the user
+/// wins), and `requiresApproval` true whenever one is named.
+function approverOf(v: Record<string, unknown>): Pick<ProcessStep, "requiresApproval" | "approverUserId" | "approverContactId"> {
+  const userId = typeof v.approverUserId === "string" && v.approverUserId.trim() ? v.approverUserId.trim() : null;
+  const contactId = !userId && typeof v.approverContactId === "string" && v.approverContactId.trim() ? v.approverContactId.trim() : null;
+  // Only what is named is written, so a step stored before stage 3 reads
+  // back exactly as it was.
+  return { requiresApproval: v.requiresApproval === true || !!userId || !!contactId, ...(userId ? { approverUserId: userId } : {}), ...(contactId ? { approverContactId: contactId } : {}) };
+}
+
 /// Whatever was stored or sent, as steps. Unknown tags and modes are
 /// dropped rather than trusted.
 export function readSteps(value: unknown): ProcessStep[] {
@@ -141,7 +162,8 @@ export function readSteps(value: unknown): ProcessStep[] {
       systemIds: Array.isArray(v.systemIds) ? [...new Set((v.systemIds as unknown[]).filter((x): x is string => typeof x === "string" && !!x))] : [],
       output: s(v.output, 500),
       verification: s(v.verification, 500),
-      requiresApproval: v.requiresApproval === true,
+      ...approverOf(v),
+      ...(s(v.evidence, 500) ? { evidence: s(v.evidence, 500) } : {}),
       amountMaxMinor:
         typeof v.amountMaxMinor === "number" && Number.isInteger(v.amountMaxMinor) && v.amountMaxMinor >= 0 && v.amountMaxMinor <= 1e13 ? v.amountMaxMinor : null,
       currency: typeof v.currency === "string" && /^[A-Za-z]{3}$/.test(v.currency.trim()) ? v.currency.trim().toUpperCase() : null,

@@ -156,6 +156,11 @@ export function ProcessPage({
                 {blocker}
               </p>
             )}
+            {(p.approverLeft ?? []).map((l) => (
+              <p key={l.step} className="text-sm font-bold text-app-warning" data-testid="process-approver-left">
+                {l.step ? tp("approverLeft", { step: l.step, name: l.name }) : tp("approverLeftProcess", { name: l.name })}
+              </p>
+            ))}
           </div>
           <div className="flex items-center gap-2.5">
             {!guide && p.status === "ACTIVE" && p.triggerKinds.some((k) => k !== "CONTINUOUS" && k !== "EXTERNAL") && (

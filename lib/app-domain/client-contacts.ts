@@ -275,6 +275,9 @@ export interface ClientContactInput extends KnowledgeInput {
   clientSideAddress?: string | null;
   /// Ankora people only: the user in the product (spec 3.5).
   userId?: string | null;
+  /// 14.11.2026 (processes redesign, stage 3, spec 4.6): the day they left
+  /// the client or the role, "YYYY-MM-DD"; null clears it.
+  endedAt?: string | null;
 }
 
 export async function addClientContact(actor: User, input: ClientContactInput) {
@@ -338,6 +341,16 @@ export async function addClientContact(actor: User, input: ClientContactInput) {
   return contact;
 }
 
+/// The day a contact left, at noon in UTC so it reads as the same day in
+/// Israel. Refused when it is not a real day.
+function endedAtOf(value: string | null): Date | null {
+  if (!value || !value.trim()) return null;
+  const key = value.trim();
+  const at = /^\d{4}-\d{2}-\d{2}$/.test(key) ? new Date(`${key}T12:00:00Z`) : new Date(NaN);
+  if (Number.isNaN(at.getTime()) || at.toISOString().slice(0, 10) !== key) throw new DomainError("clientContacts.badEndedAt", "תאריך העזיבה לא תקין.");
+  return at;
+}
+
 export async function updateClientContact(actor: User, id: string, input: Partial<Omit<ClientContactInput, "clientId">>) {
   assertCan(actor.role, "time_entry.create_self");
   const before = await prisma.clientContact.findUnique({ where: { id }, include: { person: true } });
@@ -375,6 +388,7 @@ export async function updateClientContact(actor: User, id: string, input: Partia
       isPrimary: input.isPrimary ?? undefined,
       isDecisionMaker: input.isDecisionMaker ?? undefined,
       clientSideAddress: input.clientSideAddress !== undefined ? input.clientSideAddress?.trim() || null : undefined,
+      endedAt: input.endedAt !== undefined ? endedAtOf(input.endedAt) : undefined,
       userId: input.userId !== undefined || input.relationship !== undefined ? await ankoraUser(input.relationship ?? before.relationship, input.userId !== undefined ? input.userId : before.userId) : undefined,
       ...knowledgeData(input),
       ...sourced,

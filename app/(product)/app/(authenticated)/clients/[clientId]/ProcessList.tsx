@@ -50,6 +50,10 @@ export function ProcessList({ clientId, userId, processes, form }: { clientId: s
     const key = runBlockerKey(p.readiness?.blocker);
     if (p.readiness && !p.readiness.ready && p.status !== "PAUSED" && p.status !== "DRAFT")
       return [{ p, reason: key ? tp(`readiness.blockers.${key}`) : (p.readiness.blocker ?? ""), action: t("toProcess"), href: processHref(clientId, p.id) }];
+    // 14.11.2026 (stage 3, spec 4.6): an approver at the client left.
+    const left = p.approverLeft?.[0];
+    if (left && p.status !== "RETIRED")
+      return [{ p, reason: left.step ? tp("approverLeft", { step: left.step, name: left.name }) : tp("approverLeftProcess", { name: left.name }), action: t("toProcess"), href: processHref(clientId, p.id) }];
     if (p.draft?.mayApprove) return [{ p, reason: t("draftWaits", { version: p.draft.version }), action: t("toApprove"), href: processHref(clientId, p.id) }];
     if (open && open.dueDate && open.dueDate.slice(0, 10) < today)
       return [{ p, reason: open.waitingOn ? t("runWaits", { date: short(open.dueDate), step: open.waitingOn }) : t("runOpen", { date: short(open.dueDate) }), action: t("toRun"), href: `/app/tasks/${open.id}` }];
