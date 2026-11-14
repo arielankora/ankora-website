@@ -490,6 +490,22 @@ export function computeLeadDate(
   return toUtcMidnight(y, m, d, timezone);
 }
 
+/// The day a process's run for `occurrence` opens (14.11.2026): the date's
+/// own lead, in its own unit, or earlier when the procedure's earliest step
+/// needs it (business days). One rule for the daily job that opens runs,
+/// the list of processes and the process's page, which before this counted
+/// an older date's calendar-day lead as business days.
+export function runOpensOn(
+  occurrence: Date,
+  date: { autoTaskLeadDays: number | null; leadUnit: LeadUnitLike; businessCalendar: string | null | undefined; timezone?: string | null },
+  stepsLeadBusinessDays: number
+): Date {
+  const timezone = date.timezone || TIMEZONE;
+  const byDate = computeLeadDate(occurrence, date.autoTaskLeadDays ?? 0, date.leadUnit, date.businessCalendar, timezone);
+  const bySteps = computeLeadDate(occurrence, stepsLeadBusinessDays, "BUSINESS_DAYS", date.businessCalendar, timezone);
+  return bySteps.getTime() < byDate.getTime() ? bySteps : byDate;
+}
+
 // ---------------------------------------------------------------------------
 // Elapsed-years display ("בן/בת X", "X שנים לנישואין", etc.)
 // ---------------------------------------------------------------------------

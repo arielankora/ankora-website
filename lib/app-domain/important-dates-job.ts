@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { sendEmail } from "@/lib/email";
 import { canManageClients } from "@/lib/app-auth/permissions";
-import { computeNextOccurrence, computeLeadDate, recurrenceInputFromRow } from "@/lib/app-domain/important-dates-recurrence";
+import { computeNextOccurrence, recurrenceInputFromRow, runOpensOn } from "@/lib/app-domain/important-dates-recurrence";
 import { computeHolidayOccurrencesForYear, type HolidayCalendarKey } from "@/lib/app-domain/important-dates-holidays";
 import {
   buildReminderIdempotencyKey,
@@ -487,18 +487,9 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
     if (date.process?.status === "PAUSED" || date.process?.status === "RETIRED" || date.process?.kind === "GUIDE") continue;
     if (date.processId && !approvedSteps && !date.createAutoTask) continue;
 
-    let dueAt = computeLeadDate(
-      date.nextOccurrenceAt,
-      date.autoTaskLeadDays ?? 0,
-      date.leadUnit,
-      date.businessCalendar,
-      date.timezone
-    );
-    // A run opens early enough for its earliest step not to be late.
-    if (approvedSteps) {
-      const forSteps = computeLeadDate(date.nextOccurrenceAt, runLeadBusinessDays(approvedSteps), "BUSINESS_DAYS", date.businessCalendar, date.timezone);
-      if (forSteps.getTime() < dueAt.getTime()) dueAt = forSteps;
-    }
+    // A run opens early enough for its earliest step not to be late
+    // (runOpensOn, the same rule the screens show).
+    const dueAt = runOpensOn(date.nextOccurrenceAt, date, approvedSteps ? runLeadBusinessDays(approvedSteps) : 0);
     if (dueAt.getTime() > now.getTime()) continue;
 
     // Org-brain spec 3.10: a conditional date ("quarterly, only if the SLA
