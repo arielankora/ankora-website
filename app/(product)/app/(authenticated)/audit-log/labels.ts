@@ -381,6 +381,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "call_recording.manual_import": "ייבוא הקלטות שאלוהה שלחה ידנית",
   "comms_channel.connected": "חיבור מספר WhatsApp לשמירה",
   "comms_channel.excluded_viewers_updated": "עריכת מי לא רואה שיחות ממספר WhatsApp",
+  "comms_channel.extraction_updated": "שינוי קריאת החילוץ האוטומטי במספר WhatsApp",
   "comms_channel.store_started": "התחלת שמירה של שיחות WhatsApp",
   "comms_channel.owner_changed": "שינוי הבעלים של מספר WhatsApp",
   "comms_block.requested": "בקשה לא לשמור שיחות עם מספר",

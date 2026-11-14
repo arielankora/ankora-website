@@ -133,4 +133,22 @@ describe("client communications through the connector", () => {
     expect(page.json.messages.map((m: { text: string }) => m.text)).toEqual(["תודה"]);
     expect(page.json.hasEarlier).toBe(true);
   });
+
+  it("lets the extraction account read a number people are kept out of, unless a manager turned it off (14.11.2026)", async () => {
+    const { hadas, chat } = await world();
+    const { user: ops } = await createTestUser({ role: "SUPER_ADMIN", email: "ops@ankora.co.il" });
+    process.env.COMMS_EXTRACTION_ACCOUNTS = "";
+    process.env.COMMS_FULL_VIEWERS = `${hadas.email},${ops.email}`;
+    const client = await prisma.client.findFirstOrThrow({ where: { name: "לוי" } });
+    await prisma.userClientAccess.create({ data: { userId: ops.id, clientId: client.id } });
+    const channel = await prisma.commsConversation.findUniqueOrThrow({ where: { id: chat.id }, select: { channelId: true } });
+    await prisma.commsChannel.update({ where: { id: channel.channelId }, data: { excludeAllViewers: true } });
+
+    const listed = await call(ops, "list_client_communications", { client: "לוי" });
+    expect(listed.json.conversations.map((c: { id: string }) => c.id)).toContain(chat.id);
+    expect((await call(ops, "get_client_communication", { client: "לוי", id: chat.id })).json.messages).toHaveLength(2);
+
+    await prisma.commsChannel.update({ where: { id: channel.channelId }, data: { extractionAllowed: false } });
+    expect((await call(ops, "get_client_communication", { client: "לוי", id: chat.id })).text).toContain("No such conversation");
+  });
 });

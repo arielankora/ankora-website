@@ -4593,6 +4593,11 @@ model CommsChannel {
   /// conversations, including people added to the system later. The
   /// names in excludedViewerIds are kept, so turning it off brings them back.
   excludeAllViewers Boolean   @default(false)
+  /// 14.11.2026 (Ariel): the automatic extraction account (Ankora Ops,
+  /// lib/comms/extraction-account.ts) reads this number's conversations for
+  /// the client files even when people are kept out of it. A manager turns
+  /// it off. It lets no person see more than before.
+  extractionAllowed Boolean   @default(true)
   /// Nothing is stored until the owner has gone through the block list
   /// and pressed "התחל לשמור".
   storeEnabled      Boolean   @default(false)

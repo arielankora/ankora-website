@@ -16,6 +16,7 @@ import {
   ConnectForm,
   DecideForm,
   ExcludedViewersForm,
+  ExtractionForm,
   LoadHistoryForm,
   ManualRecordingsForm,
   NewChatsReview,
@@ -152,6 +153,11 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
           {channel.storeEnabled ? <p className="text-app-text-secondary">{t("history", { count: loaded })}</p> : null}
         </div>
         {channel.storeEnabled && isOwnerOrManager ? <LoadHistoryForm channelId={channel.id} /> : null}
+        {manager ? (
+          <ExtractionForm channelId={channel.id} allowed={channel.extractionAllowed} />
+        ) : (
+          <p className="text-sm text-app-text-secondary">{channel.extractionAllowed ? t("extractionOn") : t("extractionOff")}</p>
+        )}
         {manager ? (
           <ChangeOwnerForm
             channelId={channel.id}

@@ -2162,7 +2162,8 @@
       "processRhythm": "Edit the rhythm of a process",
       "processReconfirmed": "Confirm the procedure document is still right",
       "processAuditPrep": "Prepare a procedure for an audit",
-      "processKind": "Change the kind of a process (one that runs, or a work instruction)"
+      "processKind": "Change the kind of a process (one that runs, or a work instruction)",
+      "commsChannelExtractionUpdated": "Changed whether the automatic extraction reads a WhatsApp number"
     },
     "kinds": {
       "failure": "Failure",
@@ -7285,7 +7286,9 @@
         "newChats": "New conversations to review",
         "newChatsHint": "Conversations that began after storing started, with no decision yet. They're stored until someone decides otherwise.",
         "keepRest": "Keep all the rest",
-        "shownOf": "Showing the first {shown} of {total}"
+        "shownOf": "Showing the first {shown} of {total}",
+        "extraction": "The automatic extraction (Ankora Ops) reads this number's conversations",
+        "extractionHint": "Even when people can't see conversations from this number. It only proposes knowledge for the client files, for approval, and no person sees more than before."
       },
       "result": {
         "forbidden": "You don't have permission.",
@@ -7322,8 +7325,12 @@
         "chatBlockRequested": "A request went to a manager. The messages are hidden until the decision.",
         "unknownDecision": "Unknown decision.",
         "nothingToMark": "No conversations to mark.",
-        "keptAll": "{count, plural, one {# conversation} other {# conversations}} marked as reviewed, and still stored."
-      }
+        "keptAll": "{count, plural, one {# conversation} other {# conversations}} marked as reviewed, and still stored.",
+        "extractionOn": "The automatic extraction will read this number's conversations.",
+        "extractionOff": "The automatic extraction will not read this number's conversations."
+      },
+      "extractionOn": "The automatic extraction for client files reads this number's conversations.",
+      "extractionOff": "The automatic extraction does not read this number's conversations."
     }
   },
   "portal": {

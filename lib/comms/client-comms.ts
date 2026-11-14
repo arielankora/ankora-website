@@ -7,6 +7,7 @@ import { canSeeConversation } from "./visibility";
 import { loadCallBlockIndex } from "./call-blocks";
 import type { CallBlockIndex } from "./call-block-rules";
 import { storedCallLine } from "./call-lines";
+import { isExtractionAccount } from "./extraction-account";
 
 // One client's stored communications, for the Ankora connector (14.11.2026):
 // the WhatsApp conversations with the client's people and groups, and the
@@ -65,7 +66,12 @@ async function scopeFor(actor: User, clientId: string): Promise<Scope | CommsDen
   return { actor, access, fullViewers, client, phones: all.filter((p) => !marked.has(p)), blocks };
 }
 
-function seesConversation(s: Scope, channel: { ownerUserId: string; excludedViewerIds: string[]; excludeAllViewers: boolean }) {
+function seesConversation(
+  s: Scope,
+  channel: { ownerUserId: string; excludedViewerIds: string[]; excludeAllViewers: boolean; extractionAllowed: boolean },
+) {
+  // The extraction account reads every number that allows it (lib/comms/extraction-account.ts).
+  if (channel.extractionAllowed && isExtractionAccount(s.actor.email)) return true;
   return canSeeConversation({
     viewer: { id: s.actor.id, email: s.actor.email },
     channel,
@@ -121,7 +127,7 @@ export async function listClientComms(actor: User, clientId: string, since: Date
     where: conversationWhere(s),
     orderBy: { lastMessageAt: "desc" },
     take: 200,
-    include: { channel: { select: { ownerUserId: true, excludedViewerIds: true, excludeAllViewers: true, owner: { select: { name: true } } } } },
+    include: { channel: { select: { ownerUserId: true, excludedViewerIds: true, excludeAllViewers: true, extractionAllowed: true, owner: { select: { name: true } } } } },
   });
   const visible = conversations.filter((c) => seesConversation(s, c.channel));
   const stats = visible.length
@@ -204,7 +210,7 @@ export async function readClientConversation(
   if ("denied" in s) return s;
   const c = await prisma.commsConversation.findFirst({
     where: { id: conversationId, ...conversationWhere(s) },
-    include: { channel: { select: { ownerUserId: true, excludedViewerIds: true, excludeAllViewers: true, owner: { select: { name: true } } } } },
+    include: { channel: { select: { ownerUserId: true, excludedViewerIds: true, excludeAllViewers: true, extractionAllowed: true, owner: { select: { name: true } } } } },
   });
   if (!c || !seesConversation(s, c.channel)) return { denied: "not_found" };
 

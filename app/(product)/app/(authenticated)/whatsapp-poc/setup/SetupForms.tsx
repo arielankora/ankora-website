@@ -14,6 +14,7 @@ import {
   revokeBlockAction,
   startStoringAction,
   updateExcludedViewersAction,
+  setExtractionAllowedAction,
   type SetupState,
 } from "./actions";
 
@@ -346,6 +347,30 @@ export function ManualRecordingsForm() {
       <button type="submit" disabled={pending} className={secondary}>
         {pending ? t("starting") : t("importManual")}
       </button>
+      <Result state={state} />
+    </form>
+  );
+}
+
+/// 14.11.2026: managers only. Whether the automatic extraction reads this number.
+export function ExtractionForm({ channelId, allowed }: { channelId: string; allowed: boolean }) {
+  const t = useTranslations("comms.setup.forms");
+  const [state, action, pending] = useActionState(setExtractionAllowedAction, undefined);
+  return (
+    <form action={action} className="space-y-1">
+      <input type="hidden" name="channelId" value={channelId} />
+      <label className="flex min-h-11 items-center gap-2 text-sm text-app-text-primary">
+        <input
+          type="checkbox"
+          name="extractionAllowed"
+          defaultChecked={allowed}
+          disabled={pending}
+          onChange={(e) => e.currentTarget.form?.requestSubmit()}
+          className="h-4 w-4"
+        />
+        {t("extraction")}
+      </label>
+      <p className="text-xs text-app-text-secondary">{t("extractionHint")}</p>
       <Result state={state} />
     </form>
   );

@@ -607,7 +607,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
         description: [
           "The guidelines decide what counts as relevant, what does not go in (small talk, momentary glitches, guesses, Ankora's terms of engagement), and when an item is confirmed. Every extraction prompt, manual or daily, carries the latest approved version.",
           "What the system enforces by itself does not depend on the guidelines and does not change here: a source for every item, no overwriting, no secrets, no quoting from a restricted source, and an Ankora document does not confirm.",
-          "Besides meetings, Claude also extracts from the WhatsApp conversations and call recordings kept on the communications screen, only from what the user may see there. Each stretch of a conversation and each recording is registered as a source in the file, and the next extraction continues from the day after. Only what the client's people wrote or said counts as the client's word.",
+          "Besides meetings, Claude also extracts from the WhatsApp conversations and call recordings kept on the communications screen, only from what the user may see there. Each stretch of a conversation and each recording is registered as a source in the file, and the next extraction continues from the day after. Only what the client's people wrote or said counts as the client's word. The automatic extraction (Ankora Ops) reads every number, even when people can't see its conversations, unless a manager turned that off on the number's card on the conversation storage screen.",
         ],
         steps: [
           "\"Propose a new version\": edit the guidelines, one guideline per line, and write what changed and why.",
