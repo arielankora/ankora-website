@@ -24,6 +24,8 @@ import { ClosedBankError } from "@/lib/app-domain/closed-bank-guard";
 import { applyPlanSteps, approveTaskPlan, recordAdvancePromptCopied, saveTaskPlan } from "@/lib/app-domain/task-plans";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
+import { listAccessibleClients } from "@/lib/app-domain/clients";
+import { pickCategoryForTask } from "@/lib/app-domain/auto-category";
 import { recordRunLesson } from "@/lib/app-domain/process-lessons";
 import { addTaskPortalNote, removeTaskPortalNote } from "@/lib/app-domain/task-portal-notes";
 import { decideVendorCheck } from "@/lib/app-domain/vendor-detections";
@@ -186,7 +188,8 @@ export async function updateTaskDetailAction(input: {
 /// The category is the task's own. A task with none cannot start a timer
 /// here at all, because a time entry without a category cannot be billed
 /// and inventing one silently is worse than asking - the screen asks for
-/// the category first and this refuses in case it is ever called without.
+/// the category first (TimerButton's picker, 15.11.2026, saves it on the
+/// task) and this refuses in case it is ever called without.
 export async function startTimerForTaskAction(input: {
   taskId: string;
   stopTimerId?: string;
@@ -245,6 +248,32 @@ export async function startTimerForTaskAction(input: {
   } catch (err) {
     return { ok: false as const, error: await friendlyError(err) };
   }
+}
+
+/// The category the timer button proposes for a task that has none
+/// (15.11.2026). The button no longer stops at "choose a category and try
+/// again": it opens a picker with this one already chosen, saves the
+/// person's choice on the task and starts. Same pick as create_task
+/// (lib/app-domain/auto-category.ts), from the task's own words. Null when
+/// nothing could be picked; the picker then starts empty.
+export async function suggestTaskCategoryAction(input: { taskId: string }): Promise<{ id: string; name: string } | null> {
+  const user = await requireUser();
+  const task = await prisma.task.findFirst({
+    where: { id: input.taskId, deletedAt: null },
+    select: { clientId: true, title: true, description: true, categoryId: true },
+  });
+  if (!task || task.categoryId) return null;
+  const accessible = await listAccessibleClients(user);
+  if (!accessible.some((c) => c.id === task.clientId)) return null;
+  // A task opened from messages keeps them in its first comment, not in
+  // the description, and they are most of what it is about.
+  const lead = await prisma.taskComment.findFirst({
+    where: { taskId: input.taskId, deletedAt: null },
+    orderBy: { createdAt: "asc" },
+    select: { body: true },
+  });
+  const pick = await pickCategoryForTask(user, task.clientId, [task.title, task.description ?? "", lead?.body ?? ""].join("\n"));
+  return pick ? { id: pick.id, name: pick.name } : null;
 }
 
 /// "קדם עם קלוד והפעל טיימר" (3.11.2026): the timer half of the button.
