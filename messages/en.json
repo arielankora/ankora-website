@@ -6927,6 +6927,7 @@
       },
       "quote": {
         "label": "Reply to {name}",
+        "labelUnknown": "Reply to a message",
         "us": "Us",
         "jump": "Go to the original message",
         "notLoaded": "The original message is older and isn't loaded here",

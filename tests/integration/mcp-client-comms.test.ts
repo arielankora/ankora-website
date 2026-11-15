@@ -117,6 +117,49 @@ describe("client communications through the connector", () => {
     expect((await call(hadas, "get_client_communication", { client: "לוי", id: sharedChat.id })).text).toContain("No such conversation");
   });
 
+  it("says who wrote a quoted message, never WhatsApp's hidden number", async () => {
+    const { hadas, chat } = await world();
+    await prisma.commsMessage.createMany({
+      data: [
+        {
+          conversationId: chat.id,
+          externalId: "r1",
+          at: new Date("2026-11-10T08:10:00Z"),
+          text: "אני על זה",
+          isSender: true,
+          quotedExternalId: "m1",
+          quotedText: "החשבונית מגיעה ביום ראשון",
+          quotedSenderName: "+972••••••••99",
+        },
+        {
+          conversationId: chat.id,
+          externalId: "r2",
+          at: new Date("2026-11-10T08:11:00Z"),
+          text: "מעולה",
+          quotedExternalId: "m2",
+          quotedText: "תודה",
+          quotedSenderName: "+972••••••••11",
+        },
+        {
+          conversationId: chat.id,
+          externalId: "r3",
+          at: new Date("2026-11-10T08:12:00Z"),
+          text: "?",
+          quotedExternalId: "old",
+          quotedText: "ישן",
+          quotedSenderName: "+972••••••••11",
+        },
+      ],
+    });
+    const read = await call(hadas, "get_client_communication", { client: "לוי", id: chat.id });
+    const byText = new Map(read.json.messages.map((m: { text: string; replyTo?: unknown }) => [m.text, m.replyTo]));
+    expect(byText.get("אני על זה")).toEqual({ from: "דנה", text: "החשבונית מגיעה ביום ראשון" });
+    expect(byText.get("מעולה")).toEqual({ from: "Ankora", text: "תודה" });
+    expect(byText.get("?")).toEqual({ from: "unknown", text: "ישן" });
+    expect(read.text).not.toContain("•");
+    expect(byText.get("תודה")).toBeUndefined();
+  });
+
   it("gives nothing to someone without access to the communications screen, and refuses a marked client", async () => {
     const { stranger, hadas } = await world();
     expect((await call(stranger, "list_client_communications", { client: "לוי" })).text).toContain("no access to the communications screen");

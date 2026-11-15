@@ -8,6 +8,7 @@ import { loadCallBlockIndex } from "./call-blocks";
 import type { CallBlockIndex } from "./call-block-rules";
 import { storedCallLine } from "./call-lines";
 import { isExtractionAccount } from "./extraction-account";
+import { quoteSender, type QuoteSender } from "./quote-sender";
 
 // One client's stored communications, for the Ankora connector (14.11.2026):
 // the WhatsApp conversations with the client's people and groups, and the
@@ -193,6 +194,9 @@ export type ClientConversationPage = {
     edited: boolean;
     forwarded: boolean;
     quoted: string | null;
+    /// Who wrote the quoted message (15.11.2026), never WhatsApp's hidden
+    /// number: see lib/comms/quote-sender.ts.
+    quotedFrom: QuoteSender | null;
     attachments: Array<{ kind: string; voiceTranscript: string | null; fileName: string | null }>;
   }>;
   /// Messages before the first one returned, for paging back.
@@ -227,6 +231,15 @@ export async function readClientConversation(
   });
   const hasEarlier = rows.length > opts.limit;
   const page = rows.slice(0, opts.limit).reverse();
+  // The quoted messages, also when they are older than the page.
+  const quotedIds = [...new Set(page.flatMap((m) => (m.quotedExternalId ? [m.quotedExternalId] : [])))];
+  const originals = quotedIds.length
+    ? await prisma.commsMessage.findMany({
+        where: { conversationId: c.id, externalId: { in: quotedIds }, held: false },
+        select: { externalId: true, isSender: true, senderName: true },
+      })
+    : [];
+  const originalOf = new Map(originals.map((o) => [o.externalId, o]));
   return {
     client: s.client.name,
     conversation: { id: c.id, name: c.name, phone: c.otherPhone, isGroup: c.isGroup, ourNumberOwner: c.channel.owner.name },
@@ -240,6 +253,16 @@ export async function readClientConversation(
       edited: m.isEdited,
       forwarded: m.forwarded,
       quoted: m.quotedText,
+      quotedFrom:
+        m.quotedExternalId || m.quotedText
+          ? quoteSender({
+              quotedName: m.quotedSenderName,
+              original: (m.quotedExternalId && originalOf.get(m.quotedExternalId)) || null,
+              isGroup: c.isGroup,
+              chatName: c.name,
+              chatPhone: c.otherPhone,
+            })
+          : null,
       attachments: m.attachments.map((a) => ({
         kind: a.voiceNote ? "voice" : a.type,
         voiceTranscript: a.voiceNote && a.transcript?.status === "DONE" ? a.transcript.text : null,
