@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ogBase } from "@/lib/seo-meta";
 import { type Locale } from "@/content";
 import { getNextOctoberContent } from "@/content/next-october";
-import { NextOctoberMemorialPage } from "@/components/sections/NextOctoberMemorialPage";
+import { NextOctoberMemorialPage } from "@/components/sections/next-october/NextOctoberMemorialPage";
 
 const PATH = "/next-october";
 

@@ -270,9 +270,11 @@ const nextConfig = {
               } https://www.googletagmanager.com${PREVIEW_ORIGINS}`,
               `connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com${PREVIEW_ORIGINS}`,
               // Google Calendar: the booking page embedded on /contact after a
-              // request is accepted (lib/contact-links.ts). The /app policy below
-              // stays strict and does not get it.
-              `frame-src 'self' https://calendar.google.com${PREVIEW_ORIGINS}`,
+              // request is accepted (lib/contact-links.ts). SoundCloud: the players
+              // of Nathanel Young's music on /next-october, the memorial page carried
+              // over from Seemore Data as it was. The /app policy below stays strict
+              // and gets neither.
+              `frame-src 'self' https://calendar.google.com https://w.soundcloud.com${PREVIEW_ORIGINS}`,
               'upgrade-insecure-requests',
             ].join('; '),
           },
