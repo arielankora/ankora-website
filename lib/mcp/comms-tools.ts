@@ -108,7 +108,7 @@ export function registerCommsTools(server: McpServer): void {
       title: "Read a client's WhatsApp conversation or recorded call",
       description: [
         "One item from list_client_communications, by its `id`: a WhatsApp conversation's messages, or a recorded call's transcript.",
-        "A conversation comes oldest first: the latest `limit` messages (default 100, at most 300) in the window `since`..`before` (YYYY-MM-DD, Israel time; `before` is exclusive). `hasEarlier` says there are older ones: ask again with `before` set to the first message's day. Messages from Ankora's side say `fromAnkora`; a voice message carries its transcript when one was made; a message deleted in WhatsApp is kept and marked `deleted`.",
+        "A conversation comes oldest first: the latest `limit` messages (default 100, at most 300) in the window `since`..`before` (YYYY-MM-DD, Israel time; `before` is exclusive). `hasEarlier` says there are older ones: ask again with `before` set to the first message's day. Messages from Ankora's side say `fromAnkora`; a voice message carries its transcript when one was made; a message deleted in WhatsApp is kept and marked `deleted`. A reply carries `replyTo`: who wrote the message it answers (`from`: \"Ankora\", a name, or \"unknown\" when WhatsApp hid it) and the quoted text.",
         "A call returns its transcript once it is ready (the nightly run makes them). The same visibility as list_client_communications. Read-only.",
       ].join(" "),
       inputSchema: z.object({
@@ -153,7 +153,22 @@ export function registerCommsTools(server: McpServer): void {
               from: m.fromAnkora ? `Ankora${m.sender ? ` (${m.sender})` : ""}` : m.sender || conversation.conversation.name,
               fromAnkora: m.fromAnkora,
               text: m.text,
-              ...(m.quoted ? { replyTo: m.quoted } : {}),
+              ...(m.quotedFrom
+                ? {
+                    // 15.11.2026: who wrote the quoted message. "unknown" when
+                    // WhatsApp hid the number and nothing else tells; never
+                    // read a number out of it.
+                    replyTo: {
+                      from:
+                        m.quotedFrom.kind === "us"
+                          ? "Ankora"
+                          : m.quotedFrom.kind === "name"
+                            ? m.quotedFrom.name
+                            : "unknown",
+                      text: m.quoted ?? "",
+                    },
+                  }
+                : {}),
               ...(m.attachments.length ? { attachments: m.attachments } : {}),
               ...(m.deleted ? { deleted: true } : {}),
               ...(m.edited ? { edited: true } : {}),

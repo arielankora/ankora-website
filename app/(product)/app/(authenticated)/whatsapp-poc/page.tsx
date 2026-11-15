@@ -11,6 +11,7 @@ import { ScrollToActive } from "./ScrollToActive";
 import { BlockButton } from "./setup/SetupForms";
 import { searchStoredMessages, type MessageHit, type StoredTranscript } from "@/lib/comms/stored-chats";
 import { countChatsToReview } from "@/lib/comms/new-chats";
+import { quoteSender } from "@/lib/comms/quote-sender";
 import { requireUser } from "@/lib/app-auth/session";
 import { Forbidden } from "@/components/app/Forbidden";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
@@ -266,7 +267,21 @@ function messageAnchor(id: string) {
 /// said. When the original is in the timeline, the quote links to it.
 function QuoteBlock({ quote, original, mine, chat }: { quote: PocQuote; original: PageMessage | undefined; mine: boolean; chat: PocChat }) {
   const t = useTranslations("comms");
-  const name = original ? (original.isSender ? t("message.quote.us") : (original.senderName ?? quote.senderName ?? chat.name)) : (quote.senderName ?? chat.name);
+  // 15.11.2026: WhatsApp hides the quoted sender's number ("+1••••••••90");
+  // quoteSender finds who it was, or leaves the name out.
+  const sender = quoteSender({
+    quotedName: quote.senderName,
+    original: original ? { isSender: original.isSender, senderName: original.senderName ?? null } : null,
+    isGroup: chat.type === "group",
+    chatName: chat.name,
+    chatPhone: chat.phone,
+  });
+  const label =
+    sender.kind === "us"
+      ? t("message.quote.label", { name: t("message.quote.us") })
+      : sender.kind === "name"
+        ? t("message.quote.label", { name: sender.name })
+        : t("message.quote.labelUnknown");
   // Deleted in WhatsApp, kept here (13.11.2026): the quote still shows it.
   // A message deleted before then has no text left, only the mark.
   const text = original ? original.text || quote.text : quote.text;
@@ -284,7 +299,7 @@ function QuoteBlock({ quote, original, mine, chat }: { quote: PocQuote; original
   }`;
   const body = (
     <>
-      <span className={`block text-xs font-medium ${mine ? "text-white" : "text-app-text-accent"}`}>{t("message.quote.label", { name })}</span>
+      <span className={`block text-xs font-medium ${mine ? "text-white" : "text-app-text-accent"}`}>{label}</span>
       <span dir="auto" className={`line-clamp-2 whitespace-pre-wrap break-words ${deleted || !text ? "italic" : ""}`}>
         {preview}
       </span>
