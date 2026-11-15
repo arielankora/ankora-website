@@ -1,0 +1,577 @@
+/*
+ * The Nathanel Young memorial page, as Seemore Data built it (seemoredata.io/seemore-next-october,
+ * theme "seemore", main.css). Every value below is copied from the original stylesheet,
+ * including its three widths: desktop (fixed px), 991-1366 (the same values in vw) and
+ * under 991 (the mobile layout). The page keeps its own look on purpose: it is a memorial
+ * page carried over as it was, not a page in Ankora's design. Change it only to match the
+ * original more closely.
+ *
+ * The layout stays left-to-right in both locales, as in the original (the photos are
+ * composed for it); Hebrew text blocks set their own direction.
+ */
+
+.root {
+  --darkBlue: #001049;
+  background: #f7fbfc;
+  color: var(--darkBlue);
+  font-family: var(--font-poppins), Heebo, sans-serif;
+  line-height: 1;
+  overflow: hidden;
+}
+
+/* Resets at zero specificity (:where), so the original section rules below win. */
+:where(.root) :where(img, video, picture) {
+  display: block;
+  max-width: none;
+}
+
+:where(.root) :where(h1, h2, p) {
+  margin: 0;
+}
+
+:where(.root) :where(a) {
+  color: inherit;
+  text-decoration: none;
+}
+
+.text {
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.83;
+  color: var(--darkBlue);
+}
+
+.text p {
+  margin-bottom: 14px;
+}
+
+/* ---------- first screen ---------- */
+
+.first-screen-next__inner {
+  position: relative;
+  z-index: 2;
+  min-height: 918px;
+  padding: 33px 61px 300px;
+}
+
+.first-screen-next__background {
+  position: absolute;
+  display: block;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.first-screen-next__background::before {
+  content: "";
+  position: absolute;
+  bottom: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% + 777px);
+  height: 581px;
+  background: #001049;
+  filter: blur(80px);
+}
+
+.first-screen-next__background img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.first-screen-next__wrapper {
+  width: 100%;
+  max-width: 1920px;
+  margin: 0 auto;
+}
+
+.first-screen-next__content {
+  line-height: 1.29;
+  color: var(--darkBlue);
+  margin-top: 229px;
+  padding: 0 135px;
+}
+
+.first-screen-next__content-caption {
+  font-weight: 500;
+  line-height: inherit;
+  font-size: 33px;
+  color: inherit;
+}
+
+.first-screen-next__content-title {
+  font-weight: 600;
+  line-height: inherit;
+  font-size: 54px;
+  letter-spacing: -0.03em;
+  color: inherit;
+  margin-bottom: 12px;
+}
+
+.first-screen-next__content-text {
+  font-weight: 300;
+  line-height: inherit;
+  font-size: 20px;
+  color: inherit;
+}
+
+/* Hebrew: the block shrinks to its text and stays where the original puts it, on the
+   left, clear of the face; inside it the lines align to their own (right) edge. */
+.first-screen-next__content--rtl {
+  width: fit-content;
+}
+
+/* ---------- person phrase ---------- */
+
+.person-phrase {
+  background: linear-gradient(180deg, #001049 0%, #005baf 100%);
+  position: relative;
+  z-index: 2;
+}
+
+.person-phrase__wrapper {
+  width: 100%;
+  max-width: 1217px;
+  margin: 0 auto;
+  transform: translateY(-248px);
+  display: flex;
+  align-items: flex-start;
+}
+
+.person-phrase__image {
+  width: 570px;
+  height: 580px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: 0 0 auto;
+  margin-right: -106px;
+}
+
+.person-phrase__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.person-phrase__content {
+  width: 100%;
+  margin-top: 157px;
+  position: relative;
+}
+
+.person-phrase__content-caption {
+  width: 100%;
+  max-width: 450px;
+  font-weight: 500;
+  line-height: 1.29;
+  font-size: 27px;
+  color: #fff;
+  margin-bottom: 25px;
+}
+
+.person-phrase__content-text {
+  width: 100%;
+  max-width: 740px;
+  font-style: italic;
+  font-weight: 300;
+  line-height: 1.19;
+  font-size: 45px;
+  letter-spacing: -0.02em;
+  color: #ffc9a0;
+}
+
+/* ---------- about person ---------- */
+
+.about-person {
+  margin-top: -392px;
+  padding-top: 196px;
+  overflow: hidden;
+}
+
+.about-person__inner {
+  padding: 138px 0 500px;
+  position: relative;
+  z-index: 2;
+}
+
+.about-person__inner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: -1;
+  width: calc(100% + 800px);
+  height: 90%;
+  background: #ffc89f;
+  filter: blur(80px);
+}
+
+.about-person__title {
+  width: 100%;
+  max-width: 976px;
+  margin: 0 auto 55px;
+  font-weight: 300;
+  line-height: 1.18;
+  font-size: 57px;
+  color: var(--darkBlue);
+  text-align: center;
+}
+
+.about-person__wrapper {
+  width: 100%;
+  max-width: 976px;
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 48px;
+}
+
+.about-person__text {
+  width: 100%;
+}
+
+.about-person__media {
+  width: 401px;
+  height: 461px;
+  border-radius: 25px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.about-person__media video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------- music ---------- */
+
+.section-music {
+  position: relative;
+  z-index: 4;
+  margin-top: -384px;
+}
+
+.section-music__image {
+  width: 125px;
+  height: 125px;
+  margin: 0 auto -89px;
+  position: relative;
+  z-index: 1;
+}
+
+.section-music__image img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.section-music__inner {
+  width: 100%;
+  max-width: 998px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 36px;
+  border: 1px solid #001049;
+  padding: 15px 15px 0;
+  overflow: hidden;
+}
+
+.section-music__title {
+  background: linear-gradient(274.35deg, #ffc9a0 12.29%, #0042ef 93.3%);
+  border-radius: 23px;
+  padding: 88px 22px 22px;
+  margin-bottom: 30px;
+  font-weight: 600;
+  line-height: 1.18;
+  font-size: 39px;
+  text-align: center;
+  color: #fff;
+}
+
+/* The original draws its scrollbar with SimpleBar, on the left (direction rtl). A native
+   scrollbar styled the same way, on the same side, does it without the script. */
+.section-music__list {
+  width: calc(100% - 16px);
+  margin-left: 16px;
+  height: 449px;
+  overflow-y: auto;
+  direction: rtl;
+  scrollbar-width: thin;
+  scrollbar-color: #7b7b7b #e4e4e4;
+}
+
+.section-music__list::-webkit-scrollbar {
+  width: 7px;
+}
+
+.section-music__list::-webkit-scrollbar-track {
+  background: #e4e4e4;
+  border-radius: 7px;
+  margin-bottom: 29px;
+}
+
+.section-music__list::-webkit-scrollbar-thumb {
+  background: #7b7b7b;
+  border-radius: 7px;
+}
+
+.section-music__list .list {
+  direction: ltr;
+  width: 100%;
+  padding-left: 30px;
+  padding-bottom: 30px;
+}
+
+.section-music__list .item:not(:first-child) {
+  margin-top: 30px;
+}
+
+.section-music__list iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+}
+
+.credit {
+  font-size: 10px;
+  color: #cccccc;
+  line-break: anywhere;
+  word-break: normal;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: Interstate, "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Garuda, Verdana, Tahoma, sans-serif;
+  font-weight: 100;
+  line-height: 1.4;
+}
+
+.credit a {
+  color: #cccccc;
+}
+
+/* ---------- respect ---------- */
+
+.section-respect {
+  margin-top: -112px;
+}
+
+.section-respect__inner {
+  width: 100%;
+  max-width: 1920px;
+  margin: 0 auto;
+  padding-bottom: 80px;
+}
+
+.section-respect__image {
+  width: 100%;
+  height: auto;
+  min-height: 630px;
+}
+
+.section-respect__image img {
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  object-fit: cover;
+}
+
+.section-respect__content {
+  position: relative;
+  z-index: 2;
+  margin-top: -151px;
+}
+
+.section-respect__content-title {
+  width: 100%;
+  max-width: 923px;
+  margin: 0 auto 20px;
+  font-weight: 700;
+  line-height: 0.87;
+  font-size: 94px;
+  text-align: center;
+  letter-spacing: -0.03em;
+  color: #919bbe;
+  opacity: 0.8;
+}
+
+.section-respect__content-text {
+  width: 100%;
+  max-width: 747px;
+  margin: 0 auto;
+}
+
+/* ---------- footer strip ---------- */
+
+.section-footer-next {
+  background: #fff;
+}
+
+.section-footer-next__inner {
+  width: 100%;
+  max-width: 706px;
+  margin: 0 auto;
+  padding: 90px 0;
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+
+.section-footer-next__partners {
+  width: 397px;
+}
+
+.section-footer-next__partners .list {
+  display: flex;
+  align-items: flex-end;
+  gap: 40px;
+}
+
+.section-footer-next__partners .item {
+  width: auto;
+  height: 108px;
+}
+
+.section-footer-next__partners .item img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.section-footer-next__hashtags {
+  width: 279px;
+  margin-top: 14px;
+}
+
+.section-footer-next__hashtags .list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 5px;
+}
+
+.section-footer-next__hashtags .item {
+  font-weight: 400;
+  line-height: 1;
+  font-size: 14px;
+  color: var(--darkBlue);
+}
+
+/* ================= 991px to 1366px: the desktop values in vw ================= */
+
+@media screen and (min-width: 991px) and (max-width: 1366px) {
+  .text { font-size: 1.0981vw; }
+  .first-screen-next__inner { min-height: 67.2035vw; padding: 2.4158vw 4.4656vw 21.9619vw; }
+  .first-screen-next__background::before { bottom: -14.6413vw; width: calc(100% + 56.8814vw); height: 42.5329vw; }
+  .first-screen-next__wrapper { max-width: 140.5564vw; }
+  .first-screen-next__content { margin-top: 16.7643vw; padding: 0 9.8829vw; }
+  .first-screen-next__content-caption { font-size: 2.4158vw; }
+  .first-screen-next__content-title { font-size: 3.9531vw; margin-bottom: 0.8785vw; }
+  .first-screen-next__content-text { font-size: 1.4641vw; }
+
+  .person-phrase__wrapper { max-width: 89.0922vw; transform: translateY(-18.1552vw); }
+  .person-phrase__image { width: 41.7277vw; height: 42.4597vw; margin-right: -7.7599vw; }
+  .person-phrase__content { margin-top: 11.4934vw; }
+  .person-phrase__content-caption { max-width: 32.9429vw; font-size: 1.9766vw; margin-bottom: 1.8302vw; }
+  .person-phrase__content-text { max-width: 54.1728vw; font-size: 3.2943vw; }
+
+  .about-person { margin-top: -28.6969vw; padding-top: 14.3485vw; }
+  .about-person__inner { padding: 10.1025vw 0 36.6032vw; }
+  .about-person__inner::before { width: calc(100% + 58.5652vw); }
+  .about-person__title { max-width: 71.4495vw; margin: 0 auto 4.0264vw; font-size: 4.1728vw; }
+  .about-person__wrapper { max-width: 71.4495vw; gap: 3.5139vw; }
+  .about-person__media { width: 29.3558vw; height: 33.7482vw; border-radius: 1.8302vw; }
+
+  .section-music { margin-top: -28.1113vw; }
+  .section-music__image { width: 9.1508vw; height: 9.1508vw; margin: 0 auto -6.5154vw; }
+  .section-music__inner { max-width: 73.06vw; border-radius: 2.6354vw; padding: 1.0981vw 1.0981vw 0; }
+  .section-music__title { border-radius: 1.6837vw; padding: 6.4422vw 1.6105vw 1.6105vw; margin-bottom: 2.1962vw; font-size: 2.8551vw; }
+  .section-music__list { height: 32.8697vw; width: calc(100% - 1.1713vw); margin-left: 1.1713vw; }
+  .section-music__list::-webkit-scrollbar { width: 0.5124vw; }
+  .section-music__list .list { padding-left: 2.1962vw; padding-bottom: 2.1962vw; }
+  .section-music__list .item:not(:first-child) { margin-top: 2.1962vw; }
+
+  .section-respect { margin-top: -8.1991vw; }
+  .section-respect__inner { max-width: 140.5564vw; padding-bottom: 5.8565vw; }
+  .section-respect__image { min-height: 46.1201vw; }
+  .section-respect__content { margin-top: -11.0542vw; }
+  .section-respect__content-title { max-width: 67.5695vw; margin: 0 auto 1.4641vw; font-size: 6.8814vw; }
+  .section-respect__content-text { max-width: 54.6852vw; }
+
+  .section-footer-next__inner { max-width: 51.6837vw; padding: 6.5886vw 0; gap: 2.1962vw; }
+  .section-footer-next__partners { width: 29.063vw; }
+  .section-footer-next__partners .list { gap: 2.9283vw; }
+  .section-footer-next__partners .item { height: 7.9063vw; }
+  .section-footer-next__hashtags { width: 20.4246vw; margin-top: 1.0249vw; }
+  .section-footer-next__hashtags .list { gap: 0.7321vw 0.366vw; }
+  .section-footer-next__hashtags .item { font-size: 1.0249vw; }
+}
+
+/* ================= under 991px: the mobile layout ================= */
+
+@media screen and (max-width: 990.98px) {
+  .text { font-size: 3.7333vw; }
+  .first-screen-next__inner { min-height: 180vw; padding: 5.0667vw 6.6667vw 40vw; }
+  .first-screen-next__background::before { display: none; }
+  .first-screen-next__wrapper { max-width: 100%; }
+  .first-screen-next__content, .first-screen-next__content--rtl { width: 41.0667vw; margin-top: 30vw; padding: 0; margin-left: 2.9333vw; }
+  .first-screen-next__content-caption { font-size: 5.6vw; margin-bottom: 1.3333vw; }
+  .first-screen-next__content-title { font-size: 9.0667vw; line-height: 1.1; margin-bottom: 2.1333vw; }
+  .first-screen-next__content-text { font-size: 3.7333vw; }
+
+  .person-phrase { margin-top: -36.5333vw; padding-bottom: 32.5333vw; background: rgba(0, 0, 0, 0); }
+  .person-phrase::before {
+    content: "";
+    position: absolute;
+    top: -105.6vw;
+    left: 0;
+    width: 100%;
+    height: calc(100% + 105.6vw);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='375' height='1544' fill='none'%3E%3Cg filter='url(%23a)'%3E%3Cellipse cx='143' cy='772' fill='%23001049' rx='592' ry='550'/%3E%3C/g%3E%3Cdefs%3E%3Cfilter id='a' width='1628' height='1544' x='-671' y='0' color-interpolation-filters='sRGB' filterUnits='userSpaceOnUse'%3E%3CfeFlood flood-opacity='0' result='BackgroundImageFix'/%3E%3CfeBlend in='SourceGraphic' in2='BackgroundImageFix' result='shape'/%3E%3CfeGaussianBlur result='effect1_foregroundBlur_2438_4733' stdDeviation='111'/%3E%3C/filter%3E%3C/defs%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: top;
+    background-size: cover;
+  }
+  .person-phrase__wrapper { max-width: 100%; transform: translateY(0); flex-direction: column; position: relative; }
+  .person-phrase__image { width: 100.8vw; height: 102.9333vw; margin-right: 0; margin-left: -29.3333vw; }
+  .person-phrase__content { width: 100%; max-width: 71.2vw; margin: -25.0667vw auto 0; text-align: center; }
+  .person-phrase__content-caption { max-width: 100%; font-size: 4.5333vw; margin-bottom: 3.2vw; }
+  .person-phrase__content-text { max-width: 100%; font-size: 7.2vw; }
+
+  .about-person { margin-top: -74.9333vw; padding-top: 37.3333vw; }
+  .about-person__inner { padding: 36.8vw 0 101.0667vw; }
+  .about-person__inner::before { width: calc(100% + 53.3333vw); filter: blur(12.8vw); }
+  .about-person__title { max-width: 77.0667vw; margin: 0 auto 8.2667vw; font-size: 9.0667vw; }
+  .about-person__wrapper { max-width: 100%; flex-direction: column-reverse; gap: 9.3333vw; }
+  .about-person__text { max-width: 81.6vw; margin: 0 auto; text-align: center; }
+  .about-person__media { width: 81.3333vw; height: 93.6vw; border-radius: 6.6667vw; margin: 0 auto; }
+
+  .section-music { margin-top: -88vw; }
+  .section-music__image { width: 16vw; height: 16.2667vw; margin: 0 auto -10.4vw; }
+  .section-music__inner { max-width: 94.9333vw; border-radius: 3.7333vw; padding: 1.3333vw 1.3333vw 0; }
+  .section-music__title { border-radius: 2.6667vw; padding: 11.4667vw 4vw 4vw; margin-bottom: 5.6vw; font-size: 5.6vw; }
+  .section-music__list { height: 43.7333vw; width: 100%; margin-left: 0; }
+  .section-music__list::-webkit-scrollbar { width: 1.6vw; }
+  .section-music__list .list { padding-left: 2.9333vw; padding-bottom: 2.9333vw; }
+  .section-music__list .item:not(:first-child) { margin-top: 2.9333vw; }
+
+  .section-respect { margin-top: -33.3333vw; }
+  .section-respect__inner { max-width: 100%; padding-bottom: 16.2667vw; }
+  .section-respect__image { min-height: 168vw; }
+  .section-respect__content { margin-top: -44.5333vw; }
+  .section-respect__content-title { max-width: 89.3333vw; margin: 0 auto 5.3333vw; font-size: 13.6vw; }
+  .section-respect__content-text { max-width: 81.0667vw; }
+
+  .section-footer-next__inner { max-width: 81.3333vw; padding: 13.3333vw 0; gap: 8vw; flex-direction: column; align-items: center; justify-content: center; }
+  .section-footer-next__partners { width: 100%; }
+  .section-footer-next__partners .list { gap: 10.6667vw; justify-content: center; }
+  .section-footer-next__partners .item { height: 20vw; }
+  .section-footer-next__hashtags { width: 100%; margin-top: 0; }
+  .section-footer-next__hashtags .list { justify-content: center; flex-wrap: wrap; gap: 2.6667vw 1.3333vw; }
+  .section-footer-next__hashtags .item { font-size: 3.7333vw; text-align: center; }
+}
