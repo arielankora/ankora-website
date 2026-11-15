@@ -1571,7 +1571,8 @@
       "managerOnly": "רק מנהל מאשר תרגום.",
       "nothingToApprove": "אין תרגום לאשר.",
       "incomplete": "התרגום לא שלם: {gaps}",
-      "clientNotFound": "הלקוח לא נמצא."
+      "clientNotFound": "הלקוח לא נמצא.",
+      "notForAi": "התהליך רגיש או מוגבל, ולכן לא נשלח לקלוד. מתרגמים אותו ידנית."
     },
     "strangerTests": {
       "processNotFound": "התהליך לא נמצא.",
@@ -1582,7 +1583,8 @@
       "kindNotAllowed": "סוג התשובה לא מתאים לתיק.",
       "ruleNotFound": "הכלל לא נמצא בתיק של הלקוח.",
       "ruleRetired": "הכלל בוטל. כותבים כלל חדש.",
-      "ruleChangeNotAllowed": "רק מנהל או מנהל התיק של הלקוח משנים כלל של לקוח. רושמים את התשובה בלי שינוי הכלל, והם יחליטו."
+      "ruleChangeNotAllowed": "רק מנהל או מנהל התיק של הלקוח משנים כלל של לקוח. רושמים את התשובה בלי שינוי הכלל, והם יחליטו.",
+      "invalidQuestions": "{problem}"
     },
     "clients": {
       "contractNotFound": "החוזה שנבחר לא נמצא בתיק של הלקוח הזה.",
@@ -1795,7 +1797,13 @@
       "notWaiting": "השיחה כבר שויכה, או שהיא לא נמצאה.",
       "notACandidate": "הלקוח שנבחר אינו אחד המועמדים.",
       "alreadyAssigned": "השיחה כבר שויכה.",
-      "discardReasonRequired": "כותבים בשורה אחת למה השיחה לא שייכת לאף אחד מהם."
+      "discardReasonRequired": "כותבים בשורה אחת למה השיחה לא שייכת לאף אחד מהם.",
+      "invalidAssignment": "{problem}",
+      "noItems": "אין פריטים באצווה.",
+      "tooManyItems": "עד 60 פריטים באצווה. מחלקים לכמה אצוות.",
+      "titleRequired": "צריך שם לשיחה.",
+      "alreadyRegistered": "השיחה כבר רשומה אצל {client} כ-{code}. שולחים אליו עם sourceCode.",
+      "alreadyWaiting": "השיחה הזו כבר ממתינה לשיוך."
     },
     "autoApply": {
       "pauseAlreadyLifted": "העצירה כבר הוסרה.",
@@ -1897,6 +1905,9 @@
     },
     "portalPreferences": {
       "tooLong": "הטקסט ארוך מדי. אפשר לקצר, או לספר לנו את השאר בוואטסאפ."
+    },
+    "proposalStats": {
+      "managerOnly": "רק למנהלים."
     }
   },
   "auditLog": {

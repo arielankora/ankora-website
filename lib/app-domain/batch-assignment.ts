@@ -50,22 +50,22 @@ export async function proposeAwaitingAssignment(actor: User, input: AwaitingInpu
   assertCan(actor.role, "time_entry.create_self");
   const candidates = [...new Set(input.candidateClientIds)];
   const problem = candidatesError(input.proposedClientId, candidates) ?? assignmentReasonError(input.reason);
-  if (problem) throw new Error(problem);
+  if (problem) throw new DomainError("batchAssignment.invalidAssignment", problem, { problem });
   for (const id of candidates) await assertClientAccess(actor, id);
-  if (input.items.length === 0) throw new Error("אין פריטים באצווה.");
-  if (input.items.length > 60) throw new Error("עד 60 פריטים באצווה. מחלקים לכמה אצוות.");
+  if (input.items.length === 0) throw new DomainError("batchAssignment.noItems", "אין פריטים באצווה.");
+  if (input.items.length > 60) throw new DomainError("batchAssignment.tooManyItems", "עד 60 פריטים באצווה. מחלקים לכמה אצוות.");
   const title = input.source.title.trim();
-  if (!title) throw new Error("צריך שם לשיחה.");
+  if (!title) throw new DomainError("batchAssignment.titleRequired", "צריך שם לשיחה.");
 
   // The same recording, already someone's or already waiting.
   const ids = (input.source.externalIds ?? []).map((i) => i.trim()).filter(Boolean);
   if (ids.length > 0) {
     const registered = await prisma.clientSource.findMany({ where: { clientId: { in: candidates }, deletedAt: null }, select: { code: true, externalRefs: true, client: { select: { name: true } } } });
     const same = registered.find((s) => Array.isArray(s.externalRefs) && (s.externalRefs as { id?: string }[]).some((r) => r?.id && ids.includes(r.id)));
-    if (same) throw new Error(`השיחה כבר רשומה אצל ${same.client.name} כ-${same.code}. שולחים אליו עם sourceCode.`);
+    if (same) throw new DomainError("batchAssignment.alreadyRegistered", `השיחה כבר רשומה אצל ${same.client.name} כ-${same.code}. שולחים אליו עם sourceCode.`, { client: same.client.name, code: same.code });
     const waiting = await prisma.knowledgeBatch.findMany({ where: { awaitingAssignment: true }, select: { pendingInput: true } });
     if (waiting.some((b) => ((b.pendingInput as StoredInput | null)?.source.externalIds ?? []).some((id) => ids.includes(id)))) {
-      throw new Error("השיחה הזו כבר ממתינה לשיוך.");
+      throw new DomainError("batchAssignment.alreadyWaiting", "השיחה הזו כבר ממתינה לשיוך.");
     }
   }
 

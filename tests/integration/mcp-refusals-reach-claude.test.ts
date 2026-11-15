@@ -11,9 +11,10 @@ import { addProcess, approveProcessVersion, saveProcessVersion } from "@/lib/app
 // into "an unexpected server error ... Do not retry", which is right for a
 // Prisma crash and wrong for a rule saying no.
 //
-// These four refusals are thrown as a plain `Error`, not a DomainError, so
-// each one reaches Claude as "unexpected server error", although each
-// sentence was written to tell Claude (or the person) what to do instead:
+// These four refusals were thrown as a plain `Error`, not a DomainError,
+// so each one reached Claude as "unexpected server error", although each
+// sentence was written to tell Claude (or the person) what to do instead.
+// Since 15.11.2026 they are DomainErrors with codes, and this holds it:
 //
 //   1. get_proposal_stats by someone who is not a manager
 //      (lib/app-domain/proposal-stats.ts, "רק למנהלים.")
@@ -25,8 +26,8 @@ import { addProcess, approveProcessVersion, saveProcessVersion } from "@/lib/app
 //      under one of the candidates (lib/app-domain/batch-assignment.ts,
 //      "...שולחים אליו עם sourceCode.")
 //
-// Each is `it.fails` so CI stays green and the suite asks for `.fails` to
-// be removed the moment the refusal reaches Claude in its own words.
+// Found by the weekly QA hunt (#523, as it.fails); fixed in the PR that
+// turned these throws into DomainErrors.
 
 vi.mock("@/lib/mcp/auth", () => ({
   actorFromAuthInfo: (authInfo: { extra: { user: User } }) => authInfo.extra.user,
@@ -65,14 +66,14 @@ async function setup() {
 }
 
 describe("a refusal of the domain reaches Claude in its own words, not as an unexpected error", () => {
-  it.fails("1. get_proposal_stats, asked by an employee who is not a manager", async () => {
+  it("1. get_proposal_stats, asked by an employee who is not a manager", async () => {
     const { hadas } = await setup();
     const text = await call(hadas, "get_proposal_stats", {});
     expect(text).not.toContain(UNEXPECTED);
     expect(text).toContain("רק למנהלים");
   });
 
-  it.fails("2. get_procedure_for_translation on a sensitive process", async () => {
+  it("2. get_procedure_for_translation on a sensitive process", async () => {
     const { nux, hadas, ariel } = await setup();
     const p = await addProcess(hadas, { clientId: nux.id, title: "פרט רפואי", sensitivity: "SENSITIVE", triggerKinds: ["ON_DEMAND"], sources: S1 });
     await saveProcessVersion(hadas, p.id, { steps: [{ title: "שולחים את הטופס", actionTags: ["OTHER"] }], baseVersion: 0 });
@@ -82,7 +83,7 @@ describe("a refusal of the domain reaches Claude in its own words, not as an une
     expect(text).toContain("Translate it by hand");
   });
 
-  it.fails("3. record_stranger_test with a step the procedure does not have", async () => {
+  it("3. record_stranger_test with a step the procedure does not have", async () => {
     const { nux, hadas } = await setup();
     const p = await addProcess(hadas, { clientId: nux.id, title: "תשלומי ספקים", purpose: "לשלם בזמן", ownerId: hadas.id, triggerKinds: ["ON_DEMAND"], sources: S1 });
     await saveProcessVersion(hadas, p.id, { steps: [{ title: "מעלים חשבוניות", actionTags: ["INVOICE"] }, { title: "מאשרים תשלום", actionTags: ["PAYMENT"] }], baseVersion: 0 });
@@ -95,7 +96,7 @@ describe("a refusal of the domain reaches Claude in its own words, not as an une
     expect(text).toContain("אין בנוהל שלב 9");
   });
 
-  it.fails("4. propose_knowledge `uncertain` for a meeting already registered under a candidate", async () => {
+  it("4. propose_knowledge `uncertain` for a meeting already registered under a candidate", async () => {
     const { rimed, hadas } = await setup();
     await addClientSource(hadas, { clientId: rimed.id, kind: "TRANSCRIPT", title: "Weekly sync", externalIds: ["ff-123"] });
     const text = await call(hadas, "propose_knowledge", {
