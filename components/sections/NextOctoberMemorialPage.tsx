@@ -62,10 +62,10 @@ export function NextOctoberMemorialPage({ locale }: { locale: Locale }) {
         <div className="grid items-center gap-10 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
           <Reveal>
             <Image
-              src="/next-october/portrait.webp"
+              src="/next-october/quote.webp"
               alt={c.portraitAlt}
-              width={1000}
-              height={999}
+              width={570}
+              height={580}
               sizes="(min-width: 768px) 35vw, 100vw"
               className="h-auto w-full max-w-[460px] border border-[rgba(243,234,219,0.12)]"
             />
@@ -83,18 +83,32 @@ export function NextOctoberMemorialPage({ locale }: { locale: Locale }) {
       </SectionShell>
 
       <SectionShell>
-        <div className="grid gap-10 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <div className="grid items-start gap-10 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
           <Reveal>
             <h2 className="max-w-xl text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-cream">
               {c.storyTitle}
             </h2>
-          </Reveal>
-          <Reveal delay={0.08}>
-            <div className="max-w-2xl space-y-5 font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-body">
+            <div className="mt-8 max-w-2xl space-y-5 font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-body">
               {c.story.map((p) => (
                 <p key={p}>{p}</p>
               ))}
             </div>
+          </Reveal>
+          <Reveal delay={0.08}>
+            {/* Same-origin file, so default-src 'self' already covers it. No autoplay:
+                the clip has sound, and a memorial page should not start talking. */}
+            <video
+              controls
+              playsInline
+              preload="metadata"
+              poster="/next-october/nathanel-poster.webp"
+              width={670}
+              height={720}
+              aria-label={c.videoLabel}
+              className="h-auto w-full max-w-[420px] border border-[rgba(243,234,219,0.12)] bg-black"
+            >
+              <source src="/next-october/nathanel.mp4" type="video/mp4" />
+            </video>
           </Reveal>
         </div>
       </SectionShell>

@@ -21,6 +21,7 @@ export type NextOctoberContent = {
   years: string;
   heroAlt: string;
   portraitAlt: string;
+  videoLabel: string;
   lead: string;
   quote: string;
   storyTitle: string;
@@ -65,7 +66,8 @@ const he: NextOctoberContent = {
   name: "נתנאל יאנג",
   years: "2003-2023",
   heroAlt: "סמל נתנאל יאנג במדים",
-  portraitAlt: "נתנאל יאנג",
+  portraitAlt: "נתנאל יאנג במדים",
+  videoLabel: "סרטון של נתנאל עם חבריו לשירות",
   lead: "נתנאל חי את החיים במלואם. החזון שלו הוא המורשת שלנו.",
   quote: "Some people want it to happen, some wish it would happen, others make it happen.",
   storyTitle: "לוחם צעיר ואמיץ, מוזיקאי נלהב, גיבור.",
@@ -101,7 +103,8 @@ const en: NextOctoberContent = {
   name: "Nathanel Young",
   years: "2003-2023",
   heroAlt: "Sgt. Nathanel Young in uniform",
-  portraitAlt: "Nathanel Young",
+  portraitAlt: "Nathanel Young in uniform",
+  videoLabel: "Video of Nathanel with his fellow soldiers",
   lead: "Nathanel lived life to the fullest. His vision is our legacy.",
   quote: "Some people want it to happen, some wish it would happen, others make it happen.",
   storyTitle: "A brave young soldier, a passionate musician, a hero.",
