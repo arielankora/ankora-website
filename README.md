@@ -264,14 +264,16 @@ existed.
 ### Claude Desktop (MCP)
 
 `/api/mcp` exposes the Time Tracking app to a staff member's Claude over
-the Model Context Protocol. 62 tools, by family:
+the Model Context Protocol. 75 tools, by family:
 
 | | |
 | --- | --- |
 | Time (`lib/mcp/tools.ts`, 15) | `list_my_clients`, `list_categories`, `get_active_timer`, `list_my_time_entries`, `start_timer`, `stop_timer`, `move_time_entry_to_open_bank`, `update_timer_note`, `create_time_entry`, `list_tasks`, `create_task`, `update_task`, `list_assignable_people`, and the two team reads below |
 | Read (team) | `list_team_members`, `list_team_time_entries` — needs `time_entry.edit_others`, the same permission the admin screen and the CSV export already use |
-| Tasks (`task-extra-tools.ts`, 11) | `get_task`, task steps (`add_task_steps`, `replace_task_steps`, `set_task_step`), the work plan (`get_task_plan`, `save_task_plan`, `apply_task_plan_steps`), `add_task_comment`, `decide_vendor_check` (a detected new vendor: open the sub-processor run or dismiss it), `create_decision`, `list_decisions` |
-| Client file (`client-file-tools.ts`, 20) | `get_client_file`, `get_client_brief`, `list_subprocessor_notice_recipients`, `set_client_subprocessor_notice`, `get_client_changes`, `propose_knowledge`, `lookup_contact`, `list_processes`, `get_process`, `get_procedure_for_translation`, `save_procedure_translation`, `list_policies`, `start_process`, `record_run_lesson`, `record_stranger_test`, `answer_stranger_question`, `list_my_routines`, `record_process_check`, `get_extraction_brief`, `propose_extraction_guide_version` (a draft of the extraction guide; an admin approves it on the screen) |
+| Tasks (`task-extra-tools.ts`, 12) | `get_task`, task steps (`add_task_steps`, `replace_task_steps`, `set_task_step`), the work plan (`get_task_plan`, `save_task_plan`, `apply_task_plan_steps`), `set_task_process` (mark a task as a run of a process), `add_task_comment`, `decide_vendor_check` (a detected new vendor: open the sub-processor run or dismiss it), `create_decision`, `list_decisions` |
+| Client file (`client-file-tools.ts`, 22) | `get_client_file`, `get_client_brief`, `list_subprocessor_notice_recipients`, `set_client_subprocessor_notice`, `get_client_changes`, `propose_knowledge`, `lookup_contact`, `list_processes`, `get_process`, `get_procedure_for_translation`, `save_procedure_translation`, `save_procedure_draft`, `save_procedure_audit_draft` (drafts of a procedure's steps and of its audit preparation; a person approves them on the screen), `list_policies`, `start_process`, `record_run_lesson`, `record_stranger_test`, `answer_stranger_question`, `list_my_routines`, `record_process_check`, `get_extraction_brief`, `propose_extraction_guide_version` (a draft of the extraction guide; an admin approves it on the screen) |
+| Processes (`process-tools.ts`, 8) | `set_process_rhythm`, `create_process` (a process or a work guide), `update_process`, `resolve_process_lesson`, `mark_process_reviewed`, `confirm_procedure_still_right`, `set_client_audit_requirements`, `set_contact_ended` |
+| Dates (`date-tools.ts`, 1) | `update_date`: change a date already in a client's file |
 | Documents (`document-tools.ts`, 5) | `list_documents`, `read_document`, `set_document_kind`, `start_document_upload`, `upload_document` |
 | Hour bank (`hour-bank-tools.ts`, 1) | `get_hours_bank`: the Hour Banks screen's figures for one client, optionally as of a date, in whole minutes. Adjustments go to managers only, flagged as internal |
 | Communications (`comms-tools.ts`, 2) | `list_client_communications`, `get_client_communication`: a client's stored WhatsApp conversations and recorded calls with their transcripts, read-only, with the communications screen's visibility and block rules, and nothing of a number that also belongs to a client marked "בלי AI" |
