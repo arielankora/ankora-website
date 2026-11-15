@@ -24,11 +24,18 @@ export async function GET(
   if (!config) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     // Stage 3: a stored voice message is played from its Drive copy.
+    // Only from the number the gate above approved: a chat id is unique per
+    // number, not across numbers, so the conversation is matched on the
+    // approved account too (security review 2026-11).
     const stored = await prisma.commsAttachment.findFirst({
       where: {
         type: "audio",
         driveFileId: { not: null },
-        message: { externalId: decodeURIComponent(messageId), held: false, conversation: { externalChatId: decodeURIComponent(chatId) } },
+        message: {
+          externalId: decodeURIComponent(messageId),
+          held: false,
+          conversation: { externalChatId: decodeURIComponent(chatId), channel: { accountId: config.accountId } },
+        },
       },
       select: { driveFileId: true, mimetype: true },
     });
