@@ -2312,8 +2312,16 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-14",
       "riskReason": "Static memorial page for Sgt. Nathanel Young (Next October): no form, no data, no auth; outbound links only"
+    },
+    "domain:auto-category": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-15",
+      "riskReason": "Picks a category for a task born without one (from WhatsApp messages, or the timer button's proposal). Never throws; the person sees the pick and can change it."
     }
   },
   "waivers": {},
-  "lastScan": "2026-11-14"
+  "lastScan": "2026-11-15"
 }
