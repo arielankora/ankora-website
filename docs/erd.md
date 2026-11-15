@@ -76,6 +76,8 @@ erDiagram
         int failedLoginAttempts
         datetime lockedUntil
         string whatsappNumber "nullable, the number a task share opens a WhatsApp chat with, as typed on the profile screen"
+        AppLocale locale "he or en, the language of the interface for this person (ADR 0006), default he"
+        CommsAccessLevel commsAccessLevel "NONE, OWN, CALLS or FULL: access to the communications screen, default NONE"
         datetime deletedAt
     }
 
@@ -103,6 +105,8 @@ erDiagram
         string subprocessorNoticeDocumentId FK "nullable, the document that holds the commitment"
         datetime subprocessorNoticeCheckedAt "nullable"
         string subprocessorNoticeCheckedById FK "nullable"
+        bool auditRequirements "the client is audited (SOC 2, ISO): procedures get compliance fields and audit readiness, default false"
+        AppLocale communicationLocale "the language Ankora writes to the client's people who have no account, default he"
         datetime deletedAt
     }
 
@@ -150,6 +154,10 @@ erDiagram
         string externalRef "nullable"
         bool mappingTask "a handover mapping stage: what it learns goes to the client file before it closes"
         bool aiExcluded "the client asked that this task stay away from AI; steps and documents inherit it"
+        string approvalContactId "nullable, a run step approved by a contact at the client (plain id)"
+        json approvalEvidence "nullable, when and how the contact approved, and who recorded it"
+        string evidenceLink "nullable, a link to what shows a run step was done (audit clients)"
+        json runBrief "nullable, what a run task shows about its procedure, as data, read in each reader's language"
         datetime deletedAt
     }
 
@@ -303,7 +311,7 @@ erDiagram
         CalendarType calendarType "GREGORIAN or HEBREW"
         int month
         int day
-        RecurrenceType recurrence "ONCE, ANNUAL, MONTHLY, CUSTOM_INTERVAL, WEEKLY or BUSINESS_DAILY"
+        RecurrenceType recurrence "ONCE, ANNUAL, MONTHLY, CUSTOM_INTERVAL, WEEKLY, BUSINESS_DAILY or DAILY"
         string responsibleUserId FK
         ImportantDateStatus status
         ImportantDateSensitivity sensitivity
@@ -315,6 +323,7 @@ erDiagram
         string expectedFrom "nullable, who sends it, in words"
         ImportantDateSource source "MANUAL, HOLIDAY or TEMPLATE"
         string holidayKey "nullable, unique per client"
+        string processStartId FK "nullable, the process start this date was generated for; edited from the process rhythm only"
         datetime deletedAt "nullable"
     }
 
@@ -785,6 +794,7 @@ erDiagram
         datetime verifiedAt "nullable"
         string supersededById "nullable"
         datetime supersededAt "nullable"
+        datetime endedAt "nullable, left the client or the role; kept so past runs still name them"
         string createdById "nullable"
         datetime createdAt
         datetime updatedAt
@@ -1170,8 +1180,10 @@ erDiagram
         string code
         string title
         string purpose "nullable"
-        string triggerKinds "enum ProcessTrigger (list)"
+        string kind "enum ProcessKind: PROCESS, or GUIDE (a work instruction with no rhythm and no runs)"
+        string triggerKinds "enum ProcessTrigger (list), derived from ProcessStart rows on every save"
         string triggerText "nullable"
+        string triggerNotes "nullable, notes on the rhythm that schedule nothing"
         string ownerId "nullable"
         string backupOwnerId "nullable"
         string slaText "nullable"
@@ -1250,6 +1262,8 @@ erDiagram
         datetime createdAt
         string approvedById "nullable"
         datetime approvedAt "nullable"
+        datetime reconfirmedAt "nullable, an approver said the document is still right after a change around it"
+        string reconfirmedById "nullable"
     }
 
     ProcessCheck {
@@ -1308,6 +1322,26 @@ erDiagram
     }
 
     ProcessStrangerTest ||--o{ ProcessStrangerQuestion : "has"
+
+    ProcessStart {
+        string id PK
+        string processId FK
+        string clientId
+        string kind "enum ProcessStartKind"
+        json schedule "nullable, SCHEDULE: the rule the rhythm editor wrote; its dates link back by ImportantDate.processStartId"
+        string description "nullable, EVENT: what happens, in words"
+        int checkEveryDays "nullable, CONTINUOUS"
+        string checkText "nullable, CONTINUOUS"
+        string externalWhere "nullable, EXTERNAL"
+        string externalWhen "nullable, EXTERNAL"
+        string externalRecipient "nullable, EXTERNAL"
+        int sortOrder
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    Process ||--o{ ProcessStart : "starts"
+    ProcessStart ||--o{ ImportantDate : "generates"
 ```
 
 ### Internal suppliers: agreements
@@ -1355,6 +1389,7 @@ erDiagram
 | `AgreementKind` | `CONFIDENTIALITY`, `DELETION_DECLARATION` |
 | `AgreementLinkPurpose` | `APP_SIGN`, `PDF_UPLOAD` |
 | `AlertCloseKind` | `MANUAL`, `BELOW_THRESHOLD`, `NEW_CYCLE`, `HOURS_LOADED`, `SUPERSEDED` |
+| `AppLocale` | `he`, `en` |
 | `BillingCycle` | `MONTHLY`, `ANNUAL`, `OTHER` |
 | `ClientDocumentKind` | `POLICY`, `PROCEDURE`, `CERTIFICATE`, `CONTRACT`, `INVOICE`, `OTHER` |
 | `ClientDomainKind` | `CLIENT`, `PARTNER` |
@@ -1382,11 +1417,13 @@ erDiagram
 | `PortalDigest` | `EVERY_DECISION`, `WEEKLY`, `MONTHLY` |
 | `PortalSummaryStatus` | `DRAFT`, `APPROVED`, `DISCARDED` |
 | `ProcessCheckOutcome` | `OK`, `ISSUE` |
+| `ProcessKind` | `PROCESS`, `GUIDE` |
 | `ProcessLessonStatus` | `NOTHING`, `OPEN`, `APPLIED`, `DISMISSED` |
 | `ProcessStatus` | `DRAFT`, `ACTIVE`, `PAUSED`, `RETIRED` |
+| `ProcessStartKind` | `SCHEDULE`, `EVENT`, `ON_DEMAND`, `CONTINUOUS`, `EXTERNAL` |
 | `ProcessStepMode` | `MANUAL`, `ASSISTED`, `AUTOMATED` |
 | `ProcessTransition` | `WITH_CLIENT`, `IN_HANDOVER`, `WITH_ANKORA`, `NOT_PLANNED` |
-| `ProcessTrigger` | `SCHEDULED`, `EVENT`, `ON_DEMAND`, `CONTINUOUS` |
+| `ProcessTrigger` | `SCHEDULED`, `EVENT`, `ON_DEMAND`, `CONTINUOUS`, `EXTERNAL` |
 | `ProcessVersionStatus` | `DRAFT`, `APPROVED`, `SUPERSEDED` |
 | `ProposalAction` | `CREATE`, `SUPERSEDE`, `CONTRADICT` |
 | `ProcedureClassification` | `PUBLIC`, `INTERNAL`, `CONFIDENTIAL` |
@@ -1500,6 +1537,18 @@ erDiagram
         boolean isDeleted
         boolean isEdited
         boolean held "hidden while a block request is pending"
+        string quotedExternalId "nullable, the message this one replies to"
+        string quotedText "nullable"
+        string quotedSenderName "nullable"
+        string quotedKind "nullable"
+        boolean forwarded
+        int eventType "nullable, a WhatsApp event shown as a line (call, group change)"
+        json eventData "nullable"
+        json reactions "nullable, [{ reaction, count }]"
+        json mentions "nullable, [{ start, length, userId }]"
+        boolean viewOnce
+        boolean disappearing "sent in a chat whose messages WhatsApp deletes; kept here and marked"
+        string buttons "(list), a business message's buttons"
         datetime createdAt
         datetime updatedAt
     }
@@ -1514,6 +1563,13 @@ erDiagram
         int durationSec "nullable"
         string fileName "nullable"
         string driveFileId "nullable, voice notes only"
+        string contactName "nullable, a shared contact card"
+        string contactPhones "(list)"
+        string contactEmails "(list)"
+        string contactOrg "nullable"
+        boolean unavailable "gone from WhatsApp servers"
+        boolean sticker
+        boolean gif
         datetime createdAt
     }
 
@@ -1537,6 +1593,12 @@ erDiagram
 | `TranscriptStatus` | `PENDING`, `DONE`, `FAILED`, `SKIPPED` |
 | `CommsBlockKind` | `PHONE`, `CHAT` |
 | `CommsBlockStatus` | `PENDING`, `APPROVED`, `REJECTED`, `REVOKED` |
+| `CommsAccessLevel` | `NONE`, `OWN`, `CALLS`, `FULL` |
+
+`CommsLineOwner` (table `comms_line_owners`, columns `line` PK in E.164,
+nullable `userId` and `updatedAt`) names the employee who owns each Aloha
+line. A block on that person's WhatsApp also leaves out the recordings of
+calls on their line.
 
 `CallRecordingSkip` (table `call_recording_skips`, columns `emailId` PK and
 `createdAt`, 14.11.2026) holds the id of each recording email left out
