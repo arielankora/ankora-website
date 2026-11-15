@@ -36,6 +36,13 @@ test.describe("public pages", () => {
         // prefetch of /en/blog.
         const url = new URL(req.url());
         if (url.searchParams.has("_rsc") && req.failure()?.errorText === "net::ERR_ABORTED") return;
+        // And a video with preload="metadata". Chromium reads the start of
+        // the file for the poster frame and duration, then cancels the rest
+        // until the visitor presses play; that cancel is ERR_ABORTED on a
+        // media request, every time. Seen on /next-october after the clip
+        // was added (#527, 15.11.2026). Any other failure of a media request
+        // (refused, reset, blocked) still counts.
+        if (req.resourceType() === "media" && req.failure()?.errorText === "net::ERR_ABORTED") return;
         if (url.origin === new URL(page.url() || "http://x").origin) {
           failedRequests.push(`${req.url()} — ${req.failure()?.errorText ?? "failed"}`);
         }
