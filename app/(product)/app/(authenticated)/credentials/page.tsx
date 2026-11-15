@@ -91,15 +91,22 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
           rows.map((row) => (
             <CredentialRowShell key={row.id} id={row.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p dir="auto" className="text-[15px] font-medium text-app-text-primary">{row.systemName}</p>
+                {/* Names and links are often Latin (DOKKA, Gmail, a URL). Their own
+                    direction is LTR, so text-start would push them left inside an
+                    RTL card. The rtl:/ltr: variants align them by the page's
+                    direction instead (match-parent and unicode-bidi: plaintext
+                    were tried: both still resolve start from the text), and flex-1
+                    keeps the block the card's width rather than the width of its
+                    longest link. */}
+                <div className="min-w-0 flex-1">
+                  <p dir="auto" className="ltr:text-left rtl:text-right text-[15px] font-medium text-app-text-primary">{row.systemName}</p>
                   {row.url && (
                     <a
                       href={row.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       dir="ltr"
-                      className="block truncate text-start text-xs text-app-text-accent hover:underline"
+                      className="block truncate ltr:text-left rtl:text-right text-xs text-app-text-accent hover:underline"
                     >
                       {row.url}
                     </a>
