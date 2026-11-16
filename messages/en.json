@@ -1571,7 +1571,8 @@
       "managerOnly": "Only a manager approves a translation.",
       "nothingToApprove": "There is no translation to approve.",
       "incomplete": "The translation is incomplete: {gaps}",
-      "clientNotFound": "Client not found."
+      "clientNotFound": "Client not found.",
+      "notForAi": "This process is sensitive or restricted, so it is not sent to Claude. Translate it by hand."
     },
     "strangerTests": {
       "processNotFound": "Process not found.",
@@ -1582,7 +1583,8 @@
       "kindNotAllowed": "This kind of answer does not fit the file.",
       "ruleNotFound": "The rule is not in the client's file.",
       "ruleRetired": "The rule was retired. Write a new rule.",
-      "ruleChangeNotAllowed": "Only a manager or the client's account manager changes a client's rule. Record the answer without changing the rule, and they will decide."
+      "ruleChangeNotAllowed": "Only a manager or the client's account manager changes a client's rule. Record the answer without changing the rule, and they will decide.",
+      "invalidQuestions": "{problem}"
     },
     "clients": {
       "contractNotFound": "The selected contract is not in this client's file.",
@@ -1795,7 +1797,13 @@
       "notWaiting": "The call was already assigned, or it was not found.",
       "notACandidate": "The chosen client is not one of the candidates.",
       "alreadyAssigned": "The call was already assigned.",
-      "discardReasonRequired": "Write in one line why the call does not belong to any of them."
+      "discardReasonRequired": "Write in one line why the call does not belong to any of them.",
+      "invalidAssignment": "{problem}",
+      "noItems": "The batch has no items.",
+      "tooManyItems": "Up to 60 items in a batch. Split it into several batches.",
+      "titleRequired": "The conversation needs a name.",
+      "alreadyRegistered": "This conversation is already registered with {client} as {code}. Send it there with sourceCode.",
+      "alreadyWaiting": "This conversation is already waiting to be assigned."
     },
     "autoApply": {
       "pauseAlreadyLifted": "The pause was already lifted.",
@@ -1897,6 +1905,9 @@
     },
     "portalPreferences": {
       "tooLong": "That's too long. You can shorten it, or tell us the rest on WhatsApp."
+    },
+    "proposalStats": {
+      "managerOnly": "Managers only."
     }
   },
   "auditLog": {

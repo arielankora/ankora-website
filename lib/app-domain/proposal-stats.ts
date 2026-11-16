@@ -2,6 +2,7 @@ import "server-only";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canManageClients } from "@/lib/app-auth/permissions";
+import { DomainError } from "@/lib/domain-error";
 import { readSourceRefs } from "@/lib/knowledge-sources";
 import { bulkApproveBlocker, reviewConfidence, type ProposalFlag, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { proposalKindKey } from "@/lib/knowledge-review-filters";
@@ -114,7 +115,7 @@ export async function proposalStatsForAi(
   actor: User,
   opts: { since?: Date | null; via?: "MCP" | "SCREEN" | null; rows?: boolean; limit?: number; offset?: number } = {}
 ) {
-  if (!canManageClients(actor.role)) throw new Error("רק למנהלים.");
+  if (!canManageClients(actor.role)) throw new DomainError("proposalStats.managerOnly", "רק למנהלים.");
 
   // A proposal reaches its client through its batch.
   const where = (aiExcluded: boolean) => ({

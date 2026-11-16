@@ -40,7 +40,7 @@ export async function recordStrangerTest(actor: User, processId: string, input: 
   await assertClientAccess(actor, process.clientId);
   const latest = process.versions[0] ?? null;
   const read = readStrangerQuestions(input.questions, latest ? readSteps(latest.steps).length : 0);
-  if (!read.ok) throw new Error(read.error);
+  if (!read.ok) throw new DomainError("strangerTests.invalidQuestions", read.error, { problem: read.error });
   const summary = input.summary?.trim().slice(0, MAX_STRANGER_TEXT * 2) || null;
 
   const test = await prisma.$transaction(async (tx) => {

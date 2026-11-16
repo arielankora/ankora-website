@@ -320,7 +320,7 @@ export async function procedureDocument(
 export async function translationSource(actor: User, processId: string) {
   const p = await readableProcess(actor, processId);
   // Rule 3 (lib/knowledge.ts): what may leave the product for Claude.
-  if (!canSendToAi(p, actor.id)) throw new Error("This process is sensitive or restricted, so it is not sent to Claude. Translate it by hand.");
+  if (!canSendToAi(p, actor.id)) throw new DomainError("procedureDocuments.notForAi", "This process is sensitive or restricted, so it is not sent to Claude. Translate it by hand.");
   const v = p.versions.find((x) => x.status === "APPROVED");
   if (!v) throw new DomainError("procedureDocuments.noApprovedVersion", "רק נוהל מאושר מתורגם. לתהליך הזה אין עדיין גרסה מאושרת.");
   // Resolved before anything is handed over. canSendToAi above answers
