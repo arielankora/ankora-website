@@ -33,7 +33,11 @@ import type {
 // navy, and its two darkest (#0F1B29, #1B2A3D) could not be told apart:
 // on "לפי עובד" Ariel and Hadas looked like a single block (9.10.2026).
 // Each step now changes hue as well as lightness.
-const SERIES_COLORS = ["#1B2A3D", "#4A78A6", "#7FA89C", "#A9BCCB", "#8E7FA6"];
+// No series may be navy: the tooltip sits on bg-app-surface-nav (#1B2A3D),
+// and a navy dot vanished there, so the top client had no marker in the
+// tooltip (15.11.2026). The first color is a terracotta that reads on both
+// the navy tooltip (3.5:1) and the white card (4.1:1).
+const SERIES_COLORS = ["#B9674F","#4A78A6", "#7FA89C", "#A9BCCB", "#8E7FA6"];
 const OTHER_COLOR = "#B08D57";
 
 const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
