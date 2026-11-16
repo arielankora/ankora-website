@@ -257,6 +257,7 @@ function AttachDialog(props: {
       <Shell title={t("savedTitle")} closeLabel={t("close")} onClose={props.onClose}>
         <p className="text-sm text-app-success" role="status">
           {state.done.created ? t("doneCreated", { title: state.done.title }) : t("doneAttached", { title: state.done.title })}
+          {state.done.category ? ` ${t("doneCategory", { category: state.done.category })}` : ""}
           {state.done.steps > 0 ? ` ${t("doneSteps", { count: state.done.steps })}` : ""}
           {state.done.images > 0 ? ` ${t("doneImages", { count: state.done.images })}` : ""}
           {state.done.portalLine ? ` ${t("donePortal")}` : ""}

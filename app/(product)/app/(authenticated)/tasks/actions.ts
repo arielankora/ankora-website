@@ -6,6 +6,7 @@ import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { procedureReminderForScreen } from "@/lib/app-domain/procedure-to-file";
 import { assignableUsers, createTask, updateTask } from "@/lib/app-domain/tasks";
+import { pickCategoryForTask } from "@/lib/app-domain/auto-category";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import type { SupplierExperience, TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
@@ -87,11 +88,21 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
   const assignedToId = String(formData.get("assignedToId") || "") || null;
   const supervisorId = String(formData.get("supervisorId") || "") || null;
 
+  // 15.11.2026: a task opened from a conversation ("צור משימה מהשיחה")
+  // has no category field, and a task with no category cannot start a
+  // timer. That form asks for the pick the way create_task does through
+  // Claude. The tasks screen's own form leaves an empty choice empty.
+  let categoryId = String(formData.get("categoryId") || "") || null;
+  if (!categoryId && formData.get("autoCategory") === "on") {
+    const description = String(formData.get("description") || "");
+    categoryId = (await pickCategoryForTask(user, clientId, `${title}\n${description}`))?.id ?? null;
+  }
+
   let created;
   try {
     created = await createTask(user, {
       clientId,
-      categoryId: String(formData.get("categoryId") || "") || null,
+      categoryId,
       title,
       // Portal phase 1: opting a task in at creation is the cheapest
       // moment to do it, and the only one where the person already has

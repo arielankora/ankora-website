@@ -10,6 +10,7 @@ import { renderMarkdownLite } from "@/lib/markdown-lite";
 import {
   startTimerForTaskAction,
   stopTimerForTaskAction,
+  suggestTaskCategoryAction,
   updateTaskDetailAction,
 } from "./actions";
 import { moveEntryIntoOpenBankAction } from "../../timer/actions";
@@ -287,7 +288,7 @@ export function TaskDetail({
                 <Clock size={15} />
                 {t("header.manualEntry")}
               </button>
-              <TimerButton task={task} activeTimers={activeTimers} disabled={pending} />
+              <TimerButton task={task} categories={categories} activeTimers={activeTimers} disabled={pending} />
             </div>
             <a
               href="#task-time"
@@ -1203,12 +1204,19 @@ export type TaskActiveTimer = {
 /// - A timer on another client: run in parallel, or stop it and start
 ///   here. "In parallel" is the confirmation the domain requires.
 /// - Two running: pick which one to stop.
-function TimerButton({
+/// - No category on the task (15.11.2026): a time entry needs one, so the
+///   button first opens a picker with a proposed category already chosen,
+///   saves the choice on the task, and then goes on as above. Before this
+///   it only said "choose a category and try again", and a task opened
+///   from WhatsApp messages always had none.
+export function TimerButton({
   task,
+  categories,
   activeTimers,
   disabled,
 }: {
   task: TaskDetailData;
+  categories: { id: string; name: string }[];
   activeTimers: TaskActiveTimer[];
   disabled?: boolean;
 }) {
@@ -1218,6 +1226,14 @@ function TimerButton({
   const { announce } = useActiveTimer();
   const [pending, setPending] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  /// The category picker, open while the person chooses. `choice` is the
+  /// selected id; it starts as the proposed one when there is one.
+  const [picking, setPicking] = useState(false);
+  const [choice, setChoice] = useState("");
+  /// Saved from the picker, so the next click starts at once even before
+  /// the page's own data catches up.
+  const [savedCategory, setSavedCategory] = useState<string | null>(null);
+  const hasCategory = Boolean(task.categoryId || savedCategory);
 
   const running = activeTimers.find((t) => t.onThisTask) ?? null;
 
@@ -1283,6 +1299,30 @@ function TimerButton({
       return;
     }
     showToast({ tone: "success", title: t("stopped"), description: task.title });
+  }
+
+  async function openPicker() {
+    setChoice("");
+    setPicking(true);
+    const suggested = await suggestTaskCategoryAction({ taskId: task.id });
+    // Only if the person has not chosen something else meanwhile.
+    if (suggested && categories.some((c) => c.id === suggested.id)) {
+      setChoice((current) => current || suggested.id);
+    }
+  }
+
+  async function saveCategoryAndStart() {
+    if (!choice) return;
+    setPending(true);
+    const saved = await updateTaskDetailAction({ taskId: task.id, categoryId: choice });
+    setPending(false);
+    if (!saved.ok) {
+      showToast({ tone: "error", title: t("categoryFailed"), description: saved.error });
+      return;
+    }
+    setSavedCategory(choice);
+    setPicking(false);
+    ask();
   }
 
   function ask() {
@@ -1366,15 +1406,61 @@ function TimerButton({
   }
 
   return (
-    <button
-      type="button"
-      disabled={disabled || pending}
-      onClick={ask}
-      className="flex items-center gap-2 rounded-full border border-app-surface-nav bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary disabled:opacity-50"
-    >
-      <Play size={15} />
-      {t("start")}
-    </button>
+    <div className="relative">
+      <button
+        type="button"
+        disabled={disabled || pending}
+        aria-expanded={picking}
+        onClick={() => (hasCategory ? ask() : picking ? setPicking(false) : void openPicker())}
+        className="flex items-center gap-2 rounded-full border border-app-surface-nav bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary disabled:opacity-50"
+      >
+        <Play size={15} />
+        {t("start")}
+      </button>
+      {picking && !hasCategory ? (
+        <div
+          role="dialog"
+          aria-label={t("pickCategoryTitle")}
+          data-testid="timer-category-picker"
+          className="absolute end-0 z-20 mt-2 w-[min(20rem,calc(100vw-2rem))] space-y-3 rounded-xl border border-app-border bg-white p-4 text-start shadow-lg"
+        >
+          <p className="text-sm font-medium text-app-text-primary">{t("pickCategoryTitle")}</p>
+          <p className="text-[12.5px] text-app-text-secondary">{t("pickCategoryHint")}</p>
+          <select
+            value={choice}
+            onChange={(e) => setChoice(e.target.value)}
+            aria-label={t("pickCategoryTitle")}
+            className="w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary"
+          >
+            <option value="" disabled>
+              {t("pickCategoryPlaceholder")}
+            </option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={!choice || pending}
+              onClick={saveCategoryAndStart}
+              className="min-h-9 rounded-lg bg-navy px-3 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {t("saveCategoryAndStart")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPicking(false)}
+              className="min-h-9 rounded-lg border border-app-border-strong bg-white px-3 text-sm text-app-text-primary"
+            >
+              {t("cancel")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

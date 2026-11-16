@@ -616,7 +616,12 @@
         "runParallel": "Run both",
         "cancel": "Cancel",
         "stop": "Stop",
-        "start": "Start timer"
+        "start": "Start timer",
+        "pickCategoryTitle": "Choose a category to start the timer",
+        "pickCategoryHint": "Reported time needs a category. It is saved on the task, and you can change it later.",
+        "pickCategoryPlaceholder": "Choose a category",
+        "saveCategoryAndStart": "Save and start",
+        "categoryFailed": "The category was not saved"
       },
       "share": {
         "recipient": "To",
@@ -7037,6 +7042,7 @@
     },
     "task": {
       "created": "Task created.",
+      "createdCategory": "Category: {category}, you can change it on the task.",
       "open": "Open the task",
       "button": "Create a task from this conversation",
       "client": "Client",
@@ -7105,6 +7111,7 @@
       "savedTitle": "Saved",
       "doneCreated": "Task created: {title}.",
       "doneAttached": "The messages were added to the task: {title}.",
+      "doneCategory": "Category: {category}, chosen from the messages. You can change it on the task.",
       "doneSteps": "{count, plural, one {1 step added.} other {# steps added.}}",
       "doneImages": "{count, plural, one {1 image filed on the task.} other {# images filed on the task.}}",
       "donePortal": "The client line was added to the portal.",

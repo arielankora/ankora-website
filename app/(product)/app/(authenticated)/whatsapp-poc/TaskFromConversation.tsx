@@ -27,6 +27,7 @@ export function TaskFromConversation(props: {
     return (
       <p className="flex min-h-9 items-center gap-2 text-sm text-app-success">
         {t("created")}
+        {state.created.categoryName ? ` ${t("createdCategory", { category: state.created.categoryName })}` : ""}
         <Link href={`/app/tasks/${state.created.id}`} className="text-app-text-primary underline">
           {t("open")}
         </Link>
@@ -42,6 +43,9 @@ export function TaskFromConversation(props: {
         action={action}
         className="absolute end-0 z-20 mt-2 w-[min(28rem,calc(100vw-2rem))] space-y-3 rounded-xl border border-app-border bg-white p-4 shadow-lg"
       >
+        {/* No category field here: the server picks one (15.11.2026), so
+            the new task's timer can start. The line after saving names it. */}
+        <input type="hidden" name="autoCategory" value="on" />
         <div>
           <label htmlFor="task-client" className={label}>
             {t("client")}

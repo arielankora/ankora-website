@@ -616,7 +616,12 @@
         "runParallel": "להפעיל במקביל",
         "cancel": "ביטול",
         "stop": "עצירה",
-        "start": "הפעלת טיימר"
+        "start": "הפעלת טיימר",
+        "pickCategoryTitle": "בחרו קטגוריה כדי להפעיל טיימר",
+        "pickCategoryHint": "דיווח זמן חייב קטגוריה. הקטגוריה תישמר במשימה, ואפשר לשנות אותה אחר כך.",
+        "pickCategoryPlaceholder": "בחירת קטגוריה",
+        "saveCategoryAndStart": "שמירה והפעלה",
+        "categoryFailed": "הקטגוריה לא נשמרה"
       },
       "share": {
         "recipient": "למי",
@@ -7037,6 +7042,7 @@
     },
     "task": {
       "created": "המשימה נוצרה.",
+      "createdCategory": "קטגוריה: {category}, אפשר לשנות אותה במשימה.",
       "open": "לפתיחת המשימה",
       "button": "צור משימה מהשיחה",
       "client": "לקוח",
@@ -7105,6 +7111,7 @@
       "savedTitle": "נשמר",
       "doneCreated": "המשימה נוצרה: {title}.",
       "doneAttached": "ההודעות צורפו למשימה: {title}.",
+      "doneCategory": "קטגוריה: {category}, נבחרה לפי תוכן ההודעות. אפשר לשנות אותה במשימה.",
       "doneSteps": "{count, plural, one {נוסף שלב אחד.} other {נוספו # שלבים.}}",
       "doneImages": "{count, plural, one {תמונה אחת תויקה במשימה.} other {# תמונות תויקו במשימה.}}",
       "donePortal": "השורה ללקוח נוספה לפורטל.",

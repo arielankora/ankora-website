@@ -10,6 +10,7 @@ import { commsAccess } from "@/lib/comms/access";
 import { accountForChatFile } from "@/lib/comms/route-access";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { MAX_COMMENT_LENGTH, addTaskComment, createTask, listTasks } from "@/lib/app-domain/tasks";
+import { pickCategoryForTask } from "@/lib/app-domain/auto-category";
 import { addClientDocument, DriveNotConfiguredError } from "@/lib/app-domain/client-documents";
 import { addTaskPortalNote } from "@/lib/app-domain/task-portal-notes";
 import { MAX_PORTAL_NOTE_LENGTH, checkPortalNote } from "@/lib/task-portal-note-text";
@@ -63,7 +64,18 @@ export async function listTasksForMessagesAction(input: { clientId: string; q?: 
 
 export type AttachState = {
   error?: string;
-  done?: { taskId: string; title: string; created: boolean; images: number; portalLine: boolean; steps: number; comment: boolean };
+  done?: {
+    taskId: string;
+    title: string;
+    created: boolean;
+    images: number;
+    portalLine: boolean;
+    steps: number;
+    comment: boolean;
+    /// The category a new task was given automatically (15.11.2026), so
+    /// the dialog can say which one and the person can change it.
+    category: string | null;
+  };
   /// What did not go through while the rest did (an image Drive refused,
   /// a portal line on a task that is not visible).
   warnings?: string[];
@@ -113,14 +125,25 @@ export async function attachSelectedMessagesAction(_prev: AttachState | undefine
   // written, so a hand-edited form cannot reach another client's task.
   let task: { id: string; clientId: string; title: string; clientVisible: boolean };
   let created = false;
+  let categoryName: string | null = null;
   const accessible = await listAccessibleClients(user);
   try {
     if (mode === "new") {
       const clientId = String(formData.get("clientId") || "");
       if (!accessible.some((c) => c.id === clientId)) return { error: t("pickClient") };
       const title = String(formData.get("title") || "").trim().slice(0, 200) || proposeSelectedTitle(contactName, phone);
+      // 15.11.2026: a task born here had no category, so its timer button
+      // refused. Picked from the title and the messages' words, the way
+      // create_task picks through Claude; the done line names it.
+      const pick = await pickCategoryForTask(
+        user,
+        clientId,
+        [title, ...messages.map((m) => m.text || m.transcript || "")].join("\n"),
+      );
+      categoryName = pick?.name ?? null;
       const createdTask = await createTask(user, {
         clientId,
+        categoryId: pick?.id ?? null,
         title,
         clientVisible: formData.get("clientVisible") === "on",
         description: null,
@@ -237,7 +260,7 @@ export async function attachSelectedMessagesAction(_prev: AttachState | undefine
 
   revalidatePath(`/app/tasks/${task.id}`);
   return {
-    done: { taskId: task.id, title: task.title, created, images: filed.size, portalLine: portalAdded, steps: stepsAdded, comment: commentWritten },
+    done: { taskId: task.id, title: task.title, created, images: filed.size, portalLine: portalAdded, steps: stepsAdded, comment: commentWritten, category: categoryName },
     warnings: warnings.length ? [...new Set(warnings)] : undefined,
   };
 }

@@ -56,6 +56,7 @@ import { addSystemAccess } from "@/lib/app-domain/system-map";
 import { addRequestType } from "@/lib/app-domain/request-types";
 import { addClientPolicy } from "@/lib/app-domain/client-policies";
 import { createTask } from "@/lib/app-domain/tasks";
+import { pickCategoryForTask } from "@/lib/app-domain/auto-category";
 import { createImportantDate } from "@/lib/app-domain/important-dates";
 import { duplicateFlag, findExisting, keepsSources, withLiveDuplicate, type ExistingItem } from "@/lib/app-domain/proposal-existing";
 import { dateProposalKey, dateSchedule } from "@/lib/date-proposals";
@@ -1107,16 +1108,10 @@ function defaultDueDate(): Date {
   return new Date(`${defaultTaskDue(localDateKey(new Date(), "Asia/Jerusalem"))}T00:00:00Z`);
 }
 
-/// The category the task's words point to (lib/mcp/category-pick.ts), the
-/// same pick create_task makes. Dynamic, as in employee-lifecycle.ts: the
-/// lookup module imports back into the app domain.
+/// The category the task's words point to (lib/app-domain/auto-category.ts),
+/// the same pick create_task makes.
 async function autoCategory(actor: User, clientId: string, text: string): Promise<string | null> {
-  try {
-    const { autoPickCategory } = await import("@/lib/mcp/lookup");
-    return (await autoPickCategory(actor, clientId, text))?.id ?? null;
-  } catch {
-    return null;
-  }
+  return (await pickCategoryForTask(actor, clientId, text))?.id ?? null;
 }
 
 async function draftFor(proposal: { batchId: string; target: string; payload: Prisma.JsonValue; reason: string | null; quote: string | null }) {
