@@ -560,7 +560,7 @@ export function TaskRow({
                 onChange={(e) => setClientTitle(e.target.value)}
                 onBlur={saveTitle}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) e.currentTarget.blur();
                   if (e.key === "Escape") {
                     setClientTitle(task.clientTitle ?? "");
                     setEditingTitle(false);
@@ -598,7 +598,7 @@ export function TaskRow({
                       disabled={pending}
                       onChange={(e) => setClientOutcome(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") void confirmClose();
+                        if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) void confirmClose();
                         if (e.key === "Escape") cancelClose();
                       }}
                       placeholder={t("outcomePlaceholder")}
@@ -625,7 +625,7 @@ export function TaskRow({
                   onChange={(e) => setClientOutcome(e.target.value)}
                   onBlur={saveOutcome}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") e.currentTarget.blur();
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) e.currentTarget.blur();
                     if (e.key === "Escape") {
                       setClientOutcome(task.clientOutcome ?? "");
                       setEditingOutcome(false);

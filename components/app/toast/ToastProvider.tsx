@@ -246,7 +246,7 @@ function ToastQuestion({ ask, onDone }: { ask: ToastAsk; onDone: () => void }) {
             disabled={saving}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && text.trim()) void answer(choice.value, text.trim());
+              if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229 && text.trim()) void answer(choice.value, text.trim());
               if (e.key === "Escape") setChoice(null);
             }}
             placeholder={choice.prompt.placeholder}
