@@ -36,6 +36,7 @@
       "users": "Users",
       "integrations": "Integrations",
       "auditLog": "Activity log",
+      "claudeUsage": "Claude usage",
       "myNotifications": "My notifications",
       "myProfile": "My profile",
       "guide": "User guide",
@@ -1913,6 +1914,11 @@
     },
     "proposalStats": {
       "managerOnly": "Managers only."
+    },
+    "claudeUsage": {
+      "forbidden": "Only a super admin can see the team's Claude usage.",
+      "seatRange": "A seat costs between {min} and {max} dollars.",
+      "multiplierRange": "The multiplier is between {min} and {max}."
     }
   },
   "auditLog": {
@@ -1979,6 +1985,7 @@
       "knowledgeAutoApplySwitch": "Automatic adding to client files turned on or off",
       "knowledgeAutoApplyPause": "Automatic adding paused after errors: proposals go back to a person for approval",
       "knowledgeAutoApplyLift": "A manager turned automatic adding back on",
+      "claudeUsageSettings": "Claude usage seats or threshold changed",
       "brainMetricsWeeklyEmail": "Weekly file metrics email sent",
       "requestTypeAdd": "Request type added to the client file",
       "requestTypeUpdate": "Request type updated in the client file",
@@ -2216,6 +2223,104 @@
       "page": "Page {page} of {total}"
     },
     "retention": "The log is kept for two years and cannot be edited or deleted."
+  },
+  "claudeUsage": {
+    "title": "Claude usage",
+    "intro": "How much of Claude's allowance each person on the team uses, and how much of it Ankora causes. Cost is Cowork's estimate: on a Team plan it measures how heavy the work was, not a bill.",
+    "period": "Period: {days} days",
+    "periodOption": "{days} days",
+    "empty": "No data has arrived for this period yet.",
+    "people": {
+      "title": "By person",
+      "name": "Person",
+      "seat": "Seat",
+      "requests": "Requests",
+      "cost": "Estimated cost",
+      "month": "This month against the threshold",
+      "limitHits": "Limit hits",
+      "window": "Heaviest 5-hour window",
+      "cache": "From cache",
+      "connector": "Connector calls",
+      "connectorBytes": "Sent by the connector",
+      "prompts": "Prompts copied",
+      "last": "Last Cowork event",
+      "noTelemetry": "Uses the connector, but nothing arrives from their Cowork. Probably an old desktop app, or they do not work in Cowork.",
+      "alertsOff": "Alerts are off until the threshold is calibrated. The status is shown here only.",
+      "monthValue": "{cost} of {threshold} (pace: {projected})"
+    },
+    "status": {
+      "ok": "Within threshold",
+      "near": "On pace to pass",
+      "over": "Over threshold"
+    },
+    "tools": {
+      "title": "Connector tools",
+      "intro": "What each Ankora tool sent Claude in the period, largest first. The answer's size is what enters Claude's context.",
+      "tool": "Tool",
+      "calls": "Calls",
+      "people": "People",
+      "avg": "Average",
+      "max": "Largest",
+      "total": "Total",
+      "failures": "Refusals",
+      "truncated": "Truncated",
+      "images": "Images",
+      "duplicates": "Repeat reads",
+      "none": "No connector calls in this period."
+    },
+    "prompts": {
+      "title": "Prompts Ankora builds",
+      "kind": "Prompt",
+      "copies": "Copies",
+      "avg": "Average length",
+      "max": "Longest",
+      "none": "No prompts were copied in this period.",
+      "kinds": {
+        "advance_plan": "Advance with Claude",
+        "advance_lessons": "Summary and lessons",
+        "extract": "Extract knowledge",
+        "translation": "Procedure translation",
+        "client_activity": "Client summary"
+      }
+    },
+    "signals": {
+      "title": "Signs of waste",
+      "briefThenFile": "Brief, then the whole file",
+      "briefThenFileAbout": "Claude read the client brief and asked for the whole file within 15 minutes. The brief was not enough.",
+      "duplicateReads": "Reading the same thing again",
+      "duplicateReadsAbout": "The same tool with the same arguments, by the same person, within half an hour.",
+      "truncated": "Truncated answers",
+      "truncatedAbout": "The tool sent the most it can and cut the rest. Usually a long document.",
+      "limitHits": "Limit hits",
+      "limitHitsAbout": "Cowork errors that show the five-hour window ran out."
+    },
+    "heavy": {
+      "title": "Heaviest requests",
+      "intro": "Everything Cowork did for one message, heaviest first. No content: who, when, how much, and which Ankora tools ran.",
+      "who": "Person",
+      "when": "When",
+      "cost": "Estimated cost",
+      "requests": "Requests",
+      "models": "Models",
+      "tools": "Ankora tools",
+      "none": "No data from Cowork yet."
+    },
+    "settings": {
+      "title": "Seats and threshold",
+      "intro": "Each person's threshold is their seat price times the multiplier. An empty seat means the default seat.",
+      "defaultSeat": "Default seat (USD a month)",
+      "multiplier": "Threshold multiplier",
+      "seatFor": "Seat (USD a month)",
+      "save": "Save",
+      "saved": "Saved.",
+      "error": "Not saved: {message}"
+    },
+    "coverage": {
+      "title": "Sources",
+      "line": "{events} Cowork events, {calls} connector calls, {copies} prompt copies.",
+      "unmatched": "Addresses that came from Cowork with no Ankora user: {emails}"
+    },
+    "none": "·"
   },
   "brainMetrics": {
     "title": "File metrics",

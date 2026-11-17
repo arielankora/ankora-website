@@ -77,6 +77,10 @@ function navItemsFor(role: User["role"], t: Translate, options: { whatsappPoc?: 
   // "Alert rules", not "alerts": the rules managers set, never confused
   // with "my notifications" in the account menu.
   if (can(role, "alert.manage")) items.push(item("/app/alerts", "nav.alertRules", "control"));
+  // Claude usage measurement (17.11.2026): the team's use of Claude. Here
+  // with the rest of "control": a group's items must sit together, or the
+  // menu draws the group's heading twice.
+  if (can(role, "claude_usage.view")) items.push(item("/app/claude-usage", "nav.claudeUsage", "control"));
 
   if (can(role, "category.manage")) items.push(item("/app/categories", "nav.categories", "settings"));
   if (can(role, "user.manage")) items.push(item("/app/users", "nav.users", "settings"));

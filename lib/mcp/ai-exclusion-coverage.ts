@@ -93,6 +93,9 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   get_employee_status: "marked lifecycle tasks are left out",
   record_pdf_signature: "refuses a marked document",
 
+  // lib/mcp/usage-tools.ts
+  get_claude_usage: "staff usage measurements only: names of staff, sizes, counts and cost estimates. No client, task or document is read",
+
   // lib/mcp/hour-bank-tools.ts
   get_hours_bank: "lookupClient; entries of marked tasks count only as minutes in the totals, no titles or notes",
   list_client_communications: "lookupClient; a number that also belongs to a marked client is left out (lib/comms/client-comms.ts scopeFor)",
