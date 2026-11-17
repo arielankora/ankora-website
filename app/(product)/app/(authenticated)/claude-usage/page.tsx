@@ -571,6 +571,11 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
         <h2 className="text-sm font-medium text-app-text-primary">{t("coverage.title")}</h2>
         <p className="mt-1">{t("coverage.line", { events: int(report.coverage.coworkEvents), calls: int(report.coverage.toolCalls), copies: int(report.coverage.promptCopies) })}</p>
         {report.coverage.unmatchedEmails.length > 0 && <p className="mt-1" dir="auto">{t("coverage.unmatched", { emails: report.coverage.unmatchedEmails.join(", ") })}</p>}
+        {report.coverage.unmatchedLimitEmails.length > 0 && (
+          <p className="mt-1" dir="auto">
+            {t("coverage.unmatchedLimits", { emails: report.coverage.unmatchedLimitEmails.join(", ") })}
+          </p>
+        )}
       </section>
     </div>
   );

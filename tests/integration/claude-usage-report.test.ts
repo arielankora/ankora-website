@@ -175,6 +175,7 @@ describe("the Claude usage report", () => {
     const a = report.people.find((p) => p.userId === ariel.id)!;
     const h = report.people.find((p) => p.userId === hadas.id)!;
     expect(a.fiveHour.current).toMatchObject({ state: "near", pct: 92, source: "extension" });
+    expect(report.coverage.unmatchedLimitEmails).toEqual([]);
     expect(a.fiveHour.weeklyPct).toBe(61);
     expect(a.fiveHour.week.map((w) => w.hit)).toEqual([true, false]);
     // Hadas has no extension: Cowork's 429 half an hour ago marks her stuck now.
@@ -190,6 +191,20 @@ describe("the Claude usage report", () => {
     const body = JSON.parse((await call(ariel, "get_claude_usage", { days: 7 })).content[0].text);
     expect(body.fiveHour).toMatchObject({ stuckNow: expect.any(Array), over70Now: expect.any(Array), hitsThisWeek: expect.any(Number) });
     expect(body.people.find((p: { userId: string }) => p.userId === hadas.id).fiveHour.week).toEqual(expect.any(Array));
+  });
+
+  it("lists the extension's readings that match no Ankora user, so an alias is not lost silently", async () => {
+    const { ariel } = await seed();
+    await prisma.claudeLimitSample.createMany({
+      data: [
+        { userId: null, email: "alias@example.com", fiveHourPct: 40, sevenDayPct: 20, observedAt: ago(30) },
+        { userId: null, email: "alias@example.com", fiveHourPct: 45, sevenDayPct: 21, observedAt: ago(15) },
+        // Outside the period.
+        { userId: null, email: "old@example.com", fiveHourPct: 10, sevenDayPct: 5, observedAt: ago(10 * 24 * 60) },
+      ],
+    });
+    const report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
+    expect(report.coverage.unmatchedLimitEmails).toEqual(["alias@example.com"]);
   });
 
   it("refuses a seat or multiplier out of range, and writes nothing", async () => {

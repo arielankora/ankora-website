@@ -131,6 +131,14 @@ describe("managerSummary with the browser extension's readings (way 3)", () => {
   });
 });
 
+describe("managerSummary and extension readings with no person", () => {
+  it("asks to match the address, and says data is missing", () => {
+    const s = managerSummary(base({ coverage: { coworkEvents: 40, toolCalls: 20, unmatchedEmails: [], limitReadings: 3, unmatchedLimitEmails: ["facufacu@ankora.co.il"] } }));
+    expect(s.verdict).toBe("partial");
+    expect(s.actions).toContainEqual({ key: "unmatchedLimits", values: { emails: "facufacu@ankora.co.il", count: 1 } });
+  });
+});
+
 describe("managerSummary and the five-hour window", () => {
   it("someone close to stuck now is the first thing to do, and needs attention", () => {
     const s = managerSummary(
