@@ -2323,6 +2323,10 @@
         "nearFiveHour": {
           "title": "{name} is at {pct}% of the five-hour window",
           "detail": "Likely to get stuck before it resets. Lighter work until the window resets would help."
+        },
+        "unmatchedLimits": {
+          "title": "{count, plural, one {A limit reading with no person} other {# limit-reading addresses with no person}}",
+          "detail": "The extension sent a reading from {emails}, and no Ankora user has that address. Probably an alias of a work account. Until it is matched, that person's limits do not show on the screen."
         }
       },
       "toolsTitle": "Where Ankora is heavy",
@@ -2434,7 +2438,8 @@
     "coverage": {
       "title": "Sources",
       "line": "{events} Cowork events, {calls} connector calls, {copies} prompt copies.",
-      "unmatched": "Addresses that came from Cowork with no Ankora user: {emails}"
+      "unmatched": "Addresses that came from Cowork with no Ankora user: {emails}",
+      "unmatchedLimits": "Addresses the browser extension sent with no Ankora user: {emails}"
     },
     "none": "·",
     "five": {

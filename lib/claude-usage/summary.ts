@@ -24,7 +24,7 @@ export type Kpi = {
   who?: string;
 };
 
-export type ActionKey = "nearFiveHour" | "shortenTool" | "checkTelemetry" | "lighterModel" | "repeatReads" | "limitHit" | "nearThreshold" | "nearWeeklyLimit" | "checkExtension";
+export type ActionKey = "nearFiveHour" | "unmatchedLimits" | "shortenTool" | "checkTelemetry" | "lighterModel" | "repeatReads" | "limitHit" | "nearThreshold" | "nearWeeklyLimit" | "checkExtension";
 export type SummaryAction = { key: ActionKey; values: Record<string, string | number> };
 
 export type Verdict = "ok" | "attention" | "partial";
@@ -95,7 +95,7 @@ export type SummaryInput = {
   }[];
   tools: { tool: string; totalBytes: number }[];
   signals: { duplicateReads: number; limitHits: number };
-  coverage: { coworkEvents: number; toolCalls: number; unmatchedEmails: string[]; limitReadings?: number };
+  coverage: { coworkEvents: number; toolCalls: number; unmatchedEmails: string[]; limitReadings?: number; unmatchedLimitEmails?: string[] };
 };
 
 export function managerSummary(r: SummaryInput): ManagerSummary {
@@ -179,8 +179,12 @@ export function managerSummary(r: SummaryInput): ManagerSummary {
   const extensionLive = (r.coverage.limitReadings ?? 0) > 0;
   const noExtension = (p: SummaryInput["people"][number]) => extensionLive && !p.limits && (p.cowork.requests > 0 || p.connector.calls > 0);
   for (const p of r.people) if (noExtension(p)) actions.push({ key: "checkExtension", values: { name: p.name } });
+  // Readings for an address no one in Ankora has: someone works in Claude
+  // under an alias, and their limits are invisible until it is matched.
+  const unmatchedLimits = r.coverage.unmatchedLimitEmails ?? [];
+  if (unmatchedLimits.length) actions.push({ key: "unmatchedLimits", values: { emails: unmatchedLimits.join(", "), count: unmatchedLimits.length } });
 
-  const missing = (r.coverage.coworkEvents === 0 && !extensionLive) || r.people.some((p) => p.noTelemetry || noExtension(p)) || r.coverage.unmatchedEmails.length > 0;
+  const missing = (r.coverage.coworkEvents === 0 && !extensionLive) || r.people.some((p) => p.noTelemetry || noExtension(p)) || r.coverage.unmatchedEmails.length > 0 || unmatchedLimits.length > 0;
   // The verdict is about people: stuck, or heading past their threshold.
   // An indicator off target shows on its own card and in the actions; it
   // does not turn a quiet week into one that needs attention.

@@ -228,7 +228,7 @@ export type ClaudeUsageReport = {
   prompts: { kind: PromptKind; copies: number; avgChars: number; maxChars: number }[];
   signals: { briefThenFile: number; duplicateReads: number; truncatedAnswers: number; limitHits: number };
   heaviestRequests: { promptId: string; name: string; at: string; costUsd: number; requests: number; models: string[]; ankoraTools: string[] }[];
-  coverage: { coworkEvents: number; toolCalls: number; promptCopies: number; unmatchedEmails: string[]; limitReadings: number };
+  coverage: { coworkEvents: number; toolCalls: number; promptCopies: number; unmatchedEmails: string[]; limitReadings: number; unmatchedLimitEmails: string[] };
 };
 
 const isReadOnly = (tool: string) => (TOOL_ANNOTATIONS as Record<string, { readOnlyHint?: boolean }>)[tool]?.readOnlyHint === true;
@@ -273,7 +273,7 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
   const month = monthStart(now);
   const settings = await claudeUsageSettings();
 
-  const [users, calls, events, copies, monthCosts, unmatched, firstThisMonth, limitSamples] = await Promise.all([
+  const [users, calls, events, copies, monthCosts, unmatched, firstThisMonth, limitSamples, unmatchedLimits] = await Promise.all([
     prisma.user.findMany({
       // Active staff only: an invited or suspended person, or an old
       // duplicate account, has nothing to report and only confuses the list.
@@ -321,6 +321,15 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
     prisma.claudeLimitSample.findMany({
       where: { observedAt: { gte: fiveFrom, lte: now }, userId: { not: null } },
       select: { userId: true, fiveHourPct: true, fiveHourResetsAt: true, sevenDayPct: true, sevenDayResetsAt: true, observedAt: true },
+    }),
+    // Readings the extension sent for an address no Ankora user has (both
+    // the Claude account's and the Chrome profile's were tried): someone
+    // signed in under an alias. Shown, so the reading is not lost silently.
+    prisma.claudeLimitSample.findMany({
+      where: { userId: null, observedAt: { gte: from, lte: now } },
+      distinct: ["email"],
+      select: { email: true },
+      take: 20,
     }),
   ]);
 
@@ -473,6 +482,7 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
     promptCopies: copies.length,
     unmatchedEmails: unmatched.map((u) => u.userEmail!).filter(Boolean),
     limitReadings: limitInPeriod.length,
+    unmatchedLimitEmails: unmatchedLimits.map((u) => u.email).sort(),
   };
 
   return {
