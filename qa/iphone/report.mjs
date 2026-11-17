@@ -25,7 +25,7 @@ const CHECK_HE = {
   rtl: "כיוון ויישור",
   "modal-height": "חלונית גבוהה מהמסך",
 };
-const DEV_SHORT = { "iPhone SE": "SE", "iPhone 15": "15", "iPhone 15 Pro Max": "Pro Max" };
+const DEV_SHORT = { "iPhone SE": "SE", "iPhone SE (3rd gen)": "SE 3", "iPhone 15": "15", "iPhone 15 Pro Max": "Pro Max" };
 const ROLE_HE = { superadmin: "מנהל-על", admin: "מנהל", employee1: "עובדת", clientadmin: "מנהל לקוח", anon: "לא מחובר" };
 
 const num = (s, re) => {
@@ -175,7 +175,7 @@ if (crashed.length) {
 }
 L.push(`## איך לקרוא את הדוח`);
 L.push("");
-L.push(`- המכשירים בטבלאות: SE הוא הפרופיל "iPhone SE" של Playwright, ברוחב 320 נקודות (הדור הראשון). 15 הוא iPhone 15 ברוחב 393. Pro Max הוא iPhone 15 Pro Max ברוחב 430.`);
+L.push(`- המכשירים בטבלאות: SE הוא הפרופיל "iPhone SE" של Playwright, ברוחב 320 נקודות (הדור הראשון). SE 3 הוא הדור השלישי, ברוחב 375. 15 הוא iPhone 15 ברוחב 393. Pro Max הוא iPhone 15 Pro Max ברוחב 430.`);
 L.push(`- צילומי מסך מלאים: בתיקייה \`shots/<מכשיר>/<תפקיד>/\`. בצילום עמוד מלא של WebKit, סרגל הניווט התחתון הקבוע מצויר במקום שבו היה במסך הראשון, באמצע העמוד. זו תופעה של כלי הצילום, לא של האפליקציה.`);
 L.push(`- חלוניות: בכל מסך הסקריפט פותח את כפתור "עוד" בסרגל התחתון ועד ארבעה כפתורים שנראים כפותחי חלונית (לא כפתורי שמירה, מחיקה, שליחה או אישור). ממצא בתוך חלונית מסומן "בחלונית" עם שם הכפתור.`);
 L.push(`- אזור בטוח: הבדיקה קוראת את גיליונות הסגנון ומחפשת \`env(safe-area-inset-*)\` על הרכיב הצמוד לקצה, על ילדיו ועל הוריו. הדפדפן באמולציה לא מדמה חריץ, ולכן אין דרך למדוד את החפיפה עצמה.`);
@@ -200,6 +200,28 @@ if (sharedFindings.length) {
   L.push(`|---|---|---|---|---|---|---:|`);
   for (const f of sharedFindings.filter((f) => f.severity !== "info")) L.push(row(f, true));
   L.push("");
+}
+
+// Pro Max: the device Ariel uses. Everything seen on it, worst first, shared shell included.
+{
+  const PM = "iPhone 15 Pro Max";
+  const pm = [...sharedFindings, ...screens.flatMap((s) => s.findings)].filter((f) => f.devices.has(PM) && f.severity !== "info" && f.severity !== "low");
+  const pmCrash = data.visits.filter((v) => v.device === PM && !["ok", "redirected", "forbidden"].includes(v.outcome));
+  L.push(`## iPhone 15 Pro Max: מה שנמצא במכשיר של אריאל`);
+  L.push("");
+  L.push(`כל ממצא בחומרה בינונית ומעלה שהופיע ב-Pro Max, מהחמור לקל. ממצאים נמוכים מופיעים בסעיפי המסכים. ${pmCrash.length ? `קריסות או שגיאות ב-Pro Max: ${[...new Set(pmCrash.map((v) => `\`${v.route}\``))].join(", ")}.` : ""}`);
+  L.push("");
+  if (pm.length) {
+    L.push(`| חומרה | בדיקה | מסך | רכיב | פרטים | תפקידים |`);
+    L.push(`|---|---|---|---|---|---|`);
+    pm.sort((a, b) => SEV.indexOf(a.severity) - SEV.indexOf(b.severity));
+    for (const f of pm) {
+      const where = f.modal ? `בחלונית "${f.modal}": ` : "";
+      const scr = f.routes.size > 1 ? `${f.routes.size} מסכים (משותף)` : `\`${[...f.routes][0]}\``;
+      L.push(`| ${SEV_ICON[f.severity]} ${SEV_HE[f.severity]} | ${CHECK_HE[f.check]} | ${scr} | ${where}${elDesc(f.el)} | ${heMessage(f)} | ${fmtSet(f.roles, ROLE_HE)} |`);
+    }
+    L.push("");
+  }
 }
 
 L.push(`## לפי מסך, מהחמור לקל`);

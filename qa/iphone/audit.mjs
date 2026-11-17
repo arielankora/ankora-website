@@ -33,7 +33,7 @@ const arg = (name, def) => {
 // https, through qa/iphone/https-proxy.mjs: WebKit applies the CSP's upgrade-insecure-requests
 // to http://127.0.0.1 (Chromium exempts loopback), so plain http loads no scripts at all.
 const BASE = arg("base", process.env.QA_BASE_URL ?? "https://localhost:3443");
-const DEVICES = arg("devices", "iPhone SE,iPhone 15,iPhone 15 Pro Max").split(",").map((s) => s.trim());
+const DEVICES = arg("devices", "iPhone SE,iPhone SE (3rd gen),iPhone 15,iPhone 15 Pro Max").split(",").map((s) => s.trim());
 const ONLY = arg("only", null);
 const CONCURRENCY = Number(arg("concurrency", 4));
 const PROBE = !args.includes("--no-probe");
@@ -361,6 +361,16 @@ async function main() {
   ).flat();
   await browser.close();
 
+  // --append: add these visits to an earlier results.json (e.g. one more device), replacing any
+  // visit for the same role, device and screen.
+  if (args.includes("--append") && fs.existsSync(path.join(OUT, "results.json"))) {
+    const prev = JSON.parse(fs.readFileSync(path.join(OUT, "results.json"), "utf8"));
+    const key = (v) => `${v.role}|${v.device}|${v.route}`;
+    const fresh = new Set(all.map(key));
+    all.unshift(...prev.visits.filter((v) => !fresh.has(key(v))));
+    DEVICES.splice(0, DEVICES.length, ...new Set([...prev.devices, ...DEVICES]));
+    ROLE_LIST.splice(0, ROLE_LIST.length, ...new Set([...prev.roles, ...ROLE_LIST]));
+  }
   const out = { generatedAt: new Date().toISOString(), base: BASE, devices: DEVICES, roles: ROLE_LIST, ids, seconds: Math.round((Date.now() - started) / 1000), visits: all };
   fs.writeFileSync(path.join(OUT, "results.json"), JSON.stringify(out, null, 1));
   console.log(`[iphone] ${all.length} visits in ${out.seconds}s -> ${path.join(OUT, "results.json")}`);
