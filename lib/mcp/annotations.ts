@@ -130,6 +130,8 @@ export const TOOL_ANNOTATIONS = {
   // 1.11.2026: a client's hour bank as of a date, computed on each call.
   // Unlike the screen it closes nothing and refreshes no cache.
   get_hours_bank: READ_ONLY,
+  // 17.11.2026: the team's Claude usage, as on /app/claude-usage.
+  get_claude_usage: READ_ONLY,
   // 14.11.2026: a client's WhatsApp conversations and recorded calls.
   list_client_communications: READ_ONLY,
   get_client_communication: READ_ONLY,

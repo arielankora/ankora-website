@@ -90,6 +90,12 @@ export type Permission =
   // surface, not routine per-client data entry) than to Task creation, so
   // it follows their same SUPER_ADMIN-only precedent.
   | "important_date.manage_catalog"
+  // Claude usage measurement, stage 3 (17.11.2026): the "שימוש בקלוד"
+  // screen and get_claude_usage. How much each employee uses Claude, and
+  // the seat each one is on, is for the system's managers only (Ariel,
+  // 17.11.2026: "רק מנהלי מערכת"). SUPER_ADMIN only, like audit.view;
+  // granting it to ANKORA_ADMIN is one line below.
+  | "claude_usage.view"
   // Credentials vault (claude/credentials-vault-spec-2026-10-06.md,
   // approved by Ariel 6.10.2026). Three literals rather than one, unlike
   // Tasks and Important Dates above, because the three really can diverge:
@@ -141,6 +147,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "report.internal.view",
     "integration.manage",
     "important_date.manage_catalog",
+    "claude_usage.view",
     ...CREDENTIAL_PERMISSIONS,
   ],
   // Spec 4: Ankora Admin/Manager gets clients/categories/edits, but not

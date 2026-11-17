@@ -2352,6 +2352,30 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-17",
       "riskReason": "Public URL that Cowork posts telemetry to from employees' computers. Behind a shared secret (COWORK_OTEL_SECRET); must keep metadata only and never a prompt or an answer."
+    },
+    "action:(product)/app/(authenticated)/claude-usage/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-17",
+      "riskReason": "Saves seat prices and the threshold multiplier for the Claude usage screen (SUPER_ADMIN only, audited). It changes what the screen shows; it bills nothing and sends nothing."
+    },
+    "domain:claude-usage": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-17",
+      "riskReason": "Builds the team's Claude usage report from measurements only. Who may see it is the risk: claude_usage.view, SUPER_ADMIN only, tested through the connector."
+    },
+    "screen:/app/claude-usage": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-17",
+      "riskReason": "Read-only report for SUPER_ADMIN, plus the seats form. Shows staff usage, never client data or prompt text."
     }
   },
   "waivers": {},

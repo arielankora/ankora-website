@@ -161,6 +161,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "knowledge.auto_apply_switch": "הפעלה או כיבוי של כניסה אוטומטית לתיקי הלקוחות",
   "knowledge.auto_apply_pause": "כניסה אוטומטית נעצרה אחרי שגיאות: ההצעות חוזרות לאישור של אדם",
   "knowledge.auto_apply_lift": "מנהל החזיר לכניסה אוטומטית",
+  "claude_usage.settings": "שינוי מושבים או סף בשימוש בקלוד",
   "brain_metrics.weekly_email": "נשלח מייל שבועי של מדדי התיק",
   "request_type.add": "הוספת סוג פנייה לתיק הלקוח",
   "request_type.update": "עדכון סוג פנייה בתיק הלקוח",

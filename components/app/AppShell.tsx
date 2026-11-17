@@ -82,6 +82,8 @@ function navItemsFor(role: User["role"], t: Translate, options: { whatsappPoc?: 
   if (can(role, "user.manage")) items.push(item("/app/users", "nav.users", "settings"));
   if (can(role, "integration.manage")) items.push(item("/app/integrations", "nav.integrations", "settings"));
   if (can(role, "audit.view")) items.push(item("/app/audit-log", "nav.auditLog", "settings"));
+  // Claude usage measurement (17.11.2026): the team's use of Claude.
+  if (can(role, "claude_usage.view")) items.push(item("/app/claude-usage", "nav.claudeUsage", "control"));
 
   items.push(...accountItems(item));
   return items;
