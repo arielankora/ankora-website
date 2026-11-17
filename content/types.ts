@@ -35,6 +35,8 @@ export interface Dictionary {
     aboutDescription: string;
   };
   nav: {
+    /** The skip link, first in <body> on every page: keyboard users bypass the header. */
+    skipToContent: string;
     home: string;
     solutions: string;
     howItWorks: string;
@@ -480,6 +482,11 @@ export interface PagesContent {
     bookingSub: string;
     bookingFallback: string;
     errorMessage: string;
+    /** Field errors, shown only after the visitor has left the field (or tried to
+     *  send) and it is still invalid. `errorPrefix` is the icon's text alternative. */
+    errorPrefix: string;
+    nameError: string;
+    emailError: string;
   };
   legal: LegalContent;
   segmentBridge: SegmentBridge;

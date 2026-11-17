@@ -114,9 +114,17 @@ export default async function LocaleLayout(
         />
       </head>
       <body className="font-sans antialiased">
+        {/* First focusable element on every page, hidden until focused
+            (.skip-link in globals.css). The target takes focus with tabIndex -1,
+            so screen magnifiers and the next Tab start from the content. */}
+        <a href="#main-content" className="skip-link">
+          {dict.nav.skipToContent}
+        </a>
         <PageShell>
           <Header dict={dict} locale={locale} blogPairs={getBlogTranslationPairs()} />
-          <main>{children}</main>
+          <main id="main-content" tabIndex={-1} className="outline-none">
+            {children}
+          </main>
           <Footer dict={dict} locale={locale} />
         </PageShell>
         <CtaTracking />

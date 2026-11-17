@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
 import { track } from "@/lib/analytics";
 import { readAttribution } from "@/lib/attribution-client";
@@ -8,6 +9,26 @@ import { BOOKING_EMBED_URL, WHATSAPP_URL } from "@/lib/contact-links";
 import type { Dictionary, Locale } from "@/content";
 
 type Status = "idle" | "loading" | "booking" | "error";
+
+/** The fields that can be invalid, and so carry an error message. */
+type CheckedField = "name" | "email";
+const CHECKED: CheckedField[] = ["name", "email"];
+
+function isCheckedField(el: unknown): el is HTMLInputElement {
+  return el instanceof HTMLInputElement && (CHECKED as string[]).includes(el.name);
+}
+
+/** Invalid as the visitor should see it: only after they left the field changed
+ *  (:user-invalid), or after they tried to send. Never on load, never mid-typing. */
+function shownInvalid(el: HTMLInputElement, submitted: boolean): boolean {
+  if (el.validity.valid) return false;
+  if (submitted) return true;
+  try {
+    return el.matches(":user-invalid");
+  } catch {
+    return false; // a browser without :user-invalid: the submit attempt still marks it
+  }
+}
 
 const FIELD =
   "w-full min-h-[48px] border border-[rgba(243,234,219,0.18)] bg-[rgba(11,27,51,0.5)] px-4 py-3 text-base text-cream outline-none transition-colors duration-200 focus:border-gold focus:bg-[rgba(176,141,87,0.06)]";
@@ -70,6 +91,23 @@ export function ContactForm({
   const fieldsDone = useRef(new Set<string>());
   const invalidReported = useRef(false);
   const bookingRef = useRef<HTMLDivElement>(null);
+  // Field errors (modern-web-guidance: validate-input-after-interaction,
+  // accessible-error-announcement). aria-invalid is "false" until the field is
+  // shown as invalid, and the error's id joins aria-describedby only then: a
+  // reference in the markup would read the hidden message from page load.
+  const [invalid, setInvalid] = useState<Record<CheckedField, boolean>>({ name: false, email: false });
+  const [submitted, setSubmitted] = useState(false);
+  const submittedRef = useRef(false);
+  // The page's one polite live region (below the button) also carries this: an
+  // error that appears when the visitor leaves a field is said once, half a
+  // second later, so it does not talk over the next field being announced.
+  const [announcement, setAnnouncement] = useState("");
+  const announced = useRef(new Set<CheckedField>());
+  const announceTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(announceTimer.current), []);
+
+  const errorText: Record<CheckedField, string> = { name: p.nameError, email: p.emailError };
+  const labelText: Record<CheckedField, string> = { name: p.nameLabel, email: p.emailLabel };
 
   // Step 2 replaces the form. On a phone the submit button sits near the bottom of
   // the screen, so bring the calendar's heading into view.
@@ -94,10 +132,35 @@ export function ContactForm({
     track("contact_form_field", { form: "contact", field: name, fields_done: fieldsDone.current.size });
   }
 
+  /** Bring a field's aria state in line with what is shown. `announce` on blur only. */
+  function syncField(el: HTMLInputElement, announce: boolean) {
+    const name = el.name as CheckedField;
+    const now = shownInvalid(el, submittedRef.current);
+    setInvalid((prev) => (prev[name] === now ? prev : { ...prev, [name]: now }));
+    if (now && announce && !announced.current.has(name)) {
+      announced.current.add(name);
+      clearTimeout(announceTimer.current);
+      setAnnouncement("");
+      const text = `${labelText[name]}: ${p.errorPrefix}: ${errorText[name]}`;
+      announceTimer.current = setTimeout(() => setAnnouncement(text), 500);
+    } else if (!now && announced.current.delete(name)) {
+      // Fixed: clear what was said, so it is not found later when reading the page.
+      clearTimeout(announceTimer.current);
+      setAnnouncement("");
+    }
+  }
+
   function onFieldBlur(e: React.FocusEvent<HTMLFormElement>) {
+    if (isCheckedField(e.target)) syncField(e.target, true);
     const el = e.target as unknown as HTMLInputElement | HTMLTextAreaElement;
     if (!el.name || el.type === "checkbox" || !el.value.trim()) return;
     markField(el.name);
+  }
+
+  function onFieldInput(e: React.FormEvent<HTMLFormElement>) {
+    onFirstInteraction();
+    // Clears an error as soon as it is fixed; never raises one while typing.
+    if (isCheckedField(e.target) && invalid[e.target.name as CheckedField]) syncField(e.target, false);
   }
 
   function onInvalid(e: React.FormEvent<HTMLInputElement>) {
@@ -110,7 +173,28 @@ export function ContactForm({
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const data = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+
+    // The form is noValidate, so the errors are ours (in the page's language)
+    // rather than the browser's bubble. checkValidity() still fires "invalid"
+    // on each bad field, which onInvalid reports to the funnel.
+    if (!form.checkValidity()) {
+      submittedRef.current = true;
+      const fields = CHECKED.map((n) => form.elements.namedItem(n)).filter(isCheckedField);
+      // Focus reading the field announces its error, so it is not also said by
+      // the live region. The aria state is committed before focus moves.
+      flushSync(() => {
+        setSubmitted(true);
+        for (const el of fields) {
+          if (!el.validity.valid) announced.current.add(el.name as CheckedField);
+          syncField(el, false);
+        }
+      });
+      fields.find((el) => !el.validity.valid)?.focus();
+      return;
+    }
+
+    const data = new FormData(form);
     const chosenAreas = data.getAll("areas").map(String);
     const phone = String(data.get("phone") ?? "").trim();
     setStatus("loading");
@@ -180,8 +264,10 @@ export function ContactForm({
       <form
         onSubmit={handleSubmit}
         onFocus={onFirstInteraction}
-        onInput={onFirstInteraction}
+        onInput={onFieldInput}
         onBlur={onFieldBlur}
+        noValidate
+        data-submitted={submitted || undefined}
         className={panel}
       >
         <Steps p={p} current={1} />
@@ -190,7 +276,18 @@ export function ContactForm({
             <label htmlFor={`${id}-name`} className={label}>
               {p.nameLabel}
             </label>
-            <input id={`${id}-name`} name="name" type="text" autoComplete="name" required onInvalid={onInvalid} className={FIELD} />
+            <input
+              id={`${id}-name`}
+              name="name"
+              type="text"
+              autoComplete="name"
+              required
+              onInvalid={onInvalid}
+              aria-invalid={invalid.name ? "true" : "false"}
+              aria-describedby={invalid.name ? `${id}-name-error` : undefined}
+              className={`${FIELD} contact-field`}
+            />
+            <FieldError id={`${id}-name-error`} prefix={p.errorPrefix} text={p.nameError} />
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2">
@@ -205,9 +302,12 @@ export function ContactForm({
                 autoComplete="email"
                 required
                 onInvalid={onInvalid}
+                aria-invalid={invalid.email ? "true" : "false"}
+                aria-describedby={invalid.email ? `${id}-email-error` : undefined}
                 dir="ltr"
-                className={`${FIELD} text-end`}
+                className={`${FIELD} contact-field text-end`}
               />
+              <FieldError id={`${id}-email-error`} prefix={p.errorPrefix} text={p.emailError} />
             </div>
             <div>
               <label htmlFor={`${id}-phone`} className={label}>
@@ -266,9 +366,11 @@ export function ContactForm({
                 {p.privacyLink}
               </Link>
             </p>
-            {/* aria-live so a failure is announced, not just shown. */}
+            {/* The page's one live region: a failed send is announced, not just
+                shown, and so is a field error when the visitor leaves the field. */}
             <p aria-live="polite" className="mt-2 text-center font-assistant text-sm">
               {status === "error" && <span className="text-error-on-dark">{p.errorMessage}</span>}
+              <span className="sr-only">{announcement}</span>
             </p>
           </div>
         </div>
@@ -296,5 +398,23 @@ export function ContactForm({
         </a>
       </p>
     </div>
+  );
+}
+
+/**
+ * A field's error message: a sibling after the input, shown by CSS only while
+ * the input is :user-invalid (or the form was sent with it invalid), see
+ * .contact-error in globals.css. The icon's text alternative says "Error",
+ * so the message is not carried by colour alone.
+ */
+function FieldError({ id, prefix, text }: { id: string; prefix: string; text: string }) {
+  return (
+    <p id={id} className="contact-error mt-2 items-start gap-1.5 font-assistant text-sm text-error-on-dark">
+      <svg role="img" aria-label={prefix} className="mt-[3px] shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 7v6M12 17h.01" />
+      </svg>
+      <span>{text}</span>
+    </p>
   );
 }
