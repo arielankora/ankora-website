@@ -54,6 +54,8 @@ import { ClosedBankError, OVERRIDE_WARNING, stoppedAcrossClosureMessage } from "
 import { prisma } from "@/lib/prisma";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
 import { READ_ONLY, WRITES } from "@/lib/mcp/annotations";
+import { FIELD_NOTES_SENTENCE, withFieldNotes } from "@/lib/mcp/field-notes";
+import { UPDATE_TASK_NOTES } from "@/lib/mcp/tool-field-notes";
 import { registerTaskExtraTools } from "@/lib/mcp/task-extra-tools";
 import { registerDocumentTools } from "@/lib/mcp/document-tools";
 import { registerClientFileTools } from "@/lib/mcp/client-file-tools";
@@ -1251,7 +1253,8 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Update a task",
       description:
-        "Changes an existing Ankora task: its status, owner, supervisor, due date, title, category, portal visibility or what it is waiting on. Identify the task by its title; if two tasks share one, Ankora will say so rather than guess. Only the fields you pass are changed - omitting a field leaves it alone. Use `clearAssignee` or `clearDue` to empty a field rather than passing an empty string. Finishing a task the client can see also needs `outcome`, one sentence in their language saying what came of it; Ankora refuses the close without it, because that sentence is what the client reads on their portal. A task that still has no category gets one chosen automatically with any change (a timer cannot run without it); when `categoryAutoPicked` is true, tell the user which category was set, and if one of `categoryOptions` clearly fits the work better, set that one instead. If the result carries `reminder`, act on it: it says what the task still owes the client file. Always give the user the task's `url`, quoted exactly.",
+        "Changes an existing Ankora task: its status, owner, supervisor, due date, title, category, portal visibility or what it is waiting on. Identify the task by its title; if two tasks share one, Ankora will say so rather than guess. Only the fields you pass are changed - omitting a field leaves it alone. Use `clearAssignee` or `clearDue` to empty a field rather than passing an empty string. Finishing a task the client can see also needs `outcome`, one sentence in their language saying what came of it; Ankora refuses the close without it, because that sentence is what the client reads on their portal. A task that still has no category gets one chosen automatically with any change (a timer cannot run without it). " +
+        FIELD_NOTES_SENTENCE,
       inputSchema: z.object({
         task: z.string().optional().describe("The task's title, or enough of it to identify it. Not needed when `taskId` is given."),
         taskId: z
@@ -1500,7 +1503,7 @@ export function registerAnkoraTools(server: McpServer): void {
         });
         // P8: an open question on this task, new or still unanswered.
         const vendorCheck = await checkVendorSignalSafely(updated.id);
-        return toolJson({
+        return toolJson(withFieldNotes({
           updated: true,
           taskId: updated.id,
           url: taskUrl(appBaseUrl(), updated.id),
@@ -1515,7 +1518,7 @@ export function registerAnkoraTools(server: McpServer): void {
             : {}),
           ...(reminder ? { reminder: reminder.forClaude } : {}),
           ...(vendorCheck ? { vendorCheck, next: VENDOR_CHECK_NEXT } : {}),
-        });
+        }, UPDATE_TASK_NOTES));
       } catch (err) {
         console.error("[mcp] update_task failed", err);
         return toolFailure(err);
