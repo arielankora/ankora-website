@@ -1,4 +1,6 @@
 import "server-only";
+import { FIELD_NOTES_SENTENCE, withFieldNotes } from "@/lib/mcp/field-notes";
+import { GET_PROCESS_NOTES, PROCESS_SUMMARY_NOTES } from "@/lib/mcp/tool-field-notes";
 import { readClientCall, readClientConversation } from "@/lib/comms/client-comms";
 import { whatsappRefId } from "@/lib/comms/extraction-refs";
 import { deniedText } from "@/lib/mcp/comms-tools";
@@ -626,7 +628,8 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "List a client's processes",
       description:
-        "The client's processes (P1, P2...), one line each: what it is for, its triggers, `rhythm` (when it runs, in one sentence built from what starts it and its dates; quote it rather than `trigger` when asked how often a process runs), owner (and backup, only when one is set), where it stands in the handover, whether it runs (\"רץ\", or the first reason it will not: no owner, no trigger, no approved procedure, or a scheduled process with no date), every reason it will not run (`notRunningBecause`, empty when it runs; tell the user all of them), how well it is documented (the documentation fields, less those marked not relevant), whether it needs review and why, the approved procedure's version, the next date, the last run, and `url`, a direct link to the process in the client's file. `kind` is PROCESS, or GUIDE for a work guide (\"הוראת עבודה\": how to do something, with steps, and no rhythm, runs or blockers). Retired processes are left out unless includeRetired. Use get_process for the steps. Sensitive processes, and restricted ones the user is not named on, are left out.",
+        "The client's processes (P1, P2...) and work guides, one line each: what it is for, how and when it runs, its owner, where it stands, whether it runs and why not, and a direct link. Retired processes are left out unless includeRetired. Use get_process for the steps. Sensitive processes, and restricted ones the user is not named on, are left out. " +
+        FIELD_NOTES_SENTENCE,
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it."),
         includeRetired: z.boolean().optional().describe("Also list retired processes (status RETIRED)."),
@@ -639,7 +642,7 @@ export function registerClientFileTools(server: McpServer): void {
         const client = await lookupClient(actor, args.client);
         if (!client.ok) return toolText(client.message);
         const processes = await mcpListProcesses(actor, client.value.id, { includeRetired: args.includeRetired });
-        return toolJson({ client: client.value.name, count: processes.length, processes });
+        return toolJson(withFieldNotes({ client: client.value.name, count: processes.length, processes }, PROCESS_SUMMARY_NOTES));
       } catch (err) {
         console.error("[mcp] list_processes failed", err);
         return toolFailure(err);
@@ -652,7 +655,8 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "Get a process and its procedure",
       description:
-        "One of a client's processes in full: everything list_processes says, plus the SLA, who executes it today, the approver, the external party, the exception playbook, the gaps, the approved procedure step by step (mode, business day, actions, systems, output, how a person verifies an automated step, whether it needs approval, the most it moves, the channel), what in it fails the client's rules today, the last five runs, and the open lessons people left when closing runs (read them before drafting a new version). Each step names its own `approver` (atAnkora or atClient; `leftOn` when that contact left, and the step needs a new approver) and `evidence`. A procedure with conditions also has `flow`. `rhythmDetail`: each start and the next three dates with the day each run opens. `staleReasons`: why the approved document is out of date. `audit`, for a client with audit requirements: scope, controls, classification and what an audit still misses (fill it with save_procedure_audit_draft). Follow the approved procedure; a step marked as needing approval waits for a person. If the procedure fails a rule, say so before acting. `procedure` is null when no version is approved; a version waiting for approval is under `draft`, in the same shape, with what holds it back in `failsRules`.",
+        "One of a client's processes in full: everything list_processes gives, plus the SLA, who executes it today, the approver, the external party, the exception playbook, the gaps, the approved procedure step by step, a version waiting for approval, what in it fails the client's rules today, the last five runs, and the open lessons people left when closing runs. Follow the approved procedure; a step marked as needing approval waits for a person. If the procedure fails a rule, say so before acting. " +
+        FIELD_NOTES_SENTENCE,
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it."),
         process: z.string().describe('The process code ("P3") or its title.'),
@@ -668,7 +672,7 @@ export function registerClientFileTools(server: McpServer): void {
         if (!process.ok) return toolText(process.message);
         const detail = await mcpGetProcess(actor, client.value.id, process.id);
         if (!detail) return toolText(`No process "${args.process}" for ${client.value.name}.`);
-        return toolJson(detail);
+        return toolJson(withFieldNotes(detail, GET_PROCESS_NOTES));
       } catch (err) {
         console.error("[mcp] get_process failed", err);
         return toolFailure(err);

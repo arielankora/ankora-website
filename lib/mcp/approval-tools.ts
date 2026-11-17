@@ -1,4 +1,6 @@
 import "server-only";
+import { FIELD_NOTES_SENTENCE, withFieldNotes } from "@/lib/mcp/field-notes";
+import { DECIDE_PROPOSALS_NOTES, LIST_APPROVALS_NOTES, PROPOSAL_STATS_NOTES } from "@/lib/mcp/tool-field-notes";
 import { z } from "zod";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import { toolFailure, toolJson, toolText } from "@/lib/mcp/errors";
@@ -118,7 +120,8 @@ export function registerApprovalTools(server: McpServer): void {
     {
       title: "List what waits on my approval",
       description:
-        'What waits on the signed-in person\'s decision, as Ankora\'s "אישורים" screen shows it: tasks sent for sign-off, exceptions, rules, procedures, process decisions, Ankora\'s own file, proposals to client files (with each proposal), task plans, monthly summaries, the extraction guide and signed PDFs to check. Each row has its kind and id (pass them to decide_approval), Ankora\'s recommendation and why, `approve` and `reject` (the button\'s label, or null when the row has none here; `reject.needsReason` when rejecting needs a reason), and `url`: a direct link that opens the screen on that very row. Each proposal has its own `proposalId` (for decide_knowledge_proposals) and `url`. `enteredAutomatically` (with no kind, or kind knowledge) lists items that entered a client file on their own and still need a person to look: each with `proposalId`, `result` (the item in the file), `url` (its row) and `decisions`: what decide_knowledge_proposals can do with it ("reviewed_ok" for "תקין", "revert" for "ביטול"). For a manager, `autoApplyPauses` lists the kinds and clients sent back to a person after too many errors, each with `label`, `since`, `errors` and `url` (its row, where the manager lifts it on the screen). Give the user the links as they are; never build one by hand. By default the person\'s own rows; `everyone` adds the meetings other people sent; a client shows all of that client\'s.',
+        'What waits on the signed-in person\'s decision, as Ankora\'s "אישורים" screen shows it: tasks sent for sign-off, exceptions, rules, procedures, process decisions, Ankora\'s own file, proposals to client files (with each proposal), task plans, monthly summaries, the extraction guide and signed PDFs to check, each with a direct link. Give the user the links as they are; never build one by hand. By default the person\'s own rows; `everyone` adds the meetings other people sent; a client shows all of that client\'s. ' +
+        FIELD_NOTES_SENTENCE,
       inputSchema: z.object({
         client: z.string().optional().describe("Only this client, as the user said it."),
         kind: z.enum(KINDS).optional().describe("Only this kind of row."),
@@ -146,7 +149,7 @@ export function registerApprovalTools(server: McpServer): void {
         // screen: the manager checks the bar there.
         const overview = !args.kind || args.kind === "knowledge" ? await autoApplyOverview(actor, { forAi: true }) : null;
         const pauses = (overview?.pauses ?? []).filter((p) => !clientId || p.scope === "KIND" || p.clientId === clientId);
-        return toolJson({
+        return toolJson(withFieldNotes({
           count: sorted.length,
           screen: appUrl(base, "/app/approvals"),
           approvals: sorted.map((i) => serializeItem(base, i, actor.timezone, proposals.get(i.id))),
@@ -176,7 +179,7 @@ export function registerApprovalTools(server: McpServer): void {
                 url: pauseUrl(base, p),
               }))
             : undefined,
-        });
+        }, LIST_APPROVALS_NOTES));
       } catch (err) {
         console.error("[mcp] list_approvals failed", err);
         return toolFailure(err);
@@ -234,7 +237,8 @@ export function registerApprovalTools(server: McpServer): void {
     {
       title: "Decide proposals to a client file",
       description:
-        'Decides proposals to a client file, each as its own button on the review card: "approve" puts it in the file, "reject" drops it (needs `reason`), "already_in_file" closes it against the item already there and adds its source (only for a proposal list_approvals shows with `alreadyInFile`, as the card offers it only then), "task" opens a task from it instead (assigned to the user, due in three business days). Pass `proposalId`s exactly as list_approvals or propose_knowledge returned them. A proposal marked `approveAlone` (it changes an item in the file, may be a duplicate, or was flagged) is approved only in a call of its own, after the user read it. Each proposal is decided separately: one that fails is reported and the rest go on. For an item under `enteredAutomatically`, "reviewed_ok" marks it right ("תקין") and "revert" takes it out of the file again ("ביטול"), as its buttons do; only the decisions its row lists are accepted. Each result has `url` (the proposal on its card, or its row under "נכנס אוטומטית"), and `result` (the item in the client\'s file) or `task` where the decision made one: give the user those to see the outcome. Approving a process proposal also approves the procedure it brought when the user approves procedures of that client (a manager, or its account manager), the client has no separation of duties, and the procedure passes every check against the client\'s rules: the result\'s `procedure` then says it was approved and the process runs. When it does not pass, `procedure` says why and the process is a draft as before; tell the user what to fix. Before calling, tell the user which proposals and what will happen, and call only after they said so.',
+        'Decides proposals to a client file, each as its own button on the review card: "approve" puts it in the file, "reject" drops it (needs `reason`), "already_in_file" closes it against the item already there and adds its source (only for a proposal list_approvals shows with `alreadyInFile`, as the card offers it only then), "task" opens a task from it instead (assigned to the user, due in three business days). Pass `proposalId`s exactly as list_approvals or propose_knowledge returned them. A proposal marked `approveAlone` (it changes an item in the file, may be a duplicate, or was flagged) is approved only in a call of its own, after the user read it. Each proposal is decided separately: one that fails is reported and the rest go on. For an item under `enteredAutomatically`, "reviewed_ok" marks it right ("תקין") and "revert" takes it out of the file again ("ביטול"), as its buttons do; only the decisions its row lists are accepted. Approving a process proposal also approves the procedure it brought when the user approves procedures of that client (a manager, or its account manager), the client has no separation of duties, and the procedure passes every check against the client\'s rules; otherwise the process enters as a draft. Before calling, tell the user which proposals and what will happen, and call only after they said so. ' +
+        FIELD_NOTES_SENTENCE,
       inputSchema: z.object({
         proposalIds: z.array(z.string().min(1)).min(1).max(MAX_PROPOSALS).describe("The proposals, by proposalId. Never typed or guessed."),
         decision: z.enum(["approve", "reject", "already_in_file", "task", "reviewed_ok", "revert"]),
@@ -289,7 +293,7 @@ export function registerApprovalTools(server: McpServer): void {
             failed.push({ proposalId: id, error: err instanceof Error ? err.message : "Something went wrong." });
           }
         }
-        return toolJson({ decision: args.decision, done: done.length, failed: failed.length, results: done, errors: failed.length ? failed : undefined });
+        return toolJson(withFieldNotes({ decision: args.decision, done: done.length, failed: failed.length, results: done, errors: failed.length ? failed : undefined }, DECIDE_PROPOSALS_NOTES));
       } catch (err) {
         console.error("[mcp] decide_knowledge_proposals failed", err);
         return toolFailure(err);
@@ -304,7 +308,8 @@ export function registerApprovalTools(server: McpServer): void {
     {
       title: "Measure how proposals to client files ended",
       description:
-        "Managers only. How every proposal to a client file ended, for measuring which kinds are approved as they come and which are edited or rejected: `groups` counts, per kind (a fact's own kind, contact, rule, process, date...) and action (CREATE, SUPERSEDE, CONTRADICT), how many are pending, approved as is, approved after an edit, approved together with others, found already in the file, rejected, or turned into a task. With `rows: true`, one row per proposal with its metadata: source kind, Claude's confidence and the review screen's level, flags, whether it is sensitive, client-visible or carries a \"do not disclose\", why it could not be approved together with others, the outcome and how long the decision took, whether the server approved it with no person (`autoApplied`), whether a person looked at it after and marked it right (`autoReviewed`), whether its item was taken out of the file again (`reverted`), for an auto-applied proposal the error it counted as (`autoError`: null, or its `type`, REVERTED, SUPERSEDED, CONTRADICTED, UPDATED or REMOVED within 30 days of entering, and `fields`, the names of the fields changed in the file; a replacement or contradiction that came from an approved proposal of a different, later source, a later meeting or message, is new information and not an error), `autoChange` (NEWER_SOURCE when such a later-source replacement or contradiction happened and was not counted, else null), and for a date whether it opens a task before it (`autoTask`). Metadata only: no proposal text, reason, quote or rejection reason is returned, and clients appear as opaque keys (L1, L2...). Proposals of a client marked \"בלי AI\" are left out and only counted. `guideVersions` gives when each version of the extraction guide was approved, to compare periods. `autoApply` says whether auto-apply is on, since when, and which kinds and clients (by key) are paused back to a person; each pause gives the errors that caused it by type (`byType`) and the fields fixed most often (`topFields`, names with counts), so you can say what to fix before a manager lifts it; a pause has no link here, since a link would name the client, so for the link to a pause call list_approvals (`autoApplyPauses`). `edited` says that something was changed before approval; `editedFields` names the payload fields that were changed (names only, never their values), and `editKind` says whether the change was WORDING (free text reworded, same numbers), FACT (a name, date, amount, kind, contact detail or other fact, or text added, removed or rewritten), or MIXED (both). Proposals approved before 3.11.2026 have `edited` with no fields and a null `editKind`. Rows are written short: a field that is false, null or an empty list is left out (so a missing `autoError` on an auto-applied row means no error), `rejected` is left out (state REJECTED says it), `decidedAt` is left out (createdAt plus hoursToDecision), and createdAt is to the minute. Rows are the heavy part of this tool: answer from `groups` when they are enough, and narrow rows with `since` and `via`.",
+        'Managers only. How every proposal to a client file ended, for measuring which kinds are approved as they come and which are edited or rejected: `groups` counts them by kind and action, and `rows: true` adds one row per proposal. Metadata only: no proposal text, reason, quote or rejection reason is returned, and clients appear as opaque keys (L1, L2...). Proposals of a client marked "בלי AI" are left out and only counted. Rows are the heavy part of this tool: answer from `groups` when they are enough, and narrow rows with `since` and `via`. ' +
+        FIELD_NOTES_SENTENCE,
       inputSchema: z.object({
         since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Only proposals that arrived on or after this day, YYYY-MM-DD. Omit for all of them."),
         via: z.enum(["MCP", "SCREEN"]).optional().describe("MCP: sent by Claude (the extraction). SCREEN: typed on the screen. Omit for both."),
@@ -324,7 +329,7 @@ export function registerApprovalTools(server: McpServer): void {
           limit: args.limit,
           offset: args.offset,
         });
-        return toolJson(out.rows ? { ...out, rows: out.rows.map(compactRow) } : out);
+        return toolJson(withFieldNotes(out.rows ? { ...out, rows: out.rows.map(compactRow) } : out, PROPOSAL_STATS_NOTES));
       } catch (err) {
         console.error("[mcp] get_proposal_stats failed", err);
         return toolFailure(err);

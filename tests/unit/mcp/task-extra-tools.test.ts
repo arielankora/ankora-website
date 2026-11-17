@@ -235,6 +235,18 @@ describe("update_task: portal visibility and waiting", () => {
     expect(out.reminder).toContain("propose_knowledge");
   });
 
+  // 17.11.2026: what `reminder` and `url` mean travels with them, not in
+  // the tool's description (lib/mcp/field-notes.ts).
+  it("explains the link and the reminder in fieldNotes, and only what the result carries", async () => {
+    procedure.procedureReminderFor.mockResolvedValueOnce({ kind: "PROCEDURE", forClaude: "Propose it now with propose_knowledge", forScreen: "x" });
+    tasks.updateTask.mockResolvedValueOnce({ id: "t1", title: "x", status: "DONE" });
+    const out = await call("update_task", { task: "x", status: "DONE" });
+    expect(Object.keys(out.fieldNotes)).toEqual(["url", "reminder"]);
+    expect(out.fieldNotes.reminder).toContain("Act on it");
+    const quiet = await call("update_task", { task: "x", priority: "HIGH" });
+    expect(Object.keys(quiet.fieldNotes)).toEqual(["url"]);
+  });
+
   it("has no reminder field when there is nothing to remind, and a failed check never fails the close", async () => {
     const quiet = await call("update_task", { task: "x", priority: "HIGH" });
     expect(quiet).not.toHaveProperty("reminder");
