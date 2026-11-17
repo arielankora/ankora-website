@@ -202,11 +202,17 @@ export function ProcessPage({
             {/* Stage 2: at most two actions in sight. With "הרצה עכשיו" there,
                 "רישום בדיקה" moves into ⋯. */}
             {!guide && p.routine && !canRunNow && checkDialog("secondary")}
+            {/* The menu opens toward the inside of the card. On a phone the
+                header wraps and these actions sit at the start (right) edge, so
+                it anchors to the start; from sm up they sit at the end (left)
+                and it anchors to the end. Anchored to the end on a phone, it
+                opened 130px past the screen edge and its actions could not be
+                reached (iPhone audit, 17.11.2026). */}
             <details className="relative" data-testid="process-page-more">
               <summary aria-label={t("more")} className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-[10px] border border-app-border-strong bg-white text-xl text-app-text-primary">
                 ⋯
               </summary>
-              <div className="absolute end-0 z-20 mt-1 flex min-w-[14rem] flex-col items-start gap-2.5 rounded-xl border border-app-border bg-white p-3 text-sm shadow-lg">
+              <div className="absolute start-0 z-20 mt-1 flex min-w-[14rem] sm:start-auto sm:end-0 flex-col items-start gap-2.5 rounded-xl border border-app-border bg-white p-3 text-sm shadow-lg">
                 {!guide && p.routine && canRunNow && checkDialog("menu")}
                 <CenterDialog triggerLabel={t("menu.editWhat")} triggerClassName="!text-sm !font-normal !text-app-text-primary" eyebrow={`${p.code} ${p.title}`} title={t("menu.editWhat")}>
                   <div className="px-5 py-6 sm:px-8">

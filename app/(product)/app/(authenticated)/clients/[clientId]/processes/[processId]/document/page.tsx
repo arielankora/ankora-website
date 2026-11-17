@@ -4,6 +4,7 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { PageBack } from "@/components/app/BackSlot";
 import { requireUser } from "@/lib/app-auth/session";
 import { canManageClients, ForbiddenError } from "@/lib/app-auth/permissions";
+import { DomainError } from "@/lib/domain-error";
 import { procedureDocument, type ProcedureDocumentView } from "@/lib/app-domain/procedure-documents";
 import { type DocBlock, type ProcedureDoc } from "@/lib/procedure-document";
 import { parsePageNumber } from "@/lib/url-numbers";
@@ -144,7 +145,11 @@ export default async function ProcedureDocumentPage(props: {
       : heView;
   } catch (err) {
     if (err instanceof ForbiddenError) notFound();
-    if (err instanceof Error && /לא נמצא|אין עדיין נוהל|לא נמצאה/.test(err.message)) notFound();
+    // By code, not by wording: the message changed from "אין עדיין נוהל" to
+    // "עוד אין נוהל" and this check kept matching the old one, so a process
+    // with no procedure yet showed the error screen (iPhone audit, 17.11.2026).
+    if (err instanceof DomainError && err.code === "procedureDocuments.noProcedure") notFound();
+    if (err instanceof Error && /לא נמצא|לא נמצאה/.test(err.message)) notFound();
     throw err;
   }
   if (view.clientId !== clientId) notFound();

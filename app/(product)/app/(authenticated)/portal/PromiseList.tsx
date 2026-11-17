@@ -90,12 +90,12 @@ export async function PromiseRow({ promise, showStage = true }: { promise: Porta
           <span className="text-[11.5px] text-app-text-secondary">{waitingLabel(promise.waitingSince)}</span>
         )}
         {promise.stage === "DONE" && (
-          <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
+          <span dir="auto" className="font-jbmono text-[11.5px] text-app-text-tertiary">
             {formatDay(promise.movedAt)}
           </span>
         )}
         {promise.stage !== "DONE" && promise.dueDate && (
-          <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
+          <span dir="auto" className="font-jbmono text-[11.5px] text-app-text-tertiary">
             {formatDay(promise.dueDate, TIMEZONE)}
           </span>
         )}

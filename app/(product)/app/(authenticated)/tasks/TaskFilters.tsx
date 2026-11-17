@@ -119,7 +119,10 @@ export function TaskFilters({
       ref={formRef}
       method="get"
       action="/app/tasks"
-      className="flex flex-wrap items-center gap-2.5"
+      // max-w-full: the form is itself an item of a wrapping row
+      // (tasks/page.tsx), so without a cap it kept the width of its widest
+      // line and ran 13px past a 320px screen (iPhone audit, 17.11.2026).
+      className="flex min-w-0 max-w-full flex-wrap items-center gap-2.5"
     >
       {carried.map(([key, value]) => (
         <input key={key} type="hidden" name={key} value={value} />
@@ -137,7 +140,10 @@ export function TaskFilters({
           onChange={(e) => setText(e.target.value)}
           aria-label={t("searchLabel")}
           placeholder={t("searchPlaceholder")}
-          className="min-w-0 flex-1 bg-transparent text-[13.5px] text-app-text-primary outline-none placeholder:text-app-text-tertiary"
+          // w-0 with flex-1: the field fills the pill without its own
+          // intrinsic width (20 characters, wider at 16px on a phone) pushing
+          // the filter row past a 320px screen (iPhone audit, 17.11.2026).
+          className="w-0 min-w-0 flex-1 bg-transparent text-[13.5px] text-app-text-primary outline-none placeholder:text-app-text-tertiary"
         />
         {text && (
           // A plain anchor, and NOT next/link.

@@ -90,7 +90,11 @@ export default async function BrainMetricsPage() {
         {report.clients.length === 0 ? (
           <p className="mt-3 text-sm text-app-text-tertiary">{t("noClients")}</p>
         ) : (
-          <div className="mt-3 overflow-x-auto">
+          <div className="relative mt-3 overflow-x-auto">
+            {/* `relative`: the cells hold `sr-only` labels, which are absolutely
+                positioned. Without a positioned scroller they escape its clip and
+                widen the whole page by the table's overflow, so on a phone the
+                screen pans sideways (iPhone audit, 17.11.2026). */}
             <table className="w-full min-w-[720px] text-sm" data-testid="metrics-clients">
               <thead>
                 <tr className="border-b border-app-border text-xs text-app-text-secondary">

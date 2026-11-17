@@ -1,6 +1,7 @@
 import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
-import { canManageClients } from "@/lib/app-auth/permissions";
+import { can, canManageClients } from "@/lib/app-auth/permissions";
+import { Forbidden } from "@/components/app/Forbidden";
 import { currentGuide, listGuideVersions } from "@/lib/app-domain/extraction-guide";
 import { DEFAULT_EXTRACTION_GUIDE, guideLines } from "@/lib/extract-prompt";
 import { DecideGuide, ProposeGuide } from "./GuideActions";
@@ -16,6 +17,10 @@ export const metadata = { robots: { index: false, follow: false } };
 
 export default async function ExtractionGuidePage() {
   const user = await requireUser();
+  // Same gate as listGuideVersions, checked here so a client user gets the
+  // "no permission" card like every other gated screen instead of the
+  // ForbiddenError reaching the error boundary (iPhone audit, 17.11.2026).
+  if (!can(user.role, "time_entry.create_self")) return <Forbidden />;
   const [current, versions] = await Promise.all([currentGuide(), listGuideVersions(user)]);
   const body = current?.body ?? DEFAULT_EXTRACTION_GUIDE();
   const canDecide = canManageClients(user.role);

@@ -207,3 +207,18 @@ input[type="datetime-local"]::-webkit-date-and-time-value {
 .contact-field:is(:user-invalid, [data-submitted] :invalid) ~ .contact-error {
   display: flex;
 }
+
+/* iOS Safari zooms the page in when a field under 16px takes focus, and the
+   page stays zoomed and panned sideways after the keyboard closes. Most of
+   the product's fields are 13 to 14px (iPhone audit, 17.11.2026: 94 fields
+   on 26 screens), so on touch screens every text field, select and textarea
+   is held at 16px. Desktop keeps the design's sizes. `!important` because
+   the sizes come from utility classes on each field. No field in the app is
+   set larger than 16px, so nothing here shrinks. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], [type="hidden"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

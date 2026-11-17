@@ -82,7 +82,11 @@ export function BottomNav({
             onClick={() => setMoreOpen(false)}
             className="absolute inset-0 bg-app-surface-nav/30"
           />
-          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-app-border bg-white px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6 shadow-lg">
+          {/* Capped at the screen and scrollable: a Super Admin's list is
+              taller than an iPhone SE or 15, and without the cap the sheet's
+              top (name, role, the first links) sat above the screen with
+              nothing to scroll (iPhone audit, 17.11.2026). */}
+          <div className="absolute inset-x-0 bottom-0 max-h-[calc(100dvh-env(safe-area-inset-top)-0.5rem)] overflow-y-auto overscroll-contain rounded-t-2xl border-t border-app-border bg-white px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6 shadow-lg">
             <div className="mb-4 border-b border-app-border pb-4">
               <p dir="auto" className="text-sm font-medium text-app-text-primary">{userName}</p>
               <p className="text-xs text-app-text-tertiary">{roleLabel}</p>
