@@ -430,6 +430,35 @@ export async function listOpenPromises(actor: User) {
   });
 }
 
+/// Every open task a person can log time against, for the one-line
+/// manual entry on "הזמן שלי" (17.11.2026).
+///
+/// Unlike listOpenPromises this is not limited to what the client sees:
+/// the person reporting wants the task the work was for, and most of the
+/// tasks on a client are internal. Steps stay out, as everywhere a person
+/// picks "a task". `categoryId` lets the form fill the category in from
+/// the task, the same default the task screen and the MCP tool use.
+export async function listOpenTasksForTimeEntry(actor: User) {
+  assertCan(actor.role, "time_entry.create_self");
+  const accessible = await listAccessibleClients(actor);
+  const ids = accessible.map((c) => c.id);
+  if (ids.length === 0) return [];
+
+  return prisma.task.findMany({
+    where: {
+      deletedAt: null,
+      ...TOP_LEVEL_ONLY,
+      clientId: { in: ids },
+      status: { in: OPEN_STATUSES },
+    },
+    // The Tasks screen's order: soonest deadline first, undated last.
+    orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+    // A picker, not a list: per client this is far more than anyone opens.
+    take: 1000,
+    select: { id: true, clientId: true, title: true, categoryId: true },
+  });
+}
+
 /// How long a visible promise may sit without a word before the home
 /// screen says so. The spec's own number.
 export const STALE_PROMISE_HOURS = 24;
