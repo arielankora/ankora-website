@@ -692,7 +692,7 @@ export default async function AppHomePage() {
                     <Link
                       key={row.clientId}
                       href={`/app/tasks?clientId=${row.clientId}`}
-                      className="rounded-full border border-app-border bg-white px-2.5 py-1 text-[11.5px] text-app-text-secondary transition-colors hover:border-gold"
+                      className="tap-area rounded-full border border-app-border bg-white px-2.5 py-1 text-[11.5px] text-app-text-secondary transition-colors hover:border-gold"
                     >
                       <bdi>{row.clientName}</bdi> · {row.count}
                       {row.overdue > 0 && (

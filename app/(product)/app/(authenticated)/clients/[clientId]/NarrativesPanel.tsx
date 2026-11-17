@@ -33,7 +33,7 @@ function NarrativeForm({ clientId, n }: { clientId: string; n: PanelNarrative })
       <textarea name="body" rows={10} defaultValue={n.body} placeholder={t(`kinds.${n.kind}.placeholder`)} dir="auto" className={INPUT} />
       <p className="-mt-2 text-[11px] text-app-text-tertiary">{t("formHint")}</p>
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("saving") : t("saveVersion")}
       </button>
     </form>

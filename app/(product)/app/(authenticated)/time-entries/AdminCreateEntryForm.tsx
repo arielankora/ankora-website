@@ -15,7 +15,7 @@ function SubmitButton({ pending }: { pending: boolean }) {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
+      className="tap-area rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
       {pending ? t("saving") : t("submit")}
     </button>
@@ -89,7 +89,7 @@ export function AdminCreateEntryForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-full border border-app-border bg-white px-5 py-2.5 text-sm font-medium text-app-text-primary hover:border-gold"
+        className="tap-area rounded-full border border-app-border bg-white px-5 py-2.5 text-sm font-medium text-app-text-primary hover:border-gold"
       >
         {t("open")}
       </button>

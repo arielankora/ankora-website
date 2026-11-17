@@ -38,7 +38,7 @@ export function CopyValue({ value, label }: { value: string; label: string }) {
         type="button"
         onClick={copy}
         aria-label={label}
-        className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-app-text-secondary transition-colors hover:bg-app-surface-sunken hover:text-app-text-primary"
+        className="tap-area shrink-0 rounded-md px-2 py-1 text-xs font-medium text-app-text-secondary transition-colors hover:bg-app-surface-sunken hover:text-app-text-primary"
       >
         {copied ? t("copied") : t("copy")}
       </button>

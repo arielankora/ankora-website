@@ -142,7 +142,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
               key={d}
               href={`/app/claude-usage?days=${d}`}
               aria-current={d === days ? "page" : undefined}
-              className={`rounded-full border px-3 py-1 text-[12.5px] ${d === days ? "border-gold bg-white font-medium text-app-text-primary" : "border-app-border text-app-text-secondary hover:border-gold"}`}
+              className={`tap-area rounded-full border px-3 py-1 text-[12.5px] ${d === days ? "border-gold bg-white font-medium text-app-text-primary" : "border-app-border text-app-text-secondary hover:border-gold"}`}
             >
               {t("periodOption", { days: d })}
             </Link>
@@ -561,7 +561,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
               </div>
             ))}
           </div>
-          <button type="submit" className="rounded-full border border-app-border bg-white px-4 py-1.5 text-[12.5px] font-medium text-app-text-primary hover:border-gold">
+          <button type="submit" className="tap-area rounded-full border border-app-border bg-white px-4 py-1.5 text-[12.5px] font-medium text-app-text-primary hover:border-gold">
             {t("settings.save")}
           </button>
         </form>

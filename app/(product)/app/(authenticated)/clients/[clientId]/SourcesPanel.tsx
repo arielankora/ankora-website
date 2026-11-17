@@ -140,7 +140,7 @@ function SourceForm({ clientId }: { clientId: string }) {
         <textarea name="notes" rows={2} className={INPUT} />
       </Field>
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("saving") : t("form.submit")}
       </button>
     </form>
@@ -173,7 +173,7 @@ function DomainForm({ clientId }: { clientId: string }) {
         </>
       )}
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("saving") : t("domains.submit")}
       </button>
     </form>
@@ -198,7 +198,7 @@ function AnchorsForm({ clientId, anchors }: { clientId: string; anchors: PanelAn
       </Field>
       <p className="-mt-1 text-[11px] text-app-text-tertiary">{t("anchors.hint")}</p>
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("saving") : t("save")}
       </button>
     </form>
@@ -225,7 +225,7 @@ function ConfirmForm({ clientId, source, count }: { clientId: string; source: Pa
         <input name="note" required placeholder={t("confirm.notePlaceholder")} className={INPUT} />
       </Field>
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("saving") : t("confirm.done")}
       </button>
     </form>

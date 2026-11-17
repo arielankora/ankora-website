@@ -94,12 +94,12 @@ export default async function AuditLogPage(
               className="mt-1.5 w-64 max-w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </div>
-          <button type="submit" className="rounded-full border border-app-border px-4 py-2 text-sm text-app-text-secondary hover:border-gold">
+          <button type="submit" className="tap-area rounded-full border border-app-border px-4 py-2 text-sm text-app-text-secondary hover:border-gold">
             {t("filter.submit")}
           </button>
           <a
             href={`/api/audit-log/export${entityType || q ? `?${new URLSearchParams({ ...(entityType ? { entityType } : {}), ...(q ? { q } : {}) }).toString()}` : ""}`}
-            className="ms-auto rounded-full border border-app-border px-4 py-2 text-sm text-app-text-secondary transition-colors hover:border-gold"
+            className="tap-area ms-auto rounded-full border border-app-border px-4 py-2 text-sm text-app-text-secondary transition-colors hover:border-gold"
           >
             {t("filter.export")}
           </a>
@@ -155,7 +155,7 @@ export default async function AuditLogPage(
             {page > 1 && (
               <Link
                 href={{ pathname: "/app/audit-log", query: { entityType, q, page: page - 1 } }}
-                className="rounded-full border border-app-border px-3 py-1.5 hover:border-gold"
+                className="tap-area rounded-full border border-app-border px-3 py-1.5 hover:border-gold"
               >
                 {t("pagination.previous")}
               </Link>
@@ -164,7 +164,7 @@ export default async function AuditLogPage(
             {page < totalPages && (
               <Link
                 href={{ pathname: "/app/audit-log", query: { entityType, q, page: page + 1 } }}
-                className="rounded-full border border-app-border px-3 py-1.5 hover:border-gold"
+                className="tap-area rounded-full border border-app-border px-3 py-1.5 hover:border-gold"
               >
                 {t("pagination.next")}
               </Link>

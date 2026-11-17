@@ -232,7 +232,7 @@ function ResolveLessonForm({ clientId, lesson }: { clientId: string; lesson: Pan
         <input name="resolution" required placeholder={t("lessons.oneLinePlaceholder")} className={INPUT} />
       </Field>
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("common.saving") : t("common.save")}
       </button>
     </form>
@@ -673,7 +673,7 @@ export function ProcessForm({
       />
       )}
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("common.saving") : existing ? t("common.save") : t("form.addToFile")}
       </button>
     </form>
@@ -694,7 +694,7 @@ export function StartRunForm({ clientId, process }: { clientId: string; process:
         <input name="day" type="date" required className={INPUT} />
       </Field>
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("run.opening") : t("run.open")}
       </button>
     </form>

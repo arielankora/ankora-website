@@ -423,10 +423,10 @@ export function StepsEditor({ data }: { data: StepsEditorData }) {
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           <div role="group" aria-label={t("viewLabel")} className="flex overflow-hidden rounded-[10px] border border-app-border">
-            <button type="button" aria-pressed={view === "list"} onClick={() => view !== "list" && toList()} className={`px-4 py-2.5 text-sm ${view === "list" ? "bg-app-surface-nav font-bold text-white" : "bg-white text-app-text-secondary"}`}>
+            <button type="button" aria-pressed={view === "list"} onClick={() => view !== "list" && toList()} className={`tap-area px-4 py-2.5 text-sm ${view === "list" ? "bg-app-surface-nav font-bold text-white" : "bg-white text-app-text-secondary"}`}>
               {t("viewList")}
             </button>
-            <button type="button" aria-pressed={view === "flow"} onClick={() => view !== "flow" && toFlow()} className={`px-4 py-2.5 text-sm ${view === "flow" ? "bg-app-surface-nav font-bold text-white" : "bg-white text-app-text-secondary"}`}>
+            <button type="button" aria-pressed={view === "flow"} onClick={() => view !== "flow" && toFlow()} className={`tap-area px-4 py-2.5 text-sm ${view === "flow" ? "bg-app-surface-nav font-bold text-white" : "bg-white text-app-text-secondary"}`}>
               {t("viewFlow")}
             </button>
           </div>
@@ -495,13 +495,13 @@ export function StepsEditor({ data }: { data: StepsEditorData }) {
                     setMessage({ tone: "error", text: t("promptNotCopied") });
                   }
                 }}
-                className="h-[42px] rounded-[10px] bg-app-surface-nav px-[18px] text-[15px] font-bold text-white"
+                className="tap-area h-[42px] rounded-[10px] bg-app-surface-nav px-[18px] text-[15px] font-bold text-white"
                 data-testid="steps-claude-drafts"
               >
                 {t("claudeDrafts")}
               </button>
             )}
-            <button type="button" onClick={addStep} className="h-[42px] rounded-[10px] border border-dashed border-app-border-strong bg-white px-4 text-[15px] text-app-text-primary">
+            <button type="button" onClick={addStep} className="tap-area h-[42px] rounded-[10px] border border-dashed border-app-border-strong bg-white px-4 text-[15px] text-app-text-primary">
               {t("addStep")}
             </button>
           </div>
@@ -550,10 +550,10 @@ export function StepsEditor({ data }: { data: StepsEditorData }) {
               })}
             </ol>
             <div className="mt-1 flex flex-wrap items-center gap-2.5">
-              <button type="button" onClick={addStep} disabled={steps.length >= MAX_PROCESS_STEPS} className="h-[42px] rounded-[10px] border border-dashed border-app-border-strong bg-white px-4 text-[15px] font-bold text-app-text-primary disabled:opacity-50">
+              <button type="button" onClick={addStep} disabled={steps.length >= MAX_PROCESS_STEPS} className="tap-area h-[42px] rounded-[10px] border border-dashed border-app-border-strong bg-white px-4 text-[15px] font-bold text-app-text-primary disabled:opacity-50">
                 {t("addStep")}
               </button>
-              <button type="button" onClick={addCondition} className="h-[42px] rounded-[10px] border border-dashed border-app-border-strong bg-white px-4 text-[15px] text-app-text-primary">
+              <button type="button" onClick={addCondition} className="tap-area h-[42px] rounded-[10px] border border-dashed border-app-border-strong bg-white px-4 text-[15px] text-app-text-primary">
                 {t("addCondition")}
               </button>
               <span className="text-sm text-app-text-secondary">{t("conditionHint")}</span>

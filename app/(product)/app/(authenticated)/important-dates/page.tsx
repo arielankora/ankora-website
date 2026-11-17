@@ -144,7 +144,7 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
               <a
                 key={value}
                 href={value === "upcoming" ? "/app/important-dates" : `/app/important-dates?tab=${value}`}
-                className={`rounded-full px-4 py-2 text-[13px] transition-colors ${
+                className={`tap-area rounded-full px-4 py-2 text-[13px] transition-colors ${
                   tab === value ? "bg-app-surface-nav text-cream font-medium" : "text-app-text-secondary hover:text-app-text-primary"
                 }`}
               >

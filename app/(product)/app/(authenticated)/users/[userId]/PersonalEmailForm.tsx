@@ -10,7 +10,7 @@ function SubmitButton() {
   const { pending } = useFormStatus();
   const t = useTranslations("users.personalEmail");
   return (
-    <button type="submit" disabled={pending} className="rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-primary disabled:opacity-50">
+    <button type="submit" disabled={pending} className="tap-area rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-primary disabled:opacity-50">
       {pending ? t("saving") : t("save")}
     </button>
   );

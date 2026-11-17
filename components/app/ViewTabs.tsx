@@ -16,7 +16,7 @@ export function ViewTabs({ tabs, active, label }: { tabs: ViewTab[]; active: str
           key={tab.key}
           href={tab.href}
           aria-current={active === tab.key ? "page" : undefined}
-          className={`-mb-px border-b-2 px-4 py-2.5 text-[13.5px] ${
+          className={`tap-area -mb-px border-b-2 px-4 py-2.5 text-[13.5px] ${
             active === tab.key
               ? "border-app-accent font-medium text-app-text-primary"
               : "border-transparent text-app-text-secondary hover:text-app-text-primary"

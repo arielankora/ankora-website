@@ -136,7 +136,7 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
                   <Link
                     key={c.id}
                     href={`/app/alerts?clientId=${c.id}`}
-                    className="rounded-full border border-app-border bg-white px-2.5 py-1 text-[11.5px] text-app-text-secondary transition-colors hover:border-gold"
+                    className="tap-area rounded-full border border-app-border bg-white px-2.5 py-1 text-[11.5px] text-app-text-secondary transition-colors hover:border-gold"
                   >
                     <bdi dir="auto">{c.name}</bdi> ·{" "}
                     {n > 0 ? <span className="font-jbmono">{n}</span> : <span className="text-app-warning">{t("page.noRules")}</span>}

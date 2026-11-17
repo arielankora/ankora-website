@@ -308,7 +308,7 @@ export default async function ImportantDateDetailPage(props: {
                   <form action={startWorkOnImportantDateAction} className="mt-3">
                     <input type="hidden" name="importantDateId" value={date.id} />
                     <input type="hidden" name="from" value={fromParam} />
-                    <button type="submit" className="inline-flex items-center rounded-full bg-app-accent px-4 py-2.5 text-sm font-medium text-app-text-primary">
+                    <button type="submit" className="tap-area inline-flex items-center rounded-full bg-app-accent px-4 py-2.5 text-sm font-medium text-app-text-primary">
                       {t("detail.startWork")}
                     </button>
                   </form>
@@ -334,7 +334,7 @@ export default async function ImportantDateDetailPage(props: {
                   required
                   className="w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
                 />
-                <button type="submit" className="whitespace-nowrap rounded-full border border-app-border px-4 py-2 text-sm text-app-text-primary hover:border-gold">
+                <button type="submit" className="tap-area whitespace-nowrap rounded-full border border-app-border px-4 py-2 text-sm text-app-text-primary hover:border-gold">
                   {t("detail.snoozeButton")}
                 </button>
               </form>
@@ -345,7 +345,7 @@ export default async function ImportantDateDetailPage(props: {
               <p className="mt-1 text-xs text-app-text-tertiary">{t("detail.deleteHint")}</p>
               <form action={deleteImportantDateAction} className="mt-3">
                 <input type="hidden" name="importantDateId" value={date.id} />
-                <button type="submit" className="rounded-full border border-app-error/30 px-4 py-2 text-sm text-app-error hover:bg-app-error-soft">
+                <button type="submit" className="tap-area rounded-full border border-app-error/30 px-4 py-2 text-sm text-app-error hover:bg-app-error-soft">
                   {t("detail.deleteButton")}
                 </button>
               </form>

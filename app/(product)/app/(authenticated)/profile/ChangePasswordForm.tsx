@@ -10,7 +10,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="mt-1 w-full rounded-full border border-gold/40 px-5 py-2.5 text-sm font-medium text-app-text-accent disabled:opacity-50"
+      className="tap-area mt-1 w-full rounded-full border border-gold/40 px-5 py-2.5 text-sm font-medium text-app-text-accent disabled:opacity-50"
     >
       {pending ? t("submitting") : t("submit")}
     </button>

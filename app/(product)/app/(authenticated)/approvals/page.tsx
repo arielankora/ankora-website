@@ -178,7 +178,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
           <a
             href={withScope(approvalsHref(tab, null))}
             aria-current={!clientId ? "true" : undefined}
-            className={`rounded-full border px-3 py-1 text-[12.5px] ${!clientId ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary hover:border-app-accent"}`}
+            className={`tap-area rounded-full border px-3 py-1 text-[12.5px] ${!clientId ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary hover:border-app-accent"}`}
           >
             {t("allClients")}
           </a>
@@ -189,7 +189,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
                 key={id}
                 href={withScope(approvalsHref(tab, id))}
                 aria-current={clientId === id ? "true" : undefined}
-                className={`rounded-full border px-3 py-1 text-[12.5px] ${clientId === id ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary hover:border-app-accent"}`}
+                className={`tap-area rounded-full border px-3 py-1 text-[12.5px] ${clientId === id ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary hover:border-app-accent"}`}
               >
                 <span dir="auto">{c.name}</span>
                 {c.count > 0 && <span className="ms-1 text-app-text-tertiary">{c.count}</span>}
@@ -268,10 +268,10 @@ function ScopeToggle({
   if (!everyone && hidden === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-[12.5px]" data-testid="approvals-scope">
-      <a href={mineHref} aria-current={!everyone ? "true" : undefined} className={`rounded-full border px-3 py-1 ${!everyone ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary"}`}>
+      <a href={mineHref} aria-current={!everyone ? "true" : undefined} className={`tap-area rounded-full border px-3 py-1 ${!everyone ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary"}`}>
         {words.mine}
       </a>
-      <a href={allHref} aria-current={everyone ? "true" : undefined} className={`rounded-full border px-3 py-1 ${everyone ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary"}`}>
+      <a href={allHref} aria-current={everyone ? "true" : undefined} className={`tap-area rounded-full border px-3 py-1 ${everyone ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary"}`}>
         {words.everyone}
       </a>
       {!everyone && hidden > 0 && <span className="text-app-text-tertiary">{words.hidden}</span>}

@@ -90,7 +90,7 @@ export function ClaudeGrantList({ grants }: { grants: GrantRow[] }) {
                 type="button"
                 disabled={pending}
                 onClick={() => setConfirmingId(grant.id)}
-                className="rounded-full border border-app-border px-3 py-1 text-xs font-medium text-app-text-secondary transition-colors hover:border-app-error hover:text-app-error disabled:opacity-50"
+                className="tap-area rounded-full border border-app-border px-3 py-1 text-xs font-medium text-app-text-secondary transition-colors hover:border-app-error hover:text-app-error disabled:opacity-50"
               >
                 {t("revoke")}
               </button>

@@ -36,7 +36,7 @@ export function TranslateWithClaude({ prompt, label }: { prompt: string; label: 
         <button
           type="button"
           onClick={copy}
-          className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
+          className="tap-area inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
         >
           {state === "copied" ? <Check size={14} className="text-app-text-accent" /> : <Languages size={14} className="text-app-text-accent" />}
           {label}

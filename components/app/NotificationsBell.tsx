@@ -87,7 +87,7 @@ export function NotificationsBell({
         onClick={() => setOpen((v) => !v)}
         aria-label={t("title")}
         aria-expanded={open}
-        className="relative flex h-9 w-9 items-center justify-center rounded-full text-app-text-secondary hover:bg-app-surface-sunken hover:text-app-text-primary"
+        className="tap-area relative flex h-9 w-9 items-center justify-center rounded-full text-app-text-secondary hover:bg-app-surface-sunken hover:text-app-text-primary"
       >
         <Bell size={18} strokeWidth={1.75} />
         {unreadCount > 0 && (

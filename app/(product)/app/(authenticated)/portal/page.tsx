@@ -134,7 +134,7 @@ export default async function PortalHomePage() {
                 href={waHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-full border border-app-border-strong px-3.5 py-1.5 text-xs text-app-text-primary hover:border-app-accent"
+                className="tap-area rounded-full border border-app-border-strong px-3.5 py-1.5 text-xs text-app-text-primary hover:border-app-accent"
               >
                 {t("whatsapp")}
               </a>

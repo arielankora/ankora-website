@@ -281,7 +281,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
             <input type="hidden" name="userId" value={targetUser.id} />
             <button
               type="submit"
-              className="rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-gold hover:text-app-text-primary"
+              className="tap-area rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-gold hover:text-app-text-primary"
             >
               {t("logoutAll")}
             </button>
@@ -308,7 +308,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
                 <input type="hidden" name="userId" value={targetUser.id} />
                 <button
                   type="submit"
-                  className="rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-app-error hover:text-app-error"
+                  className="tap-area rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-app-error hover:text-app-error"
                 >
                   {t("claudeRevoke")}
                 </button>
@@ -329,7 +329,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
                 <input type="hidden" name="userId" value={targetUser.id} />
                 <button
                   type="submit"
-                  className="rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-app-error hover:text-app-error"
+                  className="tap-area rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-app-error hover:text-app-error"
                 >
                   {t("passkeysReset")}
                 </button>

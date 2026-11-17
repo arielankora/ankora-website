@@ -61,7 +61,7 @@ export function ForgotPasswordForm() {
 
       <p className="mt-4 text-xs text-app-text-secondary">{t("privacyNote")}</p>
 
-      <Link href="/app/login" className="mt-2 block py-2 text-xs text-app-text-accent">
+      <Link href="/app/login" className="tap-area mt-2 block py-2 text-xs text-app-text-accent">
         {t("backToSignIn")}
       </Link>
     </form>

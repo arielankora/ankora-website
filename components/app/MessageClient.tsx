@@ -138,7 +138,7 @@ export function MessageClient({
       <button
         type="button"
         onClick={begin}
-        className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
+        className="tap-area inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
       >
         <MessageSquare size={14} strokeWidth={2} />
         {buttonLabel ?? t("button")}

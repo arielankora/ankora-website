@@ -36,7 +36,7 @@ export default async function NotificationsPage() {
           </div>
           {unreadCount > 0 && (
             <form action={markAllNotificationsReadAction}>
-              <button type="submit" className="rounded-full border border-app-border px-4 py-2 text-sm text-app-text-primary hover:border-gold">
+              <button type="submit" className="tap-area rounded-full border border-app-border px-4 py-2 text-sm text-app-text-primary hover:border-gold">
                 {t("markAllRead")}
               </button>
             </form>
@@ -89,7 +89,7 @@ export default async function NotificationsPage() {
               {!n.readAt && (
                 <form action={markNotificationReadAction}>
                   <input type="hidden" name="notificationId" value={n.id} />
-                  <button type="submit" className="whitespace-nowrap py-2 text-xs text-app-text-tertiary hover:text-app-text-primary">
+                  <button type="submit" className="tap-area whitespace-nowrap py-2 text-xs text-app-text-tertiary hover:text-app-text-primary">
                     {t("markRead")}
                   </button>
                 </form>

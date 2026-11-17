@@ -81,7 +81,7 @@ function SegToggle<T extends string>({
           type="button"
           onClick={() => onChange(opt.value)}
           aria-pressed={value === opt.value}
-          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+          className={`tap-area rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
             value === opt.value ? "bg-app-surface-nav text-cream" : "text-app-text-secondary hover:text-app-text-primary"
           }`}
         >

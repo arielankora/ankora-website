@@ -174,7 +174,7 @@ export function Drawer({
         className={
           variant === "link"
             ? `tap-area text-xs text-app-text-secondary hover:text-app-text-primary ${triggerClassName}`
-            : `inline-flex items-center gap-1.5 rounded-full bg-app-accent px-4 py-2.5 text-sm font-medium text-app-text-primary ${triggerClassName}`
+            : `tap-area inline-flex items-center gap-1.5 rounded-full bg-app-accent px-4 py-2.5 text-sm font-medium text-app-text-primary ${triggerClassName}`
         }
       >
         {variant === "primary" && <Plus size={16} strokeWidth={2.25} />}
