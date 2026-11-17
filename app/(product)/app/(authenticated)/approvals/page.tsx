@@ -3,7 +3,7 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { collectApprovals, countMyPendingProposals } from "@/lib/app-domain/approvals";
-import { countAutoReview } from "@/lib/app-domain/auto-apply";
+import { countAutoReview, seesActivePause } from "@/lib/app-domain/auto-apply";
 import { ViewTabs } from "@/components/app/ViewTabs";
 import {
   APPROVAL_DATE_FORMATS,
@@ -76,13 +76,16 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
     return days <= 0 ? t("waited.today") : days === 1 ? t("waited.yesterday") : t("waited.days", { count: String(days) });
   };
 
-  const [everything, knowledgeAll, knowledgeClient, autoReview] = await Promise.all([
+  const [everything, knowledgeAll, knowledgeClient, autoReview, pauseActive] = await Promise.all([
     collectApprovals(user),
     countMyPendingProposals(user, { everyone }),
     clientId ? countMyPendingProposals(user, { clientId, everyone: true }) : Promise.resolve(null),
     // 3.11.2026: items that entered a file on their own and still need a
     // look count on "ידע מהחילוץ", so the tab is there while they wait.
     countAutoReview(user, { clientId }),
+    // 17.11.2026: a manager reaches the lift button of a pause even when
+    // nothing on the tab waits. Not counted: a pause is not a decision.
+    seesActivePause(user),
   ]);
   const allItems = everyone ? everything : onlyMine(everything);
 
@@ -108,7 +111,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
 
   const items = clientId ? forClient(everything, clientId) : allItems;
   const counts = tabCounts(items, (clientId ? (knowledgeClient ?? 0) : knowledgeAll) + autoReview);
-  const tabs = visibleTabs(counts, tab);
+  const tabs = visibleTabs(counts, tab, pauseActive ? ["knowledge"] : []);
 
   // The row in the reader's words: a key from `screen` where the domain
   // gave one, otherwise the field as it is (a title someone wrote, a

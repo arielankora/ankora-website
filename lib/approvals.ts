@@ -206,9 +206,11 @@ export function tabCounts(items: ApprovalItem[], knowledgeTotal?: number): Recor
 
 /// The tabs a person sees: "הכול" always, the rest only while they hold
 /// something, plus the one asked for. A person who approves no rules never
-/// sees a "כללים" tab with a zero in it.
-export function visibleTabs(counts: Record<ApprovalTab, number>, active: ApprovalTab): { key: ApprovalTab; label: string; count: number }[] {
-  return APPROVAL_TABS.filter((t) => t.key === "all" || t.key === active || counts[t.key] > 0).map((t) => ({ ...t, count: counts[t.key] }));
+/// sees a "כללים" tab with a zero in it. `keep` names tabs shown even at
+/// zero: "ידע מהחילוץ" for a manager while a kind or a client is paused
+/// from auto-apply, since the lift button is there (17.11.2026).
+export function visibleTabs(counts: Record<ApprovalTab, number>, active: ApprovalTab, keep: readonly ApprovalTab[] = []): { key: ApprovalTab; label: string; count: number }[] {
+  return APPROVAL_TABS.filter((t) => t.key === "all" || t.key === active || counts[t.key] > 0 || keep.includes(t.key)).map((t) => ({ ...t, count: counts[t.key] }));
 }
 
 type Params = Record<string, string | string[] | undefined>;
