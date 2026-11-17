@@ -3,7 +3,10 @@ import {
   AUTO_REVIEW_SAMPLE_PERCENT,
   autoDecisionBlocker,
   autoError,
+  autoOutcome,
   changedFields,
+  isNewerSource,
+  proposalSource,
   summarizeAutoErrors,
   REVERT_SLACK_MS,
   autoReviewReason,
@@ -109,6 +112,57 @@ describe("what an error is", () => {
     const skew = new Date(revertedAt.getTime() - REVERT_SLACK_MS / 2).toISOString();
     expect(autoError({ decidedAt, revertedAt }, [change("client_contact.remove", skew)])).toMatchObject({ type: "REVERTED", at: revertedAt });
     expect(autoError({ decidedAt, revertedAt }, [change("client_contact.update", "2026-11-03T00:00:00Z", { role: "CEO" }, { role: "CTO" })])).toMatchObject({ type: "UPDATED", fields: ["role"] });
+  });
+});
+
+describe("a replacement or a contradiction from a later source (17.11.2026)", () => {
+  const decidedAt = D("2026-11-01T10:00:00Z");
+  const own = { key: "S:s1", day: "2026-11-01" };
+  const later = { key: "S:s2", day: "2026-11-05" };
+  const at = D("2026-11-05T12:00:00Z");
+  const change = (action: string, by?: { key: string; day: string } | null) => ({ action, at, before: { body: "a" }, after: { body: "b" }, by });
+
+  it("is not an error: a later meeting brought new information", () => {
+    for (const action of ["client_fact.supersede", "client_fact.contradict"]) {
+      const o = autoOutcome({ decidedAt, revertedAt: null, source: own }, [change(action, later)]);
+      expect(o.error).toBeNull();
+      expect(o.notCounted).toEqual([{ type: action.endsWith("supersede") ? "SUPERSEDED" : "CONTRADICTED", at, reason: "NEWER_SOURCE" }]);
+    }
+  });
+
+  it("is an error from the same source, even on a later day's batch", () => {
+    expect(autoError({ decidedAt, revertedAt: null, source: own }, [change("client_fact.supersede", { key: "S:s1", day: "2026-11-05" })])).toMatchObject({ type: "SUPERSEDED" });
+  });
+
+  it("is an error from an earlier or a same-day source", () => {
+    expect(autoError({ decidedAt, revertedAt: null, source: own }, [change("client_fact.supersede", { key: "S:s0", day: "2026-10-20" })])).toMatchObject({ type: "SUPERSEDED" });
+    expect(autoError({ decidedAt, revertedAt: null, source: own }, [change("client_fact.contradict", { key: "S:s3", day: "2026-11-01" })])).toMatchObject({ type: "CONTRADICTED" });
+  });
+
+  it("is an error when a person changed it on the screen, with no proposal", () => {
+    expect(autoError({ decidedAt, revertedAt: null, source: own }, [change("client_fact.supersede")])).toMatchObject({ type: "SUPERSEDED", fields: ["body"] });
+    expect(autoError({ decidedAt, revertedAt: null, source: own }, [change("client_fact.contradict", null)])).toMatchObject({ type: "CONTRADICTED" });
+  });
+
+  it("leaves a revert, an update and a removal as they were", () => {
+    expect(autoError({ decidedAt, revertedAt: at, source: own }, [change("client_fact.supersede", later)])).toMatchObject({ type: "REVERTED" });
+    expect(autoError({ decidedAt, revertedAt: null, source: own }, [change("client_contact.update", later)])).toMatchObject({ type: "UPDATED" });
+    expect(autoError({ decidedAt, revertedAt: null, source: own }, [change("client_fact.remove", later)])).toMatchObject({ type: "REMOVED" });
+  });
+
+  it("an error after a later-source replacement still counts", () => {
+    const o = autoOutcome({ decidedAt, revertedAt: null, source: own }, [change("client_fact.contradict", later), { ...change("client_fact.supersede"), at: D("2026-11-08T00:00:00Z") }]);
+    expect(o.error).toMatchObject({ type: "SUPERSEDED", at: D("2026-11-08T00:00:00Z") });
+    expect(o.notCounted).toHaveLength(1);
+  });
+
+  it("a source's day is its own date, or the day its batch arrived in Israel", () => {
+    expect(proposalSource({ id: "b1", createdAt: D("2026-11-03T08:00:00Z"), sourceId: "s1" }, { occurredAt: D("2026-11-01T00:00:00Z") })).toEqual({ key: "S:s1", day: "2026-11-01" });
+    expect(proposalSource({ id: "b1", createdAt: D("2026-11-03T22:30:00Z"), sourceId: "s1" }, { occurredAt: null })).toEqual({ key: "S:s1", day: "2026-11-04" });
+    expect(proposalSource({ id: "b1", createdAt: D("2026-11-03T08:00:00Z"), sourceId: null }, null)).toEqual({ key: "B:b1", day: "2026-11-03" });
+    expect(isNewerSource(own, later)).toBe(true);
+    expect(isNewerSource(null, later)).toBe(false);
+    expect(isNewerSource(own, null)).toBe(false);
   });
 });
 

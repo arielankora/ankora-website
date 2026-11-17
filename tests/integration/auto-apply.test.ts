@@ -3,7 +3,7 @@ import type { User } from "@prisma/client";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import { listClientFacts, removeClientFact } from "@/lib/app-domain/client-facts";
+import { listClientFacts, removeClientFact, supersedeClientFact } from "@/lib/app-domain/client-facts";
 import { updateClientContact } from "@/lib/app-domain/client-contacts";
 import { proposalStatsForAi } from "@/lib/app-domain/proposal-stats";
 import { approveProposal, proposeKnowledge, revertProposal, type ProposalItemInput } from "@/lib/app-domain/knowledge-proposals";
@@ -343,5 +343,70 @@ describe("what the errors behind a pause were (14.11.2026)", () => {
     const row = (await autoApplyOverview(manager))!.pauses.find((p) => p.id === pause.id)!;
     expect(row.breakdown.byType).toEqual({ REVERTED: 1, UPDATED: 1 });
     expect(row.breakdown.topFields).toEqual([{ field: "role", count: 1 }]);
+  });
+});
+
+describe("a later source that replaces or contradicts is new information, not an error (17.11.2026)", () => {
+  /// A batch from a given meeting: its day, and its recording (the same
+  /// recording is the same source in the register).
+  function fromMeeting(user: User, clientId: string, items: ProposalItemInput[], day: string, recording: string, autoApply = false) {
+    return proposeKnowledge(user, { clientId, source: { kind: "TRANSCRIPT", title: `פגישה ${recording}`, occurredAt: new Date(`${day}T00:00:00Z`), externalIds: [recording] }, items }, { autoApply });
+  }
+  const supersede = (targetId: string, body: string, at: string): ProposalItemInput => ({
+    target: "FACT",
+    action: "SUPERSEDE",
+    targetId,
+    reason: "נאמר בפגישה",
+    at,
+    payload: { knowledgeStatus: "CONFIRMED", kind: "PREFERENCE", body },
+  });
+
+  async function threeAutoApplied(user: User, clientId: string) {
+    const r = await fromMeeting(user, clientId, [pref("דוחות במייל"), pref("פגישות בבוקר", { at: "02:00" }), pref("חשבוניות לרון", { at: "03:00" })], "2026-11-01", "ff-first", true);
+    expect(r.autoApplied).toHaveLength(3);
+    return r.autoApplied;
+  }
+
+  async function approveAll(user: User, batchId: string) {
+    for (const p of await prisma.knowledgeProposal.findMany({ where: { batchId, state: "PENDING" }, orderBy: { createdAt: "asc" } })) await approveProposal(user, p.id);
+  }
+
+  it("replacements from a later meeting pause neither the client nor the kind, and the stats show no error", async () => {
+    const { client, user, manager } = await setup();
+    const applied = await threeAutoApplied(user, client.id);
+    const later = await fromMeeting(user, client.id, applied.map((a, i) => supersede(a.resultId!, `גרסה חדשה ${i}`, `0${i + 1}:00`)), "2026-11-05", "ff-later");
+    await approveAll(user, later.batchId!);
+    expect(await prisma.knowledgeProposal.count({ where: { batchId: later.batchId!, state: "APPROVED" } })).toBe(3);
+
+    // The next arrival reads the counters: nothing pauses, and it enters.
+    expect((await fromMeeting(user, client.id, [pref("עוד העדפה", { at: "09:00" })], "2026-11-06", "ff-next", true)).autoApplied).toHaveLength(1);
+    expect(await prisma.autoApplyPause.count()).toBe(0);
+
+    const stats = await proposalStatsForAi(manager, { rows: true });
+    const byId = Object.fromEntries(stats.rows!.map((r) => [r.id, r]));
+    for (const a of applied) expect(byId[a.proposalId]).toMatchObject({ autoError: null, autoChange: "NEWER_SOURCE" });
+  });
+
+  it("replacements from the same meeting, a same-day one, or by hand on the screen still count", async () => {
+    const { client, user, manager } = await setup();
+    const applied = await threeAutoApplied(user, client.id);
+    // The same recording again: the same source.
+    const same = await fromMeeting(user, client.id, [supersede(applied[0].resultId!, "תיקון", "05:00")], "2026-11-01", "ff-first");
+    await approveAll(user, same.batchId!);
+    // Another meeting on the same day.
+    const sameDay = await fromMeeting(user, client.id, [supersede(applied[1].resultId!, "תיקון אחר", "01:00")], "2026-11-01", "ff-same-day");
+    await approveAll(user, sameDay.batchId!);
+    // A person on the screen.
+    const handFixed = await prisma.clientFact.findUniqueOrThrow({ where: { id: applied[2].resultId! } });
+    await supersedeClientFact(user, handFixed.id, { kind: "PREFERENCE", body: "תוקן ביד", knowledgeStatus: "CONFIRMED", sources: handFixed.sources as never });
+
+    await fromMeeting(user, client.id, [pref("עוד העדפה", { at: "09:00" })], "2026-11-06", "ff-next", true);
+    const pauses = await prisma.autoApplyPause.findMany({ where: { liftedAt: null } });
+    expect(pauses.find((p) => p.scope === "CLIENT")).toMatchObject({ key: client.id });
+    expect(pauses.find((p) => p.scope === "KIND")).toMatchObject({ key: "FACT.PREFERENCE", errors: 3 });
+
+    const stats = await proposalStatsForAi(manager, { rows: true });
+    const byId = Object.fromEntries(stats.rows!.map((r) => [r.id, r]));
+    for (const a of applied) expect(byId[a.proposalId]).toMatchObject({ autoError: { type: "SUPERSEDED" }, autoChange: null });
   });
 });

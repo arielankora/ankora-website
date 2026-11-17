@@ -9,7 +9,8 @@
 //   version was approved, and a fixed 20% sample otherwise;
 // - what an error is: an auto-applied item taken out again ("ביטול"), or
 //   changed, removed or replaced in the file within 30 days (autoError,
-//   with its type and the names of the fields that were fixed);
+//   with its type and the names of the fields that were fixed), except a
+//   replacement or a contradiction that a later source brought;
 // - when a kind or a client goes back to a person: 3 errors in the last 30
 //   auto-applied proposals of a kind, or 2 errors of one client within 14
 //   days.
@@ -117,9 +118,40 @@ export const AUTO_ERROR_TYPES: readonly AutoErrorType[] = ["REVERTED", "SUPERSED
 /// a removal).
 export type AutoError = { type: AutoErrorType; at: Date; fields: string[] };
 
+/// Where a proposal's knowledge came from (17.11.2026): its source in the
+/// register, or its batch when it has none (`key`), and the day of that
+/// source (`day`, YYYY-MM-DD): the source's own date, or the day its batch
+/// arrived when the source has no date.
+export type ProposalSource = { key: string; day: string };
+
+/// The day a batch arrived, in Israel: the day a person would give it.
+const israelDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" });
+
+/// A proposal's source, from its batch and the batch's source in the
+/// register. A source's date is stored as UTC midnight, so its UTC day is
+/// the day.
+export function proposalSource(batch: { id: string; createdAt: Date; sourceId: string | null }, source: { occurredAt: Date | null } | null): ProposalSource {
+  const day = source?.occurredAt ? source.occurredAt.toISOString().slice(0, 10) : israelDay.format(batch.createdAt);
+  return { key: batch.sourceId ? `S:${batch.sourceId}` : `B:${batch.id}`, day };
+}
+
+/// Whether a change came from a different source, of a later day, than
+/// the item it changed: a later meeting or message that brought new
+/// information. Not a mistake of the extraction. The same source, an
+/// earlier or same-day one, or a person's own change (no source) is.
+export function isNewerSource(own: ProposalSource | null | undefined, by: ProposalSource | null | undefined): boolean {
+  return !!own && !!by && by.key !== own.key && by.day > own.day;
+}
+
 /// One audit row on the item in the file: its action, when, and the item
-/// before and after, as recordAudit stored them.
-export type ItemChange = { action: string; at: Date; before?: unknown; after?: unknown };
+/// before and after, as recordAudit stored them. `by`: for a replacement
+/// or a contradiction that came from an approved proposal, that
+/// proposal's source; absent for a person's direct change on the screen.
+export type ItemChange = { action: string; at: Date; before?: unknown; after?: unknown; by?: ProposalSource | null };
+
+/// A change that is not counted as an error, and why: a replacement or a
+/// contradiction from a later source (NEWER_SOURCE).
+export type AutoChange = { type: "SUPERSEDED" | "CONTRADICTED"; at: Date; reason: "NEWER_SOURCE" };
 
 const TYPE_OF: Record<(typeof CHANGE_ACTIONS)[number], AutoErrorType> = {
   "client_fact.supersede": "SUPERSEDED",
@@ -185,26 +217,45 @@ export function changedFields(before: unknown, after: unknown): string[] {
   return proposalEditDiff(pick(b, a), pick(a, b)).map((d) => d.field);
 }
 
-/// The error of one auto-applied item, or null. The single definition of
-/// an error: the pauses count these, and the stats and the approvals
-/// screen explain them. The first that happened counts: taken out again
-/// at any time, or a change in CHANGE_ACTIONS within ERROR_WINDOW_DAYS of
-/// entering. A removal that is the revert itself is not counted twice.
-export function autoError(p: { decidedAt: Date; revertedAt: Date | null }, changes: ItemChange[]): AutoError | null {
+/// The error of one auto-applied item, or null, and the changes that were
+/// not counted. The single definition of an error: the pauses count
+/// these, and the stats and the approvals screen explain them. The first
+/// that happened counts: taken out again at any time, or a change in
+/// CHANGE_ACTIONS within ERROR_WINDOW_DAYS of entering. A removal that is
+/// the revert itself is not counted twice. A replacement or a
+/// contradiction from a later source than the item's own (isNewerSource,
+/// 17.11.2026) is new information, not an error: it is returned in
+/// `notCounted`.
+export function autoOutcome(
+  p: { decidedAt: Date; revertedAt: Date | null; source?: ProposalSource | null },
+  changes: ItemChange[]
+): { error: AutoError | null; notCounted: AutoChange[] } {
   const from = p.decidedAt.getTime();
   const until = from + ERROR_WINDOW_DAYS * DAY;
   const found: AutoError[] = p.revertedAt ? [{ type: "REVERTED", at: p.revertedAt, fields: [] }] : [];
+  const notCounted: AutoChange[] = [];
   for (const c of changes) {
     const type = TYPE_OF[c.action as keyof typeof TYPE_OF];
     if (!type) continue;
     const t = c.at.getTime();
     if (t < from || t > until) continue;
     if (type === "REMOVED" && p.revertedAt && t >= p.revertedAt.getTime() - REVERT_SLACK_MS) continue;
+    if ((type === "SUPERSEDED" || type === "CONTRADICTED") && isNewerSource(p.source, c.by)) {
+      notCounted.push({ type, at: c.at, reason: "NEWER_SOURCE" });
+      continue;
+    }
     found.push({ type, at: c.at, fields: type === "REMOVED" ? [] : changedFields(c.before, c.after) });
   }
-  if (found.length === 0) return null;
+  notCounted.sort((x, y) => x.at.getTime() - y.at.getTime());
+  if (found.length === 0) return { error: null, notCounted };
   // Earliest first; at the same moment a revert says the most.
-  return found.sort((x, y) => x.at.getTime() - y.at.getTime() || (x.type === "REVERTED" ? -1 : y.type === "REVERTED" ? 1 : 0))[0];
+  const error = found.sort((x, y) => x.at.getTime() - y.at.getTime() || (x.type === "REVERTED" ? -1 : y.type === "REVERTED" ? 1 : 0))[0];
+  return { error, notCounted };
+}
+
+/// autoOutcome, the error only.
+export function autoError(p: { decidedAt: Date; revertedAt: Date | null; source?: ProposalSource | null }, changes: ItemChange[]): AutoError | null {
+  return autoOutcome(p, changes).error;
 }
 
 /// The errors behind a pause, for the manager who decides to lift it:
