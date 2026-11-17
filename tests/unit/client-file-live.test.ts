@@ -22,8 +22,22 @@ const DOC: ClientFileDoc = {
 
 describe("brief", () => {
   const md = briefMarkdown(DOC);
-  it("keeps the rules in full, with sources and ids", () => {
-    expect(md).toContain('תשלום מעל 10,000 באישור המנכ"ל [S1 08:13] (id: r1)');
+  it("keeps the rules in full, without source codes, owner or id (17.11.2026)", () => {
+    expect(md).toContain('- תשלום מעל 10,000 באישור המנכ"ל');
+    expect(md).not.toContain("[S1 08:13]");
+    expect(md).not.toContain("(id: r1)");
+    expect(md).not.toContain("בעלים:");
+  });
+  it("keeps the status, the client-visible mark and the do-not-tell of a rule", () => {
+    const doc: ClientFileDoc = {
+      ...DOC,
+      sections: [{ number: "6", title: "כללים והגבלות", empty: "", items: [{ ref: "r2", text: "כלל", status: "UNCERTAIN", toResolve: "לוודא עם אורן", clientVisible: true, owner: "הדס", doNotDisclose: "לא לספק" } as never] }],
+    };
+    const line = briefMarkdown(doc).split("\n").find((l) => l.startsWith("- כלל"))!;
+    expect(line).toContain("לוודא עם אורן");
+    expect(line).toContain("גלוי ללקוח");
+    expect(line).toContain("לא לספר: לא לספק");
+    expect(line).not.toContain("הדס");
   });
   it("names people and processes only, and leaves the log and the narrative out", () => {
     expect(md).toContain("- P1 תשלומי ספקים (id: p1)");
@@ -34,6 +48,24 @@ describe("brief", () => {
   it('carries every "do not tell", even of a line cut short', () => {
     expect(md).toContain("## לא לספר");
     expect(md).toContain("איילה מנצור: המעבר ל-Doka");
+  });
+  it('lists a "do not tell" once, even when its item sits in two sections', () => {
+    const twice = { ref: "c1", text: "איילה מנצור", doNotDisclose: "המעבר ל-Doka" };
+    const doc: ClientFileDoc = {
+      ...DOC,
+      sections: [
+        { number: "3", title: "אנשים ויחסים", empty: "", items: [twice] },
+        { number: "7.2", title: "ספקים", empty: "", items: [twice] },
+      ],
+    };
+    expect(briefMarkdown(doc).split("איילה מנצור: המעבר ל-Doka").length - 1).toBe(1);
+  });
+  it("keeps the ids of people and processes, and of dates", () => {
+    expect(md).toContain("איילה מנצור (id: c1)");
+    const doc: ClientFileDoc = { ...DOC, sections: [{ number: "10", title: "תאריכים", empty: "", items: [{ ref: "d1", text: "דוח שנתי", sources: ["S2"], owner: "הדס" } as never] }] };
+    const line = briefMarkdown(doc);
+    expect(line).toContain("(id: d1)");
+    expect(line).not.toContain("[S2]");
   });
 });
 

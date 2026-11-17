@@ -312,7 +312,7 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "Get client brief",
       description:
-        "A one-page brief of a client's file: who they are, their preferences and requirements, the rules to follow, finance and approval rules, how to communicate with them, what is temporary, open questions and specific working rules in full; people, systems, suppliers and processes by name and id; the next dates; and every \"do not tell\" in one list. Use it for a short question or a short message. For a process, a supplier, a document or anything longer, read get_client_file. Same rules as the file: no contact details, nothing sensitive.",
+        "A one-page brief of a client's file: who they are, their preferences and requirements, the rules to follow, finance and approval rules, how to communicate with them, what is temporary, open questions and specific working rules in full; people, systems, suppliers and processes by name and id; the next dates; and every \"do not tell\" in one list. Use it for a short question or a short message. For a process, a supplier, a document or anything longer, read get_client_file. Same rules as the file: no contact details, nothing sensitive. To stay short it leaves out the source codes, the owners and the ids of text items; get_client_file has them.",
       inputSchema: z.object({ client: z.string().describe("Client name, as the user said it.") }),
       annotations: TOOL_ANNOTATIONS.get_client_brief,
     },

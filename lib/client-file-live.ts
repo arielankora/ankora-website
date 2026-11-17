@@ -38,19 +38,31 @@ const FULL = ["1", "4", "5", "6", "8", "9", "11", "13", "14"];
 const NAMES_ONLY = ["3", "7.1", "7.2", "7.4"];
 const FIRST_OF = { "10": 8 } as Record<string, number>;
 
+// What the brief leaves out of a line (17.11.2026, measured on three real
+// briefs of 20 to 66 KB): the source codes, about 2%, which mean nothing
+// without the legend the full file carries; the owner, 4% to 6.5%, which
+// repeats on nearly every item; and the id of a text item, about 5%, which
+// only a change to the file needs, and a change reads the full file. The
+// ids of people, systems, suppliers, processes and dates stay: Claude
+// calls the next tool with them.
+const BRIEF_LINE = { sources: false, owner: false } as const;
+
 export function briefMarkdown(doc: ClientFileDoc): string {
   const out = [`# תקציר תיק: ${doc.clientName}`, "", "תקציר לשאלה קצרה או להודעה קצרה. לעבודה מעמיקה, לתהליך או לניסוח מורכב: get_client_file."];
   if (doc.control?.length) out.push("", `**בקרה:** ${doc.control.map((p) => p.text).join(" · ")}`);
   for (const s of doc.sections) {
     if (!s.items.length) continue;
-    if (FULL.includes(s.number)) out.push(...sectionLines(s, s.items, (i) => itemLine(i, true)));
+    if (FULL.includes(s.number)) out.push(...sectionLines(s, s.items, (i) => itemLine(i, false, BRIEF_LINE)));
     else if (NAMES_ONLY.includes(s.number)) out.push(...sectionLines(s, s.items, (i) => `${i.text.trim()}${i.ref ? ` (id: ${i.ref})` : ""}`));
-    else if (FIRST_OF[s.number]) out.push(...sectionLines(s, s.items.slice(0, FIRST_OF[s.number]), (i) => itemLine(i, true)));
+    else if (FIRST_OF[s.number]) out.push(...sectionLines(s, s.items.slice(0, FIRST_OF[s.number]), (i) => itemLine(i, true, BRIEF_LINE)));
   }
   // "Do not tell" travels with the brief wherever it is, since the brief
   // is what a message gets drafted from.
-  const secrets = doc.sections.flatMap((s) => (FULL.includes(s.number) ? [] : s.items.filter((i) => i.doNotDisclose)));
-  if (secrets.length) out.push("", "## לא לספר", "", ...secrets.map((i) => `- ${oneLine(i.text)}: ${oneLine(i.doNotDisclose!)}`));
+  // Each one once: the same item can sit in two sections.
+  const secrets = [
+    ...new Set(doc.sections.flatMap((s) => (FULL.includes(s.number) ? [] : s.items.filter((i) => i.doNotDisclose))).map((i) => `- ${oneLine(i.text)}: ${oneLine(i.doNotDisclose!)}`)),
+  ];
+  if (secrets.length) out.push("", "## לא לספר", "", ...secrets);
   out.push("");
   return out.join("\n");
 }
