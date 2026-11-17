@@ -109,6 +109,21 @@ describe("the Claude usage report", () => {
     expect(report.people.find((p) => p.userId === hadas.id)!.month.projectedUsd).toBeNull();
   });
 
+  it("lists active staff only, and dates the month from when measurement began", async () => {
+    const { ariel, hadas } = await seed();
+    const { user: invited } = await createTestUser({ role: "ANKORA_EMPLOYEE", status: "INVITED" });
+    const { user: suspended } = await createTestUser({ role: "ANKORA_EMPLOYEE", status: "SUSPENDED" });
+    const report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
+    const ids = report.people.map((p) => p.userId);
+    expect(ids).toContain(hadas.id);
+    expect(ids).not.toContain(invited.id);
+    expect(ids).not.toContain(suspended.id);
+    // The seed's first event this month is 55 minutes before NOW: too
+    // little to state a pace.
+    expect(report.month.measuredSince).toBe(ago(55).toISOString());
+    expect(report.people.find((p) => p.userId === hadas.id)!.month.projectedUsd).toBeNull();
+  });
+
   it("puts each person against their own seat", async () => {
     const { ariel, hadas } = await seed();
     await updateClaudeUsageSettings(ariel, { seats: { [hadas.id]: 100 }, multiplier: 1 });

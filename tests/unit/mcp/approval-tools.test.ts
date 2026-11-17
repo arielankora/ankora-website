@@ -24,7 +24,7 @@ const domain = vi.hoisted(() => ({
 }));
 const decide = vi.hoisted(() => ({ decideApproval: vi.fn() }));
 const lookup = vi.hoisted(() => ({ lookupClient: vi.fn() }));
-const auto = vi.hoisted(() => ({ listAutoReview: vi.fn(async () => [] as unknown[]) }));
+const auto = vi.hoisted(() => ({ listAutoReview: vi.fn(async () => [] as unknown[]), autoApplyOverview: vi.fn(async () => null as unknown) }));
 
 vi.mock("@/lib/app-domain/mcp-approvals", () => domain);
 vi.mock("@/lib/app-domain/decide-approval", () => decide);
@@ -71,6 +71,7 @@ beforeEach(() => {
   lookup.lookupClient.mockResolvedValue({ ok: true, value: { id: "c-nux", name: "NUX" } });
   domain.proposalAloneBecause.mockResolvedValue(null);
   auto.listAutoReview.mockResolvedValue([]);
+  auto.autoApplyOverview.mockResolvedValue(null);
 });
 
 describe("list_approvals", () => {
@@ -128,6 +129,41 @@ describe("list_approvals", () => {
     const rules = await call("list_approvals", { kind: "rule" });
     expect(auto.listAutoReview).not.toHaveBeenCalled();
     expect(rules.enteredAutomatically).toBeUndefined();
+  });
+
+  it("lists the pauses for a manager, each with the link to its row, and reads them as for Claude (17.11.2026)", async () => {
+    domain.listApprovalsForAi.mockResolvedValue({ items: [], proposals: new Map() });
+    const breakdown = { errors: 2, byType: { UPDATED: 2 }, topFields: [{ field: "role", count: 2 }], types: [{ type: "UPDATED", count: 2, fields: [{ field: "role", count: 2 }] }] };
+    auto.autoApplyOverview.mockResolvedValue({
+      enabled: true,
+      firstEnabledAt: null,
+      pauses: [
+        { id: "pz1", scope: "CLIENT", label: "NUX", clientId: "c-nux", since: new Date("2026-11-10T10:00:00Z"), reason: "2 פריטים", decisions: 4, approvedAsIs: 3, breakdown },
+        { id: "pz2", scope: "KIND", label: "איש קשר", clientId: null, since: new Date("2026-11-11T10:00:00Z"), reason: "3 מתוך 30", decisions: 0, approvedAsIs: 0, breakdown: { errors: 0, byType: {}, topFields: [], types: [] } },
+        { id: "pz3", scope: "CLIENT", label: "RIMED", clientId: "c-rimed", since: new Date("2026-11-11T10:00:00Z"), reason: "2 פריטים", decisions: 0, approvedAsIs: 0, breakdown },
+      ],
+    });
+    const out = await call("list_approvals", {});
+    expect(auto.autoApplyOverview).toHaveBeenCalledWith(ACTOR, { forAi: true });
+    expect(out.autoApplyPauses[0]).toEqual({
+      pauseId: "pz1",
+      scope: "CLIENT",
+      label: "NUX",
+      since: "2026-11-10",
+      reason: "2 פריטים",
+      errors: "2 טעויות: 2 עריכות (תפקיד)",
+      decisionsSince: 4,
+      approvedAsIs: 3,
+      url: `${BASE}/app/approvals?tab=knowledge&clientId=c-nux#pause-pz1`,
+    });
+    expect(out.autoApplyPauses[1]).toMatchObject({ pauseId: "pz2", url: `${BASE}/app/approvals?tab=knowledge#pause-pz2` });
+    expect(out.autoApplyPauses[1]).not.toHaveProperty("errors");
+    // On a client: that client's pause and the kinds', not another client's.
+    const nux = await call("list_approvals", { client: "NUX" });
+    expect(nux.autoApplyPauses.map((p: { pauseId: string }) => p.pauseId)).toEqual(["pz1", "pz2"]);
+    auto.autoApplyOverview.mockClear();
+    expect((await call("list_approvals", { kind: "rule" })).autoApplyPauses).toBeUndefined();
+    expect(auto.autoApplyOverview).not.toHaveBeenCalled();
   });
 
   it("says who decides a sensitive proposal, in Hebrew", async () => {

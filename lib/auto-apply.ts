@@ -374,3 +374,26 @@ export function autoDecisionBlocker(
   if (!listed) return "It is not waiting for a look (it is not under `enteredAutomatically`), so there is nothing to mark.";
   return null;
 }
+
+/// Fields named beside each type of error in a pause's line, at most.
+export const PAUSE_FIELDS_PER_TYPE = 3;
+
+/// "3 טעויות: 2 עריכות (תפקיד, אימייל), 1 מחיקה": what the errors that
+/// caused a pause were, in one line, worded by the caller's dictionary
+/// (knowledge.auto). The screen and list_approvals word it the same way.
+/// A field with no label keeps its name. Null when there were none.
+export function pauseErrorsLine(
+  words: { type: (type: AutoErrorType, count: number) => string; field: (field: string) => string | null; line: (count: number, parts: string) => string },
+  types: { type: AutoErrorType; count: number; fields: string[] }[]
+): string | null {
+  if (types.length === 0) return null;
+  const parts = types.map((e) => {
+    const fields = e.fields.slice(0, PAUSE_FIELDS_PER_TYPE).map((f) => words.field(f) ?? f);
+    const what = words.type(e.type, e.count);
+    return fields.length ? `${what} (${fields.join(", ")})` : what;
+  });
+  return words.line(
+    types.reduce((n, e) => n + e.count, 0),
+    parts.join(", ")
+  );
+}

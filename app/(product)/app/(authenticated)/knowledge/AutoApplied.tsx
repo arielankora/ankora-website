@@ -2,10 +2,10 @@
 import { useState } from "react";
 import { noTranslateProps } from "@/components/app/NoMachineTranslation";
 import { useFormatter, useTranslations } from "next-intl";
-import { autoReviewAnchor } from "@/lib/approval-links";
+import { autoReviewAnchor, pauseAnchor } from "@/lib/approval-links";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { kindKeyLabel } from "./labels";
-import type { AutoErrorType } from "@/lib/auto-apply";
+import { pauseErrorsLine, type AutoErrorType } from "@/lib/auto-apply";
 import { liftAutoApplyPauseAction, markAutoReviewedAction, revertProposalAction, setAutoApplyAction } from "./actions";
 
 // "נכנס אוטומטית" (3.11.2026, approval tiers part 2): the items that
@@ -50,19 +50,17 @@ export type AutoApplyPauseRow = {
 
 export type AutoApplyControls = { enabled: boolean; firstEnabled: Date | null; pauses: AutoApplyPauseRow[] };
 
-/// Fields named beside each type of error, at most.
-const FIELDS_PER_TYPE = 3;
-
-/// "3 טעויות: 2 עריכות (תפקיד, אימייל), 1 מחיקה": what the errors that
-/// caused a pause were, in one line. A field with no label keeps its name.
+/// "3 טעויות: 2 עריכות (תפקיד, אימייל), 1 מחיקה" (lib/auto-apply.ts,
+/// pauseErrorsLine), in the reader's words.
 function errorsLine(t: ReturnType<typeof useTranslations<"knowledge.auto">>, types: AutoApplyPauseRow["errorTypes"]): string | null {
-  if (types.length === 0) return null;
-  const parts = types.map((e) => {
-    const fields = e.fields.slice(0, FIELDS_PER_TYPE).map((f) => (t.has(`errorFields.${f}` as never) ? t(`errorFields.${f}` as never) : f));
-    const what = t(`errorTypes.${e.type}`, { count: e.count });
-    return fields.length ? `${what} (${fields.join(", ")})` : what;
-  });
-  return t("pauseErrors", { count: types.reduce((n, e) => n + e.count, 0), parts: parts.join(", ") });
+  return pauseErrorsLine(
+    {
+      type: (type, count) => t(`errorTypes.${type}`, { count }),
+      field: (f) => (t.has(`errorFields.${f}` as never) ? t(`errorFields.${f}` as never) : null),
+      line: (count, parts) => t("pauseErrors", { count, parts }),
+    },
+    types
+  );
 }
 
 /// A day, in the reader's time zone: these are moments, not dates.
@@ -181,7 +179,10 @@ function PauseRow({ p }: { p: AutoApplyPauseRow }) {
     else showToast({ tone: "info", title: t("lifted", { label }) });
   }
   return (
-    <li className="flex flex-wrap items-start justify-between gap-3 py-2.5" data-testid="auto-apply-pause">
+    // 17.11.2026: its own anchor, so Claude can hand a manager a link to it
+    // (lib/approval-links.ts, pauseUrl). The highlight spans the card's
+    // edges, as on "אישורים" (ApprovalRow).
+    <li id={pauseAnchor(p.id)} className="-mx-5 flex flex-wrap items-start justify-between gap-3 px-5 py-2.5 scroll-mt-24 target:bg-app-accent-soft" data-testid="auto-apply-pause">
       <div className="min-w-0 flex-1">
         <p className="text-sm text-app-text-primary">
           {p.scope === "KIND" ? t("pauseKind") : t("pauseClient")} <bdi>{label}</bdi>
@@ -224,7 +225,7 @@ export function AutoApplied({ rows, controls }: { rows: AutoReviewRow[]; control
       {controls && controls.pauses.length > 0 && (
         <div>
           <h3 className="text-xs font-medium text-app-text-primary">{t("pausesTitle")}</h3>
-          <ul className="divide-y divide-app-border">
+          <ul className="-mx-5 divide-y divide-app-border overflow-hidden px-5">
             {controls.pauses.map((p) => (
               <PauseRow key={p.id} p={p} />
             ))}
