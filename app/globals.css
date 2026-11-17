@@ -162,3 +162,48 @@ input[type="datetime-local"]::-webkit-date-and-time-value {
     text-align: left;
   }
 }
+
+/* Skip link (app/[locale]/layout.tsx): visually hidden until it takes focus,
+   then fixed at the reader's start corner (top right in Hebrew, top left in
+   English) above the sticky header and the mobile drawer (z-60), so nothing
+   shifts. Same hiding technique as a visually-hidden utility, with the
+   :focus-within / :active exception that lets a focusable element show. */
+.skip-link:where(:not(:focus-within, :active)) {
+  position: absolute !important;
+  clip-path: inset(50%) !important;
+  overflow: hidden !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  white-space: nowrap !important;
+}
+.skip-link {
+  position: fixed;
+  top: 12px;
+  inset-inline-start: 12px;
+  z-index: 70;
+  padding: 12px 20px;
+  background: theme("colors.gold.DEFAULT");
+  color: theme("colors.navy.DEFAULT");
+  font-weight: 600;
+  text-decoration: none;
+  outline: 2px solid theme("colors.cream.DEFAULT");
+  outline-offset: 2px;
+}
+
+/* Contact form errors (components/sections/ContactForm.tsx). The message and
+   the red border appear only once the browser says the visitor has
+   interacted (:user-invalid: left the field changed, or tried to send), never
+   on load and never mid-typing. [data-submitted] covers the form's own
+   noValidate submit, which marks the empty fields the visitor never touched. */
+.contact-error {
+  display: none;
+}
+.contact-field:is(:user-invalid, [data-submitted] :invalid) {
+  border-color: theme("colors.error.on-dark");
+}
+.contact-field:is(:user-invalid, [data-submitted] :invalid) ~ .contact-error {
+  display: flex;
+}

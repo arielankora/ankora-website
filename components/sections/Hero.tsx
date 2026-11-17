@@ -229,10 +229,11 @@ export function Hero({ dict, locale }: { dict: Dictionary; locale: Locale }) {
             every example it gives is positive (.05em eyebrow, .1-.16em mono) -- and the
             prototype applies this negative optical tightening in both panes. */}
         <h1 className="mt-6 max-w-[20ch] text-balance text-[clamp(2.6rem,6.2vw,6rem)] leading-[1.2] tracking-[-0.03em]">
-          <Reveal delay={0.08}>
+          {/* span, not div: an h1 takes phrasing content only. */}
+          <Reveal as="span" delay={0.08}>
             <span className="block font-extralight text-cream">{dict.hero.titleLine1}</span>
           </Reveal>
-          <Reveal delay={0.16}>
+          <Reveal as="span" delay={0.16}>
             <span className="block font-light text-gold">{dict.hero.titleLine2}</span>
           </Reveal>
         </h1>

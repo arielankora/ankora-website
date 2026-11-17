@@ -13,6 +13,7 @@ const en: Dictionary = {
   nav: {
     // Breadcrumb root label.
     home: "Home",
+    skipToContent: "Skip to content",
     solutions: "Who it's for",
     howItWorks: "How it works",
     technology: "Technology",
@@ -564,6 +565,9 @@ const en: Dictionary = {
       bookingSub: "Choose a day and time, and the invitation will arrive by email.",
       bookingFallback: "No time that works? We already have your details and will get back to you within one business day.",
       errorMessage: "Something went wrong sending this. Please try again, or email us directly at hello@ankora.co.il.",
+      errorPrefix: "Error",
+      nameError: "Enter your name, so we know who we are speaking to.",
+      emailError: "Enter an email address in the format name@example.com.",
     },
     legal,
     segmentBridge: {

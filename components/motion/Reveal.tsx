@@ -20,7 +20,7 @@ import { motion, useInView, useReducedMotion } from "framer-motion";
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 function useRevealState(margin: string) {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLElement>(null);
   const reduceMotion = useReducedMotion();
   const [deferred, setDeferred] = useState(false);
   const inView = useInView(ref, { once: true, margin: margin as `${number}px` });
@@ -40,24 +40,33 @@ export function Reveal({
   delay = 0,
   y = 16,
   className,
+  as = "div",
 }: {
   children: React.ReactNode;
   delay?: number;
   y?: number;
   className?: string;
+  /** "span" inside phrasing content such as a heading, where a <div> is invalid
+   *  HTML. Rendered with display:block, so it lays out and animates exactly as
+   *  the div does. */
+  as?: "div" | "span";
 }) {
   const { ref, reduceMotion, hidden } = useRevealState("-80px");
+  const props = {
+    initial: false as const,
+    animate: hidden ? { opacity: 0, y } : { opacity: 1, y: 0 },
+    transition: reduceMotion || hidden ? { duration: 0 } : { duration: 0.7, delay, ease: [0.16, 1, 0.3, 1] as const },
+  };
 
+  if (as === "span") {
+    return (
+      <motion.span ref={ref as React.RefObject<HTMLSpanElement>} {...props} className={className} style={{ display: "block" }}>
+        {children}
+      </motion.span>
+    );
+  }
   return (
-    <motion.div
-      ref={ref}
-      initial={false}
-      animate={hidden ? { opacity: 0, y } : { opacity: 1, y: 0 }}
-      transition={
-        reduceMotion || hidden ? { duration: 0 } : { duration: 0.7, delay, ease: [0.16, 1, 0.3, 1] }
-      }
-      className={className}
-    >
+    <motion.div ref={ref as React.RefObject<HTMLDivElement>} {...props} className={className}>
       {children}
     </motion.div>
   );
@@ -76,7 +85,7 @@ export function RevealStagger({
 
   return (
     <motion.div
-      ref={ref}
+      ref={ref as React.RefObject<HTMLDivElement>}
       initial={false}
       animate={hidden ? "hidden" : "show"}
       variants={{

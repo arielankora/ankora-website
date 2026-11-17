@@ -13,6 +13,7 @@ const he: Dictionary = {
   nav: {
     // Breadcrumb root label.
     home: "ראשי",
+    skipToContent: "דלג לתוכן",
     solutions: "עבור מי",
     howItWorks: "איך זה עובד",
     technology: "טכנולוגיה",
@@ -572,6 +573,9 @@ const he: Dictionary = {
       bookingSub: "בחרו יום ושעה ביומן, והזימון יגיע אליכם למייל.",
       bookingFallback: "לא מוצאים מועד שמתאים? הפרטים כבר אצלנו, ונחזור אליכם תוך יום עסקים.",
       errorMessage: "משהו השתבש בשליחה. אפשר לנסות שוב, או לכתוב לנו ישירות ל-hello@ankora.co.il.",
+      errorPrefix: "שגיאה",
+      nameError: "צריך למלא שם, כדי שנדע עם מי מדברים.",
+      emailError: "צריך כתובת אימייל במבנה name@example.com",
     },
     legal,
     segmentBridge: {
