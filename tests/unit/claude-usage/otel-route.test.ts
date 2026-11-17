@@ -16,6 +16,8 @@ const route = await import("@/app/api/otel/v1/logs/route");
 
 const SECRET = "otel-secret-0123456789abcdef";
 const ORIGINAL = process.env.COWORK_OTEL_SECRET;
+const ORIGINAL_CODE = process.env.CLAUDE_CODE_OTEL_SECRET;
+const CODE_SECRET = "claude-code-secret-0123456789abcdef";
 
 function post(body: BodyInit | null, headers: Record<string, string> = {}) {
   return new Request("https://ankora.test/api/otel/v1/logs", {
@@ -28,10 +30,53 @@ function post(body: BodyInit | null, headers: Record<string, string> = {}) {
 describe("POST /api/otel/v1/logs", () => {
   beforeEach(() => {
     process.env.COWORK_OTEL_SECRET = SECRET;
+    delete process.env.CLAUDE_CODE_OTEL_SECRET;
     ingest.ingestCoworkEvents.mockClear();
   });
   afterEach(() => {
     process.env.COWORK_OTEL_SECRET = ORIGINAL;
+    if (ORIGINAL_CODE === undefined) delete process.env.CLAUDE_CODE_OTEL_SECRET;
+    else process.env.CLAUDE_CODE_OTEL_SECRET = ORIGINAL_CODE;
+  });
+
+  it("lets Claude Code in with its own secret, and Cowork's keeps working beside it", async () => {
+    process.env.CLAUDE_CODE_OTEL_SECRET = CODE_SECRET;
+    const claudeCode = {
+      resourceLogs: [
+        {
+          resource: { attributes: [{ key: "service.name", value: { stringValue: "claude-code" } }] },
+          scopeLogs: [
+            {
+              logRecords: [
+                {
+                  timeUnixNano: "1763366400000000000",
+                  body: { stringValue: "claude_code.api_request" },
+                  attributes: [
+                    { key: "event.name", value: { stringValue: "api_request" } },
+                    { key: "user.email", value: { stringValue: "ops@ankora.co.il" } },
+                    { key: "model", value: { stringValue: "claude-opus-5-5" } },
+                    { key: "cost_usd", value: { doubleValue: 0.2 } },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const res = await route.POST(post(JSON.stringify(claudeCode), { authorization: `Bearer ${CODE_SECRET}` }));
+    expect(res.status).toBe(200);
+    expect(ingest.ingestCoworkEvents.mock.calls[0][0]).toEqual([
+      expect.objectContaining({ eventName: "api_request", source: "claude-code", userEmail: "ops@ankora.co.il", costUsd: "0.200000" }),
+    ]);
+    expect((await route.POST(post(JSON.stringify(claudeCode)))).status).toBe(200);
+  });
+
+  it("works with only the Claude Code secret set", async () => {
+    delete process.env.COWORK_OTEL_SECRET;
+    process.env.CLAUDE_CODE_OTEL_SECRET = CODE_SECRET;
+    expect((await route.POST(post("{}", { authorization: `Bearer ${CODE_SECRET}` }))).status).toBe(200);
+    expect((await route.POST(post("{}"))).status).toBe(401);
   });
 
   it("refuses a wrong secret and stores nothing", async () => {
