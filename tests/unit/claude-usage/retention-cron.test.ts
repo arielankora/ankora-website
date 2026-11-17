@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // deletes measurements past their retention. Like every cron route it is a
 // public URL, so it must check CRON_SECRET before it deletes anything.
 
-const record = vi.hoisted(() => ({ pruneClaudeUsage: vi.fn(async () => ({ toolCalls: 3, promptCopies: 1, coworkEvents: 2 })) }));
+const record = vi.hoisted(() => ({ pruneClaudeUsage: vi.fn(async () => ({ toolCalls: 3, promptCopies: 1, coworkEvents: 2, limitSamples: 0 })) }));
 vi.mock("@/lib/claude-usage/record", () => record);
 
 const route = await import("@/app/api/cron/claude-usage-retention/route");
@@ -36,7 +36,7 @@ describe("claude-usage-retention cron", () => {
   it("prunes with the secret and says how many rows went", async () => {
     const res = await route.GET(req(`Bearer ${SECRET}`));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, toolCalls: 3, promptCopies: 1, coworkEvents: 2 });
+    expect(await res.json()).toEqual({ ok: true, toolCalls: 3, promptCopies: 1, coworkEvents: 2, limitSamples: 0 });
     expect(record.pruneClaudeUsage).toHaveBeenCalledOnce();
   });
 });

@@ -2277,6 +2277,12 @@
           "label": "Average connector answer",
           "value": "{value} KB",
           "target": "Target: under 8 KB"
+        },
+        "closestToWeeklyLimit": {
+          "label": "Closest to the weekly limit",
+          "value": "{value}%",
+          "target": "Target: under 60% of the limit",
+          "targetWho": "{who} · Target: under 60% of the limit"
         }
       },
       "teamTitle": "The team against the monthly threshold",
@@ -2288,7 +2294,9 @@
         "cache": "{pct}% from cache",
         "noTelemetry": "Uses the connector, but nothing arrives from Cowork",
         "idle": "No activity in the period",
-        "nonCowork": "Does not work in Cowork. Only connector calls are measured"
+        "nonCowork": "Does not work in Cowork. Only connector calls are measured",
+        "limits": "Limits: 5 hours {five}% · weekly {week}%",
+        "limitsStale": "Last limit reading: {when}"
       },
       "statusNone": "No Cowork data",
       "actionsTitle": "What to do this week",
@@ -2317,6 +2325,14 @@
         "checkTelemetry": {
           "title": "Check {name}'s desktop app",
           "detail": "Uses the connector, but nothing arrives from Cowork."
+        },
+        "nearWeeklyLimit": {
+          "title": "{name} is close to the weekly limit",
+          "detail": "{pct}% of the weekly limit is used. Lighter work until it resets would help."
+        },
+        "checkExtension": {
+          "title": "Check the extension for {name}",
+          "detail": "There is activity, but no limit reading arrives from the browser. Maybe not signed in to Chrome with the work account."
         }
       },
       "toolsTitle": "Where Ankora is heavy",
@@ -2347,7 +2363,8 @@
       "alertsOff": "Alerts are off until the threshold is calibrated. The status is shown here only.",
       "monthValue": "{cost} of {threshold} (pace: {projected})",
       "monthValueNoPace": "{cost} of {threshold} (pace: after 3 days of measurement)",
-      "measuredSince": "This month is measured from {date}. The pace counts only the days measured."
+      "measuredSince": "This month is measured from {date}. The pace counts only the days measured.",
+      "limits": "Limits (5 hours / weekly)"
     },
     "status": {
       "ok": "Within threshold",

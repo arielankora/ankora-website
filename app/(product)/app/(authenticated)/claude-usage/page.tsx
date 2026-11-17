@@ -47,13 +47,26 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
   const offCount = sum.kpis.filter((k) => k.state === "off").length;
   const sentBytes = report.tools.reduce((n, x) => n + x.totalBytes, 0);
   const heavyTools = report.tools.slice(0, 3).map((x) => ({ tool: x.tool, size: bytes(x.totalBytes), share: sentBytes ? Math.round((x.totalBytes / sentBytes) * 100) : 0 }));
+  // The browser extension's reading (way 3), when one is fresh: the real
+  // share of each limit, ahead of everything estimated.
+  const limitsNote = (p: (typeof report.people)[number]) => {
+    const c = p.limits?.current;
+    if (c) return t("summary.note.limits", { five: c.fiveHourPct ?? "·", week: c.sevenDayPct ?? "·" });
+    if (p.limits?.lastReadingAt) return t("summary.note.limitsStale", { when: when(p.limits.lastReadingAt) });
+    return null;
+  };
   const personNote = (p: (typeof report.people)[number]) => {
-    if (p.noTelemetry) return t("summary.note.noTelemetry");
-    if (p.nonCowork && !p.cowork.requests) return t("summary.note.nonCowork");
-    if (!p.cowork.requests && !p.connector.calls) return t("summary.note.idle");
-    const parts = [t("summary.note.cost", { cost: usd(p.month.costUsd), threshold: usd(p.month.thresholdUsd) }), t("summary.note.hits", { count: p.cowork.limitHits })];
-    if (p.cowork.cacheSharePct !== null) parts.push(t("summary.note.cache", { pct: p.cowork.cacheSharePct }));
-    return parts.join(" · ");
+    const limits = limitsNote(p);
+    let rest: string;
+    if (p.noTelemetry) rest = t("summary.note.noTelemetry");
+    else if (p.nonCowork && !p.cowork.requests) rest = t("summary.note.nonCowork");
+    else if (!p.cowork.requests && !p.connector.calls) rest = t("summary.note.idle");
+    else {
+      const parts = [t("summary.note.cost", { cost: usd(p.month.costUsd), threshold: usd(p.month.thresholdUsd) }), t("summary.note.hits", { count: p.cowork.limitHits })];
+      if (p.cowork.cacheSharePct !== null) parts.push(t("summary.note.cache", { pct: p.cowork.cacheSharePct }));
+      rest = parts.join(" · ");
+    }
+    return limits ? `${limits} · ${rest}` : rest;
   };
   const actionText = (a: (typeof sum.actions)[number]) => {
     const v = a.key === "nearThreshold" ? { ...a.values, cost: usd(Number(a.values.cost)), threshold: usd(Number(a.values.threshold)) } : a.values;
@@ -107,7 +120,11 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
               </div>
               <p className="mt-2 font-jbmono text-2xl text-app-text-primary">{k.value === null ? none : t(`summary.kpi.${k.key}.value`, { value: k.value })}</p>
               <p className="mt-1 text-xs text-app-text-secondary">
-                {k.key === "closestToThreshold" && k.who ? t("summary.kpi.closestToThreshold.targetWho", { who: k.who }) : t(`summary.kpi.${k.key}.target`)}
+                {k.key === "closestToThreshold" && k.who
+                  ? t("summary.kpi.closestToThreshold.targetWho", { who: k.who })
+                  : k.key === "closestToWeeklyLimit" && k.who
+                    ? t("summary.kpi.closestToWeeklyLimit.targetWho", { who: k.who })
+                    : t(`summary.kpi.${k.key}.target`)}
               </p>
             </div>
           ))}
@@ -213,6 +230,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
                 <th className={head}>{t("people.connector")}</th>
                 <th className={head}>{t("people.connectorBytes")}</th>
                 <th className={head}>{t("people.prompts")}</th>
+                <th className={head}>{t("people.limits")}</th>
                 <th className={head}>{t("people.last")}</th>
               </tr>
             </thead>
@@ -240,6 +258,9 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
                   <td className={cell}>{int(p.connector.calls)}</td>
                   <td className={cell}>{p.connector.calls ? bytes(p.connector.bytes) : none}</td>
                   <td className={cell}>{int(p.prompts.copies)}</td>
+                  <td className={cell}>
+                    {p.limits?.current ? `${p.limits.current.fiveHourPct ?? none}% / ${p.limits.current.sevenDayPct ?? none}%` : none}
+                  </td>
                   <td className={cell}>{p.cowork.lastEventAt ? when(p.cowork.lastEventAt) : none}</td>
                 </tr>
               ))}

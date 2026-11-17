@@ -261,6 +261,7 @@ model User {
   mcpToolCalls        McpToolCall[]
   claudePromptCopies  ClaudePromptCopy[]
   coworkEvents        CoworkEvent[]
+  claudeLimitSamples  ClaudeLimitSample[]
   passwordResetTokens PasswordResetToken[]
   portalLoginTokens   PortalLoginToken[]
   timeEntries         TimeEntry[]
@@ -4942,4 +4943,34 @@ model CoworkEvent {
   @@index([eventName, occurredAt])
   @@index([promptId])
   @@map("cowork_events")
+}
+
+/// One reading of a person's Claude usage limits (17.11.2026, "דרך 3"): the
+/// share of the five-hour window and of the weekly limit already used, as
+/// claude.ai shows it under Settings > Usage. Sent every 15 minutes by the
+/// Ankora browser extension (tools/claude-limits-extension). The limits are
+/// per account, so this covers every surface: the browser, the phone, the
+/// desktop app and Claude Code. Two percentages and two reset times, nothing
+/// else. Kept 90 days.
+model ClaudeLimitSample {
+  id               String    @id @default(cuid())
+  /// Matched by email to an Ankora user when the reading arrived.
+  userId           String?
+  /// The Claude account's email, else the Chrome profile's. Lower case.
+  email            String
+  /// 0 to 100, as claude.ai reports it.
+  fiveHourPct      Float?
+  fiveHourResetsAt DateTime?
+  sevenDayPct      Float?
+  sevenDayResetsAt DateTime?
+  /// When the extension read it.
+  observedAt       DateTime
+  extensionVersion String?
+  receivedAt       DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([observedAt])
+  @@index([userId, observedAt])
+  @@map("claude_limit_samples")
 }

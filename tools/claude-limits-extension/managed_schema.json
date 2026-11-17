@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "properties": {
+    "endpoint": {
+      "title": "Ankora intake URL",
+      "description": "Where readings are sent. Default: https://www.ankora.co.il/api/claude-limits",
+      "type": "string"
+    },
+    "secret": {
+      "title": "Ankora intake secret",
+      "description": "The value of CLAUDE_LIMITS_SECRET in Vercel.",
+      "type": "string"
+    }
+  }
+}

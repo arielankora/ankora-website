@@ -79,6 +79,7 @@
     "COMMS_EXTRACTION_ACCOUNTS": null,
     "COMMS_FULL_VIEWERS": null,
     "CLAUDE_CODE_OTEL_SECRET": null,
+    "CLAUDE_LIMITS_SECRET": null,
     "COWORK_OTEL_SECRET": null,
     "CRON_SECRET": null,
     "DATABASE_URL": "Neon",

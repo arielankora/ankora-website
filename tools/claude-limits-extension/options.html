@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>Ankora: Claude usage limits</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:24px;color:#1B2A3D;max-width:520px}
+label{display:block;margin:12px 0 4px;font-size:14px}
+input{width:100%;padding:8px;font-size:14px;box-sizing:border-box}
+button{margin-top:16px;padding:8px 16px;font-size:14px}
+pre{background:#F4EFE6;padding:8px;font-size:12px;white-space:pre-wrap}
+p{font-size:13px;color:#4D5867}
+</style>
+</head>
+<body>
+<h1 style="font-size:18px">אנקורה: מכסות השימוש בקלוד</h1>
+<p>התוסף שולח לאנקורה רק את אחוז הניצול של חלון חמש השעות ושל המכסה השבועית. כשהוא מותקן דרך הארגון, ההגדרות מגיעות לבד ואין צורך למלא כאן כלום.</p>
+<label for="endpoint">כתובת</label>
+<input id="endpoint" placeholder="https://www.ankora.co.il/api/claude-limits">
+<label for="secret">סוד</label>
+<input id="secret" type="password">
+<button id="save" type="button">שמירה ובדיקה</button>
+<pre id="status"></pre>
+<script src="options.js"></script>
+</body>
+</html>

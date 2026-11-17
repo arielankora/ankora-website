@@ -48,13 +48,15 @@ export const COWORK_EVENTS_RETENTION_DAYS = 180;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export async function pruneClaudeUsage(now: Date = new Date()): Promise<{ toolCalls: number; promptCopies: number; coworkEvents: number }> {
+export async function pruneClaudeUsage(now: Date = new Date()): Promise<{ toolCalls: number; promptCopies: number; coworkEvents: number; limitSamples: number }> {
   const before = new Date(now.getTime() - CLAUDE_USAGE_RETENTION_DAYS * DAY_MS);
   const coworkBefore = new Date(now.getTime() - COWORK_EVENTS_RETENTION_DAYS * DAY_MS);
-  const [toolCalls, promptCopies, coworkEvents] = await prisma.$transaction([
+  const [toolCalls, promptCopies, coworkEvents, limitSamples] = await prisma.$transaction([
     prisma.mcpToolCall.deleteMany({ where: { createdAt: { lt: before } } }),
     prisma.claudePromptCopy.deleteMany({ where: { createdAt: { lt: before } } }),
     prisma.coworkEvent.deleteMany({ where: { occurredAt: { lt: coworkBefore } } }),
+    // The browser extension's limit readings (way 3), 90 days like the rest.
+    prisma.claudeLimitSample.deleteMany({ where: { observedAt: { lt: before } } }),
   ]);
-  return { toolCalls: toolCalls.count, promptCopies: promptCopies.count, coworkEvents: coworkEvents.count };
+  return { toolCalls: toolCalls.count, promptCopies: promptCopies.count, coworkEvents: coworkEvents.count, limitSamples: limitSamples.count };
 }
