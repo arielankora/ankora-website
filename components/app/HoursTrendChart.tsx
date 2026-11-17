@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { OTHER_KEY } from "@/lib/overview-trend-key";
 import type {
@@ -42,6 +42,16 @@ const OTHER_COLOR = "#B08D57";
 
 const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 const MONTH_KEYS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"] as const;
+
+/// At most this many empty days are drawn after today in the day view, so
+/// today can scroll to the middle of the strip on a phone.
+const MAX_UPCOMING_DAYS = 7;
+
+function addDaysToKey(dateKey: string, days: number): string {
+  const d = dateOfKey(dateKey);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 function colorFor(key: string, index: number): string {
   return key === OTHER_KEY ? OTHER_COLOR : SERIES_COLORS[index % SERIES_COLORS.length];
@@ -115,10 +125,75 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
   const [unit, setUnit] = useState<TrendUnit>("day");
   const [dimension, setDimension] = useState<TrendDimension>("employee");
   const [basis, setBasis] = useState<TrendBasis>("actual");
-  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  // The tooltip lives outside the scrolling strip (a scroll box would clip
+  // it), so it is placed by the hovered column's center, measured against
+  // the wrapper.
+  const [hover, setHover] = useState<{ idx: number; x: number } | null>(null);
   const tooltipBaseId = useId();
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const series = data[basis][unit][dimension];
+
+  // The bar to center: today, this week or this month, which is always the
+  // last bucket the server sends.
+  const focusIdx = series.buckets.length - 1;
+  const lastDayKey = series.buckets[focusIdx]?.lastDay;
+  // How many empty days follow today: just enough for today to reach the
+  // middle of the strip, and none when every bar fits without scrolling
+  // (a wide screen), where they would only be blank space.
+  const [upcomingCount, setUpcomingCount] = useState(0);
+  const upcomingDays = useMemo(
+    () =>
+      unit === "day" && lastDayKey
+        ? Array.from({ length: upcomingCount }, (_, k) => addDaysToKey(lastDayKey, k + 1))
+        : [],
+    [unit, lastDayKey, upcomingCount]
+  );
+
+  // A week's column carries a date range ("25.10 - 31.10") and needs more
+  // room than a day's.
+  const colMinWidth = unit === "week" ? "min-w-[76px]" : "min-w-[56px]";
+
+  const showHover = (idx: number, el: HTMLElement) => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const a = el.getBoundingClientRect();
+    const w = wrap.getBoundingClientRect();
+    // Keep the 200px tooltip inside the card at both ends of the strip.
+    const half = Math.min(100, w.width / 2);
+    const x = Math.min(Math.max(a.left + a.width / 2 - w.left, half), w.width - half);
+    setHover({ idx, x });
+  };
+
+  useLayoutEffect(() => {
+    const box = scrollRef.current;
+    if (!box) return;
+    const measure = () => {
+      const col = box.querySelector<HTMLElement>(`[data-trend-col="${focusIdx}"]`);
+      if (!col) return;
+      const gap = parseFloat(getComputedStyle(box).columnGap) || 0;
+      const overflows = col.offsetLeft + col.offsetWidth > box.clientWidth + 1;
+      setUpcomingCount(
+        unit === "day" && overflows
+          ? Math.min(MAX_UPCOMING_DAYS, Math.ceil((box.clientWidth / 2 - col.offsetWidth / 2) / (col.offsetWidth + gap)))
+          : 0
+      );
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [unit, focusIdx]);
+
+  useLayoutEffect(() => {
+    const box = scrollRef.current;
+    if (!box) return;
+    const col = box.querySelector<HTMLElement>(`[data-trend-col="${focusIdx}"]`);
+    if (!col) return;
+    box.scrollLeft = col.offsetLeft + col.offsetWidth / 2 - box.clientWidth / 2;
+    setHover(null);
+  }, [unit, basis, dimension, focusIdx, upcomingCount]);
 
   const totalsPerBucket = useMemo(
     () => series.buckets.map((b) => b.segments.reduce((sum, s) => sum + s.hours, 0)),
@@ -173,94 +248,139 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
         <p className="mt-8 py-8 text-center text-sm text-app-text-tertiary">{t("empty")}</p>
       ) : (
         <>
-          <div dir="ltr" className="mt-8 flex h-48 items-end gap-2 sm:gap-4" role="img" aria-label={t("chartLabel", {
-              bars: series.buckets
-                .map((b) => t("barLabel", { label: labelOf(b.label), hours: formatHours(b.segments.reduce((s, x) => s + x.hours, 0)) }))
-                .join(", "),
-            })}>
-            {series.buckets.map((bucket, i) => {
-              const total = totalsPerBucket[i];
-              const barHeightPct = Math.max(2, (total / maxTotal) * 82);
+          {/* One horizontal strip that scrolls on its own, bars and labels
+              together, so a finger can swipe back through the days. Every
+              column keeps a readable width instead of shrinking to fit: on
+              a phone the 14 day bars were squeezed until the labels read
+              "..." and today was cut off at the edge (17.11.2026). On
+              opening, and on every toggle, the strip centers on today (or
+              on the running week or month). */}
+          <div ref={wrapRef} className="relative mt-8">
+            {hover && (() => {
+              const bucket = series.buckets[hover.idx];
+              if (!bucket) return null;
               return (
                 <div
-                  key={i}
-                  className="relative flex h-full flex-1 flex-col items-center justify-end"
-                  onMouseEnter={() => setHoverIdx(i)}
-                  onMouseLeave={() => setHoverIdx(null)}
-                  onFocus={() => setHoverIdx(i)}
-                  onBlur={() => setHoverIdx(null)}
-                  tabIndex={0}
+                  id={`${tooltipBaseId}-${hover.idx}`}
+                  dir={textDir}
+                  className="pointer-events-none absolute bottom-full z-10 mb-2 w-max max-w-[200px] -translate-x-1/2 rounded-lg bg-app-surface-nav px-3 py-2 text-xs text-cream shadow-lg"
+                  style={{ left: hover.x }}
                 >
-                  {hoverIdx === i && (
-                    <div
-                      id={`${tooltipBaseId}-${i}`}
-                      dir={textDir}
-                      className="absolute bottom-full z-10 mb-2 w-max max-w-[200px] rounded-lg bg-app-surface-nav px-3 py-2 text-xs text-cream shadow-lg"
-                    >
-                      <p className="font-medium">{labelOf(bucket.label)}</p>
-                      <p className="mb-1 text-cream/60">
-                        {rangeOf(bucket)}
-                        {bucket.partial ? ` · ${t("soFar")}` : ""}
-                      </p>
-                      {bucket.segments
-                        .filter((s) => s.hours > 0)
-                        .map((s, si) => (
-                          <div key={s.key} className="flex items-center gap-1.5 text-cream/85">
-                            <span
-                              className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-                              style={{ background: colorFor(s.key, series.legend.findIndex((l) => l.key === s.key)) }}
-                            />
-                            <span dir="auto" className="flex-1">{nameOf(s)}</span>
-                            <span className="font-medium">{formatHours(s.hours)}</span>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                  {total > 0 && (
-                    <span className="mb-1 text-[10px] font-medium text-app-text-secondary">{formatHours(total)}</span>
-                  )}
-                  {/* A running day or week keeps its colors and gets a thin
-                      dashed cap instead: "still growing". It used to be
-                      drawn at half opacity, which changed every color in
-                      it - Hadas turned grey, Ariel light blue - so the bar
-                      no longer matched the legend and seemed to show other
-                      people (9.10.2026). The label and dates under the bar
-                      already say the period is not over. */}
-                  {bucket.partial && total > 0 && (
-                    <div
-                      aria-hidden
-                      data-partial-cap
-                      className="mb-[3px] w-full max-w-[30px] border-t-2 border-dashed border-app-border-strong"
-                    />
-                  )}
-                  <div
-                    className="flex w-full max-w-[30px] flex-col-reverse overflow-hidden rounded-t-[5px]"
-                    style={{ height: `${barHeightPct}%` }}
-                  >
-                    {bucket.segments
-                      .filter((s) => s.hours > 0)
-                      .map((s) => (
-                        <div
-                          key={s.key}
-                          style={{
-                            background: colorFor(s.key, series.legend.findIndex((l) => l.key === s.key)),
-                            height: `${(s.hours / total) * 100}%`,
-                            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.55)",
-                          }}
+                  <p className="font-medium">{labelOf(bucket.label)}</p>
+                  <p className="mb-1 text-cream/60">
+                    {rangeOf(bucket)}
+                    {bucket.partial ? ` · ${t("soFar")}` : ""}
+                  </p>
+                  {bucket.segments
+                    .filter((s) => s.hours > 0)
+                    .map((s) => (
+                      <div key={s.key} className="flex items-center gap-1.5 text-cream/85">
+                        <span
+                          className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{ background: colorFor(s.key, series.legend.findIndex((l) => l.key === s.key)) }}
                         />
-                      ))}
-                  </div>
+                        <span dir="auto" className="flex-1">{nameOf(s)}</span>
+                        <span className="font-medium">{formatHours(s.hours)}</span>
+                      </div>
+                    ))}
                 </div>
               );
-            })}
-          </div>
-          <div dir="ltr" className="mt-2 flex gap-2 sm:gap-4 text-center">
-            {series.buckets.map((bucket, i) => (
-              <span key={i} className="flex flex-1 flex-col truncate text-[11px] text-app-text-tertiary">
-                <span className="truncate">{labelOf(bucket.label)}</span>
-                <span className="truncate text-[10px] text-app-text-tertiary">{rangeOf(bucket)}</span>
-              </span>
-            ))}
+            })()}
+            <div
+              ref={scrollRef}
+              dir="ltr"
+              data-trend-scroll
+              onScroll={() => setHover(null)}
+              className="relative flex gap-2 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin] sm:gap-4"
+              role="img"
+              aria-label={t("chartLabel", {
+                bars: series.buckets
+                  .map((b) => t("barLabel", { label: labelOf(b.label), hours: formatHours(b.segments.reduce((s, x) => s + x.hours, 0)) }))
+                  .join(", "),
+              })}
+            >
+              {series.buckets.map((bucket, i) => {
+                const total = totalsPerBucket[i];
+                const barHeightPct = Math.max(2, (total / maxTotal) * 82);
+                return (
+                  <div
+                    key={i}
+                    data-trend-col={i}
+                    data-current={i === focusIdx ? "" : undefined}
+                    className={`flex ${colMinWidth} flex-1 flex-col items-center`}
+                    // A finger has no hover: a tap opens the tooltip, and the
+                    // leave a touch browser fires right after it is ignored.
+                    onPointerEnter={(e) => e.pointerType === "mouse" && showHover(i, e.currentTarget)}
+                    onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)}
+                    onClick={(e) => showHover(i, e.currentTarget)}
+                    onFocus={(e) => showHover(i, e.currentTarget)}
+                    onBlur={() => setHover(null)}
+                    tabIndex={0}
+                    aria-describedby={hover?.idx === i ? `${tooltipBaseId}-${i}` : undefined}
+                  >
+                    <div className="flex h-48 w-full flex-col items-center justify-end">
+                      {total > 0 && (
+                        <span className="mb-1 text-[10px] font-medium text-app-text-secondary">{formatHours(total)}</span>
+                      )}
+                      {/* A running day or week keeps its colors and gets a thin
+                          dashed cap instead: "still growing". It used to be
+                          drawn at half opacity, which changed every color in
+                          it - Hadas turned grey, Ariel light blue - so the bar
+                          no longer matched the legend and seemed to show other
+                          people (9.10.2026). The label and dates under the bar
+                          already say the period is not over. */}
+                      {bucket.partial && total > 0 && (
+                        <div
+                          aria-hidden
+                          data-partial-cap
+                          className="mb-[3px] w-full max-w-[30px] border-t-2 border-dashed border-app-border-strong"
+                        />
+                      )}
+                      <div
+                        className="flex w-full max-w-[30px] flex-col-reverse overflow-hidden rounded-t-[5px]"
+                        style={{ height: `${barHeightPct}%` }}
+                      >
+                        {bucket.segments
+                          .filter((s) => s.hours > 0)
+                          .map((s) => (
+                            <div
+                              key={s.key}
+                              style={{
+                                background: colorFor(s.key, series.legend.findIndex((l) => l.key === s.key)),
+                                height: `${(s.hours / total) * 100}%`,
+                                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.55)",
+                              }}
+                            />
+                          ))}
+                      </div>
+                    </div>
+                    <span
+                      className={`mt-2 flex w-full flex-col text-center text-[11px] ${
+                        i === focusIdx ? "font-medium text-app-text-primary" : "text-app-text-tertiary"
+                      }`}
+                    >
+                      <span className="line-clamp-2 leading-tight">{labelOf(bucket.label)}</span>
+                      <span className="truncate text-[10px] text-app-text-tertiary">{rangeOf(bucket)}</span>
+                    </span>
+                  </div>
+                );
+              })}
+              {/* Days still ahead this week and a bit, empty and muted, so
+                  today can sit in the middle of the strip instead of at its
+                  edge. Only in the day view: a coming week or month has
+                  no use there. */}
+              {upcomingDays.map((dateKey) => (
+                <div key={dateKey} aria-hidden className="flex min-w-[56px] flex-1 flex-col items-center opacity-50">
+                  <div className="flex h-48 w-full items-end justify-center">
+                    <div className="w-full max-w-[30px] border-t border-dashed border-app-border" />
+                  </div>
+                  <span className="mt-2 flex w-full flex-col text-center text-[11px] text-app-text-tertiary">
+                    <span className="truncate">{t(`weekdays.${WEEKDAY_KEYS[dateOfKey(dateKey).getUTCDay()]}`)}</span>
+                    <span className="truncate text-[10px]">{shortDay(dateKey)}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-2 border-t border-app-border pt-4">
