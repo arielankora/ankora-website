@@ -209,7 +209,10 @@ async function visit(page, { role, device, route, url, shotDir }) {
     rec.meta = res.meta;
     fs.mkdirSync(shotDir, { recursive: true });
     const shot = path.join(shotDir, `${slug(route)}.jpg`);
-    await page.screenshot({ path: shot, fullPage: true, type: "jpeg", quality: 75, scale: "css" });
+    // WebKit refuses screenshots taller than 32767px (the guide is). Keep the top 32000px then.
+    const tall = (res.meta?.scrollHeight ?? 0) > 32000;
+    await page.screenshot({ path: shot, fullPage: true, type: "jpeg", quality: 75, scale: "css", ...(tall ? { clip: { x: 0, y: 0, width: res.meta.vw, height: 32000 } } : {}) });
+    if (tall) rec.shotNote = `cropped to the top 32000px of ${res.meta.scrollHeight}px`;
     rec.shot = path.relative(OUT, shot);
 
     if (PROBE) await probeModals(page, rec, url, shotDir, route);

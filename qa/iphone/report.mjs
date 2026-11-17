@@ -173,6 +173,11 @@ if (crashed.length) {
   L.push(`**מסכים שקרסו** (מסך השגיאה "משהו השתבש" או שגיאת שרת): ${crashed.map((s) => `\`${s.route}\``).join(", ")}. פירוט בסעיף של כל מסך.`);
   L.push("");
 }
+const vpath = path.join(OUT, "verified.md");
+if (fs.existsSync(vpath)) {
+  L.push(fs.readFileSync(vpath, "utf8").trim());
+  L.push("");
+}
 L.push(`## איך לקרוא את הדוח`);
 L.push("");
 L.push(`- המכשירים בטבלאות: SE הוא הפרופיל "iPhone SE" של Playwright, ברוחב 320 נקודות (הדור הראשון). SE 3 הוא הדור השלישי, ברוחב 375. 15 הוא iPhone 15 ברוחב 393. Pro Max הוא iPhone 15 Pro Max ברוחב 430.`);
@@ -181,7 +186,7 @@ L.push(`- חלוניות: בכל מסך הסקריפט פותח את כפתור 
 L.push(`- אזור בטוח: הבדיקה קוראת את גיליונות הסגנון ומחפשת \`env(safe-area-inset-*)\` על הרכיב הצמוד לקצה, על ילדיו ועל הוריו. הדפדפן באמולציה לא מדמה חריץ, ולכן אין דרך למדוד את החפיפה עצמה.`);
 L.push(`- מטרת מגע: לפי 44×44 של אפל. קישור בתוך משפט פטור. מתחת ל-24 בצד אחד מסומן בינוני, השאר נמוך.`);
 L.push(`- כיוון: ממצאי "מידע" נובעים מהקידומת [DEMO] בנתוני הדמו ולא נספרים כתקלה, אבל הם מראים איפה כותרת שמתחילה במילה לועזית תתהפך.`);
-L.push(`- מה הסקריפט שינה כדי לרוץ: מדיניות האבטחה של האתר מורה לדפדפן לשדרג בקשות ל-HTTPS. בפרודקשן זה נכון, אבל WebKit מחיל את זה גם על \`http://127.0.0.1\` ולכן שום סקריפט לא נטען. הסקריפט מסיר את ההוראה הזו מהתגובות, רק בהרצה מקומית. בנוסף, בזריעה אין תהליך, ולכן הסקריפט יצר תהליך דמו אחד (${data.ids.createdProcess ? "נוצר בהרצה הזו" : "כבר היה קיים"}) כדי לפתוח את מסכי התהליך. מסכי החתימה וההעלאה בקישור נפתחו עם קישור לא תקף, כי הקישורים נשמרים מוצפנים.`);
+L.push(`- מה נדרש כדי להריץ: מדיניות האבטחה של האתר מורה לדפדפן לשדרג כל בקשה לחיבור מאובטח. בפרודקשן זה נכון, אבל WebKit מחיל את זה גם על שרת מקומי, ובלי חיבור מאובטח אף סקריפט לא נטען. לכן הסריקה עוברת דרך שרת מקומי קטן עם תעודה עצמית (\`qa/iphone/https-proxy.mjs\`), בלי לשנות שום תגובה של האפליקציה. בנוסף, בזריעה אין תהליך, ולכן הסקריפט יוצר תהליך דמו אחד כדי לפתוח את מסכי התהליך. מסכי החתימה וההעלאה בקישור נפתחו עם קישור לא תקף, כי הקישורים נשמרים מוצפנים.`);
 L.push("");
 
 const fmtSet = (s, map) => [...s].map((x) => map[x] ?? x).join(", ");
@@ -215,7 +220,30 @@ if (sharedFindings.length) {
     L.push(`| חומרה | בדיקה | מסך | רכיב | פרטים | תפקידים |`);
     L.push(`|---|---|---|---|---|---|`);
     pm.sort((a, b) => SEV.indexOf(a.severity) - SEV.indexOf(b.severity));
+    // Many fields or taps on one screen read better as one row per screen.
+    const collapsed = [];
+    const groups = new Map();
     for (const f of pm) {
+      if ((f.check === "input-font" || f.check === "tap-target") && f.routes.size === 1) {
+        const k = `${f.check}|${[...f.routes][0]}|${f.modal ?? ""}`;
+        if (!groups.has(k)) {
+          const g = { ...f, n: 0, roles: new Set(), minV: Infinity };
+          groups.set(k, g);
+          collapsed.push(g);
+        }
+        const g = groups.get(k);
+        g.n++;
+        f.roles.forEach((r) => g.roles.add(r));
+        if (f.value != null) g.minV = Math.min(g.minV, f.value);
+      } else collapsed.push(f);
+    }
+    for (const f of collapsed) {
+      if (f.n > 1) {
+        const where = f.modal ? `בחלונית "${f.modal}": ` : "";
+        const what = f.check === "input-font" ? `${f.n} שדות בגופן קטן מ-16px (הקטן ביותר ${f.minV}px), ספארי מגדיל את העמוד בכל נגיעה בשדה` : `${f.n} רכיבים קטנים מ-44×44 (הקטן ביותר ${f.minV}px)`;
+        L.push(`| ${SEV_ICON[f.severity]} ${SEV_HE[f.severity]} | ${CHECK_HE[f.check]} | \`${[...f.routes][0]}\` | ${where}כמה רכיבים | ${what} | ${fmtSet(f.roles, ROLE_HE)} |`);
+        continue;
+      }
       const where = f.modal ? `בחלונית "${f.modal}": ` : "";
       const scr = f.routes.size > 1 ? `${f.routes.size} מסכים (משותף)` : `\`${[...f.routes][0]}\``;
       L.push(`| ${SEV_ICON[f.severity]} ${SEV_HE[f.severity]} | ${CHECK_HE[f.check]} | ${scr} | ${where}${elDesc(f.el)} | ${heMessage(f)} | ${fmtSet(f.roles, ROLE_HE)} |`);
