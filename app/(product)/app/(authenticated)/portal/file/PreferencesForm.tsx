@@ -72,7 +72,7 @@ export function PreferencesForm({
       <button
         type="submit"
         disabled={pending}
-        className="rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
+        className="tap-area rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
       >
         {pending ? t("saving") : t("save")}
       </button>
@@ -100,7 +100,7 @@ export function DigestForm({ digest, canEdit }: { digest: PortalDigest; canEdit:
         {DIGESTS.map((key) => (
           <label
             key={key}
-            className={`flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-3 py-2.5 text-[13.5px] ${
+            className={`tap-area flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-3 py-2.5 text-[13.5px] ${
               value === key ? "border-gold bg-gold/10 text-app-text-primary" : "border-app-border bg-white text-app-text-secondary"
             }`}
           >

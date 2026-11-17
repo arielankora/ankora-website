@@ -37,11 +37,11 @@ export default async function LoginPage(props: {
       <LoginForm callbackUrl={searchParams.callbackUrl} />
 
       <p className="mt-8 text-center text-[11px] text-app-text-tertiary">
-        <Link href={`/${legal}/privacy`} className="inline-block py-2 hover:text-app-text-secondary">
+        <Link href={`/${legal}/privacy`} className="tap-area inline-block py-2 hover:text-app-text-secondary">
           {t("privacy")}
         </Link>
         {" · "}
-        <Link href={`/${legal}/terms`} className="inline-block py-2 hover:text-app-text-secondary">
+        <Link href={`/${legal}/terms`} className="tap-area inline-block py-2 hover:text-app-text-secondary">
           {t("terms")}
         </Link>
       </p>

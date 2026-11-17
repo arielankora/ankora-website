@@ -173,7 +173,7 @@ export async function AppShell({
       <div className="min-w-0 flex-1">
         <header className="border-b border-app-border bg-white pt-[env(safe-area-inset-top)] md:hidden">
           <div className="flex items-center justify-between gap-4 px-6 py-4">
-            <Link href="/app" className="-my-2.5 py-2.5 text-sm font-semibold uppercase tracking-[0.16em] text-app-text-accent">
+            <Link href="/app" className="tap-area -my-2.5 py-2.5 text-sm font-semibold uppercase tracking-[0.16em] text-app-text-accent">
               Ankora
             </Link>
             <NotificationsBell notifications={notifications} unreadCount={unreadCount} />

@@ -137,7 +137,7 @@ function QuestionCardView({ card, manager }: { card: CardView; manager: boolean 
         <div className="mt-3 space-y-2" data-testid="question-draft">
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={Math.min(14, 6 + toAsk.length)} aria-label={t("draftLabel")} dir="auto" className="w-full rounded-lg border border-app-border bg-white px-3 py-2 text-[13px] leading-relaxed text-app-text-primary" />
           <div className="flex flex-wrap items-center gap-3 text-[12.5px]">
-            <button type="button" disabled={pending || !text.trim()} onClick={copy} className="rounded-full bg-app-surface-nav px-3.5 py-1.5 font-medium text-cream disabled:opacity-40">
+            <button type="button" disabled={pending || !text.trim()} onClick={copy} className="tap-area rounded-full bg-app-surface-nav px-3.5 py-1.5 font-medium text-cream disabled:opacity-40">
               {pending ? t("wait") : t("copyAndMark")}
             </button>
             <button type="button" disabled={pending || !text.trim()} onClick={toTask} className="font-medium text-app-text-accent hover:underline disabled:opacity-40">

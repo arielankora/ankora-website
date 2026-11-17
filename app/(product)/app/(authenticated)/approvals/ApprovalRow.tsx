@@ -171,7 +171,7 @@ export function ApprovalRow({ row }: { row: RowView }) {
                 type="button"
                 disabled={pending}
                 onClick={() => decide("approve")}
-                className="rounded-full bg-app-surface-nav px-3.5 py-1.5 font-medium text-cream disabled:opacity-40"
+                className="tap-area rounded-full bg-app-surface-nav px-3.5 py-1.5 font-medium text-cream disabled:opacity-40"
               >
                 {pending ? t("row.saving") : row.actions.approve}
               </button>
@@ -182,7 +182,7 @@ export function ApprovalRow({ row }: { row: RowView }) {
               </button>
             )}
             {!row.actions.approve && row.go && (
-              <a href={row.go.href} className="rounded-full bg-app-surface-nav px-3.5 py-1.5 font-medium text-cream" data-testid="approval-go">
+              <a href={row.go.href} className="tap-area rounded-full bg-app-surface-nav px-3.5 py-1.5 font-medium text-cream" data-testid="approval-go">
                 {row.go.label}
               </a>
             )}

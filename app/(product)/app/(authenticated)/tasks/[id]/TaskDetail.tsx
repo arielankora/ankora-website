@@ -250,7 +250,7 @@ export function TaskDetail({
                 type="button"
                 dir="auto"
                 onClick={() => setEditingTitle(true)}
-                className="w-full text-start text-lg font-medium text-app-text-primary hover:text-app-text-secondary"
+                className="tap-area w-full text-start text-lg font-medium text-app-text-primary hover:text-app-text-secondary"
               >
                 {title}
               </button>
@@ -274,7 +274,7 @@ export function TaskDetail({
                 type="button"
                 aria-expanded={panel === "share"}
                 onClick={() => setPanel(panel === "share" ? null : "share")}
-                className="flex items-center gap-2 rounded-full border border-app-border bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary hover:border-app-border-strong"
+                className="tap-area flex items-center gap-2 rounded-full border border-app-border bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary hover:border-app-border-strong"
               >
                 <Share2 size={15} />
                 {t("header.share")}
@@ -283,7 +283,7 @@ export function TaskDetail({
                 type="button"
                 aria-expanded={panel === "entry"}
                 onClick={() => setPanel(panel === "entry" ? null : "entry")}
-                className="flex items-center gap-2 rounded-full border border-app-border bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary hover:border-app-border-strong"
+                className="tap-area flex items-center gap-2 rounded-full border border-app-border bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary hover:border-app-border-strong"
               >
                 <Clock size={15} />
                 {t("header.manualEntry")}
@@ -379,7 +379,7 @@ export function TaskDetail({
               write({ categoryId: v || null }, { title: t("toast.categoryUpdated"), description: title })
             }
           />
-          <label className="flex items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary">
+          <label className="tap-area flex items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary">
             {t("fields.dueDate")}
             <input
               type="date"
@@ -398,7 +398,7 @@ export function TaskDetail({
         </div>
 
         {mappingTask !== null && (
-          <label className="mt-4 flex w-fit items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary">
+          <label className="tap-area mt-4 flex w-fit items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary">
             <input
               type="checkbox"
               checked={mappingTask}
@@ -429,7 +429,7 @@ export function TaskDetail({
           </p>
         ) : (
           aiExcluded !== null && (
-            <label className="mt-3 flex w-fit items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary">
+            <label className="tap-area mt-3 flex w-fit items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary">
               <input
                 type="checkbox"
                 checked={aiExcluded}
@@ -676,7 +676,7 @@ function Supervision({
           }}
         />
 
-        <label className="flex items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary">
+        <label className="tap-area flex items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary">
           <input
             type="checkbox"
             checked={requiresApproval}
@@ -827,7 +827,7 @@ function Select({
       // max-w-full / min-w-0: a select is as wide as its longest option.
       // At 16px on a phone (globals.css) a long category name pushed the
       // pill past a 320px screen (iPhone audit, 17.11.2026).
-      className={`flex max-w-full items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] ${
+      className={`tap-area flex max-w-full items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] ${
         badgeClass ?? ""
       }`}
     >
@@ -914,7 +914,7 @@ function BlockSection({
               type="button"
               disabled={pending}
               onClick={() => setOpen((v) => !v)}
-              className="flex items-center gap-1.5 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-50"
+              className="tap-area flex items-center gap-1.5 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-50"
             >
               <Hourglass size={14} />
               {open ? t("cancel") : t("mark")}
@@ -956,7 +956,7 @@ function BlockSection({
                 type="button"
                 aria-pressed={on === key}
                 onClick={() => setOn(key)}
-                className={`rounded-full border px-3 py-1.5 text-[12.5px] transition-colors ${
+                className={`tap-area rounded-full border px-3 py-1.5 text-[12.5px] transition-colors ${
                   on === key
                     ? "border-app-warning/50 bg-app-warning-soft text-app-text-primary"
                     : "border-app-border bg-white text-app-text-secondary hover:border-gold"
@@ -1052,7 +1052,7 @@ function ClientSection({
               }
             )
           }
-          className="flex items-center gap-1.5 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-50"
+          className="tap-area flex items-center gap-1.5 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-50"
         >
           {clientVisible ? <Eye size={14} /> : <EyeOff size={14} />}
           {clientVisible ? t("visible") : t("internal")}
@@ -1415,7 +1415,7 @@ export function TimerButton({
         disabled={disabled || pending}
         aria-expanded={picking}
         onClick={() => (hasCategory ? ask() : picking ? setPicking(false) : void openPicker())}
-        className="flex items-center gap-2 rounded-full border border-app-surface-nav bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary disabled:opacity-50"
+        className="tap-area flex items-center gap-2 rounded-full border border-app-surface-nav bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary disabled:opacity-50"
       >
         <Play size={15} />
         {t("start")}

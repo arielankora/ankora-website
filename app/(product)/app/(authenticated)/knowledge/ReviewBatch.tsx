@@ -275,7 +275,7 @@ function EditForm({ p }: { p: ReviewProposal }) {
         </div>
       )}
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("saving") : p.target === "TASK" ? t("edit.openTask") : p.combinedProcedure ? t("edit.approveCombinedWithChanges") : t("edit.approveWithChanges")}
       </button>
     </form>
@@ -364,7 +364,7 @@ function TaskForm({ p, staff, meId }: { p: ReviewProposal; staff: ReviewStaff; m
         </select>
       </label>
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("task.opening") : t("task.submit")}
       </button>
     </form>

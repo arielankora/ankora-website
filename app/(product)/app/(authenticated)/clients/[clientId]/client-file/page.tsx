@@ -50,8 +50,14 @@ async function Item({ item }: { item: DocItem }) {
   const details = (item.details ?? []).filter((d): d is string => !!d && !!d.trim());
   const weak = item.status === "UNCERTAIN" || item.status === "MISSING";
   return (
-    <li dir="auto" className="py-1.5 text-sm leading-relaxed text-app-text-primary">
-      {item.text}
+    // The line follows the page; only the item's own text picks its
+    // direction, and any Hebrew in it makes it right to left. With
+    // dir="auto" on the <li>, an item that starts with a Latin code or name
+    // ("P1 ...", "Google ...") turned the whole line, Hebrew details and
+    // status included, left to right (iPhone audit, 17.11.2026). A text
+    // with no Hebrew at all still picks its own direction.
+    <li className="py-1.5 text-sm leading-relaxed text-app-text-primary">
+      <span dir={/[\u0590-\u05FF]/.test(item.text) ? "rtl" : "auto"}>{item.text}</span>
       {details.length > 0 && <span className="text-app-text-secondary"> ({details.join(" · ")})</span>}
       {weak && (
         <span className={`ms-1.5 text-xs font-medium ${item.status === "MISSING" ? "text-app-error" : "text-app-warning"}`}>

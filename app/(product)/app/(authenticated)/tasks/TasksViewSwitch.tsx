@@ -26,7 +26,7 @@ export function TasksViewSwitch({ current, listHref, boardHref }: { current: Tas
           href={item.href}
           onClick={() => remember(item.view)}
           aria-current={item.view === current ? "page" : undefined}
-          className={`rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
+          className={`tap-area rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
             item.view === current
               ? "bg-app-surface-nav text-cream"
               : "text-app-text-secondary hover:text-app-text-primary"

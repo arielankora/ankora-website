@@ -149,7 +149,7 @@ export function CredentialForm({
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
+        className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
       >
         {pending ? t("saving") : existing ? t("saveChanges") : t("add")}
       </button>

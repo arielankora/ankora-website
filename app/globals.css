@@ -244,3 +244,14 @@ input[type="datetime-local"]::-webkit-date-and-time-value {
     transform: translate(-50%, -50%);
   }
 }
+
+/* Fields on touch screens: at least 44px tall (Apple's minimum). Most are
+   40 to 42px already, so this adds a few pixels (iPhone audit, 17.11.2026).
+   A transparent field inside a pill is left alone: its pill, a <label>
+   with .tap-area, is what takes the tap. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="submit"], [type="button"], [type="reset"], [type="image"]):not(.bg-transparent),
+  select:not(.bg-transparent) {
+    min-height: 44px;
+  }
+}

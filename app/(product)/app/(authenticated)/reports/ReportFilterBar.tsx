@@ -196,7 +196,7 @@ export function ReportFilterBar({
         <button
           type="button"
           onClick={apply}
-          className="rounded-full bg-app-accent px-4 py-2 text-sm font-medium text-app-text-primary"
+          className="tap-area rounded-full bg-app-accent px-4 py-2 text-sm font-medium text-app-text-primary"
         >
           {t("apply")}
         </button>

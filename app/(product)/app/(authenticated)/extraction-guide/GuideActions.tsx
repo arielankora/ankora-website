@@ -23,7 +23,7 @@ function ProposeForm({ current }: { current: string }) {
       </label>
       <p className="-mt-2 text-[11px] text-app-text-tertiary">{t("propose.enforced")}</p>
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("saving") : t("propose.submit")}
       </button>
     </form>

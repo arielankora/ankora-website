@@ -18,7 +18,7 @@ import { sourceKindLabel } from "./labels";
 
 export type FilterOption = { value: string; label: string; count: number };
 
-const CHIP = "inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[12.5px] transition-colors";
+const CHIP = "tap-area inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[12.5px] transition-colors";
 const CHIP_OFF = "border-app-border bg-white text-app-text-secondary hover:border-gold/60 hover:text-app-text-primary";
 const CHIP_ON = "border-gold bg-gold/10 font-medium text-app-text-primary";
 

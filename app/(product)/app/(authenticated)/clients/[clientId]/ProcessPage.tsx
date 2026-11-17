@@ -380,7 +380,7 @@ export function ProcessPage({
             <div className="flex flex-col">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-xl font-extrabold text-app-text-primary">{steps.length ? t("stepsCount", { count: steps.length }) : t("noSteps")}</h2>
-                <Link href={`/app/clients/${clientId}/processes/${p.id}/steps`} className="inline-flex min-h-[40px] items-center rounded-[9px] border border-app-border-strong bg-white px-4 text-sm text-app-text-primary" data-testid="process-edit-steps">
+                <Link href={`/app/clients/${clientId}/processes/${p.id}/steps`} className="tap-area inline-flex min-h-[40px] items-center rounded-[9px] border border-app-border-strong bg-white px-4 text-sm text-app-text-primary" data-testid="process-edit-steps">
                   {steps.length ? t("editSteps") : t("writeSteps")}
                 </Link>
               </div>

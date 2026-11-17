@@ -716,7 +716,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               key={key}
               href={href}
               aria-current={tab === key ? "page" : undefined}
-              className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === key ? "border-gold font-medium text-app-text-primary" : "border-transparent text-app-text-secondary hover:text-app-text-primary"}`}
+              className={`tap-area -mb-px border-b-2 px-3 py-2 text-sm ${tab === key ? "border-gold font-medium text-app-text-primary" : "border-transparent text-app-text-secondary hover:text-app-text-primary"}`}
             >
               {label}
             </Link>

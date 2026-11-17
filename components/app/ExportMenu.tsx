@@ -29,8 +29,8 @@ export function ExportMenu({ baseHref, primary = false }: { baseHref: string; pr
         aria-expanded={open}
         className={
           primary
-            ? "flex items-center gap-1.5 rounded-full bg-app-accent px-4 py-2 text-sm font-medium text-app-text-primary"
-            : "flex items-center gap-1.5 rounded-full border border-app-border px-4 py-2 text-sm font-medium text-app-text-primary transition-colors hover:border-gold"
+            ? "tap-area flex items-center gap-1.5 rounded-full bg-app-accent px-4 py-2 text-sm font-medium text-app-text-primary"
+            : "tap-area flex items-center gap-1.5 rounded-full border border-app-border px-4 py-2 text-sm font-medium text-app-text-primary transition-colors hover:border-gold"
         }
       >
         <Download size={15} strokeWidth={1.75} />

@@ -133,7 +133,7 @@ export function AdvanceWithClaude({
           type="button"
           onClick={() => void copy()}
           title={hint}
-          className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
+          className="tap-area inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
         >
           {state === "copied" ? <Check size={14} className="text-app-text-accent" /> : <Sparkles size={14} className="text-app-text-accent" />}
           {label}
@@ -143,7 +143,7 @@ export function AdvanceWithClaude({
           onClick={() => void copy(true)}
           title={t("timerHint", { hint })}
           data-testid="advance-with-claude-timer"
-          className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
+          className="tap-area inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
         >
           <Timer size={14} className="text-app-text-accent" />
           {timerLabel}
@@ -185,7 +185,7 @@ export function AdvanceWithClaude({
             <button
               type="button"
               onClick={copyFromBox}
-              className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
+              className="tap-area inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
             >
               <Copy size={13} />
               {t("copy")}

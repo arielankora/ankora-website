@@ -15,7 +15,7 @@ function SaveButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-app-accent px-4 py-2 text-sm font-medium text-app-text-primary disabled:opacity-50"
+      className="tap-area rounded-full bg-app-accent px-4 py-2 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
       {pending ? t("saving") : t("save")}
     </button>

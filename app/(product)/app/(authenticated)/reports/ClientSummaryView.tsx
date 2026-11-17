@@ -47,7 +47,7 @@ export function ClientSummaryView({ text, filename }: { text: string; filename: 
           <button
             type="button"
             onClick={copy}
-            className="rounded-full bg-app-accent px-4 py-2 text-sm font-medium text-app-text-primary"
+            className="tap-area rounded-full bg-app-accent px-4 py-2 text-sm font-medium text-app-text-primary"
           >
             {copied ? t("copied") : t("copy")}
           </button>

@@ -90,7 +90,7 @@ export default async function CalendarPage(props: {
   };
 
   const segment = (active: boolean) =>
-    `shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
+    `tap-area shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
       active ? "bg-app-surface-nav text-cream" : "text-app-text-secondary hover:text-app-text-primary"
     }`;
 
@@ -132,13 +132,13 @@ export default async function CalendarPage(props: {
       <div className="flex flex-wrap items-center gap-3">
         {/* Right is "back" in Hebrew, so the right arrow goes to the past.
             In a left-to-right page both arrows turn around (ADR 0006). */}
-        <Link href={href({ date: shiftAnchor(state.view, state.date, -1) })} aria-label={t("nav.prev")} data-testid="calendar-prev" className="rounded-full border border-app-border bg-white p-2 text-app-text-secondary hover:text-app-text-primary">
+        <Link href={href({ date: shiftAnchor(state.view, state.date, -1) })} aria-label={t("nav.prev")} data-testid="calendar-prev" className="tap-area rounded-full border border-app-border bg-white p-2 text-app-text-secondary hover:text-app-text-primary">
           <ChevronRight size={16} className="ltr:rotate-180" />
         </Link>
-        <Link href={href({ date: today })} className="rounded-full border border-app-border bg-white px-4 py-1.5 text-[13px] font-medium text-app-text-secondary hover:text-app-text-primary">
+        <Link href={href({ date: today })} className="tap-area rounded-full border border-app-border bg-white px-4 py-1.5 text-[13px] font-medium text-app-text-secondary hover:text-app-text-primary">
           {t("nav.today")}
         </Link>
-        <Link href={href({ date: shiftAnchor(state.view, state.date, 1) })} aria-label={t("nav.next")} data-testid="calendar-next" className="rounded-full border border-app-border bg-white p-2 text-app-text-secondary hover:text-app-text-primary">
+        <Link href={href({ date: shiftAnchor(state.view, state.date, 1) })} aria-label={t("nav.next")} data-testid="calendar-next" className="tap-area rounded-full border border-app-border bg-white p-2 text-app-text-secondary hover:text-app-text-primary">
           <ChevronLeft size={16} className="ltr:rotate-180" />
         </Link>
         <h2 data-testid="calendar-title" className="text-[15px] font-medium text-app-text-primary">
@@ -154,7 +154,7 @@ export default async function CalendarPage(props: {
               href={href({ drawer: state.drawer === "overdue" ? undefined : "overdue" })}
               data-testid="calendar-overdue-button"
               aria-pressed={state.drawer === "overdue"}
-              className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+              className={`tap-area flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
                 state.drawer === "overdue" ? "border-app-surface-nav bg-app-surface-nav text-cream" : "border-app-error/35 bg-white text-app-error hover:border-app-error/60"
               }`}
             >
@@ -166,7 +166,7 @@ export default async function CalendarPage(props: {
               href={href({ drawer: state.drawer === "undated" ? undefined : "undated" })}
               data-testid="calendar-undated-button"
               aria-pressed={state.drawer === "undated"}
-              className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+              className={`tap-area flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
                 state.drawer === "undated" ? "border-app-surface-nav bg-app-surface-nav text-cream" : "border-gold bg-white text-app-text-primary hover:border-gold-dim"
               }`}
             >

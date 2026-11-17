@@ -163,7 +163,7 @@ function ExceptionForm({ clientId, policy, maxDays }: { clientId: string; policy
       </Field>
       <p className="-mt-2 text-[11px] text-app-text-tertiary">{t("exception.maxDays", { max: maxDays })}</p>
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("sending") : t("exception.submit")}
       </button>
     </form>
@@ -209,7 +209,7 @@ function ApproversForm({ clientId, staff, selected }: { clientId: string; staff:
         ))}
       </fieldset>
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("saving") : t("save")}
       </button>
     </form>
@@ -305,7 +305,7 @@ function PolicyForm({
         </Field>
       )}
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("saving") : existing ? t("save") : t("addToFile")}
       </button>
     </form>

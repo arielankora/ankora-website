@@ -95,14 +95,14 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
       <SubmitButton />
 
       <div className="mt-2 flex items-center justify-between gap-2.5">
-        <Link href="/app/forgot-password" className="py-2 text-xs text-app-text-accent hover:underline">
+        <Link href="/app/forgot-password" className="tap-area py-2 text-xs text-app-text-accent hover:underline">
           {t("forgot")}
         </Link>
         {/* Portal phase 0: clients open the portal a few times a month and
             will not remember a password. The link flow is offered here
             rather than replacing the form, because Ankora staff sign in on
             this same screen and keep password-only sign-in. */}
-        <Link href="/app/login-link/request" className="py-2 text-xs text-app-text-accent hover:underline">
+        <Link href="/app/login-link/request" className="tap-area py-2 text-xs text-app-text-accent hover:underline">
           {t("emailLink")}
         </Link>
       </div>

@@ -64,7 +64,7 @@ export function RequestLinkForm() {
         {t("privacyNote")}
       </p>
 
-      <Link href="/app/login" className="mt-2 block py-2 text-xs text-app-text-accent">
+      <Link href="/app/login" className="tap-area mt-2 block py-2 text-xs text-app-text-accent">
         {t("withPassword")}
       </Link>
     </form>

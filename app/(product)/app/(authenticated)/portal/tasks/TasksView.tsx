@@ -46,14 +46,14 @@ export async function TasksView({ searchParams }: { searchParams: { monthOffset?
           <div className="flex flex-wrap gap-2">
             <a
               href={monthHref(monthOffset - 1)}
-              className="rounded-full border border-app-border-strong px-4 py-2 text-sm text-app-text-primary hover:border-app-accent"
+              className="tap-area rounded-full border border-app-border-strong px-4 py-2 text-sm text-app-text-primary hover:border-app-accent"
             >
               {t("prevMonth")}
             </a>
             {monthOffset < 0 && (
               <a
                 href={monthHref(monthOffset + 1)}
-                className="rounded-full border border-app-border-strong px-4 py-2 text-sm text-app-text-primary hover:border-app-accent"
+                className="tap-area rounded-full border border-app-border-strong px-4 py-2 text-sm text-app-text-primary hover:border-app-accent"
               >
                 {t("nextMonth")}
               </a>

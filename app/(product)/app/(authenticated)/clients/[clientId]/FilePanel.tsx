@@ -245,7 +245,7 @@ export function DocumentsPanel({
           <button
             type="submit"
             disabled={pending}
-            className="ms-auto rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
+            className="tap-area ms-auto rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
           >
             {pending ? t("uploading") : t("upload")}
           </button>
@@ -280,7 +280,7 @@ export function SummaryPanel({
         <button
           type="submit"
           disabled={generate.pending}
-          className="rounded-full border border-app-border px-4 py-2 text-[13px] text-app-text-primary hover:border-gold disabled:opacity-50"
+          className="tap-area rounded-full border border-app-border px-4 py-2 text-[13px] text-app-text-primary hover:border-gold disabled:opacity-50"
         >
           {generate.pending ? t("generating") : t("generate")}
         </button>
@@ -384,7 +384,7 @@ function SummaryEditor({
           <button
             type="submit"
             disabled={pending}
-            className="ms-auto rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
+            className="tap-area ms-auto rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
           >
             {/* Not "שליחה". Approving publishes the summary to the
                 portal; nothing leaves the building. The button beside

@@ -213,7 +213,7 @@ function FactForm({
         <input name="doNotDisclose" defaultValue={existing?.doNotDisclose ?? ""} className={INPUT} />
       </Field>
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("saving") : existing ? t("form.saveVersion") : t("addToFile")}
       </button>
     </form>
@@ -232,7 +232,7 @@ function ConfirmForm({ clientId, fact, sourceOptions }: { clientId: string; fact
       <SourcesField options={sourceOptions} defaultValue={fact.sources.join(", ")} status="CONFIRMED" />
       <p className="-mt-2 text-[11px] text-app-text-tertiary">{t("confirm.hint")}</p>
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("saving") : t("confirm.submit")}
       </button>
     </form>
@@ -253,7 +253,7 @@ function AnswerForm({ clientId, fact, sourceOptions }: { clientId: string; fact:
       </Field>
       <SourcesField options={sourceOptions} status="CONFIRMED" />
       {error && <p className="text-sm text-app-error">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? t("saving") : t("answer.submit")}
       </button>
     </form>
