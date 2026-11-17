@@ -61,7 +61,9 @@ export async function createManualEntryAction(_prev: FormState | undefined, form
     await createManualEntry(user, user.id, {
       clientId,
       categoryId,
-      taskId: null,
+      // Optional: the form offers the client's open tasks. The domain
+      // checks the task belongs to this client (assertTaskMatchesClient).
+      taskId: String(formData.get("taskId") || "") || null,
       startAt: combineWallClockTime(date, startTime),
       endAt: combineWallClockTime(date, endTime),
       note: String(formData.get("note") || ""),

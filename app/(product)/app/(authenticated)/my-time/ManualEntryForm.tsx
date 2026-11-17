@@ -9,6 +9,7 @@ import { ClosedBankNotice } from "./ClosedBankNotice";
 
 type Client = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
+type OpenTask = { id: string; clientId: string; title: string; categoryId: string | null };
 
 function SubmitButton({ pending }: { pending: boolean }) {
   const t = useTranslations("myTime.form");
@@ -39,12 +40,28 @@ function SubmitButton({ pending }: { pending: boolean }) {
 // exact same form data plus a hidden confirmOverlap flag, so nothing has to be
 // re-entered. A same-client overlap still comes back as the existing hard `error`
 // and is never offered this choice.
-export function ManualEntryForm({ clients, categories }: { clients: Client[]; categories: Category[] }) {
+//
+// 17.11.2026: once a client is picked, its open tasks are offered, so time
+// can be reported straight against a task. Optional, like the timer's
+// picker. Picking a task fills the category in from the task (it can still
+// be changed), and the note stops being required: the task says what the
+// work was, the same rule the server applies (assertNoteOrTask).
+export function ManualEntryForm({
+  clients,
+  categories,
+  tasks,
+}: {
+  clients: Client[];
+  categories: Category[];
+  tasks: OpenTask[];
+}) {
   const { onSubmit, pending, result } = useActionForm(createManualEntryAction);
   const { showToast } = useToast();
   const t = useTranslations("myTime.form");
   const formRef = useRef<HTMLFormElement>(null);
   const [clientId, setClientId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [taskId, setTaskId] = useState("");
   const [date, setDate] = useState(todayKey());
   const [warningDismissed, setWarningDismissed] = useState(false);
   const confirmOverlapRef = useRef<HTMLInputElement>(null);
@@ -56,6 +73,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
     () => categories.filter((cat) => cat.clientId === null || cat.clientId === clientId),
     [categories, clientId]
   );
+  const clientTasks = useMemo(() => tasks.filter((task) => task.clientId === clientId), [tasks, clientId]);
   const isBackdated = date !== todayKey();
 
   useEffect(() => {
@@ -74,10 +92,27 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
     if (!result?.ok) return;
     formRef.current?.reset();
     setClientId("");
+    setCategoryId("");
+    setTaskId("");
     setDate(todayKey());
     showToast({ tone: "success", title: t("saved") });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result]);
+
+  function pickClient(id: string) {
+    setClientId(id);
+    // Both belong to the client that was picked before.
+    setCategoryId("");
+    setTaskId("");
+  }
+
+  function pickTask(id: string) {
+    setTaskId(id);
+    const task = tasks.find((x) => x.id === id);
+    if (task?.categoryId && availableCategories.some((cat) => cat.id === task.categoryId)) {
+      setCategoryId(task.categoryId);
+    }
+  }
 
   function recordInOpenBank() {
     if (intoOpenBankRef.current) intoOpenBankRef.current.value = "true";
@@ -144,7 +179,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             name="clientId"
             required
             value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
+            onChange={(e) => pickClient(e.target.value)}
             className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           >
             <option value="">{t("pick")}</option>
@@ -161,6 +196,8 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             name="categoryId"
             aria-label={t("categoryAria")}
             required
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
             disabled={!clientId}
             className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
           >
@@ -173,11 +210,32 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
           </select>
         </label>
         </div>
+        {/* Absent for a client with nothing open: an empty select is a
+            question the screen asks and cannot answer. */}
+        {clientId && clientTasks.length > 0 && (
+          <label className="block min-w-0" style={{ flex: "1 1 200px" }}>
+            <span className="mb-1.5 block text-[11px] text-app-text-secondary">{t("task")}</span>
+            <select
+              name="taskId"
+              aria-label={t("taskAria")}
+              value={taskId}
+              onChange={(e) => pickTask(e.target.value)}
+              className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+            >
+              <option value="">{t("noTask")}</option>
+              {clientTasks.map((task) => (
+                <option key={task.id} value={task.id}>
+                  {task.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="block min-w-0" style={{ flex: "1 1 200px" }}>
-          <span className="mb-1.5 block text-[11px] text-app-text-secondary">{t("note")}</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">{taskId ? t("noteOptional") : t("note")}</span>
           <input
             name="note"
-            required
+            required={!taskId}
             placeholder={t("notePlaceholder")}
             className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />

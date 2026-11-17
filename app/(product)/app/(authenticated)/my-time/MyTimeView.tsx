@@ -6,6 +6,7 @@ import { listMyTimeEntries } from "@/lib/app-domain/time-entries";
 import { aiExcludedRowIds } from "@/lib/app-domain/ai-exclusion-db";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
+import { listOpenTasksForTimeEntry } from "@/lib/app-domain/tasks";
 import { Forbidden } from "@/components/app/Forbidden";
 import { ManualEntryForm } from "./ManualEntryForm";
 import { EntryRow } from "./EntryRow";
@@ -94,10 +95,11 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
   const nextWeek = addDaysToKey(startKey, 7);
   const todayKeyStr = dateKey(new Date());
 
-  const [entries, clients, allCategories] = await Promise.all([
+  const [entries, clients, allCategories, openTasks] = await Promise.all([
     listMyTimeEntries(user.id, { from: weekStart, to: weekEnd }),
     listAccessibleClients(user),
     listCategories(),
+    listOpenTasksForTimeEntry(user),
   ]);
   // ADR 0006: an entry of a client or task marked "בלי AI" is kept from
   // the browser's translator.
@@ -212,6 +214,7 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
         <ManualEntryForm
           clients={clients.map((c) => ({ id: c.id, name: c.name }))}
           categories={categories.map((cat) => ({ id: cat.id, name: cat.name, clientId: cat.clientId }))}
+          tasks={openTasks}
         />
 
         {/* Hadas, 23.9.2026: "יום עבודה נוכחי ראשון". Newest day on top,
