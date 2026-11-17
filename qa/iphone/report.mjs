@@ -300,7 +300,7 @@ for (const s of screens) {
 }
 
 const md = L.join("\n");
-if (/[–—]/.test(md)) throw new Error("report contains an em-dash or en-dash");
+if (/[\u2013\u2014]/.test(md)) throw new Error("report contains an em-dash or en-dash");
 fs.writeFileSync(path.join(OUT, "report.md"), md);
 fs.writeFileSync(
   path.join(OUT, "findings.json"),
