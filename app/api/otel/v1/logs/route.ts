@@ -13,6 +13,10 @@ import { rateLimitResponse } from "@/lib/rate-limit";
 //   OTLP headers:   Authorization=Bearer <COWORK_OTEL_SECRET>
 //
 // The exporter adds /v1/logs to the endpoint itself, which is this route.
+//
+// Claude Code sends here too (17.11.2026), with its own secret
+// (CLAUDE_CODE_OTEL_SECRET) set through its managed settings: its events
+// have the same names and attributes, and service.name "claude-code".
 // It runs on each employee's computer, so this is a public URL: the shared
 // secret is the gate, and the body is read with a size cap before
 // anything parses it. What is kept is metadata only; see
