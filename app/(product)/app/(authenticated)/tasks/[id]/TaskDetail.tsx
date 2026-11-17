@@ -824,11 +824,14 @@ function Select({
 }) {
   return (
     <label
-      className={`flex items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] ${
+      // max-w-full / min-w-0: a select is as wide as its longest option.
+      // At 16px on a phone (globals.css) a long category name pushed the
+      // pill past a 320px screen (iPhone audit, 17.11.2026).
+      className={`flex max-w-full items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] ${
         badgeClass ?? ""
       }`}
     >
-      <span className="text-app-text-tertiary">{label}</span>
+      <span className="shrink-0 text-app-text-tertiary">{label}</span>
       <select
         // The visible <span> and the chosen option share this <label>, so
         // without an explicit name the accessible label would be the
@@ -838,7 +841,7 @@ function Select({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="cursor-pointer bg-transparent font-medium text-app-text-primary outline-none disabled:opacity-50"
+        className="min-w-0 max-w-full cursor-pointer bg-transparent font-medium text-app-text-primary outline-none disabled:opacity-50"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

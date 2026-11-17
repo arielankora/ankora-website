@@ -166,7 +166,7 @@ export default async function PortalFilePage() {
                   <span className="text-app-text-secondary"> · {s.what}</span>
                 </span>
                 <span className="flex items-center gap-2.5">
-                  <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
+                  <span dir="auto" className="font-jbmono text-[11.5px] text-app-text-tertiary">
                     {formatDay(s.when)}
                   </span>
                   <span
@@ -206,7 +206,7 @@ export default async function PortalFilePage() {
                         {size}
                       </span>
                     )}
-                    <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
+                    <span dir="auto" className="font-jbmono text-[11.5px] text-app-text-tertiary">
                       {formatDay(d.addedAt)}
                     </span>
                     {/* A plain link, and the href is a document id rather
@@ -234,7 +234,7 @@ export default async function PortalFilePage() {
                   {d.title}
                 </span>
                 {d.nextAt && (
-                  <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
+                  <span dir="auto" className="font-jbmono text-[11.5px] text-app-text-tertiary">
                     {formatDay(d.nextAt)}
                   </span>
                 )}
@@ -252,7 +252,9 @@ export default async function PortalFilePage() {
             <li>{t("claude.step3")}</li>
           </ol>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <code dir="ltr" className="rounded bg-app-surface-page px-2 py-1 font-jbmono text-[12px] text-app-text-primary">
+            {/* break-all: the address is one unbroken word, wider than a phone,
+                and the card clipped it and the copy button (iPhone audit, 17.11.2026). */}
+            <code dir="ltr" className="min-w-0 max-w-full break-all rounded bg-app-surface-page px-2 py-1 font-jbmono text-[12px] text-app-text-primary">
               {PORTAL_CONNECTOR_URL}
             </code>
             <CopyValue value={PORTAL_CONNECTOR_URL} label={t("claude.copyLabel")} />

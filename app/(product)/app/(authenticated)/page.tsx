@@ -391,7 +391,7 @@ export default async function AppHomePage() {
                   <span className="flex items-center gap-2.5 text-[11.5px] text-app-text-tertiary">
                     <span dir="auto" className="truncate">{task.clientName}</span>
                     {task.dueDate && (
-                      <span dir="ltr" className="font-jbmono">
+                      <span dir="auto" className="font-jbmono">
                         {format.dateTime(task.dueDate, { day: "numeric", month: "short" })}
                       </span>
                     )}

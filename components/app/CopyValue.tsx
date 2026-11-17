@@ -26,8 +26,11 @@ export function CopyValue({ value, label }: { value: string; label: string }) {
     }
   }
 
+  // min-w-0 / max-w-full: inside a wrapping row the box otherwise takes the
+  // value's full width and the card clips the copy button (iPhone audit,
+  // 17.11.2026, the connector address on the client portal).
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-app-border bg-cream-dim px-3 py-2">
+    <div className="flex min-w-0 max-w-full items-center gap-2 rounded-lg border border-app-border bg-cream-dim px-3 py-2">
       <code dir="ltr" className="min-w-0 flex-1 truncate text-start text-xs text-app-text-primary">
         {value}
       </code>
