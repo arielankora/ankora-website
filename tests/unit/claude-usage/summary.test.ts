@@ -130,3 +130,19 @@ describe("managerSummary with the browser extension's readings (way 3)", () => {
     expect(s.kpis[1].key).toBe("closestToThreshold");
   });
 });
+
+describe("managerSummary and the five-hour window", () => {
+  it("someone close to stuck now is the first thing to do, and needs attention", () => {
+    const s = managerSummary(
+      base({
+        people: [
+          person({ name: "Hadas", fiveHour: { current: { pct: 92.4, state: "near" } } }),
+          person({ name: "Ariel", fiveHour: { current: { pct: 74, state: "watch" } } }),
+        ],
+      })
+    );
+    expect(s.verdict).toBe("attention");
+    expect(s.actions[0]).toEqual({ key: "nearFiveHour", values: { name: "Hadas", pct: 92 } });
+    expect(s.actions.some((a) => a.values.name === "Ariel")).toBe(false);
+  });
+});

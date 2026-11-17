@@ -9,12 +9,14 @@ import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
 import { PROMPT_KINDS, type PromptKind } from "@/lib/claude-usage/prompt-kinds";
 import { managerSummary, type ManagerSummary } from "@/lib/claude-usage/summary";
 import { personLimits, type PersonLimits } from "@/lib/claude-usage/limits";
+import { WEEK_MS, personFiveHour, teamFiveHour, type PersonFiveHour, type TeamFiveHour } from "@/lib/claude-usage/five-hour";
 import {
   ankoraToolFor,
   briefThenFile,
   duplicateReads,
   fiveHourWindows,
   heaviestWindow,
+  WINDOW_MS,
   isLimitHit,
   requestsBySource,
   type SourceKey,
@@ -191,6 +193,9 @@ export type PersonUsage = {
   /// The browser extension's readings of this person's usage limits
   /// (way 3): null when none arrived in the period.
   limits: PersonLimits | null;
+  /// The five-hour window: now, and the past week window by window
+  /// (lib/claude-usage/five-hour.ts). The top of the screen.
+  fiveHour: PersonFiveHour;
 };
 
 export type ToolUsage = {
@@ -215,6 +220,9 @@ export type ClaudeUsageReport = {
   /// The managers' summary: one verdict, six leading indicators against
   /// their targets, and at most three things to do (lib/claude-usage/summary.ts).
   summary: ManagerSummary;
+  /// The team in the five-hour window: who is stuck now, who is close,
+  /// hits this week and the hours they cluster in.
+  fiveHour: TeamFiveHour;
   people: PersonUsage[];
   tools: ToolUsage[];
   prompts: { kind: PromptKind; copies: number; avgChars: number; maxChars: number }[];
@@ -259,6 +267,9 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
   const now = opts.now ?? new Date();
   const days: UsagePeriod = opts.days === 30 ? 30 : 7;
   const from = new Date(now.getTime() - days * 86_400_000);
+  // The five-hour view always shows the past week, plus the window that
+  // was open a week ago, whatever the period.
+  const fiveFrom = new Date(Math.min(from.getTime(), now.getTime() - WEEK_MS - WINDOW_MS));
   const month = monthStart(now);
   const settings = await claudeUsageSettings();
 
@@ -272,7 +283,7 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
     }),
     prisma.mcpToolCall.findMany({ where: { createdAt: { gte: from, lte: now } } }),
     prisma.coworkEvent.findMany({
-      where: { occurredAt: { gte: from, lte: now } },
+      where: { occurredAt: { gte: fiveFrom, lte: now } },
       select: {
         eventName: true,
         userId: true,
@@ -308,7 +319,7 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
     prisma.coworkEvent.findFirst({ where: { occurredAt: { gte: month.start, lte: now } }, orderBy: { occurredAt: "asc" }, select: { occurredAt: true } }),
     // The browser extension's limit readings (way 3).
     prisma.claudeLimitSample.findMany({
-      where: { observedAt: { gte: from, lte: now }, userId: { not: null } },
+      where: { observedAt: { gte: fiveFrom, lte: now }, userId: { not: null } },
       select: { userId: true, fiveHourPct: true, fiveHourResetsAt: true, sevenDayPct: true, sevenDayResetsAt: true, observedAt: true },
     }),
   ]);
@@ -317,7 +328,11 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
   const measuredSince = firstThisMonth?.occurredAt ?? null;
   const measuredDays = measuredSince ? (now.getTime() - measuredSince.getTime()) / DAY : 0;
   const daysLeft = Math.max(0, (month.end.getTime() - now.getTime()) / DAY);
-  const coworkIn = events.map(toCoworkIn);
+  // Events and readings were read from fiveFrom; everything but the
+  // five-hour view counts the period alone.
+  const coworkAll = events.map(toCoworkIn);
+  const coworkIn = coworkAll.filter((e) => e.occurredAt >= from);
+  const limitInPeriod = limitSamples.filter((s) => s.observedAt >= from);
   const callIn: ToolCallIn[] = calls;
   const byUser = <T extends { userId: string | null }>(rows: T[]) => {
     const m = new Map<string, T[]>();
@@ -326,8 +341,10 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
   };
   const callsBy = byUser(callIn);
   const eventsBy = byUser(coworkIn);
+  const allEventsBy = byUser(coworkAll);
   const copiesBy = byUser(copies);
-  const limitsBy = byUser(limitSamples);
+  const limitsBy = byUser(limitInPeriod);
+  const allLimitsBy = byUser(limitSamples);
   const monthBy = new Map(monthCosts.map((m) => [m.userId, Number(m._sum.costUsd ?? 0)]));
 
   const people: PersonUsage[] = users.map((u) => {
@@ -382,6 +399,7 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
       noTelemetry: !settings.nonCowork.includes(u.id) && userCalls.length > 0 && ev.length === 0,
       nonCowork: settings.nonCowork.includes(u.id),
       limits: limitsBy.has(u.id) ? personLimits(limitsBy.get(u.id)!, now) : null,
+      fiveHour: personFiveHour(allLimitsBy.get(u.id) ?? [], allEventsBy.get(u.id) ?? [], now),
     };
   });
   // Busiest first; people with no activity at all stay, at the end, so a
@@ -450,11 +468,11 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
     limitHits: coworkIn.filter(isLimitHit).length,
   };
   const coverage = {
-    coworkEvents: events.length,
+    coworkEvents: coworkIn.length,
     toolCalls: calls.length,
     promptCopies: copies.length,
     unmatchedEmails: unmatched.map((u) => u.userEmail!).filter(Boolean),
-    limitReadings: limitSamples.length,
+    limitReadings: limitInPeriod.length,
   };
 
   return {
@@ -462,6 +480,7 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
     month: { measuredSince: measuredSince?.toISOString() ?? null, measuredDays: Math.round(measuredDays * 10) / 10 },
     settings,
     summary: managerSummary({ people, tools, signals, coverage }),
+    fiveHour: teamFiveHour(people),
     people,
     tools,
     prompts,

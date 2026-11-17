@@ -159,6 +159,39 @@ describe("the Claude usage report", () => {
     expect((await claudeUsageSettings()).nonCowork).toEqual([]);
   });
 
+  it("puts the five-hour window first: who is stuck now, who is close, and the week window by window", async () => {
+    const { ariel, hadas } = await seed();
+    await prisma.claudeLimitSample.createMany({
+      data: [
+        // Ariel: the extension read 92% ten minutes ago; the window resets in 1:35.
+        { userId: ariel.id, email: "a@example.com", fiveHourPct: 92, fiveHourResetsAt: new Date(NOW.getTime() + 95 * 60_000), sevenDayPct: 61, observedAt: ago(10) },
+        // Ariel, two days ago: a window that reached the limit.
+        { userId: ariel.id, email: "a@example.com", fiveHourPct: 100, fiveHourResetsAt: ago(2 * 24 * 60 - 60), sevenDayPct: 40, observedAt: ago(2 * 24 * 60 + 60) },
+        // Eight days ago: outside the week, even on a 30-day report.
+        { userId: ariel.id, email: "a@example.com", fiveHourPct: 100, fiveHourResetsAt: ago(8 * 24 * 60), sevenDayPct: 30, observedAt: ago(8 * 24 * 60 + 60) },
+      ],
+    });
+    const report = await getClaudeUsageReport(ariel, { days: 30, now: NOW });
+    const a = report.people.find((p) => p.userId === ariel.id)!;
+    const h = report.people.find((p) => p.userId === hadas.id)!;
+    expect(a.fiveHour.current).toMatchObject({ state: "near", pct: 92, source: "extension" });
+    expect(a.fiveHour.weeklyPct).toBe(61);
+    expect(a.fiveHour.week.map((w) => w.hit)).toEqual([true, false]);
+    // Hadas has no extension: Cowork's 429 half an hour ago marks her stuck now.
+    expect(h.fiveHour.current).toMatchObject({ state: "stuck", source: "cowork" });
+    expect(report.fiveHour.stuckNow.map((x) => x.name)).toEqual([h.name]);
+    expect(report.fiveHour.over70Now).toEqual([{ name: a.name, pct: 92 }]);
+    expect(report.fiveHour.hitsThisWeek).toBe(2);
+    expect(report.fiveHour.closestWeekly).toEqual({ name: a.name, pct: 61 });
+    expect(report.summary.actions[0]).toEqual({ key: "nearFiveHour", values: { name: a.name, pct: 92 } });
+
+    // Claude reads the same fields through the connector (the tool runs on
+    // the clock, so only the shape is checked here).
+    const body = JSON.parse((await call(ariel, "get_claude_usage", { days: 7 })).content[0].text);
+    expect(body.fiveHour).toMatchObject({ stuckNow: expect.any(Array), over70Now: expect.any(Array), hitsThisWeek: expect.any(Number) });
+    expect(body.people.find((p: { userId: string }) => p.userId === hadas.id).fiveHour.week).toEqual(expect.any(Array));
+  });
+
   it("refuses a seat or multiplier out of range, and writes nothing", async () => {
     const { user: ariel } = await createTestUser({ role: "SUPER_ADMIN" });
     await expect(updateClaudeUsageSettings(ariel, { defaultSeatUsd: 0 })).rejects.toMatchObject({ code: "claudeUsage.seatRange" });
