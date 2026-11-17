@@ -54,6 +54,7 @@ function credentialColumns(schema: string): { model: string; field: string }[] {
  */
 const REVIEWED: Record<string, string> = {
   contentHash: "a document's content digest, not a credential. It identifies bytes, it does not open anything.",
+  argsHash: "the first 16 hex characters of a SHA-256 over an MCP tool call's arguments (McpToolCall), to spot the same call made twice. It opens nothing.",
   secretUpdatedAt: "a timestamp. The vault screen shows it on purpose, so that someone can see how stale a password is.",
 };
 

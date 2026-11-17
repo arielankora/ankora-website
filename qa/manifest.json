@@ -2320,8 +2320,32 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-15",
       "riskReason": "Picks a category for a task born without one (from WhatsApp messages, or the timer button's proposal). Never throws; the person sees the pick and can change it."
+    },
+    "action:(product)/app/(authenticated)/prompt-copy-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-17",
+      "riskReason": "Claude usage measurement: records only the kind and length of a prompt the person already copied. Writes nothing anyone works from, never throws, and the copy never waits on it."
+    },
+    "api:/api/cron/claude-usage-retention": {
+      "kind": "api",
+      "area": "cron",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-17",
+      "riskReason": "Deletes Claude usage measurements older than 90 days (mcp_tool_calls, claude_prompt_copies). Behind CRON_SECRET; touches no other table."
+    },
+    "cron:/api/cron/claude-usage-retention": {
+      "kind": "cron",
+      "area": "cron",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-17",
+      "riskReason": "Deletes Claude usage measurements older than 90 days (mcp_tool_calls, claude_prompt_copies). Behind CRON_SECRET; touches no other table."
     }
   },
   "waivers": {},
-  "lastScan": "2026-11-15"
+  "lastScan": "2026-11-17"
 }

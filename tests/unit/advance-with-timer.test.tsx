@@ -17,6 +17,11 @@ vi.mock("@/app/(product)/app/(authenticated)/tasks/[id]/actions", () => ({
   startTimerFromAdvanceAction: (input: unknown) => startAction(input),
   recordAdvancePromptCopiedAction: (input: unknown) => recordAction(input),
 }));
+// Claude usage measurement (17.11.2026): the copy is also recorded for the
+// usage report. Not what these cases are about.
+vi.mock("@/app/(product)/app/(authenticated)/prompt-copy-actions", () => ({
+  recordPromptCopiedAction: vi.fn(async () => ({ ok: true })),
+}));
 const announce = vi.fn();
 vi.mock("@/components/app/ActiveTimerProvider", () => ({
   useActiveTimer: () => ({ summary: null, announce }),

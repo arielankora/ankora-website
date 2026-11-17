@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Check, ExternalLink, Languages } from "lucide-react";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { approveProcedureTranslationAction } from "../../../../process-actions";
+import { recordPromptCopiedAction } from "../../../../../prompt-copy-actions";
 
 // The English version of a procedure document (23.10.2026): a prompt to
 // copy into Claude, which translates through MCP and saves a draft, and a
@@ -22,6 +23,7 @@ export function TranslateWithClaude({ prompt, label }: { prompt: string; label: 
       if (!navigator.clipboard?.writeText) throw new Error("no clipboard");
       await navigator.clipboard.writeText(prompt);
       setState("copied");
+      void recordPromptCopiedAction({ kind: "translation", chars: prompt.length });
     } catch {
       setState("manual");
       requestAnimationFrame(() => boxRef.current?.select());

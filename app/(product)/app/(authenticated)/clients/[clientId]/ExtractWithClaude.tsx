@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Copy, ExternalLink, Sparkles } from "lucide-react";
+import { recordPromptCopiedAction } from "../../prompt-copy-actions";
 
 // "חלץ ידע עם קלוד" (org-brain spec 5.1): one press copies a prompt that
 // carries the extraction rules and what is already in this client's file.
@@ -23,6 +24,7 @@ export function ExtractWithClaude({ prompt }: { prompt: string }) {
       if (!navigator.clipboard?.writeText) throw new Error("no clipboard");
       await navigator.clipboard.writeText(prompt);
       setState("copied");
+      void recordPromptCopiedAction({ kind: "extract", chars: prompt.length });
     } catch {
       setState("manual");
       requestAnimationFrame(() => boxRef.current?.select());
@@ -33,7 +35,10 @@ export function ExtractWithClaude({ prompt }: { prompt: string }) {
     const box = boxRef.current;
     if (!box) return;
     box.select();
-    if (document.execCommand("copy")) setState("copied");
+    if (document.execCommand("copy")) {
+      setState("copied");
+      void recordPromptCopiedAction({ kind: "extract", chars: prompt.length });
+    }
   }
 
   return (
