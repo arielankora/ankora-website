@@ -331,6 +331,10 @@ const he: Dictionary = {
       foundersLabel: "המייסדים",
       foundersTitle: "האנשים שאחראים על אנקורה",
       foundersLinkLabel: "פרופיל לינקדאין",
+      memorialLabel: "זוכרים",
+      memorialTitle: "לזכרו של סמל נתנאל יאנג",
+      memorialBody: "אנקורה מנציחה את סמל נתנאל יאנג (2003-2023), לוחם גדוד 13 של גולני שנפל ב-7 באוקטובר 2023 ליד קיבוץ זיקים, במסגרת יוזמת Next October.",
+      memorialLinkLabel: "לדף ההנצחה",
       principlesLabel: "העקרונות שלנו",
       principles: [
         { title: "אמינות מעל הכול", body: "אם התחייבנו, אנחנו עומדים בזה. אם יש עיכוב, העדכון מגיע לפני שעולה הצורך לשאול." },

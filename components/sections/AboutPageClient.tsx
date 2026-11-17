@@ -11,11 +11,13 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 import { HairlineGrid, HairlineGridCell } from "@/components/ui/HairlineGrid";
 import { Reveal, RevealStagger, staggerItem } from "@/components/motion/Reveal";
 import Image from "next/image";
+import Link from "next/link";
 import { FOUNDERS } from "@/lib/founders";
 
 /**
  * About: intro paragraph, vision and mission as two glass panels, the founders,
- * then the four principle cards.
+ * then the four principle cards, and the memorial: Sgt. Nathanel Young, whom Ankora
+ * honors within Next October. That section is the site's only link to /next-october.
  *
  * The founders section exists because this is the page search engines and AI
  * models read to learn who stands behind Ankora; before it, the page named no
@@ -145,6 +147,26 @@ export function AboutPageClient({ dict, locale }: { dict: Dictionary; locale: Lo
             ))}
           </HairlineGrid>
         </RevealStagger>
+      </SectionShell>
+
+      <SectionShell>
+        <Reveal>
+          <Eyebrow>{p.memorialLabel}</Eyebrow>
+        </Reveal>
+        <Reveal delay={0.08}>
+          <h2 className="mt-5 max-w-2xl text-balance text-[clamp(1.6rem,3vw,2.4rem)] font-extralight leading-[1.2] tracking-[-0.02em] text-cream">
+            {p.memorialTitle}
+          </h2>
+          <p className="mt-5 max-w-[72ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-body">
+            {p.memorialBody}
+          </p>
+          <Link
+            href={`/${locale}/next-october`}
+            className="mt-4 inline-flex min-h-[24px] items-center font-assistant text-[15px] text-gold underline-offset-4 transition-colors hover:text-gold-light hover:underline"
+          >
+            {p.memorialLinkLabel}
+          </Link>
+        </Reveal>
       </SectionShell>
 
       <InnerCTA dict={dict} locale={locale} />
