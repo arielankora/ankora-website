@@ -183,8 +183,11 @@ export function EditClientForm({
           <span className="block text-base font-bold text-app-text-primary">{t("auditRequirements")}</span>
           <span className="block text-sm text-app-text-secondary">{t("auditRequirementsHint")}</span>
         </span>
+        {/* Native switch where supported (Safari 17.4+); role="switch" stays as the
+            fallback everywhere else, and the drawn look comes from the classes. */}
         <input
           type="checkbox"
+          {...({ switch: "" } as object)}
           role="switch"
           name="auditRequirements"
           defaultChecked={client.auditRequirements}

@@ -103,9 +103,6 @@ export async function redisRateLimit(
   const windowId = Math.floor(Date.now() / windowMs);
   const redisKey = `rl:${key}:${windowId}`;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
   try {
     // One round trip: increment, and set the TTL only if the key is new.
     // The NX flag matters - without it every request would push the
@@ -121,7 +118,8 @@ export async function redisRateLimit(
         ["INCR", redisKey],
         ["EXPIRE", redisKey, String(windowSeconds), "NX"],
       ]),
-      signal: controller.signal,
+      // A deadline, not a controller: nothing else ever aborts this request.
+      signal: AbortSignal.timeout(TIMEOUT_MS),
       cache: "no-store",
     });
 
@@ -148,7 +146,5 @@ export async function redisRateLimit(
     // a broken Upstash config would otherwise flood the logs on every
     // login attempt.
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }

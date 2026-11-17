@@ -237,7 +237,7 @@ export function TaskDetail({
                   await write({ title: next }, { title: t("toast.titleUpdated"), description: next });
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) e.currentTarget.blur();
                   if (e.key === "Escape") {
                     setTitle(task.title);
                     setEditingTitle(false);

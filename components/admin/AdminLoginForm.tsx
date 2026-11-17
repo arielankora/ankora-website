@@ -35,9 +35,12 @@ export function AdminLoginForm({ redirectTo }: { redirectTo: string }) {
 
   return (
     <form onSubmit={onSubmit} className="mx-auto mt-10 max-w-sm rounded-2xl border border-app-border bg-white/60 p-8">
-      <label className="block text-sm font-medium text-app-text-secondary">Admin password</label>
+      <label htmlFor="admin-password" className="block text-sm font-medium text-app-text-secondary">Admin password</label>
       <input
+        id="admin-password"
+        name="password"
         type="password"
+        autoComplete="current-password"
         autoFocus
         value={password}
         onChange={(e) => setPassword(e.target.value)}
