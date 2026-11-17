@@ -54,7 +54,7 @@ export function SubprocessorRecipientsPanel({ groups }: { groups: SubprocessorRe
   const t = useTranslations("clients.subprocessors");
   return (
     <details className="rounded-2xl border border-app-border bg-white p-5">
-      <summary className="cursor-pointer text-sm font-medium text-app-text-primary">
+      <summary className="tap-area cursor-pointer text-sm font-medium text-app-text-primary">
         {t("title")}
       </summary>
       <p className="mt-2 text-xs text-app-text-secondary">

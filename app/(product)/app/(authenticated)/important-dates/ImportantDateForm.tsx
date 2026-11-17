@@ -392,7 +392,7 @@ export function ImportantDateForm({
       {/* Spec 3.10: something due to reach us on the date. */}
       <div className="rounded-lg border border-app-border px-3 py-2" data-testid="date-receipt">
         <input type="hidden" name="receiptShown" value="1" />
-        <label className="flex items-center gap-2 text-sm text-app-text-primary">
+        <label className="tap-area flex items-center gap-2 text-sm text-app-text-primary">
           <input type="checkbox" name="expectsReceipt" defaultChecked={!!existing?.expectsReceipt} className="h-4 w-4 accent-gold" />
           {t("form.receiptCheckbox")}
         </label>

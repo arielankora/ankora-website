@@ -212,7 +212,7 @@ export default async function PortalFilePage() {
                     {/* A plain link, and the href is a document id rather
                         than a file: the server decides on every request
                         whether this person may have it. */}
-                    <a href={`/api/portal/documents/${d.id}`} className="text-xs text-app-text-accent hover:underline">
+                    <a href={`/api/portal/documents/${d.id}`} className="tap-area text-xs text-app-text-accent hover:underline">
                       {t("download")}
                     </a>
                   </span>

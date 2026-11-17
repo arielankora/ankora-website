@@ -209,7 +209,7 @@ export function CreateTaskForm({
           digest, so the person choosing it is told what it will do, and
           the person not choosing it is told when it will be seen. */}
       <div>
-        <label className="flex items-center gap-2.5 text-sm text-app-text-primary">
+        <label className="tap-area flex items-center gap-2.5 text-sm text-app-text-primary">
           <input
             type="checkbox"
             name="urgent"
@@ -234,7 +234,7 @@ export function CreateTaskForm({
           is optional - left empty, the portal falls back to the task's
           own title rather than showing a blank row. */}
       <div className="rounded-lg border border-app-border bg-cream-dim/40 p-3">
-        <label className="flex items-center gap-2.5 text-xs text-app-text-primary">
+        <label className="tap-area flex items-center gap-2.5 text-xs text-app-text-primary">
           <input
             type="checkbox"
             name="clientVisible"

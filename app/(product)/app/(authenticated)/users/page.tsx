@@ -114,7 +114,7 @@ export default async function UsersPage() {
                     so a full load costs nothing that matters. Why the
                     router aborts is still not understood; see
                     claude/search-navigation-lost-2026-09-25. */}
-                <a href={`/app/users/${u.id}`} className="text-xs text-app-text-accent hover:text-app-text-accent">
+                <a href={`/app/users/${u.id}`} className="tap-area text-xs text-app-text-accent hover:text-app-text-accent">
                   {t("edit")}
                 </a>
               </span>

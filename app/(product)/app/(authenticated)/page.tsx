@@ -358,7 +358,7 @@ export default async function AppHomePage() {
                 <ListChecks size={15} strokeWidth={2} className="text-app-text-tertiary" />
                 {t("myTasks.title")}
               </span>
-              <Link href="/app/tasks?mine=1" className="text-[11.5px] text-app-text-accent hover:underline">
+              <Link href="/app/tasks?mine=1" className="tap-area text-[11.5px] text-app-text-accent hover:underline">
                 {t("myTasks.allMine")}
               </Link>
             </div>
@@ -772,7 +772,7 @@ export default async function AppHomePage() {
         )}
 
         {canSeeAudit && (
-          <Link href="/app/audit-log" className="inline-block text-sm text-app-text-accent hover:text-app-text-primary">
+          <Link href="/app/audit-log" className="tap-area inline-block text-sm text-app-text-accent hover:text-app-text-primary">
             {t("auditLog")}
           </Link>
         )}

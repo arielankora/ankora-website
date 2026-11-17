@@ -59,7 +59,7 @@ export function EditCategoryForm({ category }: { category: Category }) {
           defaultChecked={category.active}
           className="h-4 w-4 rounded border-app-border"
         />
-        <label htmlFor="active" className="text-sm text-app-text-secondary">
+        <label htmlFor="active" className="tap-area text-sm text-app-text-secondary">
           {t("active")}
         </label>
       </div>

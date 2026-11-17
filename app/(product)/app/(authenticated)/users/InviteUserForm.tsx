@@ -177,10 +177,10 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
               <label className="block text-xs font-medium text-app-text-secondary">{t("clientAccess")}</label>
               {clients.length > 0 && (
                 <div className="flex items-center gap-3 text-xs">
-                  <button type="button" onClick={() => setAllChecked(true)} className="text-app-text-accent underline">
+                  <button type="button" onClick={() => setAllChecked(true)} className="tap-area text-app-text-accent underline">
                     {t("selectAll")}
                   </button>
-                  <button type="button" onClick={() => setAllChecked(false)} className="text-app-text-tertiary underline">
+                  <button type="button" onClick={() => setAllChecked(false)} className="tap-area text-app-text-tertiary underline">
                     {t("clearAll")}
                   </button>
                 </div>
@@ -189,7 +189,7 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
             <div ref={checkboxContainerRef} className="mt-2 flex flex-col gap-2">
               {clients.length === 0 && <p className="text-xs text-app-text-tertiary">{t("noClients")}</p>}
               {clients.map((c) => (
-                <label key={c.id} className="flex items-center gap-1.5 text-sm text-app-text-secondary">
+                <label key={c.id} className="tap-area flex items-center gap-1.5 text-sm text-app-text-secondary">
                   <input type="checkbox" name="clientIds" value={c.id} className="h-4 w-4 rounded border-app-border" />
                   <span dir="auto">{c.name}</span>
                 </label>

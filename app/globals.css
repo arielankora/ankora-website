@@ -222,3 +222,25 @@ input[type="datetime-local"]::-webkit-date-and-time-value {
     font-size: 16px !important;
   }
 }
+
+/* .tap-area: a 44x44 touch target (Apple's minimum) around a small text link
+   or button, on touch screens only, without changing how it looks or where
+   anything sits. The hit area is an invisible ::before centred on the
+   element. Opt-in, on the elements the iPhone audit (17.11.2026) found under
+   24px: applying it to every link would turn each one into a positioned
+   box, which breaks the stretched-link cards that rely on an ancestor's
+   positioning. Not for elements that are themselves absolute or fixed. */
+@media (pointer: coarse) {
+  .tap-area {
+    position: relative;
+  }
+  .tap-area::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}

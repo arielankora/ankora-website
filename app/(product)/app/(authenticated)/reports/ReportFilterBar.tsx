@@ -181,11 +181,11 @@ export function ReportFilterBar({
           />
         </div>
         <div className="flex items-end gap-4">
-          <label className="flex items-center gap-2 text-sm text-app-text-secondary">
+          <label className="tap-area flex items-center gap-2 text-sm text-app-text-secondary">
             <input type="checkbox" checked={editedOnly} onChange={(e) => setEditedOnly(e.target.checked)} />
             {t("editedOnly")}
           </label>
-          <label className="flex items-center gap-2 text-sm text-app-text-secondary">
+          <label className="tap-area flex items-center gap-2 text-sm text-app-text-secondary">
             <input type="checkbox" checked={manualOnly} onChange={(e) => setManualOnly(e.target.checked)} />
             {t("manualOnly")}
           </label>
@@ -200,7 +200,7 @@ export function ReportFilterBar({
         >
           {t("apply")}
         </button>
-        <button type="button" onClick={clear} className="text-sm text-app-text-secondary hover:text-app-text-primary">
+        <button type="button" onClick={clear} className="tap-area text-sm text-app-text-secondary hover:text-app-text-primary">
           {t("reset")}
         </button>
         <ExportMenu baseHref={exportHref} />

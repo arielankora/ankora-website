@@ -204,7 +204,7 @@ function FactForm({
         </Field>
       )}
       {(question || status !== "CONFIRMED") && (
-        <label className="flex items-center gap-2 text-sm text-app-text-primary">
+        <label className="tap-area flex items-center gap-2 text-sm text-app-text-primary">
           <input type="checkbox" name="lowImportance" defaultChecked={existing?.lowImportance} className="h-4 w-4 accent-gold" />
           {t("lowImportance")}
         </label>

@@ -397,15 +397,15 @@ export function StepsEditor({ data }: { data: StepsEditorData }) {
   return (
     <div className="flex flex-col" data-testid="steps-editor">
       <nav className="flex flex-wrap items-center gap-2 text-sm text-app-text-secondary" aria-label={tp("page.breadcrumb")}>
-        <Link href={`/app/clients/${data.clientId}?tab=file`} className="hover:underline">
+        <Link href={`/app/clients/${data.clientId}?tab=file`} className="tap-area hover:underline">
           {data.clientName}
         </Link>
         <span aria-hidden="true">/</span>
-        <Link href={`/app/clients/${data.clientId}?tab=file&section=processes`} className="hover:underline">
+        <Link href={`/app/clients/${data.clientId}?tab=file&section=processes`} className="tap-area hover:underline">
           {tp("page.processes")}
         </Link>
         <span aria-hidden="true">/</span>
-        <Link href={processHref} className="hover:underline">
+        <Link href={processHref} className="tap-area hover:underline">
           {data.code}
         </Link>
         <span aria-hidden="true">/</span>

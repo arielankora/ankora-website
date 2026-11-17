@@ -110,7 +110,7 @@ export default async function BrainMetricsPage() {
                 {report.clients.map((c) => (
                   <tr key={c.clientId}>
                     <td className="py-2 pe-3">
-                      <Link dir="auto" href={`/app/clients/${c.clientId}?tab=file`} className="text-app-text-primary hover:text-app-text-accent">
+                      <Link dir="auto" href={`/app/clients/${c.clientId}?tab=file`} className="tap-area text-app-text-primary hover:text-app-text-accent">
                         {c.clientName}
                       </Link>
                     </td>

@@ -92,14 +92,16 @@ export function BottomNav({
               <p className="text-xs text-app-text-tertiary">{roleLabel}</p>
             </div>
             {overflow.length > 0 && (
-              <nav className="mb-4 flex flex-col gap-4">
+              <nav className="mb-4 flex flex-col">
                 {overflow.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
                     prefetch={false}
                     onClick={() => setMoreOpen(false)}
-                    className="flex items-center gap-3 text-sm text-app-text-primary"
+                    // 44px rows (Apple's minimum) in place of 20px text
+                    // lines with 16px gaps (iPhone audit, 17.11.2026).
+                    className="flex min-h-[44px] items-center gap-3 text-sm text-app-text-primary"
                   >
                     {(() => {
                       const Icon = NAV_ICONS[item.href] ?? Home;

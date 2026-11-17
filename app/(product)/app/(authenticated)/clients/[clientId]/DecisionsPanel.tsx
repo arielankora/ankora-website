@@ -98,7 +98,7 @@ export function DecisionsPanel({
     <div className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <h2 className="text-sm font-medium text-app-text-primary">{t("title", { count: decisions.filter((d) => d.status === "OPEN").length })}</h2>
-        <button type="button" onClick={() => setOpen((v) => !v)} className="text-xs text-app-text-accent hover:underline">
+        <button type="button" onClick={() => setOpen((v) => !v)} className="tap-area text-xs text-app-text-accent hover:underline">
           {open ? t("close") : t("new")}
         </button>
       </div>
@@ -198,7 +198,7 @@ export function DecisionsPanel({
                 {d.status === "OPEN" && (
                   <>
                     <span className="text-app-warning">{t("waiting")}</span>
-                    <button type="button" onClick={() => cancel(d.id, d.question)} className="hover:text-app-error">
+                    <button type="button" onClick={() => cancel(d.id, d.question)} className="tap-area hover:text-app-error">
                       {t("cancel")}
                     </button>
                   </>

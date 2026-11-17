@@ -163,7 +163,7 @@ export function ConnectionsScreen(props: {
               <p className="rounded-[10px] bg-app-neutral-soft px-3 py-2 text-xs text-app-text-secondary">{t("new.googleNotReady")}</p>
             )}
             <details className="rounded-[10px] border border-app-border px-3.5 py-2.5">
-              <summary className="cursor-pointer text-sm font-medium text-app-text-primary">{t("new.appPassword")}</summary>
+              <summary className="tap-area cursor-pointer text-sm font-medium text-app-text-primary">{t("new.appPassword")}</summary>
               <form action={formAction} className="mt-3 flex flex-col gap-2">
                 <input type="hidden" name="clientId" value={props.clientId} />
                 <p className="text-xs text-app-text-secondary">{t("new.appPasswordHint")}</p>

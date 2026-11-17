@@ -23,7 +23,7 @@ export function ExceptionApproverForm({ userId, value }: { userId: string; value
   return (
     <form action={formAction} className="flex flex-wrap items-center gap-3">
       <input type="hidden" name="userId" value={userId} />
-      <label className="flex items-center gap-2 text-sm text-app-text-primary">
+      <label className="tap-area flex items-center gap-2 text-sm text-app-text-primary">
         <input type="checkbox" name="canApproveExceptions" defaultChecked={value} className="h-4 w-4 accent-gold" />
         {t("label")}
       </label>

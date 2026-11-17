@@ -85,7 +85,7 @@ export function ApprovalRow({ row }: { row: RowView }) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           {row.showLabel && <KindLabel label={row.label} tone={row.tone} />}
-          <a href={row.href} dir="auto" className="text-[14px] font-medium text-app-text-primary hover:text-app-text-accent hover:underline">
+          <a href={row.href} dir="auto" className="tap-area text-[14px] font-medium text-app-text-primary hover:text-app-text-accent hover:underline">
             {row.title}
           </a>
         </div>
@@ -192,7 +192,7 @@ export function ApprovalRow({ row }: { row: RowView }) {
               </a>
             )}
             {!reject && (row.actions.approve || row.go) && (
-              <a href={row.href} className="text-app-text-secondary hover:text-app-text-primary hover:underline">
+              <a href={row.href} className="tap-area text-app-text-secondary hover:text-app-text-primary hover:underline">
                 {t("row.otherwise")}
               </a>
             )}
