@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Copy, ExternalLink, Sparkles, Timer } from "lucide-react";
 import { recordAdvancePromptCopiedAction, startTimerFromAdvanceAction } from "./actions";
+import { recordPromptCopiedAction } from "../../prompt-copy-actions";
 import { useActiveTimer } from "@/components/app/ActiveTimerProvider";
 import type { AdvanceTimerOutcome } from "@/lib/advance-timer";
 
@@ -73,6 +74,7 @@ export function AdvanceWithClaude({
   function copied() {
     setState("copied");
     void recordAdvancePromptCopiedAction({ taskId, mode });
+    void recordPromptCopiedAction({ kind: mode === "lessons" ? "advance_lessons" : "advance_plan", chars: prompt.length });
   }
 
   const label = mode === "lessons" ? t("lessons") : t("plan");

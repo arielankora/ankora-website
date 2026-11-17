@@ -258,6 +258,8 @@ model User {
   clientMemberships   ClientUser[]
   clientAccess        UserClientAccess[]
   auditEvents         AuditEvent[]         @relation("AuditActor")
+  mcpToolCalls        McpToolCall[]
+  claudePromptCopies  ClaudePromptCopy[]
   passwordResetTokens PasswordResetToken[]
   portalLoginTokens   PortalLoginToken[]
   timeEntries         TimeEntry[]
@@ -4827,4 +4829,65 @@ enum ConnectionKind {
   MAIL_APP_PASSWORD
   /// The account manager's own mailbox, send only.
   MANAGER_SEND
+}
+
+// --- Claude usage measurement (17.11.2026) ---------------------------------
+//
+// Ankora's own view of how much of each employee's Claude allowance the app
+// causes, from any surface (Cowork, the browser, the phone): every call to
+// the staff MCP connector, and every prompt the app copies for Claude. The
+// goal is to stop people hitting the five-hour window and to see which
+// tools and prompts to shrink, so these rows are measurements only. They
+// never hold a tool's arguments or result, nor a prompt's text: sizes,
+// timings and a short hash of the arguments that can spot the same call
+// made twice, nothing that could be read back.
+//
+// Kept 90 days (app/api/cron/claude-usage-retention).
+
+/// One call to a tool on the staff MCP connector (/api/mcp).
+model McpToolCall {
+  id          String   @id @default(cuid())
+  /// Null when the call never reached an identified user (a refused token).
+  userId      String?
+  tool        String
+  /// False when the tool answered with isError, a refusal included.
+  ok          Boolean
+  /// What went back to Claude: UTF-8 bytes of every text part plus the
+  /// decoded size of every image.
+  resultBytes Int
+  /// Characters of text, the closest cheap proxy for tokens.
+  resultChars Int
+  imageCount  Int      @default(0)
+  /// The tool said it cut its answer short (`"truncated": true`).
+  truncated   Boolean  @default(false)
+  /// First 16 hex characters of a SHA-256 over the arguments, keys sorted.
+  /// Equal hashes from one user minutes apart are the same call made twice.
+  argsHash    String
+  durationMs  Int
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([tool, createdAt])
+  @@map("mcp_tool_calls")
+}
+
+/// One copy of a prompt that Ankora built for Claude ("קדם עם קלוד",
+/// "חלץ ידע עם קלוד", a translation, a client summary).
+model ClaudePromptCopy {
+  id        String   @id @default(cuid())
+  userId    String?
+  /// See PROMPT_KINDS in lib/claude-usage/prompt-kinds.ts.
+  kind      String
+  /// Length of the prompt in characters. Never the prompt itself.
+  chars     Int
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@map("claude_prompt_copies")
 }

@@ -6,6 +6,8 @@ import { checkRateLimit, clientIpFrom } from "@/lib/rate-limit";
 import { hashMcpToken, looksLikeMcpToken, parseBearerToken } from "@/lib/mcp/token";
 import { isProductionBuild } from "@/lib/env";
 import { TOOL_INPUT_LIMIT } from "@/lib/mcp/limits";
+import { withToolMeasurement } from "@/lib/claude-usage/measure";
+import { recordToolCall } from "@/lib/claude-usage/record";
 
 // Phase 13 (MCP server, docs/adr/0005). The Model Context Protocol
 // endpoint that lets an Ankora employee reach the Time Tracking app from
@@ -39,7 +41,12 @@ export const dynamic = "force-dynamic";
 // timeout rather than hanging a user's Claude session.
 export const maxDuration = 60;
 
-const handler = createMcpHandler(registerAnkoraTools, {
+// Claude usage measurement (17.11.2026): every tool call is logged with its
+// size and timing (never its arguments or result), so Ankora can see which
+// tools cost each employee's Claude allowance the most. The wrapper sits
+// here rather than inside registerAnkoraTools so the tool tests, which
+// register against a stand-in server, are untouched by it.
+const handler = createMcpHandler((server) => registerAnkoraTools(withToolMeasurement(server, recordToolCall)), {
   // Caps the number of array elements and object members one tools/call
   // may ask the SDK to validate. See lib/mcp/limits.ts: without it, the
   // 2.3.0 upgrade that closed GHSA-46jr-4wx8-v453 does nothing, because

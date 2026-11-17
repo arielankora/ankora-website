@@ -17,6 +17,9 @@ export const prisma = new PrismaClient();
 
 const TABLES = [
   "audit_events",
+  // Claude usage measurement (17.11.2026): before the users they point at.
+  "mcp_tool_calls",
+  "claude_prompt_copies",
   // Marketing site contact requests (11.10.2026). No foreign keys.
   "website_leads",
   // Communications storage, stage 2 (1.11.2026): transcripts before the

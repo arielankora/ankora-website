@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { recordPromptCopiedAction } from "../prompt-copy-actions";
 
 // docs/adr/0001 section 19.14. The prompt text itself is built server-side
 // in page.tsx (via lib/client-activity-prompt.ts, using real DB data) and
@@ -16,6 +17,7 @@ export function ClientSummaryView({ text, filename }: { text: string; filename: 
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
+      void recordPromptCopiedAction({ kind: "client_activity", chars: text.length });
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard API can be unavailable (e.g. non-HTTPS, permissions) -
