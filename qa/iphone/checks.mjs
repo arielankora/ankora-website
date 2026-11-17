@@ -161,6 +161,13 @@ export function pageChecks() {
     if (el.tagName === "INPUT" && ["checkbox", "radio"].includes(el.type)) {
       const lab = el.closest("label") || (el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`));
       if (lab) target = lab;
+    } else if (["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)) {
+      // A field inside its own label is focused by a tap anywhere on the label.
+      const lab = el.closest("label");
+      if (lab && lab.querySelectorAll("input:not([type=hidden]), select, textarea").length === 1) {
+        const lr = lab.getBoundingClientRect(), er = el.getBoundingClientRect();
+        if (lr.width * lr.height > er.width * er.height) target = lab;
+      }
     }
     if (seenTap.has(target)) continue;
     seenTap.add(target);
@@ -176,6 +183,12 @@ export function pageChecks() {
     }
     const r = target.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) continue;
+    // A hit area drawn by ::before (the app's .tap-area utility) counts: it is what a finger hits.
+    const pb = getComputedStyle(target, "::before");
+    const hasHit = pb.content && pb.content !== "none" && pb.position === "absolute";
+    const hitW = hasHit ? Math.max(r.width, parseFloat(pb.width) || 0) : r.width;
+    const hitH = hasHit ? Math.max(r.height, parseFloat(pb.height) || 0) : r.height;
+    if (hitW >= 44 && hitH >= 44) continue;
     if (r.width < 44 || r.height < 44) {
       add("tap-target", r.width < 24 || r.height < 24 ? "medium" : "low", `tap target ${Math.round(r.width)}x${Math.round(r.height)}px (min 44x44)`, target, { value: Math.round(Math.min(r.width, r.height)) });
     }
