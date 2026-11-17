@@ -3,7 +3,8 @@ import { authorizeCronRequest } from "@/lib/cron-auth";
 import { pruneClaudeUsage } from "@/lib/claude-usage/record";
 
 // Claude usage measurement (17.11.2026): deletes tool-call and prompt-copy
-// measurements older than CLAUDE_USAGE_RETENTION_DAYS. Its own cron so it
+// measurements older than CLAUDE_USAGE_RETENTION_DAYS, and Cowork events
+// older than COWORK_EVENTS_RETENTION_DAYS. Its own cron so it
 // can be run by hand without running anything else. Same CRON_SECRET
 // protection as the other cron routes.
 export async function GET(request: Request) {

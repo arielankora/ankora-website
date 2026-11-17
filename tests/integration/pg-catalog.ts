@@ -177,6 +177,11 @@ export function fixtureValue(
     case "int4":
     case "int8":
       return i + 1;
+    // cowork_events.costUsd (17.11.2026), the first decimal column.
+    case "numeric":
+    case "float4":
+    case "float8":
+      return `${i + 1}.25`;
     case "timestamp":
     case "timestamptz":
       return new Date(Date.UTC(2026, 0, 1 + i, 9, 30, 0)).toISOString();

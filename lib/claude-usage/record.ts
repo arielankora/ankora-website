@@ -42,11 +42,19 @@ export function recordPromptCopy(userId: string, kind: unknown, chars: unknown):
 /// change with a month after it; short enough that the tables stay small.
 export const CLAUDE_USAGE_RETENTION_DAYS = 90;
 
-export async function pruneClaudeUsage(now: Date = new Date()): Promise<{ toolCalls: number; promptCopies: number }> {
-  const before = new Date(now.getTime() - CLAUDE_USAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000);
-  const [toolCalls, promptCopies] = await prisma.$transaction([
+/// Cowork's telemetry is kept twice as long (stage 2): its rows are fewer
+/// per day, and half a year shows a seasonal peak against a quiet month.
+export const COWORK_EVENTS_RETENTION_DAYS = 180;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export async function pruneClaudeUsage(now: Date = new Date()): Promise<{ toolCalls: number; promptCopies: number; coworkEvents: number }> {
+  const before = new Date(now.getTime() - CLAUDE_USAGE_RETENTION_DAYS * DAY_MS);
+  const coworkBefore = new Date(now.getTime() - COWORK_EVENTS_RETENTION_DAYS * DAY_MS);
+  const [toolCalls, promptCopies, coworkEvents] = await prisma.$transaction([
     prisma.mcpToolCall.deleteMany({ where: { createdAt: { lt: before } } }),
     prisma.claudePromptCopy.deleteMany({ where: { createdAt: { lt: before } } }),
+    prisma.coworkEvent.deleteMany({ where: { occurredAt: { lt: coworkBefore } } }),
   ]);
-  return { toolCalls: toolCalls.count, promptCopies: promptCopies.count };
+  return { toolCalls: toolCalls.count, promptCopies: promptCopies.count, coworkEvents: coworkEvents.count };
 }

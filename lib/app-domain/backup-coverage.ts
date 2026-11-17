@@ -286,6 +286,7 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   PortalLoginToken: { decision: "SKIP", table: "portal_login_tokens", reason: "Single-use portal login hashes, valid for one click.", recovery: "The client asks for a new portal link." },
   McpToolCall: { decision: "SKIP", table: "mcp_tool_calls", reason: "Claude usage measurement (17.11.2026): sizes and timings of MCP tool calls, kept 90 days. Statistics, not records: no business data, and nothing reads them but the usage report.", recovery: "Nothing to regain. Measurement starts again with the next call; the report covers less history until it refills." },
   ClaudePromptCopy: { decision: "SKIP", table: "claude_prompt_copies", reason: "Claude usage measurement (17.11.2026): the kind and length of each prompt copied for Claude, kept 90 days. Statistics, not records.", recovery: "Nothing to regain. Measurement starts again with the next copy." },
+  CoworkEvent: { decision: "SKIP", table: "cowork_events", reason: "Claude usage measurement, stage 2 (17.11.2026): Cowork's telemetry events, metadata only, kept 180 days. Statistics, not records.", recovery: "Nothing to regain. Cowork keeps sending; the report covers less history until it refills." },
   McpAccessToken: { decision: "SKIP", table: "mcp_access_tokens", reason: "Hashed MCP access tokens, one per integration client.", recovery: "Re-issue with scripts/mcp-issue-token.ts." },
   OAuthClient: {
     decision: "SKIP",

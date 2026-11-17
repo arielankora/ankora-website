@@ -48,8 +48,9 @@ const HTTP_VERBS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", 
  * Session: requireUser, requireUserOrThrow, getCurrentUser, resolvePortalClient.
  * Credential on a machine route: authorizeCronRequest, resolveBlogWriter,
  * isRequestAuthorized (the blog admin cookie), openJsonRoute (session and body
- * limits for the passkey routes), plus assertCan/can for a permission checked
- * in the entry point itself.
+ * limits for the passkey routes), authorizeOtelRequest (the shared secret Cowork
+ * sends with its telemetry, lib/claude-usage/otel-auth.ts), plus assertCan/can
+ * for a permission checked in the entry point itself.
  *
  * Adding a name here is a decision that every call to it really refuses.
  */
@@ -63,6 +64,7 @@ export const GUARDS = [
   "resolveBlogWriter",
   "isRequestAuthorized",
   "openJsonRoute",
+  "authorizeOtelRequest",
 ];
 
 /**
