@@ -8,6 +8,7 @@ import { dayStartInZone, localDateKey } from "@/lib/timezone";
 import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
 import { PROMPT_KINDS, type PromptKind } from "@/lib/claude-usage/prompt-kinds";
 import { managerSummary, type ManagerSummary } from "@/lib/claude-usage/summary";
+import { personLimits, type PersonLimits } from "@/lib/claude-usage/limits";
 import {
   ankoraToolFor,
   briefThenFile,
@@ -183,6 +184,9 @@ export type PersonUsage = {
   noTelemetry: boolean;
   /// Marked on the screen as someone who does not work in Cowork.
   nonCowork: boolean;
+  /// The browser extension's readings of this person's usage limits
+  /// (way 3): null when none arrived in the period.
+  limits: PersonLimits | null;
 };
 
 export type ToolUsage = {
@@ -212,7 +216,7 @@ export type ClaudeUsageReport = {
   prompts: { kind: PromptKind; copies: number; avgChars: number; maxChars: number }[];
   signals: { briefThenFile: number; duplicateReads: number; truncatedAnswers: number; limitHits: number };
   heaviestRequests: { promptId: string; name: string; at: string; costUsd: number; requests: number; models: string[]; ankoraTools: string[] }[];
-  coverage: { coworkEvents: number; toolCalls: number; promptCopies: number; unmatchedEmails: string[] };
+  coverage: { coworkEvents: number; toolCalls: number; promptCopies: number; unmatchedEmails: string[]; limitReadings: number };
 };
 
 const isReadOnly = (tool: string) => (TOOL_ANNOTATIONS as Record<string, { readOnlyHint?: boolean }>)[tool]?.readOnlyHint === true;
@@ -253,7 +257,7 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
   const month = monthStart(now);
   const settings = await claudeUsageSettings();
 
-  const [users, calls, events, copies, monthCosts, unmatched, firstThisMonth] = await Promise.all([
+  const [users, calls, events, copies, monthCosts, unmatched, firstThisMonth, limitSamples] = await Promise.all([
     prisma.user.findMany({
       // Active staff only: an invited or suspended person, or an old
       // duplicate account, has nothing to report and only confuses the list.
@@ -296,6 +300,11 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
     }),
     // When measurement began this month: the pace counts only measured days.
     prisma.coworkEvent.findFirst({ where: { occurredAt: { gte: month.start, lte: now } }, orderBy: { occurredAt: "asc" }, select: { occurredAt: true } }),
+    // The browser extension's limit readings (way 3).
+    prisma.claudeLimitSample.findMany({
+      where: { observedAt: { gte: from, lte: now }, userId: { not: null } },
+      select: { userId: true, fiveHourPct: true, fiveHourResetsAt: true, sevenDayPct: true, sevenDayResetsAt: true, observedAt: true },
+    }),
   ]);
 
   const DAY = 86_400_000;
@@ -312,6 +321,7 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
   const callsBy = byUser(callIn);
   const eventsBy = byUser(coworkIn);
   const copiesBy = byUser(copies);
+  const limitsBy = byUser(limitSamples);
   const monthBy = new Map(monthCosts.map((m) => [m.userId, Number(m._sum.costUsd ?? 0)]));
 
   const people: PersonUsage[] = users.map((u) => {
@@ -364,6 +374,7 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
       month: { costUsd: monthCost, ...seat },
       noTelemetry: !settings.nonCowork.includes(u.id) && userCalls.length > 0 && ev.length === 0,
       nonCowork: settings.nonCowork.includes(u.id),
+      limits: limitsBy.has(u.id) ? personLimits(limitsBy.get(u.id)!, now) : null,
     };
   });
   // Busiest first; people with no activity at all stay, at the end, so a
@@ -436,6 +447,7 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
     toolCalls: calls.length,
     promptCopies: copies.length,
     unmatchedEmails: unmatched.map((u) => u.userEmail!).filter(Boolean),
+    limitReadings: limitSamples.length,
   };
 
   return {

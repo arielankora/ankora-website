@@ -85,3 +85,48 @@ describe("managerSummary", () => {
     expect(managerSummary(base({ people })).actions).toHaveLength(3);
   });
 });
+
+describe("managerSummary with the browser extension's readings (way 3)", () => {
+  const limits = (week: number | null, hits = 0) => ({
+    current: { fiveHourPct: 10, sevenDayPct: week },
+    lastReadingAt: "2026-11-17T11:50:00.000Z",
+    fiveHourLimitHits: hits,
+    weeklyLimitHits: 0,
+  });
+
+  it("puts the real weekly limit in place of the cost estimate, and needs attention past 80%", () => {
+    const s = managerSummary(
+      base({
+        people: [person({ name: "Hadas", limits: limits(85) }), person({ name: "Ariel", limits: limits(20) })],
+        coverage: { coworkEvents: 40, toolCalls: 20, unmatchedEmails: [], limitReadings: 10 },
+      })
+    );
+    expect(s.kpis[1]).toMatchObject({ key: "closestToWeeklyLimit", value: 85, who: "Hadas", state: "off" });
+    expect(s.verdict).toBe("attention");
+    expect(s.actions).toContainEqual({ key: "nearWeeklyLimit", values: { name: "Hadas", pct: 85 } });
+  });
+
+  it("counts a limit hit the extension saw, without adding it to Cowork's own count", () => {
+    const hadas = person({ name: "Hadas", limits: limits(30, 2), cowork: { ...person({ name: "x" }).cowork, limitHits: 1 } });
+    const s = managerSummary(base({ people: [hadas], signals: { duplicateReads: 0, limitHits: 1 }, coverage: { coworkEvents: 40, toolCalls: 20, unmatchedEmails: [], limitReadings: 5 } }));
+    expect(s.kpis[0]).toMatchObject({ key: "limitHits", value: 2 });
+    expect(s.actions[0]).toEqual({ key: "limitHit", values: { name: "Hadas", count: 2 } });
+  });
+
+  it("once the extension reports for anyone, asks to check it for an active person it never reported for", () => {
+    const s = managerSummary(
+      base({
+        people: [person({ name: "Hadas", limits: limits(20) }), person({ name: "Sagit" })],
+        coverage: { coworkEvents: 40, toolCalls: 20, unmatchedEmails: [], limitReadings: 3 },
+      })
+    );
+    expect(s.actions).toContainEqual({ key: "checkExtension", values: { name: "Sagit" } });
+    expect(s.verdict).toBe("partial");
+  });
+
+  it("asks nothing about the extension before it is rolled out", () => {
+    const s = managerSummary(base());
+    expect(s.actions.some((a) => a.key === "checkExtension")).toBe(false);
+    expect(s.kpis[1].key).toBe("closestToThreshold");
+  });
+});

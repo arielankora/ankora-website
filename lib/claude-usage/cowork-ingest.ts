@@ -23,3 +23,23 @@ export async function ingestCoworkEvents(rows: CoworkEventRow[]): Promise<{ stor
   });
   return { stored: count, duplicates: rows.length - count };
 }
+
+/// Stores one reading from the browser extension (way 3), matched to an
+/// Ankora user by the Claude account's email, else the Chrome profile's.
+export async function ingestLimitReading(r: import("@/lib/claude-usage/limits").LimitReading): Promise<{ matched: boolean }> {
+  const emails = [r.email, r.altEmail].filter((e): e is string => !!e);
+  const user = await prisma.user.findFirst({ where: { email: { in: emails, mode: "insensitive" }, deletedAt: null }, select: { id: true } });
+  await prisma.claudeLimitSample.create({
+    data: {
+      userId: user?.id ?? null,
+      email: r.email,
+      fiveHourPct: r.fiveHourPct,
+      fiveHourResetsAt: r.fiveHourResetsAt,
+      sevenDayPct: r.sevenDayPct,
+      sevenDayResetsAt: r.sevenDayResetsAt,
+      observedAt: r.observedAt,
+      extensionVersion: r.extensionVersion,
+    },
+  });
+  return { matched: !!user };
+}

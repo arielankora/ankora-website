@@ -13,7 +13,7 @@
 
 export type KpiState = "ok" | "watch" | "off" | "none";
 
-export type KpiKey = "limitHits" | "closestToThreshold" | "cacheShare" | "duplicateRate" | "heavyModelShare" | "avgCallKb";
+export type KpiKey = "limitHits" | "closestToThreshold" | "closestToWeeklyLimit" | "cacheShare" | "duplicateRate" | "heavyModelShare" | "avgCallKb";
 
 export type Kpi = {
   key: KpiKey;
@@ -24,7 +24,7 @@ export type Kpi = {
   who?: string;
 };
 
-export type ActionKey = "shortenTool" | "checkTelemetry" | "lighterModel" | "repeatReads" | "limitHit" | "nearThreshold";
+export type ActionKey = "shortenTool" | "checkTelemetry" | "lighterModel" | "repeatReads" | "limitHit" | "nearThreshold" | "nearWeeklyLimit" | "checkExtension";
 export type SummaryAction = { key: ActionKey; values: Record<string, string | number> };
 
 export type Verdict = "ok" | "attention" | "partial";
@@ -40,6 +40,9 @@ export type ManagerSummary = {
 export const KPI_TARGETS: Record<Exclude<KpiKey, "limitHits">, { target: number; watch: number; higherIsBetter?: boolean }> = {
   /// Percent of the monthly threshold used by the person closest to it.
   closestToThreshold: { target: 80, watch: 100 },
+  /// The highest weekly-limit share, read by the browser extension (way 3).
+  /// Past 80% a person is days, or hours, from getting stuck.
+  closestToWeeklyLimit: { target: 60, watch: 80 },
   /// Percent of input read from the cache. Low means conversations that
   /// start from nothing again and again.
   cacheShare: { target: 80, watch: 60, higherIsBetter: true },
@@ -78,18 +81,31 @@ export type SummaryInput = {
     connector: { calls: number };
     month: { costUsd: number; thresholdUsd: number; status: "ok" | "near" | "over" };
     noTelemetry: boolean;
+    /// The browser extension's readings (way 3); absent or null when none.
+    limits?: {
+      current: { fiveHourPct: number | null; sevenDayPct: number | null } | null;
+      lastReadingAt: string | null;
+      fiveHourLimitHits: number;
+      weeklyLimitHits: number;
+    } | null;
+    nonCowork?: boolean;
   }[];
   tools: { tool: string; totalBytes: number }[];
   signals: { duplicateReads: number; limitHits: number };
-  coverage: { coworkEvents: number; toolCalls: number; unmatchedEmails: string[] };
+  coverage: { coworkEvents: number; toolCalls: number; unmatchedEmails: string[]; limitReadings?: number };
 };
 
 export function managerSummary(r: SummaryInput): ManagerSummary {
   const sum = <T>(xs: T[], f: (x: T) => number) => xs.reduce((n, x) => n + f(x), 0);
 
   // 1. Limit hits: any is worth a look; more than two in a week is off.
-  const limitHits = r.signals.limitHits;
-  const limitState: KpiState = r.coverage.coworkEvents === 0 ? "none" : limitHits === 0 ? "ok" : limitHits <= 2 ? "watch" : "off";
+  // Two sources can see the same hit: Cowork's error, and the extension's
+  // reading at 100%. Per person the larger count is taken, never the sum.
+  const extHits = (p: SummaryInput["people"][number]) => (p.limits ? p.limits.fiveHourLimitHits + p.limits.weeklyLimitHits : 0);
+  const personHits = (p: SummaryInput["people"][number]) => Math.max(p.cowork.limitHits, extHits(p));
+  const hasLimitData = r.coverage.coworkEvents > 0 || (r.coverage.limitReadings ?? 0) > 0;
+  const limitHits = Math.max(r.signals.limitHits, sum(r.people, personHits));
+  const limitState: KpiState = !hasLimitData ? "none" : limitHits === 0 ? "ok" : limitHits <= 2 ? "watch" : "off";
 
   // 2. Closest to the threshold.
   const ranked = r.people
@@ -115,9 +131,18 @@ export function managerSummary(r: SummaryInput): ManagerSummary {
   const bytes = sum(r.tools, (t) => t.totalBytes);
   const avgCallKb = calls > 0 ? round1(bytes / calls / 1000) : null;
 
+  // 2b. With the extension's readings, the real weekly limit replaces the
+  // cost estimate: it is what actually gets a person stuck.
+  const weekly = r.people
+    .filter((p) => p.limits?.current?.sevenDayPct != null)
+    .map((p) => ({ name: p.name, pct: p.limits!.current!.sevenDayPct! }))
+    .sort((a, b) => b.pct - a.pct)[0];
+
   const kpis: Kpi[] = [
-    { key: "limitHits", value: r.coverage.coworkEvents === 0 ? null : limitHits, state: limitState },
-    { key: "closestToThreshold", value: closest ? Math.round(closest.pct) : null, state: stateOf("closestToThreshold", closest ? closest.pct : null), ...(closest ? { who: closest.name } : {}) },
+    { key: "limitHits", value: hasLimitData ? limitHits : null, state: limitState },
+    weekly
+      ? { key: "closestToWeeklyLimit", value: Math.round(weekly.pct), state: stateOf("closestToWeeklyLimit", weekly.pct), who: weekly.name }
+      : { key: "closestToThreshold", value: closest ? Math.round(closest.pct) : null, state: stateOf("closestToThreshold", closest ? closest.pct : null), ...(closest ? { who: closest.name } : {}) },
     { key: "cacheShare", value: cacheShare, state: stateOf("cacheShare", cacheShare) },
     { key: "duplicateRate", value: duplicateRate, state: stateOf("duplicateRate", duplicateRate) },
     { key: "heavyModelShare", value: heavyModelShare, state: stateOf("heavyModelShare", heavyModelShare) },
@@ -126,7 +151,11 @@ export function managerSummary(r: SummaryInput): ManagerSummary {
 
   // Things to do, most urgent first, at most three.
   const actions: SummaryAction[] = [];
-  for (const p of r.people) if (p.cowork.limitHits > 0) actions.push({ key: "limitHit", values: { name: p.name, count: p.cowork.limitHits } });
+  for (const p of r.people) if (personHits(p) > 0) actions.push({ key: "limitHit", values: { name: p.name, count: personHits(p) } });
+  for (const p of r.people) {
+    const w = p.limits?.current?.sevenDayPct;
+    if (w != null && w >= KPI_TARGETS.closestToWeeklyLimit.watch && w < 100) actions.push({ key: "nearWeeklyLimit", values: { name: p.name, pct: Math.round(w) } });
+  }
   for (const p of r.people) if (p.month.status !== "ok") actions.push({ key: "nearThreshold", values: { name: p.name, cost: round1(p.month.costUsd), threshold: p.month.thresholdUsd } });
   const top = [...r.tools].sort((a, b) => b.totalBytes - a.totalBytes)[0];
   if (top && bytes > 0) {
@@ -136,12 +165,18 @@ export function managerSummary(r: SummaryInput): ManagerSummary {
   if (heavyModelShare !== null && stateOf("heavyModelShare", heavyModelShare) === "off") actions.push({ key: "lighterModel", values: { share: heavyModelShare } });
   if (duplicateRate !== null && stateOf("duplicateRate", duplicateRate) === "off") actions.push({ key: "repeatReads", values: { rate: duplicateRate } });
   for (const p of r.people) if (p.noTelemetry) actions.push({ key: "checkTelemetry", values: { name: p.name } });
+  // Once the extension reports for anyone, a person it never reported for
+  // probably has it missing, or is signed out of claude.ai.
+  const extensionLive = (r.coverage.limitReadings ?? 0) > 0;
+  const noExtension = (p: SummaryInput["people"][number]) => extensionLive && !p.limits && (p.cowork.requests > 0 || p.connector.calls > 0);
+  for (const p of r.people) if (noExtension(p)) actions.push({ key: "checkExtension", values: { name: p.name } });
 
-  const missing = r.coverage.coworkEvents === 0 || r.people.some((p) => p.noTelemetry) || r.coverage.unmatchedEmails.length > 0;
+  const missing = (r.coverage.coworkEvents === 0 && !extensionLive) || r.people.some((p) => p.noTelemetry || noExtension(p)) || r.coverage.unmatchedEmails.length > 0;
   // The verdict is about people: stuck, or heading past their threshold.
   // An indicator off target shows on its own card and in the actions; it
   // does not turn a quiet week into one that needs attention.
-  const needsAttention = limitHits > 0 || r.people.some((p) => p.month.status !== "ok");
+  const nearWeekly = r.people.some((p) => (p.limits?.current?.sevenDayPct ?? 0) >= KPI_TARGETS.closestToWeeklyLimit.watch);
+  const needsAttention = limitHits > 0 || nearWeekly || r.people.some((p) => p.month.status !== "ok");
   const verdict: Verdict = needsAttention ? "attention" : missing ? "partial" : "ok";
 
   return { verdict, kpis, actions: actions.slice(0, 3) };

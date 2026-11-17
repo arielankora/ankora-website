@@ -2376,6 +2376,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-17",
       "riskReason": "Read-only report for SUPER_ADMIN, plus the seats form. Shows staff usage, never client data or prompt text."
+    },
+    "api:/api/claude-limits": {
+      "kind": "api",
+      "area": "api",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-17",
+      "riskReason": "Public URL every employee's browser posts usage-limit readings to (tools/claude-limits-extension). Behind CLAUDE_LIMITS_SECRET; stores two percentages, two reset times and an email, nothing else."
     }
   },
   "waivers": {},
