@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approvalAnchor, approvalRowUrl, batchUrl, clientDecisionUrl, processUrl, proposalAnchor, proposalUrl } from "@/lib/approval-links";
+import { approvalAnchor, approvalRowUrl, batchUrl, clientDecisionUrl, pauseAnchor, pauseUrl, processUrl, proposalAnchor, proposalUrl } from "@/lib/approval-links";
 
 // The links Claude hands out and the anchors the screens render are one
 // definition (2.11.2026). These hold the shape a person clicks.
@@ -27,5 +27,13 @@ describe("approval links", () => {
     // 13.11.2026 (processes redesign, stage 2): a process has its own page.
     expect(processUrl(BASE, "c1", "p1")).toBe("https://www.ankora.co.il/app/clients/c1/processes/p1");
     expect(clientDecisionUrl(BASE, "c1", "d1")).toBe("https://www.ankora.co.il/app/clients/c1#decision-d1");
+  });
+
+  it("opens a pause on the knowledge review: a client's on that client, a kind's on every client (17.11.2026)", () => {
+    expect(pauseAnchor("pz1")).toBe("pause-pz1");
+    expect(pauseUrl(BASE, { id: "pz1", clientId: "c1" })).toBe("https://www.ankora.co.il/app/approvals?tab=knowledge&clientId=c1#pause-pz1");
+    expect(pauseUrl(BASE, { id: "pz2", clientId: null })).toBe("https://www.ankora.co.il/app/approvals?tab=knowledge#pause-pz2");
+    // A plain path for the screen itself, as fileItemUrl is used there.
+    expect(pauseUrl("", { id: "pz2", clientId: null })).toBe("/app/approvals?tab=knowledge#pause-pz2");
   });
 });

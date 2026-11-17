@@ -36,6 +36,12 @@ export function autoReviewAnchor(proposalId: string): string {
   return `auto-${safe(proposalId)}`;
 }
 
+/// The id of one pause on "נכנס אוטומטית": a kind or a client sent back
+/// to a person after too many errors (17.11.2026).
+export function pauseAnchor(pauseId: string): string {
+  return `pause-${safe(pauseId)}`;
+}
+
 /// The id of one decision in the client's decisions panel.
 export function decisionAnchor(decisionId: string): string {
   return `decision-${safe(decisionId)}`;
@@ -89,6 +95,13 @@ export function clientDecisionUrl(baseUrl: string, clientId: string, decisionId:
 /// client, where it is marked "תקין" or taken out again.
 export function autoReviewUrl(baseUrl: string, clientId: string, proposalId: string): string {
   return join(baseUrl, `${approvalsPath("knowledge", clientId)}#${autoReviewAnchor(proposalId)}`);
+}
+
+/// A pause on "נכנס אוטומטית", where a manager lifts it. A client's pause
+/// opens the knowledge review on that client; a kind's pause, on every
+/// client. The card with the pauses is shown under any client filter.
+export function pauseUrl(baseUrl: string, pause: { id: string; clientId: string | null }): string {
+  return join(baseUrl, `${approvalsPath("knowledge", pause.clientId)}#${pauseAnchor(pause.id)}`);
 }
 
 /// An item in the client's file.

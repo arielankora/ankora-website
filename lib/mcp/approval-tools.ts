@@ -12,8 +12,11 @@ import { decideAutoAppliedForAi, decideProposalForAi, findApprovalForAi, listApp
 import type { AutoAppliedDecision } from "@/lib/auto-apply";
 import { proposalStatsForAi } from "@/lib/app-domain/proposal-stats";
 import { APPROVAL_TABS, KIND_LABELS, type ApprovalItem, type ApprovalKind } from "@/lib/approvals";
-import { appUrl, approvalRowUrl, autoReviewUrl, batchUrl, fileItemUrl, proposalUrl } from "@/lib/approval-links";
-import { listAutoReview } from "@/lib/app-domain/auto-apply";
+import { appUrl, approvalRowUrl, autoReviewUrl, batchUrl, fileItemUrl, pauseUrl, proposalUrl } from "@/lib/approval-links";
+import { autoApplyOverview, listAutoReview } from "@/lib/app-domain/auto-apply";
+import { pauseErrorsLine, type AutoErrorSummary } from "@/lib/auto-apply";
+import { HEBREW } from "@/lib/i18n/outgoing";
+import he from "@/messages/he.json";
 
 // "אישורים" from Claude (2.11.2026, Ariel): "as if I were working inside
 // the app". Three tools:
@@ -64,6 +67,22 @@ function serializeProposal(base: string, p: ProposalForAi) {
   };
 }
 
+/// What caused a pause, in the screen's line ("3 טעויות: 2 עריכות (תפקיד),
+/// 1 מחיקה"). The tools speak Hebrew, as the rest of list_approvals does.
+function pauseErrorsHe(types: AutoErrorSummary["types"]): string | undefined {
+  const fieldWords = he.knowledge.auto.errorFields as Record<string, string>;
+  return (
+    pauseErrorsLine(
+      {
+        type: (type, count) => HEBREW.root(`knowledge.auto.errorTypes.${type}`, { count }),
+        field: (f) => fieldWords[f] ?? null,
+        line: (count, parts) => HEBREW.root("knowledge.auto.pauseErrors", { count, parts }),
+      },
+      types.map((e) => ({ type: e.type, count: e.count, fields: e.fields.map((f) => f.field) }))
+    ) ?? undefined
+  );
+}
+
 function serializeItem(base: string, i: ApprovalItem, timeZone: string, proposals: ProposalForAi[] | undefined) {
   return {
     kind: i.kind,
@@ -98,7 +117,7 @@ export function registerApprovalTools(server: McpServer): void {
     {
       title: "List what waits on my approval",
       description:
-        'What waits on the signed-in person\'s decision, as Ankora\'s "אישורים" screen shows it: tasks sent for sign-off, exceptions, rules, procedures, process decisions, Ankora\'s own file, proposals to client files (with each proposal), task plans, monthly summaries, the extraction guide and signed PDFs to check. Each row has its kind and id (pass them to decide_approval), Ankora\'s recommendation and why, `approve` and `reject` (the button\'s label, or null when the row has none here; `reject.needsReason` when rejecting needs a reason), and `url`: a direct link that opens the screen on that very row. Each proposal has its own `proposalId` (for decide_knowledge_proposals) and `url`. `enteredAutomatically` (with no kind, or kind knowledge) lists items that entered a client file on their own and still need a person to look: each with `proposalId`, `result` (the item in the file), `url` (its row) and `decisions`: what decide_knowledge_proposals can do with it ("reviewed_ok" for "תקין", "revert" for "ביטול"). Give the user the links as they are; never build one by hand. By default the person\'s own rows; `everyone` adds the meetings other people sent; a client shows all of that client\'s.',
+        'What waits on the signed-in person\'s decision, as Ankora\'s "אישורים" screen shows it: tasks sent for sign-off, exceptions, rules, procedures, process decisions, Ankora\'s own file, proposals to client files (with each proposal), task plans, monthly summaries, the extraction guide and signed PDFs to check. Each row has its kind and id (pass them to decide_approval), Ankora\'s recommendation and why, `approve` and `reject` (the button\'s label, or null when the row has none here; `reject.needsReason` when rejecting needs a reason), and `url`: a direct link that opens the screen on that very row. Each proposal has its own `proposalId` (for decide_knowledge_proposals) and `url`. `enteredAutomatically` (with no kind, or kind knowledge) lists items that entered a client file on their own and still need a person to look: each with `proposalId`, `result` (the item in the file), `url` (its row) and `decisions`: what decide_knowledge_proposals can do with it ("reviewed_ok" for "תקין", "revert" for "ביטול"). For a manager, `autoApplyPauses` lists the kinds and clients sent back to a person after too many errors, each with `label`, `since`, `errors` and `url` (its row, where the manager lifts it on the screen). Give the user the links as they are; never build one by hand. By default the person\'s own rows; `everyone` adds the meetings other people sent; a client shows all of that client\'s.',
       inputSchema: z.object({
         client: z.string().optional().describe("Only this client, as the user said it."),
         kind: z.enum(KINDS).optional().describe("Only this kind of row."),
@@ -120,6 +139,12 @@ export function registerApprovalTools(server: McpServer): void {
         const sorted = [...items].sort((a, b) => Number(!!b.blocking) - Number(!!a.blocking) || a.since.getTime() - b.since.getTime());
         // 3.11.2026: what entered a file on arrival and waits for a look.
         const auto = !args.kind || args.kind === "knowledge" ? await listAutoReview(actor, { clientId, forAi: true }) : [];
+        // 17.11.2026: for a manager, the kinds and clients sent back to a
+        // person, each with the link to its row. A kind's pause holds for
+        // every client, so a client filter keeps it. Lifting stays on the
+        // screen: the manager checks the bar there.
+        const overview = !args.kind || args.kind === "knowledge" ? await autoApplyOverview(actor, { forAi: true }) : null;
+        const pauses = (overview?.pauses ?? []).filter((p) => !clientId || p.scope === "KIND" || p.clientId === clientId);
         return toolJson({
           count: sorted.length,
           screen: appUrl(base, "/app/approvals"),
@@ -135,6 +160,19 @@ export function registerApprovalTools(server: McpServer): void {
                 url: autoReviewUrl(base, a.clientId, a.id),
                 result: a.resultId ? fileItemUrl(base, a.clientId, a.resultId) : undefined,
                 decisions: a.revertible ? ["reviewed_ok", "revert"] : ["reviewed_ok"],
+              }))
+            : undefined,
+          autoApplyPauses: pauses.length
+            ? pauses.map((p) => ({
+                pauseId: p.id,
+                scope: p.scope,
+                label: p.label,
+                since: localDateKey(p.since, actor.timezone),
+                reason: p.reason,
+                errors: pauseErrorsHe(p.breakdown.types),
+                decisionsSince: p.decisions,
+                approvedAsIs: p.approvedAsIs,
+                url: pauseUrl(base, p),
               }))
             : undefined,
         });
@@ -265,7 +303,7 @@ export function registerApprovalTools(server: McpServer): void {
     {
       title: "Measure how proposals to client files ended",
       description:
-        "Managers only. How every proposal to a client file ended, for measuring which kinds are approved as they come and which are edited or rejected: `groups` counts, per kind (a fact's own kind, contact, rule, process, date...) and action (CREATE, SUPERSEDE, CONTRADICT), how many are pending, approved as is, approved after an edit, approved together with others, found already in the file, rejected, or turned into a task. With `rows: true`, one row per proposal with its metadata: source kind, Claude's confidence and the review screen's level, flags, whether it is sensitive, client-visible or carries a \"do not disclose\", why it could not be approved together with others, the outcome and how long the decision took, whether the server approved it with no person (`autoApplied`), whether a person looked at it after and marked it right (`autoReviewed`), whether its item was taken out of the file again (`reverted`), for an auto-applied proposal the error it counted as (`autoError`: null, or its `type`, REVERTED, SUPERSEDED, CONTRADICTED, UPDATED or REMOVED within 30 days of entering, and `fields`, the names of the fields changed in the file; a replacement or contradiction that came from an approved proposal of a different, later source, a later meeting or message, is new information and not an error), `autoChange` (NEWER_SOURCE when such a later-source replacement or contradiction happened and was not counted, else null), and for a date whether it opens a task before it (`autoTask`). Metadata only: no proposal text, reason, quote or rejection reason is returned, and clients appear as opaque keys (L1, L2...). Proposals of a client marked \"בלי AI\" are left out and only counted. `guideVersions` gives when each version of the extraction guide was approved, to compare periods. `autoApply` says whether auto-apply is on, since when, and which kinds and clients (by key) are paused back to a person; each pause gives the errors that caused it by type (`byType`) and the fields fixed most often (`topFields`, names with counts), so you can say what to fix before a manager lifts it. `edited` says that something was changed before approval; `editedFields` names the payload fields that were changed (names only, never their values), and `editKind` says whether the change was WORDING (free text reworded, same numbers), FACT (a name, date, amount, kind, contact detail or other fact, or text added, removed or rewritten), or MIXED (both). Proposals approved before 3.11.2026 have `edited` with no fields and a null `editKind`.",
+        "Managers only. How every proposal to a client file ended, for measuring which kinds are approved as they come and which are edited or rejected: `groups` counts, per kind (a fact's own kind, contact, rule, process, date...) and action (CREATE, SUPERSEDE, CONTRADICT), how many are pending, approved as is, approved after an edit, approved together with others, found already in the file, rejected, or turned into a task. With `rows: true`, one row per proposal with its metadata: source kind, Claude's confidence and the review screen's level, flags, whether it is sensitive, client-visible or carries a \"do not disclose\", why it could not be approved together with others, the outcome and how long the decision took, whether the server approved it with no person (`autoApplied`), whether a person looked at it after and marked it right (`autoReviewed`), whether its item was taken out of the file again (`reverted`), for an auto-applied proposal the error it counted as (`autoError`: null, or its `type`, REVERTED, SUPERSEDED, CONTRADICTED, UPDATED or REMOVED within 30 days of entering, and `fields`, the names of the fields changed in the file; a replacement or contradiction that came from an approved proposal of a different, later source, a later meeting or message, is new information and not an error), `autoChange` (NEWER_SOURCE when such a later-source replacement or contradiction happened and was not counted, else null), and for a date whether it opens a task before it (`autoTask`). Metadata only: no proposal text, reason, quote or rejection reason is returned, and clients appear as opaque keys (L1, L2...). Proposals of a client marked \"בלי AI\" are left out and only counted. `guideVersions` gives when each version of the extraction guide was approved, to compare periods. `autoApply` says whether auto-apply is on, since when, and which kinds and clients (by key) are paused back to a person; each pause gives the errors that caused it by type (`byType`) and the fields fixed most often (`topFields`, names with counts), so you can say what to fix before a manager lifts it; a pause has no link here, since a link would name the client, so for the link to a pause call list_approvals (`autoApplyPauses`). `edited` says that something was changed before approval; `editedFields` names the payload fields that were changed (names only, never their values), and `editKind` says whether the change was WORDING (free text reworded, same numbers), FACT (a name, date, amount, kind, contact detail or other fact, or text added, removed or rewritten), or MIXED (both). Proposals approved before 3.11.2026 have `edited` with no fields and a null `editKind`.",
       inputSchema: z.object({
         since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Only proposals that arrived on or after this day, YYYY-MM-DD. Omit for all of them."),
         via: z.enum(["MCP", "SCREEN"]).optional().describe("MCP: sent by Claude (the extraction). SCREEN: typed on the screen. Omit for both."),

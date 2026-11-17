@@ -348,12 +348,16 @@ export async function liftAutoApplyPause(actor: User, id: string) {
 /// began, one at a time, and how many were approved as they came: the bar
 /// for lifting it (30 decisions, a lower bound of 85%) is checked by the
 /// manager. With it, what the errors that caused it were (pauseBreakdown).
-export async function autoApplyOverview(actor: User) {
+/// `forAi` (list_approvals, 17.11.2026) leaves out the pause of a client
+/// marked "בלי AI", and that client's errors from a kind's breakdown.
+export async function autoApplyOverview(actor: User, opts: { forAi?: boolean } = {}) {
   if (!canManageClients(actor.role)) return null;
-  const [setting, pauses] = await Promise.all([autoApplySetting(), activePauses()]);
-  const clientIds = pauses.filter((p) => p.scope === "CLIENT").map((p) => p.key);
-  const clients = clientIds.length ? await prisma.client.findMany({ where: { id: { in: clientIds } }, select: { id: true, name: true } }) : [];
+  const [setting, active] = await Promise.all([autoApplySetting(), activePauses()]);
+  const clientIds = active.filter((p) => p.scope === "CLIENT").map((p) => p.key);
+  const clients = clientIds.length ? await prisma.client.findMany({ where: { id: { in: clientIds } }, select: { id: true, name: true, aiExcluded: true } }) : [];
   const nameOf = new Map(clients.map((c) => [c.id, c.name]));
+  const excluded = new Set(clients.filter((c) => c.aiExcluded).map((c) => c.id));
+  const pauses = opts.forAi ? active.filter((p) => !(p.scope === "CLIENT" && excluded.has(p.key))) : active;
   const out = [];
   for (const p of pauses) {
     const decided = await prisma.knowledgeProposal.findMany({
@@ -387,6 +391,9 @@ export async function autoApplyOverview(actor: User) {
       /// the client's name (null when the client is gone).
       kindKey: p.scope === "KIND" ? p.key : null,
       clientName: p.scope === "CLIENT" ? (nameOf.get(p.key) ?? null) : null,
+      /// The client's id, for the pause's link (pauseUrl); null for a kind
+      /// or a client that is gone.
+      clientId: p.scope === "CLIENT" && nameOf.has(p.key) ? p.key : null,
       reason: p.reason,
       since: p.createdAt,
       decisions: alone.length,
@@ -394,7 +401,7 @@ export async function autoApplyOverview(actor: User) {
       lowerBound: wilsonLower(good, alone.length),
       /// 14.11.2026: the errors that caused it, by type and by the fields
       /// that were fixed, so the manager knows what to fix before lifting.
-      breakdown: await pauseBreakdown(p),
+      breakdown: await pauseBreakdown(p, { forAi: opts.forAi }),
     });
   }
   return { enabled: setting.enabled, firstEnabledAt: setting.firstEnabledAt, pauses: out };
@@ -470,6 +477,16 @@ export async function listAutoReview(actor: User, filter: { clientId?: string | 
 /// and in the morning email. One set, read by listAutoReview.
 export async function countAutoReview(actor: User, filter: { clientId?: string | null } = {}): Promise<number> {
   return (await listAutoReview(actor, filter)).length;
+}
+
+/// Whether this person can lift a pause (the same check as the lift
+/// button) and one is active. The approvals screen keeps the tab
+/// "ידע מהחילוץ" for them while it is, though nothing there waits: the
+/// lift button is on it (17.11.2026). Not a count: the menu badge and the
+/// morning email count what waits, and a pause does not.
+export async function seesActivePause(actor: User): Promise<boolean> {
+  if (!canManageClients(actor.role)) return false;
+  return (await prisma.autoApplyPause.count({ where: { liftedAt: null } })) > 0;
 }
 
 /// "תקין": a person looked at an auto-applied item and it is right.

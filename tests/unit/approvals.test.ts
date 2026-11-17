@@ -69,6 +69,16 @@ describe("approvals", () => {
     expect(visibleTabs(counts, "guide").map((t) => t.key)).toEqual(["all", "task", "exception", "guide"]);
   });
 
+  it("keeps a tab it is asked to keep at zero: ידע מהחילוץ for a manager while a pause is active (17.11.2026)", () => {
+    const counts = tabCounts([item({ kind: "task" })], 0);
+    expect(visibleTabs(counts, "all").some((t) => t.key === "knowledge")).toBe(false);
+    const kept = visibleTabs(counts, "all", ["knowledge"]);
+    expect(kept.find((t) => t.key === "knowledge")).toMatchObject({ count: 0 });
+    // A pause is not a decision: the totals stay as they were.
+    expect(counts.all).toBe(1);
+    expect(counts.knowledge).toBe(0);
+  });
+
   it("filters by client, and keeps rows that belong to no client out of a client's view", () => {
     const rows = [item({ clientId: "c1" }), item({ clientId: "c2" }), item({ kind: "guide", clientId: null })];
     expect(forClient(rows, "c2")).toHaveLength(1);
