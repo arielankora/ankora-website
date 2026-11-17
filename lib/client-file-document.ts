@@ -64,16 +64,21 @@ function statusNote(item: DocItem): string | null {
 
 /// One item as plain text, the way it is written in Markdown and read
 /// aloud: the line, its details, its status, its sources.
-export function itemLine(item: DocItem, withRef = false): string {
+/// What a line may leave out (17.11.2026, the brief): the source codes,
+/// which mean nothing without the legend the full file carries, and the
+/// owner, which a short question or message does not need.
+export type ItemLineOptions = { sources?: boolean; owner?: boolean };
+
+export function itemLine(item: DocItem, withRef = false, opts: ItemLineOptions = {}): string {
   const parts = [item.text.trim()];
   const details = (item.details ?? []).filter((d): d is string => !!d && !!d.trim());
   if (details.length) parts.push(`(${details.join(" · ")})`);
   const status = statusNote(item);
   if (status) parts.push(`**${status}**`);
   if (item.doNotDisclose) parts.push(`**לא לספר: ${item.doNotDisclose}**`);
-  const kept = [item.clientVisible ? "גלוי ללקוח" : null, item.owner ? `בעלים: ${item.owner}` : null, item.refs?.length ? `הפניות: ${item.refs.join(", ")}` : null].filter(Boolean);
+  const kept = [item.clientVisible ? "גלוי ללקוח" : null, item.owner && opts.owner !== false ? `בעלים: ${item.owner}` : null, item.refs?.length ? `הפניות: ${item.refs.join(", ")}` : null].filter(Boolean);
   if (kept.length) parts.push(`{${kept.join(" · ")}}`);
-  if (item.sources?.length) parts.push(`[${item.sources.join(", ")}]`);
+  if (item.sources?.length && opts.sources !== false) parts.push(`[${item.sources.join(", ")}]`);
   if (withRef && item.ref) parts.push(`(id: ${item.ref})`);
   return parts.join(" ");
 }
