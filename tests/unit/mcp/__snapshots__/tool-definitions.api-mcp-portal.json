@@ -1,0 +1,159 @@
+{
+  "answer_decision": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Records the client's answer to an open decision. Only the client's admin may answer, and the answer is final: it is kept as a signed record and cannot be changed afterwards (a change of mind needs a new decision from Ankora). Always read the options back to the user and get an explicit choice before calling this. Identify the decision by its question and the choice by the option's label.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "decision": {
+          "description": "The decision's question, or enough of it to identify it.",
+          "type": "string"
+        },
+        "option": {
+          "description": "The chosen option's label, exactly as the user chose it.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "decision",
+        "option"
+      ],
+      "type": "object"
+    },
+    "name": "answer_decision",
+    "title": "Answer a decision"
+  },
+  "get_status": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The client's own overview, as their Ankora portal shows it: how many of the tasks Ankora is handling for them are done, in progress or waiting for them; what is waiting for them right now; what was finished recently, with what came of it; how many decisions are waiting for their answer; and the current hour bank. Start here for any 'what's the status' question.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {},
+      "type": "object"
+    },
+    "name": "get_status",
+    "title": "Where things stand"
+  },
+  "hour_bank": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The client's hour bank: the current cycle's total, used and remaining hours and how many days are left in it, plus past cycles.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {},
+      "type": "object"
+    },
+    "name": "hour_bank",
+    "title": "Hour bank"
+  },
+  "list_decisions": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Lists the decisions Ankora has asked the client: open ones with their options and Ankora's recommendation, and, when asked, the ones already answered with what was chosen, by whom and when.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "includeAnswered": {
+          "description": "Include answered and withdrawn decisions.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "name": "list_decisions",
+    "title": "Decisions Ankora asked you"
+  },
+  "list_tasks": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Lists the tasks Ankora is handling for the client, as their portal shows them, newest movement first: each with its stage (not started, in progress, waiting for you, done), due date and, when done, what came of it. Filter by stage or by words in the title.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "search": {
+          "description": "Words that appear in the task title.",
+          "type": "string"
+        },
+        "stage": {
+          "description": "Only tasks at this stage. RECEIVED means not started yet.",
+          "enum": [
+            "RECEIVED",
+            "IN_PROGRESS",
+            "WAITING_ON_CLIENT",
+            "DONE"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "list_tasks",
+    "title": "Tasks Ankora is handling"
+  },
+  "monthly_report": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The client's monthly report, as on their portal: total billable hours, hours by category with their share, how many tasks were completed, every entry, and Ankora's written summary of the month once Ankora has approved it. Defaults to the current month.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "month": {
+          "description": "The month, YYYY-MM.",
+          "pattern": "^\\d{4}-\\d{2}$",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "monthly_report",
+    "title": "Monthly report"
+  },
+  "weekly_report": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The client's weekly activity report, as on their portal: billable hours per day, per category and per activity for one week (Sunday to Saturday). Defaults to the current week; pass any date inside another week to see that one.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "weekOf": {
+          "description": "Any day in the wanted week, YYYY-MM-DD.",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "weekly_report",
+    "title": "Weekly activity"
+  }
+}
