@@ -51,7 +51,7 @@ export function ControlLine({
                   type="button"
                   onClick={() => setOpen(open === p.key ? null : p.key!)}
                   aria-expanded={open === p.key}
-                  className={`underline decoration-dotted underline-offset-2 hover:text-app-text-primary ${tone} ${open === p.key ? "text-app-text-primary" : ""}`}
+                  className={`tap-area underline decoration-dotted underline-offset-2 hover:text-app-text-primary ${tone} ${open === p.key ? "text-app-text-primary" : ""}`}
                   data-testid={`control-${p.key}`}
                 >
                   {p.text}
@@ -65,7 +65,7 @@ export function ControlLine({
         {approvalsHref && (
           <span className="flex items-center gap-x-2">
             <span className="text-app-text-tertiary">·</span>
-            <a href={approvalsHref} className="text-app-text-accent hover:underline" data-testid="control-approvals">
+            <a href={approvalsHref} className="tap-area text-app-text-accent hover:underline" data-testid="control-approvals">
               {t("toApprovalsAndQuestions")}
             </a>
           </span>

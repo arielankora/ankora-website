@@ -132,7 +132,7 @@ function SourceForm({ clientId }: { clientId: string }) {
       {weight === "PRIMARY" && kind === "ANKORA_DOCUMENT" && (
         <p className="-mt-2 text-[11px] text-app-text-tertiary">{t("form.conversationHint")}</p>
       )}
-      <label className="flex items-center gap-2 text-sm text-app-text-primary">
+      <label className="tap-area flex items-center gap-2 text-sm text-app-text-primary">
         <input type="checkbox" name="topicsOnly" className="h-4 w-4 accent-gold" />
         {t("form.topicsOnly")}
       </label>

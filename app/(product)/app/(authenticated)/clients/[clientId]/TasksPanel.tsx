@@ -56,7 +56,7 @@ export function TasksPanel({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-medium text-app-text-primary">{t("title", { count: openCount })}</h2>
         <div className="flex items-center gap-4">
-          <Link href={`/app/tasks?clientId=${clientId}`} className="text-xs text-app-text-accent underline underline-offset-4">
+          <Link href={`/app/tasks?clientId=${clientId}`} className="tap-area text-xs text-app-text-accent underline underline-offset-4">
             {t("allTasks")}
           </Link>
           <Drawer triggerLabel={t("newTrigger")} title={t("newTitle", { name: clientName })}>
@@ -83,7 +83,7 @@ export function TasksPanel({
             return (
               <li key={task.id} {...noTranslateProps(task.aiExcluded)} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
                 <div className="min-w-0 flex-1">
-                  <Link href={`/app/tasks/${task.id}`} dir="auto" className="text-app-text-primary hover:text-app-text-accent">
+                  <Link href={`/app/tasks/${task.id}`} dir="auto" className="tap-area text-app-text-primary hover:text-app-text-accent">
                     {task.title}
                   </Link>
                   <p className="mt-0.5 text-xs text-app-text-tertiary">

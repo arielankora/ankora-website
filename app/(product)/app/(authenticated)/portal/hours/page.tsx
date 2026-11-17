@@ -225,7 +225,7 @@ export default async function PortalHoursPage(props: {
         <div className="overflow-hidden rounded-2xl border border-app-border bg-white">
           <div className="flex items-center justify-between border-b border-app-border px-[18px] py-3.5">
             <span className="text-[13.5px] font-medium text-app-text-primary">{t("thisWeek")}</span>
-            <Link href="/app/portal/hours?view=weekly" className="text-xs text-app-text-accent hover:underline">
+            <Link href="/app/portal/hours?view=weekly" className="tap-area text-xs text-app-text-accent hover:underline">
               {t("byDays")}
             </Link>
           </div>

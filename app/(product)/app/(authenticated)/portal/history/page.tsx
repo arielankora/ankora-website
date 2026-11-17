@@ -157,7 +157,7 @@ export default async function PortalHistoryPage() {
                       {r.reportType === "MONTHLY_DETAILED" && (
                         <a
                           href={`/api/portal/export?monthOffset=${monthOffsetFor(r.periodStart)}&format=pdf`}
-                          className="text-xs text-app-text-accent hover:underline"
+                          className="tap-area text-xs text-app-text-accent hover:underline"
                         >
                           {t("download")}
                         </a>

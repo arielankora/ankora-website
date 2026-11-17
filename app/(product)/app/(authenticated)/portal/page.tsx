@@ -108,7 +108,7 @@ export default async function PortalHomePage() {
             title={t("recentlyDoneTitle")}
             promises={recentlyDone}
             action={
-              <Link href="/app/portal/activity" className="text-xs text-app-text-accent hover:underline">
+              <Link href="/app/portal/activity" className="tap-area text-xs text-app-text-accent hover:underline">
                 {t("allActivity")}
               </Link>
             }
@@ -173,7 +173,7 @@ export default async function PortalHomePage() {
               )}
               {cycle.daysLeft !== null && ` · ${t("daysLeft", { days: String(cycle.daysLeft) })}`}
             </span>
-            <Link href="/app/portal/hours" className="text-xs text-app-text-accent hover:underline">
+            <Link href="/app/portal/hours" className="tap-area text-xs text-app-text-accent hover:underline">
               {t("hoursDetail")}
             </Link>
           </div>

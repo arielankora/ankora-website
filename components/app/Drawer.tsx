@@ -173,7 +173,7 @@ export function Drawer({
         onClick={() => setOpen(true)}
         className={
           variant === "link"
-            ? `text-xs text-app-text-secondary hover:text-app-text-primary ${triggerClassName}`
+            ? `tap-area text-xs text-app-text-secondary hover:text-app-text-primary ${triggerClassName}`
             : `inline-flex items-center gap-1.5 rounded-full bg-app-accent px-4 py-2.5 text-sm font-medium text-app-text-primary ${triggerClassName}`
         }
       >
@@ -194,14 +194,20 @@ export function Drawer({
               fields in a 28rem column and took endless scrolling. Every
               drawer gets the width, and the content stops at 48rem so a
               short form on a wide screen does not stretch its inputs. */}
-          <div className="absolute inset-y-0 end-0 flex w-full max-w-sm flex-col border-s border-app-border bg-white shadow-lg sm:max-w-xl lg:w-1/2 lg:max-w-none">
+          {/* Safe-area padding: the panel runs the full height of the
+              screen, so in the installed app its header sat under the
+              status bar and Dynamic Island, and its last field under the
+              home indicator (iPhone audit, 17.11.2026). Zero on a desktop. */}
+          <div className="absolute inset-y-0 end-0 flex w-full max-w-sm flex-col border-s border-app-border bg-white pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-lg sm:max-w-xl lg:w-1/2 lg:max-w-none">
             <div className="flex items-center justify-between border-b border-app-border px-5 py-4">
               <h2 className="text-base font-medium text-app-text-primary">{title}</h2>
               <button
                 type="button"
                 aria-label={tShell("close")}
                 onClick={dismiss}
-                className="text-app-text-tertiary transition-colors hover:text-app-text-primary"
+                // 44x44 to tap, the same 18px icon to see; the negative
+                // margin keeps the header's height and alignment.
+                className="-m-3 flex h-11 w-11 shrink-0 items-center justify-center text-app-text-tertiary transition-colors hover:text-app-text-primary"
               >
                 <X size={18} />
               </button>
@@ -307,7 +313,7 @@ export function CenterDialog({
             ? `inline-flex min-h-[44px] items-center rounded-[10px] bg-app-surface-nav px-5 text-sm font-bold text-white ${triggerClassName}`
             : triggerVariant === "secondary"
               ? `inline-flex min-h-[44px] items-center rounded-[10px] border border-app-border-strong bg-white px-4 text-sm text-app-text-primary ${triggerClassName}`
-              : `text-xs font-medium text-app-text-accent hover:underline ${triggerClassName}`
+              : `tap-area text-xs font-medium text-app-text-accent hover:underline ${triggerClassName}`
         }
       >
         {triggerLabel}
@@ -320,9 +326,13 @@ export function CenterDialog({
             <div
               ref={(el) => el?.focus()}
               tabIndex={-1}
-              className={`relative flex min-h-screen w-full ${size === "small" ? "max-w-[560px]" : "max-w-[1100px]"} flex-col overflow-hidden bg-white outline-none sm:min-h-0 sm:rounded-[18px] sm:shadow-xl`}
+              // On a phone this dialog is the whole screen, so its header
+              // and its end carry the safe-area insets (iPhone audit,
+              // 17.11.2026). From sm up it is a floating card and they
+              // are not needed.
+              className={`relative flex min-h-screen w-full ${size === "small" ? "max-w-[560px]" : "max-w-[1100px]"} flex-col overflow-hidden bg-white pb-[env(safe-area-inset-bottom)] outline-none sm:min-h-0 sm:rounded-[18px] sm:pb-0 sm:shadow-xl`}
             >
-              <div className="flex items-center justify-between gap-4 border-b border-app-border px-5 py-5 sm:px-8 sm:py-6">
+              <div className="flex items-center justify-between gap-4 border-b border-app-border px-5 pb-5 pt-[calc(1.25rem+env(safe-area-inset-top))] sm:px-8 sm:py-6">
                 <div className="flex flex-col gap-1">
                   {eyebrow && <p className="text-sm font-bold text-app-text-accent">{eyebrow}</p>}
                   <h2 className="text-[22px] font-extrabold text-app-text-primary sm:text-[26px]">{title}</h2>

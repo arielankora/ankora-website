@@ -56,16 +56,16 @@ export function ClientAccessForm({
       ) : (
         <>
           <div className="flex items-center gap-3 text-xs">
-            <button type="button" onClick={() => setAllChecked(true)} className="text-app-text-accent underline">
+            <button type="button" onClick={() => setAllChecked(true)} className="tap-area text-app-text-accent underline">
               {t("selectAll")}
             </button>
-            <button type="button" onClick={() => setAllChecked(false)} className="text-app-text-tertiary underline">
+            <button type="button" onClick={() => setAllChecked(false)} className="tap-area text-app-text-tertiary underline">
               {t("clearAll")}
             </button>
           </div>
           <div ref={checkboxContainerRef} className="flex flex-wrap gap-3">
             {clients.map((c) => (
-              <label key={c.id} className="flex items-center gap-1.5 text-sm text-app-text-secondary">
+              <label key={c.id} className="tap-area flex items-center gap-1.5 text-sm text-app-text-secondary">
                 <input
                   type="checkbox"
                   name="clientIds"

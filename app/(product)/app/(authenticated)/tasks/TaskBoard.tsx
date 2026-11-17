@@ -253,7 +253,7 @@ function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
           // (a pasted Facebook URL, 26.9.2026) has no space to break at,
           // and ran out of its card across the next column.
           dir="auto"
-          className="min-w-0 flex-1 text-[13.5px] leading-snug text-app-text-primary [overflow-wrap:anywhere] hover:text-app-text-secondary"
+          className="tap-area min-w-0 flex-1 text-[13.5px] leading-snug text-app-text-primary [overflow-wrap:anywhere] hover:text-app-text-secondary"
         >
           {card.title}
         </a>

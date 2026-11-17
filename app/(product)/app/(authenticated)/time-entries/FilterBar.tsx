@@ -116,7 +116,7 @@ export function FilterBar({
         >
           {t("apply")}
         </button>
-        <button type="button" onClick={clear} className="text-sm text-app-text-secondary hover:text-app-text-primary">
+        <button type="button" onClick={clear} className="tap-area text-sm text-app-text-secondary hover:text-app-text-primary">
           {t("reset")}
         </button>
         <ExportMenu baseHref={exportHref} />

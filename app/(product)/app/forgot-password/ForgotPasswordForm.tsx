@@ -31,7 +31,7 @@ export function ForgotPasswordForm() {
         {state.devLink && (
           <p className="rounded-[10px] border border-app-border bg-cream-dim p-3 text-xs">
             {t("devLink")}{" "}
-            <a href={state.devLink} className="text-app-text-accent underline">
+            <a href={state.devLink} className="tap-area text-app-text-accent underline">
               {state.devLink}
             </a>
           </p>

@@ -33,7 +33,7 @@ export default async function LoginLinkPage(props: { searchParams: Promise<{ tok
       )}
 
       <p className="mt-8 text-center text-[11px] text-app-text-tertiary">
-        <Link href="/app/login" className="hover:text-app-text-secondary">
+        <Link href="/app/login" className="tap-area hover:text-app-text-secondary">
           {t("withPassword")}
         </Link>
       </p>

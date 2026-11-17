@@ -554,7 +554,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
                     className="w-24 rounded-lg border border-app-border px-2 py-1 font-jbmono text-sm"
                   />
                 </label>
-                <label className="flex items-center gap-2 text-xs text-app-text-secondary">
+                <label className="tap-area flex items-center gap-2 text-xs text-app-text-secondary">
                   <input type="checkbox" name={`nonCowork:${p.userId}`} defaultChecked={p.nonCowork} className="h-4 w-4" />
                   {t("settings.nonCowork")}
                 </label>

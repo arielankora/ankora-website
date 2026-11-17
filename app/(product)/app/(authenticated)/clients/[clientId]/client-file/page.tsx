@@ -106,10 +106,10 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-medium text-app-text-primary">{t("title", { name: doc.clientName })}</h1>
           <div className="flex items-center gap-4">
-            <a href={`/api/clients/${clientId}/client-file?format=pdf`} className="text-sm text-app-text-accent hover:underline">
+            <a href={`/api/clients/${clientId}/client-file?format=pdf`} className="tap-area text-sm text-app-text-accent hover:underline">
               {t("downloadPdf")}
             </a>
-            <a href={`/api/clients/${clientId}/client-file`} className="text-sm text-app-text-accent hover:underline">
+            <a href={`/api/clients/${clientId}/client-file`} className="tap-area text-sm text-app-text-accent hover:underline">
               {t("downloadMarkdown")}
             </a>
           </div>

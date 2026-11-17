@@ -111,7 +111,7 @@ export function ClaudeConnectionCard({
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-4">
-        <Link href={MCP_GUIDE_HREF} className="text-sm font-medium text-app-text-accent hover:underline">
+        <Link href={MCP_GUIDE_HREF} className="tap-area text-sm font-medium text-app-text-accent hover:underline">
           {t("howTo")}
         </Link>
         {/* The card now owns disconnection (the "ניתוק" button on each

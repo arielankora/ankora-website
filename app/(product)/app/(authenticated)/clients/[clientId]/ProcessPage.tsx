@@ -150,11 +150,11 @@ export function ProcessPage({
         </div>
       )}
       <nav className="flex flex-wrap items-center gap-2 text-sm text-app-text-secondary" aria-label={t("breadcrumb")}>
-        <Link href={`/app/clients/${clientId}?tab=file`} className="hover:underline">
+        <Link href={`/app/clients/${clientId}?tab=file`} className="tap-area hover:underline">
           {clientName}
         </Link>
         <span aria-hidden="true">/</span>
-        <Link href={`/app/clients/${clientId}?tab=file&section=processes`} className="hover:underline">
+        <Link href={`/app/clients/${clientId}?tab=file&section=processes`} className="tap-area hover:underline">
           {t("processes")}
         </Link>
         <span aria-hidden="true">/</span>
@@ -224,16 +224,16 @@ export function ProcessPage({
                     <ProcessForm clientId={clientId} existing={p} {...form} only={["knowledge"]} />
                   </div>
                 </CenterDialog>
-                <button type="button" onClick={() => act(() => setProcessKindAction(p.id, guide ? "PROCESS" : "GUIDE", clientId), guide ? t("menu.nowProcess") : t("menu.nowGuide"))} className="text-app-text-primary hover:underline">
+                <button type="button" onClick={() => act(() => setProcessKindAction(p.id, guide ? "PROCESS" : "GUIDE", clientId), guide ? t("menu.nowProcess") : t("menu.nowGuide"))} className="tap-area text-app-text-primary hover:underline">
                   {guide ? t("menu.toProcess") : t("menu.toGuide")}
                 </button>
                 {canApprove && p.status === "ACTIVE" && (
-                  <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "PAUSED", clientId), tp("panel.paused"))} className="text-app-text-primary hover:underline">
+                  <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "PAUSED", clientId), tp("panel.paused"))} className="tap-area text-app-text-primary hover:underline">
                     {tp("panel.pause")}
                   </button>
                 )}
                 {canApprove && p.status === "PAUSED" && (
-                  <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "ACTIVE", clientId), tp("panel.resumed"))} className="text-app-text-primary hover:underline">
+                  <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "ACTIVE", clientId), tp("panel.resumed"))} className="tap-area text-app-text-primary hover:underline">
                     {tp("panel.resume")}
                   </button>
                 )}
@@ -245,7 +245,7 @@ export function ProcessPage({
                       const ask = p.current ? tp("panel.discardDraftConfirmRuns", { version: d.version, current: p.current.version }) : tp("panel.discardDraftConfirm", { version: d.version });
                       if (window.confirm(ask)) act(() => discardProcessVersionAction(p.id, d.version, clientId), tp("panel.draftDiscarded"));
                     }}
-                    className="text-app-text-primary hover:text-app-error"
+                    className="tap-area text-app-text-primary hover:text-app-error"
                   >
                     {tp("panel.discardDraft")}
                   </button>
@@ -257,13 +257,13 @@ export function ProcessPage({
                       if (window.confirm(tp("panel.retireConfirm", { code: p.code, title: p.title })))
                         act(() => setProcessStatusAction(p.id, "RETIRED", clientId), tp("panel.retired"), () => router.push(`/app/clients/${clientId}?tab=file&section=processes`));
                     }}
-                    className="text-app-text-primary hover:text-app-error"
+                    className="tap-area text-app-text-primary hover:text-app-error"
                   >
                     {tp("panel.retire")}
                   </button>
                 )}
                 {p.status === "DRAFT" && (
-                  <button type="button" onClick={() => act(() => removeProcessAction(p.id, clientId), tp("panel.removed"), () => router.push(`/app/clients/${clientId}?tab=file&section=processes`))} className="text-app-text-primary hover:text-app-error">
+                  <button type="button" onClick={() => act(() => removeProcessAction(p.id, clientId), tp("panel.removed"), () => router.push(`/app/clients/${clientId}?tab=file&section=processes`))} className="tap-area text-app-text-primary hover:text-app-error">
                     {tp("panel.remove")}
                   </button>
                 )}

@@ -47,7 +47,7 @@ export function HolidayCalendarsPanel({
                 onClick={() =>
                   startTransition(() => toggleHolidayCalendarSubscriptionAction(clientId, cal.calendarKey, !enabled))
                 }
-                className="text-xs font-medium text-app-text-secondary underline decoration-app-border-strong underline-offset-2 disabled:opacity-50"
+                className="tap-area text-xs font-medium text-app-text-secondary underline decoration-app-border-strong underline-offset-2 disabled:opacity-50"
               >
                 {enabled ? t("unsubscribe") : t("subscribe")}
               </button>

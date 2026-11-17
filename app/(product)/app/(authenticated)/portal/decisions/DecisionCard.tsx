@@ -234,7 +234,7 @@ export function DecisionCard({
         {/* Not a text box. Someone who wants to explain would rather talk,
             and the line they already use is one tap away. */}
         {whatsappHref ? (
-          <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="text-app-text-accent hover:underline">
+          <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="tap-area text-app-text-accent hover:underline">
             {t("talk")}
           </a>
         ) : (

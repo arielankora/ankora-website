@@ -100,7 +100,7 @@ function PendingPdfItem({ userId, userName, item }: { userId: string; userName: 
             />
           </label>
         </div>
-        <label className="flex items-center gap-2 text-xs text-app-text-secondary">
+        <label className="tap-area flex items-center gap-2 text-xs text-app-text-secondary">
           <input type="checkbox" name="checked" required className="h-4 w-4 accent-gold" />
           {t("checkedConfirm")}
         </label>

@@ -152,7 +152,7 @@ export async function WeeklyView({ searchParams }: { searchParams: { weekOffset?
             {selectedDay ? t("whatOnDay", { day: formatDay(selectedDay) }) : t("thisWeek")}
           </span>
           {selectedDay && (
-            <a href={weekHref()} className="text-xs text-app-text-accent hover:underline">
+            <a href={weekHref()} className="tap-area text-xs text-app-text-accent hover:underline">
               {t("wholeWeek")}
             </a>
           )}

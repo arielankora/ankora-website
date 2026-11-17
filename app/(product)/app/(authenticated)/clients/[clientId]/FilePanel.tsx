@@ -236,7 +236,7 @@ export function DocumentsPanel({
         </label>
 
         <div className="flex items-center gap-4 sm:col-span-4">
-          <label className="flex items-center gap-2 text-sm text-app-text-primary">
+          <label className="tap-area flex items-center gap-2 text-sm text-app-text-primary">
             <input type="checkbox" name="clientVisible" defaultChecked className="h-4 w-4 rounded border-app-border" />
             {t("clientVisible")}
           </label>

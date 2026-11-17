@@ -649,19 +649,19 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 </Link>
               )}
               {pendingProposals > 0 && tab !== "file" && (
-                <Link href={`/app/clients/${client.id}?tab=file#client-pending`} className="text-sm text-app-text-accent hover:underline">
+                <Link href={`/app/clients/${client.id}?tab=file#client-pending`} className="tap-area text-sm text-app-text-accent hover:underline">
                   {t("header.proposals", { count: pendingProposals })}
                 </Link>
               )}
               {openQuestions > 0 && (
-                <Link href={`/app/clients/${client.id}?tab=file#client-questions`} className="text-sm text-app-text-accent hover:underline" data-testid="client-questions-link">
+                <Link href={`/app/clients/${client.id}?tab=file#client-questions`} className="tap-area text-sm text-app-text-accent hover:underline" data-testid="client-questions-link">
                   {t("header.questions", { count: openQuestions })}
                 </Link>
               )}
-              <Link href={`/app/clients/${client.id}/client-file`} className="text-sm text-app-text-accent hover:underline">
+              <Link href={`/app/clients/${client.id}/client-file`} className="tap-area text-sm text-app-text-accent hover:underline">
                 {t("header.readFile")}
               </Link>
-              <Link href={`/app/clients/${client.id}/handover`} className="text-sm text-app-text-accent hover:underline">
+              <Link href={`/app/clients/${client.id}/handover`} className="tap-area text-sm text-app-text-accent hover:underline">
                 {t("header.handover")}
               </Link>
               {composer && <MessageClient clientId={client.id} {...composer} />}
@@ -732,7 +732,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                   <section id="client-pending" className="space-y-3" data-testid="client-pending-proposals">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <h2 className="text-sm font-medium text-app-text-primary">{t("pending.title")}</h2>
-                      <Link href={`/app/approvals?tab=knowledge&clientId=${client.id}`} className="text-xs text-app-text-accent hover:underline">
+                      <Link href={`/app/approvals?tab=knowledge&clientId=${client.id}`} className="tap-area text-xs text-app-text-accent hover:underline">
                         {t("pending.link")}
                       </Link>
                     </div>
@@ -1143,7 +1143,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             <div className="rounded-2xl border border-app-border bg-white p-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-medium text-app-text-primary">{t("dates.title", { count: clientDates.length })}</h2>
-                <Link href={`/app/important-dates?clientId=${client.id}`} className="text-xs text-app-text-accent underline underline-offset-4">
+                <Link href={`/app/important-dates?clientId=${client.id}`} className="tap-area text-xs text-app-text-accent underline underline-offset-4">
                   {t("dates.all")}
                 </Link>
               </div>
@@ -1153,7 +1153,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 <ul className="mt-3 space-y-2">
                   {clientDates.slice(0, 8).map((d) => (
                     <li key={d.id} className="flex items-center justify-between gap-3 text-sm">
-                      <Link href={`/app/important-dates/${d.id}`} dir="auto" className="text-app-text-primary hover:text-app-text-accent">
+                      <Link href={`/app/important-dates/${d.id}`} dir="auto" className="tap-area text-app-text-primary hover:text-app-text-accent">
                         {d.title}
                       </Link>
                       <StatusBadge label={t(`dates.status.${d.status}`)} tone={STATUS_TONE[d.status]} />

@@ -40,7 +40,7 @@ export default async function PortalActivityPage() {
         promises={timeline.promises}
         emptyText={t("empty")}
         action={
-          <Link href="/app/portal/hours" className="text-xs text-app-text-accent hover:underline">
+          <Link href="/app/portal/hours" className="tap-area text-xs text-app-text-accent hover:underline">
             {t("hoursLink")}
           </Link>
         }

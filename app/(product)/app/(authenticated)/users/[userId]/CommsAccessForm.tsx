@@ -65,7 +65,7 @@ export function CommsAccessForm(props: {
         <fieldset className="space-y-1">
           <legend className="text-sm text-app-text-primary">{t("lines")}</legend>
           {props.lines.map((l) => (
-            <label key={l.line} className="flex items-center gap-2 text-sm text-app-text-primary">
+            <label key={l.line} className="tap-area flex items-center gap-2 text-sm text-app-text-primary">
               <input type="checkbox" name="line" value={l.line} defaultChecked={l.mine} className="h-4 w-4 accent-gold" />
               <span dir="ltr">{l.line}</span>
               {!l.mine && l.otherOwner && <span className="text-xs text-app-text-tertiary">{t("lineOwner", { name: l.otherOwner })}</span>}

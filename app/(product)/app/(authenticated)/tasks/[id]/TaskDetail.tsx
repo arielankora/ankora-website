@@ -293,7 +293,7 @@ export function TaskDetail({
             <a
               href="#task-time"
               data-testid="task-reported-total"
-              className="text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
+              className="tap-area text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
             >
               {task.reportedSeconds > 0
                 ? t.rich("header.reportedSoFar", {
@@ -476,7 +476,7 @@ export function TaskDetail({
             <button
               type="button"
               onClick={() => setEditingDescription(true)}
-              className="text-[12.5px] text-app-text-accent hover:text-app-text-primary"
+              className="tap-area text-[12.5px] text-app-text-accent hover:text-app-text-primary"
             >
               {description ? t("description.edit") : t("description.add")}
             </button>
@@ -575,7 +575,7 @@ export function TaskDetail({
             <button
               type="button"
               onClick={() => setProcedureReminder(null)}
-              className="text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
+              className="tap-area text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
             >
               {t("procedureReminder.dismiss")}
             </button>

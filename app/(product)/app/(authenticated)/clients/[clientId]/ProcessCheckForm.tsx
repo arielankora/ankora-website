@@ -45,11 +45,11 @@ export function ProcessCheckForm({
       )}
       <fieldset className="flex flex-col gap-2">
         <legend className="sr-only">{t("legend")}</legend>
-        <label className="flex items-center gap-2 text-sm text-app-text-primary">
+        <label className="tap-area flex items-center gap-2 text-sm text-app-text-primary">
           <input type="radio" name="outcome" value="OK" checked={outcome === "OK"} onChange={() => setOutcome("OK")} className="h-4 w-4 accent-gold" />
           {t("ok")}
         </label>
-        <label className="flex items-center gap-2 text-sm text-app-text-primary">
+        <label className="tap-area flex items-center gap-2 text-sm text-app-text-primary">
           <input type="radio" name="outcome" value="ISSUE" checked={outcome === "ISSUE"} onChange={() => setOutcome("ISSUE")} className="h-4 w-4 accent-gold" />
           {t("issue")}
         </label>

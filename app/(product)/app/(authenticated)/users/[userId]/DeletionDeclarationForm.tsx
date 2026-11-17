@@ -43,7 +43,7 @@ export function DeletionDeclarationForm({
     <form action={formAction} className="mt-3 space-y-3">
       <input type="hidden" name="userId" value={userId} />
       {isActive && (
-        <label className="flex items-center gap-2 text-xs text-app-text-secondary">
+        <label className="tap-area flex items-center gap-2 text-xs text-app-text-secondary">
           <input type="checkbox" name="confirm" className="h-4 w-4 accent-gold" />
           {t("confirmActive")}
         </label>
