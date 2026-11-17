@@ -36,6 +36,9 @@ export type CoworkEventIn = {
   toolName: string | null;
   toolResultBytes: number | null;
   mcpTool: string | null;
+  /// service.name: "cowork" or "claude-code" (17.11.2026). Optional, so
+  /// callers that do not care can leave it out.
+  source?: string | null;
 };
 
 const MINUTE = 60_000;
@@ -192,3 +195,26 @@ export function seatStatus(input: {
 }
 
 export const round2 = (n: number) => Math.round(n * 100) / 100;
+
+export type SourceKey = "cowork" | "claudeCode" | "other";
+
+/// Which product a request came from, by service.name.
+export function sourceOf(source: string | null | undefined): SourceKey {
+  if (source === "cowork") return "cowork";
+  if (source === "claude-code") return "claudeCode";
+  return "other";
+}
+
+/// One person's API requests split by product: where the allowance goes.
+export function requestsBySource(events: CoworkEventIn[]): { source: SourceKey; requests: number; costUsd: number }[] {
+  const out = new Map<SourceKey, { requests: number; costUsd: number }>();
+  for (const e of events) {
+    if (e.eventName !== "api_request") continue;
+    const k = sourceOf(e.source);
+    const v = out.get(k) ?? { requests: 0, costUsd: 0 };
+    v.requests += 1;
+    v.costUsd += e.costUsd ?? 0;
+    out.set(k, v);
+  }
+  return [...out.entries()].map(([source, v]) => ({ source, requests: v.requests, costUsd: round2(v.costUsd) })).sort((a, b) => b.requests - a.requests || b.costUsd - a.costUsd);
+}

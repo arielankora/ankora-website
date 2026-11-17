@@ -6,6 +6,7 @@ import {
   fiveHourWindows,
   heaviestWindow,
   isLimitHit,
+  requestsBySource,
   seatStatus,
   type CoworkEventIn,
   type ToolCallIn,
@@ -163,5 +164,22 @@ describe("seatStatus", () => {
     expect(seatStatus({ monthCostUsd: 1, seatUsd: 20, multiplier: 1, measuredDays: 0.02, daysLeft: 13 })).toEqual({ status: "ok", thresholdUsd: 20, projectedUsd: null });
     // Already past the threshold is "over" whatever the pace.
     expect(seatStatus({ monthCostUsd: 30, seatUsd: 20, multiplier: 1, measuredDays: 1, daysLeft: 13 }).status).toBe("over");
+  });
+});
+
+describe("requestsBySource", () => {
+  it("splits API requests and cost by product, busiest first", () => {
+    const split = requestsBySource([
+      ev({ source: "cowork", costUsd: 1 }),
+      ev({ source: "claude-code", costUsd: 0.5 }),
+      ev({ source: "claude-code", costUsd: 0.25 }),
+      ev({ source: null, costUsd: 0.1 }),
+      ev({ source: "claude-code", eventName: "tool_result" }),
+    ]);
+    expect(split).toEqual([
+      { source: "claudeCode", requests: 2, costUsd: 0.75 },
+      { source: "cowork", requests: 1, costUsd: 1 },
+      { source: "other", requests: 1, costUsd: 0.1 },
+    ]);
   });
 });
