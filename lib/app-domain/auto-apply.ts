@@ -15,7 +15,8 @@ import {
   CLIENT_WINDOW_DAYS,
   ERROR_WINDOW_DAYS,
   KIND_WINDOW,
-  autoError,
+  REVERT_SLACK_MS,
+  autoOutcome,
   autoReviewReason,
   autoReviewReasonCode,
   clientPauseDue,
@@ -24,9 +25,12 @@ import {
   kindWindow,
   summarizeAutoErrors,
   wilsonLower,
+  proposalSource,
+  type AutoChange,
   type AutoError,
   type AutoErrorSummary,
   type ItemChange,
+  type ProposalSource,
 } from "@/lib/auto-apply";
 
 // Auto-apply of proposals to a client file, the parts that read the
@@ -96,28 +100,84 @@ async function lastLift(scope: AutoApplyScope, key: string, before?: Date): Prom
   return row?.liftedAt ?? null;
 }
 
-type AutoRow = { id: string; resultId: string | null; decidedAt: Date | null; revertedAt: Date | null };
-const AUTO_ROW = { id: true, resultId: true, decidedAt: true, revertedAt: true } as const;
+type AutoRow = { id: string; batchId: string; resultId: string | null; decidedAt: Date | null; revertedAt: Date | null };
+const AUTO_ROW = { id: true, batchId: true, resultId: true, decidedAt: true, revertedAt: true } as const;
 
-/// The error of each auto-applied proposal, or null (lib/auto-apply.ts,
-/// autoError): taken out again, or its item changed, replaced or removed
-/// within 30 days, read from the item's audit rows. The one reader of
-/// errors: the pauses count them, the stats and the approvals screen
-/// explain them.
-export async function autoErrors(rows: AutoRow[]): Promise<Map<string, AutoError | null>> {
+/// The source of each batch (lib/auto-apply.ts, proposalSource).
+async function batchSources(batchIds: string[]): Promise<Map<string, ProposalSource>> {
+  const ids = [...new Set(batchIds)];
+  if (ids.length === 0) return new Map();
+  const batches = await prisma.knowledgeBatch.findMany({ where: { id: { in: ids } }, select: { id: true, createdAt: true, sourceId: true } });
+  const sourceIds = [...new Set(batches.flatMap((b) => (b.sourceId ? [b.sourceId] : [])))];
+  const sources = sourceIds.length ? await prisma.clientSource.findMany({ where: { id: { in: sourceIds } }, select: { id: true, occurredAt: true } }) : [];
+  const sourceOf = new Map(sources.map((x) => [x.id, x]));
+  return new Map(batches.map((b) => [b.id, proposalSource(b, b.sourceId ? sourceOf.get(b.sourceId) ?? null : null)]));
+}
+
+const BY_PROPOSAL = { "client_fact.supersede": "SUPERSEDE", "client_fact.contradict": "CONTRADICT" } as const;
+
+/// The outcome of each auto-applied proposal (lib/auto-apply.ts,
+/// autoOutcome): its error, or null, and the changes not counted (a
+/// replacement or a contradiction a later source brought). Read from the
+/// item's audit rows; a replacement or a contradiction is tied to the
+/// approved proposal that made it (the same fact, the same person, decided
+/// within a minute after the row), and through it to its source. One
+/// with no such proposal is a person's change on the screen.
+export async function autoOutcomes(rows: AutoRow[]): Promise<Map<string, { error: AutoError | null; notCounted: AutoChange[] }>> {
   const resultIds = [...new Set(rows.flatMap((r) => (r.resultId ? [r.resultId] : [])))];
   const changes = resultIds.length
     ? await prisma.auditEvent.findMany({
         where: { entityId: { in: resultIds }, action: { in: [...CHANGE_ACTIONS] } },
-        select: { entityId: true, action: true, createdAt: true, beforeJson: true, afterJson: true },
+        select: { entityId: true, action: true, actorId: true, createdAt: true, beforeJson: true, afterJson: true },
       })
     : [];
+  const replaced = [...new Set(changes.flatMap((c) => (c.entityId && c.action in BY_PROPOSAL ? [c.entityId] : [])))];
+  const makers = replaced.length
+    ? await prisma.knowledgeProposal.findMany({
+        where: { targetId: { in: replaced }, action: { in: ["SUPERSEDE", "CONTRADICT"] }, state: "APPROVED", decidedAt: { not: null } },
+        select: { id: true, targetId: true, action: true, decidedById: true, decidedAt: true, batchId: true },
+      })
+    : [];
+  // Sources matter only beside a proposal that replaced or contradicted.
+  const sourceOf = makers.length ? await batchSources([...rows.map((r) => r.batchId), ...makers.map((m) => m.batchId)]) : new Map<string, ProposalSource>();
+  /// The approved proposal that wrote this row: the row is written while
+  /// it is approved, a moment before its decidedAt.
+  const makerOf = (c: (typeof changes)[number]) => {
+    const action = BY_PROPOSAL[c.action as keyof typeof BY_PROPOSAL];
+    if (!action) return null;
+    const t = c.createdAt.getTime();
+    return (
+      makers
+        .filter((m) => m.targetId === c.entityId && m.action === action && m.decidedById === c.actorId)
+        .map((m) => ({ m, d: m.decidedAt!.getTime() - t }))
+        .filter((x) => x.d >= -5_000 && x.d <= REVERT_SLACK_MS)
+        .sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0]?.m ?? null
+    );
+  };
   const byItem = new Map<string, ItemChange[]>();
   for (const c of changes) {
     if (!c.entityId) continue;
-    byItem.set(c.entityId, [...(byItem.get(c.entityId) ?? []), { action: c.action, at: c.createdAt, before: c.beforeJson, after: c.afterJson }]);
+    const maker = makerOf(c);
+    byItem.set(c.entityId, [
+      ...(byItem.get(c.entityId) ?? []),
+      { action: c.action, at: c.createdAt, before: c.beforeJson, after: c.afterJson, by: maker ? sourceOf.get(maker.batchId) ?? null : null },
+    ]);
   }
-  return new Map(rows.map((r) => [r.id, r.decidedAt ? autoError({ decidedAt: r.decidedAt, revertedAt: r.revertedAt }, r.resultId ? byItem.get(r.resultId) ?? [] : []) : null]));
+  const none = { error: null, notCounted: [] };
+  return new Map(
+    rows.map((r) => [
+      r.id,
+      r.decidedAt ? autoOutcome({ decidedAt: r.decidedAt, revertedAt: r.revertedAt, source: sourceOf.get(r.batchId) ?? null }, r.resultId ? byItem.get(r.resultId) ?? [] : []) : none,
+    ])
+  );
+}
+
+/// The error of each auto-applied proposal, or null (autoOutcomes): taken
+/// out again, or its item changed, replaced or removed within 30 days,
+/// except by a later source. The one reader of errors: the pauses count
+/// them, the stats and the approvals screen explain them.
+export async function autoErrors(rows: AutoRow[]): Promise<Map<string, AutoError | null>> {
+  return new Map([...(await autoOutcomes(rows))].map(([id, o]) => [id, o.error]));
 }
 
 /// Leaves out the clients marked "בלי AI", for a read that Claude gets.

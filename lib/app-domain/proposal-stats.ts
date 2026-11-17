@@ -6,7 +6,7 @@ import { DomainError } from "@/lib/domain-error";
 import { readSourceRefs } from "@/lib/knowledge-sources";
 import { bulkApproveBlocker, reviewConfidence, type ProposalFlag, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { proposalKindKey } from "@/lib/knowledge-review-filters";
-import { activePauses, autoApplySetting, autoErrors, pauseBreakdown } from "@/lib/app-domain/auto-apply";
+import { activePauses, autoApplySetting, autoOutcomes, pauseBreakdown } from "@/lib/app-domain/auto-apply";
 import type { AutoErrorType } from "@/lib/auto-apply";
 import { readEditKind, type ProposalEditKind } from "@/lib/proposal-edits";
 
@@ -76,6 +76,12 @@ export type ProposalStatRow = {
   /// fields that changed (lib/auto-apply.ts, autoError). Absent for a
   /// proposal a person approved.
   autoError?: { type: AutoErrorType; fields: string[] } | null;
+  /// 17.11.2026: for an auto-applied proposal, NEWER_SOURCE when its item
+  /// was replaced or contradicted within 30 days by an approved proposal
+  /// from a later source (a later meeting or message), which is new
+  /// information and not counted in `autoError`; otherwise null. Absent
+  /// for a proposal a person approved.
+  autoChange?: "NEWER_SOURCE" | null;
   /// A date only: whether it opens a task before it (taskDaysBefore).
   autoTask?: boolean;
   /// Approved or rejected together with others, by the audit row.
@@ -128,6 +134,7 @@ export async function proposalStatsForAi(
       orderBy: { createdAt: "asc" },
       select: {
         id: true,
+        batchId: true,
         clientId: true,
         target: true,
         action: true,
@@ -170,7 +177,7 @@ export async function proposalStatsForAi(
   ]);
   const sourceById = new Map(sources.map((s) => [s.id, s]));
   // The same reader the pauses count with (lib/app-domain/auto-apply.ts).
-  const autoErrs = await autoErrors(proposals.filter((p) => p.autoApplied));
+  const autoOuts = await autoOutcomes(proposals.filter((p) => p.autoApplied));
   const bulkIds = new Set(audits.filter((a) => (a.afterJson as { bulk?: unknown } | null)?.bulk === true).map((a) => a.entityId));
   const editKinds = new Map(audits.flatMap((a) => {
     const kind = readEditKind((a.afterJson as { editKind?: unknown } | null)?.editKind);
@@ -215,7 +222,9 @@ export async function proposalStatsForAi(
       autoApplied: p.autoApplied,
       reverted: p.revertedAt !== null,
       autoReviewed: p.autoReviewedAt !== null,
-      ...(p.autoApplied ? { autoError: autoErrorOf(autoErrs.get(p.id) ?? null) } : {}),
+      ...(p.autoApplied
+        ? { autoError: autoErrorOf(autoOuts.get(p.id)?.error ?? null), autoChange: autoOuts.get(p.id)?.notCounted.length ? ("NEWER_SOURCE" as const) : null }
+        : {}),
       ...(p.target === "DATE" ? { autoTask: payload.taskDaysBefore != null } : {}),
       bulk: bulkIds.has(p.id),
       rejected: p.state === "REJECTED",
