@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/app/StatusBadge";
 import { getClaudeUsageReport, USAGE_PERIODS } from "@/lib/app-domain/claude-usage";
 import type { SeatStatus } from "@/lib/claude-usage/report-math";
 import type { KpiState, Verdict } from "@/lib/claude-usage/summary";
+import type { FiveHourState, WindowCell } from "@/lib/claude-usage/five-hour";
 import { saveClaudeUsageSettingsAction } from "./actions";
 
 // Claude usage measurement, stage 3 (17.11.2026): how much of Claude's
@@ -23,7 +24,18 @@ export const metadata = { robots: { index: false, follow: false } };
 const TONE: Record<SeatStatus, "green" | "amber" | "red"> = { ok: "green", near: "amber", over: "red" };
 const KPI_TONE: Record<KpiState, "green" | "amber" | "red" | "gray"> = { ok: "green", watch: "amber", off: "red", none: "gray" };
 const VERDICT_TONE: Record<Verdict, "green" | "amber" | "red"> = { ok: "green", partial: "amber", attention: "red" };
-const BAR: Record<SeatStatus | "none", string> = { ok: "bg-app-success", near: "bg-app-warning", over: "bg-app-error", none: "bg-app-border" };
+
+// The five-hour window (design option ג, 17.11.2026).
+const FIVE_TONE: Record<FiveHourState, "green" | "amber" | "red" | "gray"> = { stuck: "red", near: "red", watch: "amber", free: "green", idle: "gray", unknown: "gray" };
+const FIVE_BAR: Record<FiveHourState, string> = { stuck: "bg-app-error", near: "bg-app-error", watch: "bg-app-warning", free: "bg-app-success", idle: "bg-app-border", unknown: "bg-app-border" };
+const FIVE_TEXT: Record<FiveHourState, string> = { stuck: "text-app-error", near: "text-app-error", watch: "text-app-warning", free: "text-app-success", idle: "text-app-text-secondary", unknown: "text-app-text-secondary" };
+const SQUARE = "inline-block h-3.5 w-3.5 rounded-[3px] box-border";
+function squareClass(w: Pick<WindowCell, "hit" | "peakPct">): string {
+  if (w.hit) return `${SQUARE} bg-app-error`;
+  if (w.peakPct === null) return `${SQUARE} border border-dashed border-app-text-tertiary bg-app-neutral-soft`;
+  if (w.peakPct >= 70) return `${SQUARE} bg-app-warning/45`;
+  return `${SQUARE} border border-app-success bg-app-success-soft`;
+}
 
 const cell = "px-2 py-2 font-jbmono text-[13px] text-app-text-primary";
 const head = "px-2 py-2 text-start font-medium";
@@ -47,35 +59,75 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
   const offCount = sum.kpis.filter((k) => k.state === "off").length;
   const sentBytes = report.tools.reduce((n, x) => n + x.totalBytes, 0);
   const heavyTools = report.tools.slice(0, 3).map((x) => ({ tool: x.tool, size: bytes(x.totalBytes), share: sentBytes ? Math.round((x.totalBytes / sentBytes) * 100) : 0 }));
-  // The browser extension's reading (way 3), when one is fresh: the real
-  // share of each limit, ahead of everything estimated.
-  const limitsNote = (p: (typeof report.people)[number]) => {
-    const c = p.limits?.current;
-    if (c) return t("summary.note.limits", { five: c.fiveHourPct ?? "·", week: c.sevenDayPct ?? "·" });
-    if (p.limits?.lastReadingAt) return t("summary.note.limitsStale", { when: when(p.limits.lastReadingAt) });
-    return null;
-  };
-  const personNote = (p: (typeof report.people)[number]) => {
-    const limits = limitsNote(p);
-    let rest: string;
-    if (p.noTelemetry) rest = t("summary.note.noTelemetry");
-    else if (p.nonCowork && !p.cowork.requests) rest = t("summary.note.nonCowork");
-    else if (!p.cowork.requests && !p.connector.calls) rest = t("summary.note.idle");
-    else {
-      const parts = [t("summary.note.cost", { cost: usd(p.month.costUsd), threshold: usd(p.month.thresholdUsd) }), t("summary.note.hits", { count: p.cowork.limitHits })];
-      if (p.cowork.cacheSharePct !== null) parts.push(t("summary.note.cache", { pct: p.cowork.cacheSharePct }));
-      // Where the requests came from, when more than one product was used.
-      if (p.cowork.bySource.length > 1) {
-        parts.push(p.cowork.bySource.map((x) => t("people.sourceCount", { source: t(`people.source.${x.source}`), count: x.requests })).join(" / "));
-      }
-      rest = parts.join(" · ");
-    }
-    return limits ? `${limits} · ${rest}` : rest;
-  };
   const actionText = (a: (typeof sum.actions)[number]) => {
     const v = a.key === "nearThreshold" ? { ...a.values, cost: usd(Number(a.values.cost)), threshold: usd(Number(a.values.threshold)) } : a.values;
     return { title: t(`summary.action.${a.key}.title`, v), detail: t(`summary.action.${a.key}.detail`, v) };
   };
+
+  // Five-hour window helpers.
+  const five = report.fiveHour;
+  const nowMs = Date.parse(report.period.to);
+  const left = (iso: string) => {
+    const min = Math.max(0, Math.round((Date.parse(iso) - nowMs) / 60_000));
+    return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, "0")}`;
+  };
+  const clock = (iso: string) => f.dateTime(new Date(iso), { hour: "2-digit", minute: "2-digit" });
+  const hourLabel = (h: number) => `${String(h % 24).padStart(2, "0")}:00`;
+  const fiveNote = (p: (typeof report.people)[number]) => {
+    const c = p.fiveHour.current;
+    const parts: string[] = [];
+    if (c.source === "cowork" && c.hitAt && c.resetsAt) parts.push(t("five.note.coworkOnly", { time: clock(c.hitAt), time2: left(c.resetsAt) }));
+    else if (c.state === "unknown") parts.push(t("five.note.unknown"));
+    else {
+      if (c.hitAt) parts.push(t("five.note.hitAt", { time: clock(c.hitAt) }));
+      parts.push(c.resetsAt ? t("five.note.resets", { time: left(c.resetsAt) }) : t("five.note.noWindow"));
+    }
+    if (p.fiveHour.weeklyPct !== null) parts.push(t("five.note.weekly", { pct: Math.round(p.fiveHour.weeklyPct) }));
+    return parts.join(" · ");
+  };
+  const cellLabel = (name: string, w: WindowCell) => {
+    const at = when(w.start);
+    if (w.hit) return t("five.cell.hit", { name, when: at });
+    if (w.peakPct === null) return t("five.cell.unknown", { name, when: at });
+    return t("five.cell.pct", { name, when: at, pct: w.peakPct });
+  };
+  // Who is closest to getting stuck first, then the rest as before.
+  const fiveRank: Record<FiveHourState, number> = { stuck: 0, near: 1, watch: 2, free: 3, idle: 4, unknown: 5 };
+  const fivePeople = [...report.people].sort(
+    (a, b) => fiveRank[a.fiveHour.current.state] - fiveRank[b.fiveHour.current.state] || (b.fiveHour.current.pct ?? -1) - (a.fiveHour.current.pct ?? -1) || b.fiveHour.hitsThisWeek - a.fiveHour.hitsThisWeek
+  );
+  const headline = [
+    five.stuckNow.length ? t("five.headline.stuck", { names: five.stuckNow.map((x) => x.name).join(", ") }) : null,
+    five.over70Now.some((x) => x.pct >= 90) ? t("five.headline.near", { list: five.over70Now.filter((x) => x.pct >= 90).map((x) => `${x.name} ${x.pct}%`).join(", ") }) : null,
+  ].filter(Boolean).join(" ");
+  const fiveKpis = [
+    {
+      key: "stuckNow" as const,
+      value: String(five.stuckNow.length),
+      tone: five.stuckNow.length ? "text-app-error" : "text-app-text-primary",
+      sub: five.stuckNow.length
+        ? five.stuckNow.map((x) => (x.resetsAt ? t("five.kpi.stuckNow.sub", { name: x.name, time: left(x.resetsAt) }) : t("five.kpi.stuckNow.subNoTime", { name: x.name }))).join(" · ")
+        : t("five.kpi.stuckNow.none"),
+    },
+    {
+      key: "over70" as const,
+      value: five.measuredNow ? String(five.over70Now.length) : none,
+      tone: five.over70Now.length ? "text-app-warning" : "text-app-text-primary",
+      sub: five.over70Now.length ? five.over70Now.map((x) => `${x.name} ${x.pct}%`).join(", ") : t("five.kpi.over70.none"),
+    },
+    {
+      key: "hits" as const,
+      value: String(five.hitsThisWeek),
+      tone: five.hitsThisWeek ? "text-app-error" : "text-app-text-primary",
+      sub: five.peakHours ? t("five.kpi.hits.peak", { from: hourLabel(five.peakHours.from), to: hourLabel(five.peakHours.to) }) : t("five.kpi.hits.noPeak"),
+    },
+    {
+      key: "weekly" as const,
+      value: five.closestWeekly ? `${five.closestWeekly.pct}%` : none,
+      tone: five.closestWeekly && five.closestWeekly.pct >= 80 ? "text-app-error" : five.closestWeekly && five.closestWeekly.pct > 60 ? "text-app-warning" : "text-app-text-primary",
+      sub: five.closestWeekly ? t("five.kpi.weekly.sub", { name: five.closestWeekly.name }) : t("five.kpi.weekly.none"),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -106,8 +158,93 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
       <section aria-label={t("summary.title")} className="flex flex-wrap items-center gap-3 rounded-2xl border border-app-border bg-white p-5" data-testid="usage-summary">
         <StatusBadge label={t(`summary.verdict.${sum.verdict}`)} tone={VERDICT_TONE[sum.verdict]} />
         <p className="flex-1 basis-80 text-sm text-app-text-primary">
+          {headline ? `${headline} ` : ""}
           {t(`summary.verdictLine.${sum.verdict}`)} {t("summary.offCount", { count: offCount })}
         </p>
+      </section>
+
+      {/* The five-hour window first (17.11.2026, Ariel: people get stuck in
+          the five-hour window, not on the monthly threshold). Design
+          option ג: four indicators, then each person's current window and
+          the past week window by window. */}
+      <section aria-label={t("five.title")} className="space-y-3" data-testid="usage-five-hour">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {fiveKpis.map((k) => (
+            <div key={k.key} className="rounded-2xl border border-app-border bg-white p-4">
+              <p className="text-sm text-app-text-secondary">{t(`five.kpi.${k.key}.label`)}</p>
+              <p className={`mt-1 font-jbmono text-2xl ${k.tone}`}>{k.value}</p>
+              <p className="mt-1 text-xs text-app-text-secondary" dir="auto">{k.sub}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-2xl border border-app-border bg-white p-5" data-testid="usage-team">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-medium text-app-text-primary">{t("five.title")}</h2>
+            <span className="text-xs text-app-text-secondary">{t("five.about")}</span>
+          </div>
+          {five.measuredNow === 0 && <p className="mt-2 rounded-xl bg-app-warning-soft p-3 text-xs text-app-text-primary">{t("five.noExtension")}</p>}
+          <div className="mt-3 hidden grid-cols-[minmax(0,10rem)_minmax(0,1fr)_minmax(0,13rem)_7rem] gap-4 pb-2 text-xs text-app-text-secondary md:grid">
+            <span>{t("five.col.person")}</span>
+            <span>{t("five.col.now")}</span>
+            <span>{t("five.col.week")}</span>
+            <span>{t("five.col.state")}</span>
+          </div>
+          <ul className="divide-y divide-app-border border-t border-app-border">
+            {fivePeople.map((p) => {
+              const c = p.fiveHour.current;
+              const pct = c.pct === null ? 0 : Math.min(100, Math.round(c.pct));
+              return (
+                <li key={p.userId} className="grid grid-cols-1 items-center gap-3 py-3 md:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_minmax(0,13rem)_7rem] md:gap-4">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-app-text-primary" dir="auto">{p.name}</p>
+                    <p className={`text-xs ${p.month.status === "ok" ? "text-app-text-secondary" : "text-app-error"}`}>{t("five.month", { seat: usd(p.seatUsd), cost: usd(p.month.costUsd) })}</p>
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex items-center gap-3">
+                      <div className="relative h-3 flex-1 overflow-hidden rounded-full bg-app-neutral-soft" role="img" aria-label={`${p.name}: ${c.pct === null ? t("five.state.unknown") : `${pct}%`}`}>
+                        <div className={`h-full rounded-full ${FIVE_BAR[c.state]}`} style={{ width: `${pct}%` }} />
+                        <div className="absolute inset-y-0 w-0.5 bg-white" style={{ insetInlineStart: "70%" }} />
+                        <div className="absolute inset-y-0 w-0.5 bg-white" style={{ insetInlineStart: "90%" }} />
+                      </div>
+                      <span className={`min-w-[2.75rem] font-jbmono text-sm font-medium ${FIVE_TEXT[c.state]}`}>{c.pct === null ? none : `${pct}%`}</span>
+                    </div>
+                    <p className="text-xs text-app-text-secondary">{fiveNote(p)}</p>
+                  </div>
+                  <div
+                    className="flex flex-wrap gap-[3px]"
+                    role="img"
+                    aria-label={t("five.weekAria", { name: p.name, count: p.fiveHour.week.length, hits: p.fiveHour.hitsThisWeek })}
+                  >
+                    {p.fiveHour.week.length === 0 ? (
+                      <span className="text-xs text-app-text-tertiary">{t("five.weekNone")}</span>
+                    ) : (
+                      p.fiveHour.week.map((w) => <span key={w.start} className={squareClass(w)} title={cellLabel(p.name, w)} />)
+                    )}
+                  </div>
+                  <div>
+                    <StatusBadge label={t(`five.state.${c.state}`)} tone={FIVE_TONE[c.state]} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="mt-3 flex flex-wrap gap-4 text-xs text-app-text-secondary">
+            {(
+              [
+                ["free", { hit: false, peakPct: 10 }],
+                ["watch", { hit: false, peakPct: 80 }],
+                ["hit", { hit: true, peakPct: 100 }],
+                ["unknown", { hit: false, peakPct: null }],
+              ] as const
+            ).map(([key, w]) => (
+              <span key={key} className="inline-flex items-center gap-1.5">
+                <span className={squareClass(w)} aria-hidden="true" />
+                {t(`five.legend.${key}`)}
+              </span>
+            ))}
+          </div>
+        </div>
       </section>
 
       <section aria-label={t("summary.kpisTitle")} className="space-y-2" data-testid="usage-kpis">
@@ -135,36 +272,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
         </div>
       </section>
 
-      <div className="flex flex-wrap items-start gap-5">
-        <section className="min-w-0 flex-[999_1_560px] rounded-2xl border border-app-border bg-white p-5" data-testid="usage-team">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-sm font-medium text-app-text-primary">{t("summary.teamTitle")}</h2>
-            {report.month.measuredDays < 3 && <span className="text-xs text-app-text-secondary">{t("summary.noPace")}</span>}
-          </div>
-          <ul className="mt-2 divide-y divide-app-border">
-            {report.people.map((p) => {
-              const state = p.noTelemetry || p.nonCowork || (!p.cowork.requests && !p.month.costUsd) ? "none" : p.month.status;
-              const pct = p.month.thresholdUsd ? Math.min(100, Math.round((p.month.costUsd / p.month.thresholdUsd) * 100)) : 0;
-              return (
-                <li key={p.userId} className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] items-center gap-4 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-app-text-primary" dir="auto">{p.name}</p>
-                    <p className="text-xs text-app-text-secondary">{t("summary.seat", { seat: usd(p.seatUsd) })}</p>
-                  </div>
-                  <div className="min-w-0 space-y-1">
-                    <div className="h-2.5 overflow-hidden rounded-full bg-app-neutral-soft" role="img" aria-label={`${p.name}: ${pct}%`}>
-                      <div className={`h-full rounded-full ${BAR[state]}`} style={{ width: `${state === "none" ? 0 : Math.max(pct, 2)}%` }} />
-                    </div>
-                    <p className="text-xs text-app-text-secondary">{personNote(p)}</p>
-                  </div>
-                  {state === "none" ? <StatusBadge label={t("summary.statusNone")} tone="gray" /> : <StatusBadge label={t(`status.${state}`)} tone={TONE[state]} />}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-
-        <div className="flex flex-[1_1_320px] flex-col gap-5">
+      <div className="grid items-start gap-5 lg:grid-cols-2">
           <section className="rounded-2xl border border-app-border bg-white p-5" data-testid="usage-actions">
             <h2 className="text-sm font-medium text-app-text-primary">{t("summary.actionsTitle")}</h2>
             {sum.actions.length === 0 ? (
@@ -208,7 +316,6 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
               </ul>
             )}
           </section>
-        </div>
       </div>
 
       <h2 className="pt-2 text-base font-medium text-app-text-primary">{t("summary.details")}</h2>

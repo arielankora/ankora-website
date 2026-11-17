@@ -2285,20 +2285,6 @@
           "targetWho": "{who} · Target: under 60% of the limit"
         }
       },
-      "teamTitle": "The team against the monthly threshold",
-      "noPace": "The pace appears after 3 days of measurement",
-      "seat": "Seat {seat}",
-      "note": {
-        "cost": "{cost} of {threshold}",
-        "hits": "{count, plural, =0 {no limit hits} one {one limit hit} other {# limit hits}}",
-        "cache": "{pct}% from cache",
-        "noTelemetry": "Uses the connector, but nothing arrives from Cowork",
-        "idle": "No activity in the period",
-        "nonCowork": "Does not work in Cowork. Only connector calls are measured",
-        "limits": "Limits: 5 hours {five}% · weekly {week}%",
-        "limitsStale": "Last limit reading: {when}"
-      },
-      "statusNone": "No Cowork data",
       "actionsTitle": "What to do this week",
       "actionsNone": "Nothing to do this week.",
       "action": {
@@ -2333,6 +2319,10 @@
         "checkExtension": {
           "title": "Check the extension for {name}",
           "detail": "There is activity, but no limit reading arrives from the browser. Maybe not signed in to Chrome with the work account."
+        },
+        "nearFiveHour": {
+          "title": "{name} is at {pct}% of the five-hour window",
+          "detail": "Likely to get stuck before it resets. Lighter work until the window resets would help."
         }
       },
       "toolsTitle": "Where Ankora is heavy",
@@ -2446,7 +2436,74 @@
       "line": "{events} Cowork events, {calls} connector calls, {copies} prompt copies.",
       "unmatched": "Addresses that came from Cowork with no Ankora user: {emails}"
     },
-    "none": "·"
+    "none": "·",
+    "five": {
+      "title": "The five-hour window",
+      "about": "How much of the current window each person has used, and the past week window by window. This is where people get stuck. The monthly threshold stays in the small line under each name.",
+      "col": {
+        "person": "Person",
+        "now": "Current window",
+        "week": "This week, window by window",
+        "state": "State"
+      },
+      "state": {
+        "stuck": "Stuck",
+        "near": "Close to stuck",
+        "watch": "Watch",
+        "free": "Free",
+        "idle": "No open window",
+        "unknown": "Not measured"
+      },
+      "note": {
+        "resets": "Resets in {time}",
+        "hitAt": "Stuck at {time}",
+        "weekly": "Weekly {pct}%",
+        "noWindow": "No open window",
+        "unknown": "No limit reading from the browser",
+        "coworkOnly": "Per Cowork: stuck at {time}, resets in about {time2}"
+      },
+      "month": "Seat {seat} · {cost} this month",
+      "kpi": {
+        "stuckNow": {
+          "label": "Stuck now",
+          "sub": "{name}, resets in {time}",
+          "subNoTime": "{name}",
+          "none": "Nobody"
+        },
+        "over70": {
+          "label": "Over 70% of the current window",
+          "none": "Nobody"
+        },
+        "hits": {
+          "label": "Limit hits this week",
+          "peak": "Peak hours: {from} to {to}",
+          "noPeak": "No cluster of hours"
+        },
+        "weekly": {
+          "label": "Closest to the weekly limit",
+          "sub": "{name} · target: under 60%",
+          "none": "No reading from the extension"
+        }
+      },
+      "headline": {
+        "stuck": "Stuck now: {names}.",
+        "near": "Close to stuck: {list}."
+      },
+      "noExtension": "No reading has arrived from the browser extension yet, so only limit hits reported by Cowork and Claude Code show. The percentages appear once the extension is installed.",
+      "legend": {
+        "free": "Window up to 70%",
+        "watch": "70% to 99%",
+        "hit": "Stuck",
+        "unknown": "Window not measured (per Cowork)"
+      },
+      "cell": {
+        "pct": "{name}, {when}: {pct}% of the window",
+        "hit": "{name}, {when}: stuck",
+        "unknown": "{name}, {when}: window not measured"
+      },
+      "weekAria": "{name}: {count, plural, =0 {no windows this week} one {one window this week} other {# windows this week}}, {hits, plural, =0 {no limit hits} one {one limit hit} other {# limit hits}}",
+      "weekNone": "No windows this week"
+    }
   },
   "brainMetrics": {
     "title": "File metrics",

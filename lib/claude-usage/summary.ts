@@ -24,7 +24,7 @@ export type Kpi = {
   who?: string;
 };
 
-export type ActionKey = "shortenTool" | "checkTelemetry" | "lighterModel" | "repeatReads" | "limitHit" | "nearThreshold" | "nearWeeklyLimit" | "checkExtension";
+export type ActionKey = "nearFiveHour" | "shortenTool" | "checkTelemetry" | "lighterModel" | "repeatReads" | "limitHit" | "nearThreshold" | "nearWeeklyLimit" | "checkExtension";
 export type SummaryAction = { key: ActionKey; values: Record<string, string | number> };
 
 export type Verdict = "ok" | "attention" | "partial";
@@ -89,6 +89,9 @@ export type SummaryInput = {
       weeklyLimitHits: number;
     } | null;
     nonCowork?: boolean;
+    /// The five-hour window now (lib/claude-usage/five-hour.ts); absent
+    /// when unknown.
+    fiveHour?: { current: { pct: number | null; state: string } } | null;
   }[];
   tools: { tool: string; totalBytes: number }[];
   signals: { duplicateReads: number; limitHits: number };
@@ -151,6 +154,12 @@ export function managerSummary(r: SummaryInput): ManagerSummary {
 
   // Things to do, most urgent first, at most three.
   const actions: SummaryAction[] = [];
+  // Close to getting stuck right now comes first: it is the one thing a
+  // manager can still prevent today.
+  for (const p of r.people) {
+    const c = p.fiveHour?.current;
+    if (c && c.pct !== null && c.state === "near") actions.push({ key: "nearFiveHour", values: { name: p.name, pct: Math.round(c.pct) } });
+  }
   for (const p of r.people) if (personHits(p) > 0) actions.push({ key: "limitHit", values: { name: p.name, count: personHits(p) } });
   for (const p of r.people) {
     const w = p.limits?.current?.sevenDayPct;
@@ -176,7 +185,8 @@ export function managerSummary(r: SummaryInput): ManagerSummary {
   // An indicator off target shows on its own card and in the actions; it
   // does not turn a quiet week into one that needs attention.
   const nearWeekly = r.people.some((p) => (p.limits?.current?.sevenDayPct ?? 0) >= KPI_TARGETS.closestToWeeklyLimit.watch);
-  const needsAttention = limitHits > 0 || nearWeekly || r.people.some((p) => p.month.status !== "ok");
+  const nearFive = r.people.some((p) => p.fiveHour?.current.state === "near" || p.fiveHour?.current.state === "stuck");
+  const needsAttention = limitHits > 0 || nearWeekly || nearFive || r.people.some((p) => p.month.status !== "ok");
   const verdict: Verdict = needsAttention ? "attention" : missing ? "partial" : "ok";
 
   return { verdict, kpis, actions: actions.slice(0, 3) };
