@@ -260,6 +260,7 @@ model User {
   auditEvents         AuditEvent[]         @relation("AuditActor")
   mcpToolCalls        McpToolCall[]
   claudePromptCopies  ClaudePromptCopy[]
+  coworkEvents        CoworkEvent[]
   passwordResetTokens PasswordResetToken[]
   portalLoginTokens   PortalLoginToken[]
   timeEntries         TimeEntry[]
@@ -4890,4 +4891,55 @@ model ClaudePromptCopy {
   @@index([createdAt])
   @@index([userId, createdAt])
   @@map("claude_prompt_copies")
+}
+
+/// One event from Cowork's telemetry (stage 2, 17.11.2026), received at
+/// /api/otel/v1/logs. Metadata only: lib/claude-usage/otlp.ts reads each
+/// field from an allowlist, so a prompt, an answer or a tool's input never
+/// reaches this table even when an old desktop app sends one. Kept 180 days.
+model CoworkEvent {
+  id                  String   @id @default(cuid())
+  /// Unique per event, so a batch the exporter sends twice lands once.
+  dedupeKey           String   @unique
+  /// user_prompt, api_request, api_error or tool_result.
+  eventName           String
+  /// Matched by email to an Ankora user when the event arrived.
+  userId              String?
+  userEmail           String?
+  accountUuid         String?
+  sessionId           String?
+  promptId            String?
+  occurredAt          DateTime
+  /// service.name ("cowork") and service.version (the desktop app's).
+  source              String?
+  appVersion          String?
+  model               String?
+  /// Cowork's own estimate. On a Team plan no money moves inside the seat
+  /// allowance; this measures how heavy a request was, not a bill.
+  costUsd             Decimal? @db.Decimal(12, 6)
+  inputTokens         Int?
+  outputTokens        Int?
+  cacheReadTokens     Int?
+  cacheCreationTokens Int?
+  durationMs          Int?
+  speed               String?
+  statusCode          String?
+  attempt             Int?
+  /// api_error only, at most 300 characters.
+  errorText           String?
+  toolName            String?
+  toolSuccess         Boolean?
+  toolResultBytes     Int?
+  mcpServer           String?
+  mcpTool             String?
+  promptLength        Int?
+  receivedAt          DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([occurredAt])
+  @@index([userId, occurredAt])
+  @@index([eventName, occurredAt])
+  @@index([promptId])
+  @@map("cowork_events")
 }

@@ -117,7 +117,7 @@ describe("retention", () => {
     await prisma.mcpToolCall.createMany({ data: [{ ...base, createdAt: old }, { ...base, createdAt: recent }] });
     await prisma.claudePromptCopy.createMany({ data: [{ userId: user.id, kind: "extract", chars: 1, createdAt: old }] });
 
-    expect(await pruneClaudeUsage(now)).toEqual({ toolCalls: 1, promptCopies: 1 });
+    expect(await pruneClaudeUsage(now)).toEqual({ toolCalls: 1, promptCopies: 1, coworkEvents: 0 });
     expect(await prisma.mcpToolCall.count()).toBe(1);
   });
 });

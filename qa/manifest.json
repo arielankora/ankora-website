@@ -2335,7 +2335,7 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-11-17",
-      "riskReason": "Deletes Claude usage measurements older than 90 days (mcp_tool_calls, claude_prompt_copies). Behind CRON_SECRET; touches no other table."
+      "riskReason": "Deletes Claude usage measurements past their retention: mcp_tool_calls and claude_prompt_copies after 90 days, cowork_events after 180. Behind CRON_SECRET; touches no other table."
     },
     "cron:/api/cron/claude-usage-retention": {
       "kind": "cron",
@@ -2343,7 +2343,15 @@
       "risk": "critical",
       "riskAssigned": true,
       "firstSeen": "2026-11-17",
-      "riskReason": "Deletes Claude usage measurements older than 90 days (mcp_tool_calls, claude_prompt_copies). Behind CRON_SECRET; touches no other table."
+      "riskReason": "Deletes Claude usage measurements past their retention: mcp_tool_calls and claude_prompt_copies after 90 days, cowork_events after 180. Behind CRON_SECRET; touches no other table."
+    },
+    "api:/api/otel/v1/logs": {
+      "kind": "api",
+      "area": "api",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-17",
+      "riskReason": "Public URL that Cowork posts telemetry to from employees' computers. Behind a shared secret (COWORK_OTEL_SECRET); must keep metadata only and never a prompt or an answer."
     }
   },
   "waivers": {},
