@@ -7,6 +7,7 @@ import { DomainError } from "@/lib/domain-error";
 import { dayStartInZone, localDateKey } from "@/lib/timezone";
 import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
 import { PROMPT_KINDS, type PromptKind } from "@/lib/claude-usage/prompt-kinds";
+import { managerSummary, type ManagerSummary } from "@/lib/claude-usage/summary";
 import {
   ankoraToolFor,
   briefThenFile,
@@ -187,6 +188,9 @@ export type ClaudeUsageReport = {
   /// Month figures and the pace cover only this stretch.
   month: { measuredSince: string | null; measuredDays: number };
   settings: ClaudeUsageSettings;
+  /// The managers' summary: one verdict, six leading indicators against
+  /// their targets, and at most three things to do (lib/claude-usage/summary.ts).
+  summary: ManagerSummary;
   people: PersonUsage[];
   tools: ToolUsage[];
   prompts: { kind: PromptKind; copies: number; avgChars: number; maxChars: number }[];
@@ -404,25 +408,29 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
     .sort((a, b) => b.costUsd - a.costUsd)
     .slice(0, 10);
 
+  const signals = {
+    briefThenFile: briefThenFile(callIn),
+    duplicateReads: [...dups.values()].reduce((n, d) => n + d, 0),
+    truncatedAnswers: callIn.filter((c) => c.truncated).length,
+    limitHits: coworkIn.filter(isLimitHit).length,
+  };
+  const coverage = {
+    coworkEvents: events.length,
+    toolCalls: calls.length,
+    promptCopies: copies.length,
+    unmatchedEmails: unmatched.map((u) => u.userEmail!).filter(Boolean),
+  };
+
   return {
     period: { days, from: from.toISOString(), to: now.toISOString() },
     month: { measuredSince: measuredSince?.toISOString() ?? null, measuredDays: Math.round(measuredDays * 10) / 10 },
     settings,
+    summary: managerSummary({ people, tools, signals, coverage }),
     people,
     tools,
     prompts,
-    signals: {
-      briefThenFile: briefThenFile(callIn),
-      duplicateReads: [...dups.values()].reduce((n, d) => n + d, 0),
-      truncatedAnswers: callIn.filter((c) => c.truncated).length,
-      limitHits: coworkIn.filter(isLimitHit).length,
-    },
+    signals,
     heaviestRequests,
-    coverage: {
-      coworkEvents: events.length,
-      toolCalls: calls.length,
-      promptCopies: copies.length,
-      unmatchedEmails: unmatched.map((u) => u.userEmail!).filter(Boolean),
-    },
+    coverage,
   };
 }

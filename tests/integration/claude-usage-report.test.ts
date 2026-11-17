@@ -86,6 +86,12 @@ describe("the Claude usage report", () => {
     expect(report.heaviestRequests[0]).toMatchObject({ promptId: "p1", costUsd: 5, requests: 2, ankoraTools: ["get_client_file"] });
     expect(report.prompts).toEqual([{ kind: "advance_plan", copies: 1, avgChars: 9000, maxChars: 9000 }]);
     expect(report.coverage.unmatchedEmails).toEqual(["guest@example.com"]);
+
+    // The managers' summary reads the same numbers: a limit hit makes the
+    // week one that needs attention, and names who to look at.
+    expect(report.summary.verdict).toBe("attention");
+    expect(report.summary.kpis.find((k) => k.key === "limitHits")).toMatchObject({ value: 1, state: "watch" });
+    expect(report.summary.actions[0]).toMatchObject({ key: "limitHit", values: { count: 1 } });
   });
 
   it("lists active staff only, and dates the month from when measurement began", async () => {
