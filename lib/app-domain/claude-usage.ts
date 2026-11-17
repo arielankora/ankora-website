@@ -16,6 +16,8 @@ import {
   fiveHourWindows,
   heaviestWindow,
   isLimitHit,
+  requestsBySource,
+  type SourceKey,
   round2,
   seatStatus,
   type CoworkEventIn,
@@ -172,6 +174,8 @@ export type PersonUsage = {
     cacheSharePct: number | null;
     models: { model: string; requests: number; costUsd: number }[];
     limitHits: number;
+    /// Requests and estimated cost by product: Cowork, Claude Code, other.
+    bySource: { source: SourceKey; requests: number; costUsd: number }[];
     heaviestWindow: { start: string; costUsd: number; tokens: number; requests: number; limitHits: number } | null;
     lastEventAt: string | null;
   };
@@ -245,6 +249,7 @@ function toCoworkIn(r: {
   toolName: string | null;
   toolResultBytes: number | null;
   mcpTool: string | null;
+  source?: string | null;
 }): CoworkEventIn {
   return { ...r, costUsd: r.costUsd === null ? null : Number(r.costUsd) };
 }
@@ -284,6 +289,7 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
         toolName: true,
         toolResultBytes: true,
         mcpTool: true,
+        source: true,
       },
     }),
     prisma.claudePromptCopy.findMany({ where: { createdAt: { gte: from, lte: now } } }),
@@ -361,6 +367,7 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
         cacheSharePct: allInput > 0 ? Math.round((cacheRead / allInput) * 100) : null,
         models: [...models.entries()].map(([model, m]) => ({ model, requests: m.requests, costUsd: round2(m.costUsd) })).sort((a, b) => b.costUsd - a.costUsd),
         limitHits: ev.filter(isLimitHit).length,
+        bySource: requestsBySource(ev),
         heaviestWindow: heavy ? { start: heavy.start.toISOString(), costUsd: round2(heavy.costUsd), tokens: heavy.tokens, requests: heavy.requests, limitHits: heavy.limitHits } : null,
         lastEventAt: last?.toISOString() ?? null,
       },

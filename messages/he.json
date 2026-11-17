@@ -2364,7 +2364,14 @@
       "monthValue": "{cost} מתוך {threshold} (קצב: {projected})",
       "monthValueNoPace": "{cost} מתוך {threshold} (קצב: אחרי 3 ימי מדידה)",
       "measuredSince": "נתוני החודש נמדדים מ-{date}. הקצב מחושב רק מהימים שנמדדו.",
-      "limits": "מכסה (5 שעות / שבועית)"
+      "limits": "מכסה (5 שעות / שבועית)",
+      "bySource": "מקור הבקשות",
+      "sourceCount": "{source} {count}",
+      "source": {
+        "cowork": "קוורק",
+        "claudeCode": "Claude Code",
+        "other": "אחר"
+      }
     },
     "status": {
       "ok": "בתוך הסף",
@@ -2432,7 +2439,7 @@
       "save": "שמירה",
       "saved": "נשמר.",
       "error": "לא נשמר: {message}",
-      "nonCowork": "לא עובד בקוורק (לא לסמן חוסר נתונים)"
+      "nonCowork": "לא עובד בקוורק או ב-Claude Code (לא לסמן חוסר נתונים)"
     },
     "coverage": {
       "title": "מקורות",

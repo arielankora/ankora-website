@@ -64,6 +64,10 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
     else {
       const parts = [t("summary.note.cost", { cost: usd(p.month.costUsd), threshold: usd(p.month.thresholdUsd) }), t("summary.note.hits", { count: p.cowork.limitHits })];
       if (p.cowork.cacheSharePct !== null) parts.push(t("summary.note.cache", { pct: p.cowork.cacheSharePct }));
+      // Where the requests came from, when more than one product was used.
+      if (p.cowork.bySource.length > 1) {
+        parts.push(p.cowork.bySource.map((x) => t("people.sourceCount", { source: t(`people.source.${x.source}`), count: x.requests })).join(" / "));
+      }
       rest = parts.join(" · ");
     }
     return limits ? `${limits} · ${rest}` : rest;
@@ -231,6 +235,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
                 <th className={head}>{t("people.connectorBytes")}</th>
                 <th className={head}>{t("people.prompts")}</th>
                 <th className={head}>{t("people.limits")}</th>
+                <th className={head}>{t("people.bySource")}</th>
                 <th className={head}>{t("people.last")}</th>
               </tr>
             </thead>
@@ -260,6 +265,11 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
                   <td className={cell}>{int(p.prompts.copies)}</td>
                   <td className={cell}>
                     {p.limits?.current ? `${p.limits.current.fiveHourPct ?? none}% / ${p.limits.current.sevenDayPct ?? none}%` : none}
+                  </td>
+                  <td className={cell}>
+                    {p.cowork.bySource.length
+                      ? p.cowork.bySource.map((x) => t("people.sourceCount", { source: t(`people.source.${x.source}`), count: x.requests })).join(" · ")
+                      : none}
                   </td>
                   <td className={cell}>{p.cowork.lastEventAt ? when(p.cowork.lastEventAt) : none}</td>
                 </tr>

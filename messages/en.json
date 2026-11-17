@@ -2364,7 +2364,14 @@
       "monthValue": "{cost} of {threshold} (pace: {projected})",
       "monthValueNoPace": "{cost} of {threshold} (pace: after 3 days of measurement)",
       "measuredSince": "This month is measured from {date}. The pace counts only the days measured.",
-      "limits": "Limits (5 hours / weekly)"
+      "limits": "Limits (5 hours / weekly)",
+      "bySource": "Requests by source",
+      "sourceCount": "{source} {count}",
+      "source": {
+        "cowork": "Cowork",
+        "claudeCode": "Claude Code",
+        "other": "Other"
+      }
     },
     "status": {
       "ok": "Within threshold",
@@ -2432,7 +2439,7 @@
       "save": "Save",
       "saved": "Saved.",
       "error": "Not saved: {message}",
-      "nonCowork": "Does not work in Cowork (do not flag missing data)"
+      "nonCowork": "Works in neither Cowork nor Claude Code (do not flag missing data)"
     },
     "coverage": {
       "title": "Sources",

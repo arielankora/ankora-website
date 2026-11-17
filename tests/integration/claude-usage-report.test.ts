@@ -56,7 +56,7 @@ async function seed() {
   await prisma.coworkEvent.createMany({
     data: [
       ev({ dedupeKey: "1", costUsd: 3.5, inputTokens: 1000, outputTokens: 200, cacheReadTokens: 9000 }),
-      ev({ dedupeKey: "2", costUsd: 1.5, inputTokens: 500, outputTokens: 100, cacheReadTokens: 0, occurredAt: ago(50) }),
+      ev({ dedupeKey: "2", costUsd: 1.5, inputTokens: 500, outputTokens: 100, cacheReadTokens: 0, occurredAt: ago(50), source: "claude-code" }),
       ev({ dedupeKey: "3", eventName: "tool_result", toolName: "mcp_tool", toolResultBytes: 48_000, occurredAt: ago(55) }),
       ev({ dedupeKey: "4", eventName: "api_error", statusCode: "429", errorText: "rate_limit_error", occurredAt: ago(30) }),
       ev({ dedupeKey: "5", userId: null, userEmail: "guest@example.com", promptId: "p2", costUsd: 0.1 }),
@@ -79,6 +79,11 @@ describe("the Claude usage report", () => {
     expect(h.prompts).toEqual({ copies: 1, chars: 9000 });
     expect(h.seatUsd).toBe(20);
     expect(h.noTelemetry).toBe(false);
+    // A tie on requests goes to the higher cost.
+    expect(h.cowork.bySource).toEqual([
+      { source: "other", requests: 1, costUsd: 3.5 },
+      { source: "claudeCode", requests: 1, costUsd: 1.5 },
+    ]);
 
     expect(report.tools[0]).toMatchObject({ tool: "read_document", truncated: 1 });
     expect(report.tools.find((t) => t.tool === "get_client_file")).toMatchObject({ calls: 2, duplicates: 1 });
