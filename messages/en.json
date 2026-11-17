@@ -2246,7 +2246,9 @@
       "last": "Last Cowork event",
       "noTelemetry": "Uses the connector, but nothing arrives from their Cowork. Probably an old desktop app, or they do not work in Cowork.",
       "alertsOff": "Alerts are off until the threshold is calibrated. The status is shown here only.",
-      "monthValue": "{cost} of {threshold} (pace: {projected})"
+      "monthValue": "{cost} of {threshold} (pace: {projected})",
+      "monthValueNoPace": "{cost} of {threshold} (pace: after 3 days of measurement)",
+      "measuredSince": "This month is measured from {date}. The pace counts only the days measured."
     },
     "status": {
       "ok": "Within threshold",

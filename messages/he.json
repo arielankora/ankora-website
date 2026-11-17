@@ -2246,7 +2246,9 @@
       "last": "אירוע אחרון מקוורק",
       "noTelemetry": "משתמש במחבר, אבל לא מגיע ממנו מידע מקוורק. כנראה אפליקציה ישנה, או שאינו עובד בקוורק.",
       "alertsOff": "ההתראות כבויות עד שהסף יכויל. הסטטוס מוצג כאן בלבד.",
-      "monthValue": "{cost} מתוך {threshold} (קצב: {projected})"
+      "monthValue": "{cost} מתוך {threshold} (קצב: {projected})",
+      "monthValueNoPace": "{cost} מתוך {threshold} (קצב: אחרי 3 ימי מדידה)",
+      "measuredSince": "נתוני החודש נמדדים מ-{date}. הקצב מחושב רק מהימים שנמדדו."
     },
     "status": {
       "ok": "בתוך הסף",

@@ -66,6 +66,9 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
       <section className="rounded-2xl border border-app-border bg-white p-5" data-testid="usage-people">
         <h2 className="text-sm font-medium text-app-text-primary">{t("people.title")}</h2>
         {!report.settings.alertsLive && <p className="mt-1 text-xs text-app-text-secondary">{t("people.alertsOff")}</p>}
+        {report.month.measuredSince && (
+          <p className="mt-1 text-xs text-app-text-secondary">{t("people.measuredSince", { date: f.dateTime(new Date(report.month.measuredSince), { day: "numeric", month: "numeric" }) })}</p>
+        )}
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[960px] text-sm">
             <thead>
@@ -97,7 +100,9 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
                   <td className="px-2 py-2">
                     <StatusBadge label={t(`status.${p.month.status}`)} tone={TONE[p.month.status]} />
                     <p className="mt-1 font-jbmono text-[12px] text-app-text-secondary">
-                      {t("people.monthValue", { cost: usd(p.month.costUsd), threshold: usd(p.month.thresholdUsd), projected: usd(p.month.projectedUsd) })}
+                      {p.month.projectedUsd === null
+                        ? t("people.monthValueNoPace", { cost: usd(p.month.costUsd), threshold: usd(p.month.thresholdUsd) })
+                        : t("people.monthValue", { cost: usd(p.month.costUsd), threshold: usd(p.month.thresholdUsd), projected: usd(p.month.projectedUsd) })}
                     </p>
                   </td>
                   <td className={`${cell} ${p.cowork.limitHits > 0 ? "text-app-error" : ""}`}>{int(p.cowork.limitHits)}</td>

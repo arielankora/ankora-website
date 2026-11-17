@@ -147,9 +147,21 @@ describe("ankoraToolFor", () => {
 
 describe("seatStatus", () => {
   it("is over past the threshold, near when the pace would pass it, ok otherwise", () => {
-    expect(seatStatus({ monthCostUsd: 25, seatUsd: 20, multiplier: 1, dayOfMonth: 17, daysInMonth: 30 }).status).toBe("over");
-    expect(seatStatus({ monthCostUsd: 15, seatUsd: 20, multiplier: 1, dayOfMonth: 15, daysInMonth: 30 })).toEqual({ status: "near", thresholdUsd: 20, projectedUsd: 30 });
-    expect(seatStatus({ monthCostUsd: 5, seatUsd: 20, multiplier: 1, dayOfMonth: 15, daysInMonth: 30 }).status).toBe("ok");
-    expect(seatStatus({ monthCostUsd: 150, seatUsd: 100, multiplier: 2, dayOfMonth: 30, daysInMonth: 30 }).status).toBe("ok");
+    expect(seatStatus({ monthCostUsd: 25, seatUsd: 20, multiplier: 1, measuredDays: 17, daysLeft: 13 }).status).toBe("over");
+    expect(seatStatus({ monthCostUsd: 15, seatUsd: 20, multiplier: 1, measuredDays: 15, daysLeft: 15 })).toEqual({ status: "near", thresholdUsd: 20, projectedUsd: 30 });
+    expect(seatStatus({ monthCostUsd: 5, seatUsd: 20, multiplier: 1, measuredDays: 15, daysLeft: 15 }).status).toBe("ok");
+    expect(seatStatus({ monthCostUsd: 150, seatUsd: 100, multiplier: 2, measuredDays: 30, daysLeft: 0 }).status).toBe("ok");
+  });
+
+  it("counts the pace from when measurement began, not from the first of the month", () => {
+    // Telemetry started on the 17th; four days later $8 was spent.
+    // Over 4 measured days that is $2 a day, so $8 + 9 days × $2 = $26.
+    expect(seatStatus({ monthCostUsd: 8, seatUsd: 20, multiplier: 1, measuredDays: 4, daysLeft: 9 })).toEqual({ status: "near", thresholdUsd: 20, projectedUsd: 26 });
+  });
+
+  it("states no pace before three days of measurement", () => {
+    expect(seatStatus({ monthCostUsd: 1, seatUsd: 20, multiplier: 1, measuredDays: 0.02, daysLeft: 13 })).toEqual({ status: "ok", thresholdUsd: 20, projectedUsd: null });
+    // Already past the threshold is "over" whatever the pace.
+    expect(seatStatus({ monthCostUsd: 30, seatUsd: 20, multiplier: 1, measuredDays: 1, daysLeft: 13 }).status).toBe("over");
   });
 });
