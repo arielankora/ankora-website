@@ -2287,7 +2287,8 @@
         "hits": "{count, plural, =0 {no limit hits} one {one limit hit} other {# limit hits}}",
         "cache": "{pct}% from cache",
         "noTelemetry": "Uses the connector, but nothing arrives from Cowork",
-        "idle": "No activity in the period"
+        "idle": "No activity in the period",
+        "nonCowork": "Does not work in Cowork. Only connector calls are measured"
       },
       "statusNone": "No Cowork data",
       "actionsTitle": "What to do this week",
@@ -2413,7 +2414,8 @@
       "seatFor": "Seat (USD a month)",
       "save": "Save",
       "saved": "Saved.",
-      "error": "Not saved: {message}"
+      "error": "Not saved: {message}",
+      "nonCowork": "Does not work in Cowork (do not flag missing data)"
     },
     "coverage": {
       "title": "Sources",

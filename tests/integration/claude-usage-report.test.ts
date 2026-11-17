@@ -122,6 +122,23 @@ describe("the Claude usage report", () => {
     expect((await claudeUsageSettings()).seats).toEqual({});
   });
 
+  it("does not flag missing Cowork data for someone marked as not working in Cowork", async () => {
+    const { ariel } = await seed();
+    const { user: ops } = await createTestUser({ role: "SUPER_ADMIN" });
+    await prisma.mcpToolCall.create({ data: { userId: ops.id, tool: "get_task", ok: true, resultBytes: 10, resultChars: 10, argsHash: "c1", durationMs: 5, createdAt: ago(20) } });
+
+    let report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
+    expect(report.people.find((p) => p.userId === ops.id)).toMatchObject({ noTelemetry: true, nonCowork: false });
+
+    await updateClaudeUsageSettings(ariel, { nonCowork: { [ops.id]: true } });
+    report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
+    expect(report.people.find((p) => p.userId === ops.id)).toMatchObject({ noTelemetry: false, nonCowork: true });
+    expect(report.summary.actions.some((a) => a.key === "checkTelemetry" && a.values.name === ops.name)).toBe(false);
+
+    await updateClaudeUsageSettings(ariel, { nonCowork: { [ops.id]: false } });
+    expect((await claudeUsageSettings()).nonCowork).toEqual([]);
+  });
+
   it("refuses a seat or multiplier out of range, and writes nothing", async () => {
     const { user: ariel } = await createTestUser({ role: "SUPER_ADMIN" });
     await expect(updateClaudeUsageSettings(ariel, { defaultSeatUsd: 0 })).rejects.toMatchObject({ code: "claudeUsage.seatRange" });

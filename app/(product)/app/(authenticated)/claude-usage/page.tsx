@@ -49,6 +49,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
   const heavyTools = report.tools.slice(0, 3).map((x) => ({ tool: x.tool, size: bytes(x.totalBytes), share: sentBytes ? Math.round((x.totalBytes / sentBytes) * 100) : 0 }));
   const personNote = (p: (typeof report.people)[number]) => {
     if (p.noTelemetry) return t("summary.note.noTelemetry");
+    if (p.nonCowork && !p.cowork.requests) return t("summary.note.nonCowork");
     if (!p.cowork.requests && !p.connector.calls) return t("summary.note.idle");
     const parts = [t("summary.note.cost", { cost: usd(p.month.costUsd), threshold: usd(p.month.thresholdUsd) }), t("summary.note.hits", { count: p.cowork.limitHits })];
     if (p.cowork.cacheSharePct !== null) parts.push(t("summary.note.cache", { pct: p.cowork.cacheSharePct }));
@@ -121,7 +122,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
           </div>
           <ul className="mt-2 divide-y divide-app-border">
             {report.people.map((p) => {
-              const state = p.noTelemetry || (!p.cowork.requests && !p.month.costUsd) ? "none" : p.month.status;
+              const state = p.noTelemetry || p.nonCowork || (!p.cowork.requests && !p.month.costUsd) ? "none" : p.month.status;
               const pct = p.month.thresholdUsd ? Math.min(100, Math.round((p.month.costUsd / p.month.thresholdUsd) * 100)) : 0;
               return (
                 <li key={p.userId} className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] items-center gap-4 py-3">
@@ -399,20 +400,27 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {report.people.map((p) => (
-              <label key={p.userId} className="flex items-center justify-between gap-2 rounded-lg border border-app-border px-3 py-2 text-sm text-app-text-primary">
-                <span dir="auto">{p.name}</span>
-                <input
-                  name={`seat:${p.userId}`}
-                  type="number"
-                  min={1}
-                  max={1000}
-                  step="1"
-                  aria-label={`${t("settings.seatFor")}: ${p.name}`}
-                  placeholder={String(report.settings.defaultSeatUsd)}
-                  defaultValue={report.settings.seats[p.userId] ?? ""}
-                  className="w-24 rounded-lg border border-app-border px-2 py-1 font-jbmono text-sm"
-                />
-              </label>
+              <div key={p.userId} className="flex flex-col gap-2 rounded-lg border border-app-border px-3 py-2 text-sm text-app-text-primary">
+                <input type="hidden" name={`listed:${p.userId}`} value="1" />
+                <label className="flex items-center justify-between gap-2">
+                  <span dir="auto">{p.name}</span>
+                  <input
+                    name={`seat:${p.userId}`}
+                    type="number"
+                    min={1}
+                    max={1000}
+                    step="1"
+                    aria-label={`${t("settings.seatFor")}: ${p.name}`}
+                    placeholder={String(report.settings.defaultSeatUsd)}
+                    defaultValue={report.settings.seats[p.userId] ?? ""}
+                    className="w-24 rounded-lg border border-app-border px-2 py-1 font-jbmono text-sm"
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-xs text-app-text-secondary">
+                  <input type="checkbox" name={`nonCowork:${p.userId}`} defaultChecked={p.nonCowork} className="h-4 w-4" />
+                  {t("settings.nonCowork")}
+                </label>
+              </div>
             ))}
           </div>
           <button type="submit" className="rounded-full border border-app-border bg-white px-4 py-1.5 text-[12.5px] font-medium text-app-text-primary hover:border-gold">
