@@ -486,7 +486,10 @@ export function RhythmEditor({ clientId, processId, starts, dates }: RhythmEdito
           {t(`errors.${problem.code}`, problem.params ?? {})}
         </p>
       )}
-      <div className="flex flex-wrap gap-3 border-t border-app-border px-5 py-[18px] sm:px-8">
+      {/* Pinned to the bottom of the dialog: the form runs taller than a
+          phone's screen, and with the buttons at its end a person could fill
+          it in, not see "save", and close it (approved by Ariel, 17.11.2026). */}
+      <div className="sticky bottom-0 z-10 flex flex-wrap gap-3 border-t border-app-border bg-white px-5 pb-[calc(18px+env(safe-area-inset-bottom))] pt-[18px] sm:px-8 sm:pb-[18px]">
         <button type="button" onClick={save} disabled={pending} className="min-h-[46px] rounded-xl bg-app-surface-nav px-6 text-sm font-bold text-white disabled:opacity-50" data-testid="rhythm-save">
           {pending ? t("saving") : t("save")}
         </button>

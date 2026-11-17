@@ -5,6 +5,8 @@ import { PageBack } from "@/components/app/BackSlot";
 import { requireUser } from "@/lib/app-auth/session";
 import { canManageClients, ForbiddenError } from "@/lib/app-auth/permissions";
 import { DomainError } from "@/lib/domain-error";
+import { EmptyState } from "@/components/app/states/EmptyState";
+import { FileText } from "lucide-react";
 import { procedureDocument, type ProcedureDocumentView } from "@/lib/app-domain/procedure-documents";
 import { type DocBlock, type ProcedureDoc } from "@/lib/procedure-document";
 import { parsePageNumber } from "@/lib/url-numbers";
@@ -122,6 +124,17 @@ function translationPrompt(view: ProcedureDocumentView, clientName: string, vers
   ].join("\n");
 }
 
+async function NoProcedure({ clientId, processId }: { clientId: string; processId: string }) {
+  const t = await getTranslations("clients.processes.document");
+  const processHref = `/app/clients/${clientId}/processes/${processId}`;
+  return (
+    <article className="mx-auto max-w-4xl space-y-5" data-testid="procedure-none">
+      <PageBack href={processHref} label={t("backToProcess")} />
+      <EmptyState icon={FileText} title={t("noProcedureTitle")} description={t("noProcedureBody")} action={{ label: t("noProcedureAction"), href: `${processHref}/steps` }} />
+    </article>
+  );
+}
+
 export default async function ProcedureDocumentPage(props: {
   params: Promise<{ clientId: string; processId: string }>;
   searchParams: Promise<{ version?: string; lang?: string }>;
@@ -146,9 +159,14 @@ export default async function ProcedureDocumentPage(props: {
   } catch (err) {
     if (err instanceof ForbiddenError) notFound();
     // By code, not by wording: the message changed from "אין עדיין נוהל" to
-    // "עוד אין נוהל" and this check kept matching the old one, so a process
-    // with no procedure yet showed the error screen (iPhone audit, 17.11.2026).
-    if (err instanceof DomainError && err.code === "procedureDocuments.noProcedure") notFound();
+    // "עוד אין נוהל" and a wording check kept matching the old one, so a
+    // process with no procedure yet showed the error screen (iPhone audit,
+    // 17.11.2026). It is a normal state of every new process, so it gets an
+    // empty state with the next step rather than "page not found" (approved
+    // by Ariel, 17.11.2026). readableProcess has already checked access.
+    if (err instanceof DomainError && err.code === "procedureDocuments.noProcedure") {
+      return <NoProcedure clientId={clientId} processId={processId} />;
+    }
     if (err instanceof Error && /לא נמצא|לא נמצאה/.test(err.message)) notFound();
     throw err;
   }
