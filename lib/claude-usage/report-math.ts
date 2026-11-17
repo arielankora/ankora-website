@@ -160,20 +160,34 @@ export function ankoraToolFor(event: CoworkEventIn, userCalls: ToolCallIn[]): st
 
 export type SeatStatus = "ok" | "near" | "over";
 
+/// Days of measurement before a pace is worth stating. With less, a
+/// morning's work stretched over a month says nothing (17.11.2026: on the
+/// first day, half an hour of use projected a month at 9% of the seat).
+export const MIN_DAYS_FOR_PACE = 3;
+
 /// Where a person stands against their seat this month, by Cowork's
 /// estimate. "over": the month so far is past the threshold. "near": the
-/// pace so far would pass it by the end of the month.
+/// pace since measurement began would pass it by the end of the month.
+///
+/// The pace counts only the days that were measured: a month whose first
+/// half had no telemetry is not averaged over days nobody counted.
 export function seatStatus(input: {
   monthCostUsd: number;
   seatUsd: number;
   multiplier: number;
-  dayOfMonth: number;
-  daysInMonth: number;
-}): { status: SeatStatus; thresholdUsd: number; projectedUsd: number } {
+  /// Days measured this month so far (since the month began, or since
+  /// telemetry started if that was later).
+  measuredDays: number;
+  /// Days left until the month ends.
+  daysLeft: number;
+}): { status: SeatStatus; thresholdUsd: number; projectedUsd: number | null } {
   const thresholdUsd = round2(input.seatUsd * input.multiplier);
-  const day = Math.max(1, input.dayOfMonth);
-  const projectedUsd = round2((input.monthCostUsd / day) * input.daysInMonth);
-  const status: SeatStatus = input.monthCostUsd > thresholdUsd ? "over" : projectedUsd > thresholdUsd ? "near" : "ok";
+  const projectedUsd =
+    input.measuredDays >= MIN_DAYS_FOR_PACE
+      ? round2(input.monthCostUsd + (input.monthCostUsd / input.measuredDays) * Math.max(0, input.daysLeft))
+      : null;
+  const status: SeatStatus =
+    input.monthCostUsd > thresholdUsd ? "over" : projectedUsd !== null && projectedUsd > thresholdUsd ? "near" : "ok";
   return { status, thresholdUsd, projectedUsd };
 }
 

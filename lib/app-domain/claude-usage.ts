@@ -161,7 +161,8 @@ export type PersonUsage = {
   };
   connector: { calls: number; bytes: number; images: number; failures: number };
   prompts: { copies: number; chars: number };
-  month: { costUsd: number; thresholdUsd: number; projectedUsd: number; status: SeatStatus };
+  /// projectedUsd is null until MIN_DAYS_FOR_PACE days were measured.
+  month: { costUsd: number; thresholdUsd: number; projectedUsd: number | null; status: SeatStatus };
   /// Uses the connector in the period but nothing arrived from Cowork:
   /// probably an old desktop app, or Cowork not used at all.
   noTelemetry: boolean;
@@ -182,6 +183,9 @@ export type ToolUsage = {
 
 export type ClaudeUsageReport = {
   period: { days: UsagePeriod; from: string; to: string };
+  /// When Cowork's telemetry began this month, and how many days that is.
+  /// Month figures and the pace cover only this stretch.
+  month: { measuredSince: string | null; measuredDays: number };
   settings: ClaudeUsageSettings;
   people: PersonUsage[];
   tools: ToolUsage[];
@@ -194,10 +198,11 @@ export type ClaudeUsageReport = {
 const isReadOnly = (tool: string) => (TOOL_ANNOTATIONS as Record<string, { readOnlyHint?: boolean }>)[tool]?.readOnlyHint === true;
 
 /// The first day of this month in Ankora's timezone.
-function monthStart(now: Date): { start: Date; dayOfMonth: number; daysInMonth: number } {
-  const [y, m, d] = localDateKey(now).split("-").map(Number);
+function monthStart(now: Date): { start: Date; end: Date } {
+  const [y, m] = localDateKey(now).split("-").map(Number);
   const start = dayStartInZone(`${y}-${String(m).padStart(2, "0")}-01`)!;
-  return { start, dayOfMonth: d, daysInMonth: new Date(Date.UTC(y, m, 0)).getUTCDate() };
+  const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+  return { start, end: dayStartInZone(next)! };
 }
 
 function toCoworkIn(r: {
@@ -228,9 +233,11 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
   const month = monthStart(now);
   const settings = await claudeUsageSettings();
 
-  const [users, calls, events, copies, monthCosts, unmatched] = await Promise.all([
+  const [users, calls, events, copies, monthCosts, unmatched, firstThisMonth] = await Promise.all([
     prisma.user.findMany({
-      where: { role: { in: ["SUPER_ADMIN", "ANKORA_ADMIN", "ANKORA_EMPLOYEE"] }, deletedAt: null },
+      // Active staff only: an invited or suspended person, or an old
+      // duplicate account, has nothing to report and only confuses the list.
+      where: { role: { in: ["SUPER_ADMIN", "ANKORA_ADMIN", "ANKORA_EMPLOYEE"] }, status: "ACTIVE", deletedAt: null },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
@@ -267,8 +274,14 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
       select: { userEmail: true },
       take: 20,
     }),
+    // When measurement began this month: the pace counts only measured days.
+    prisma.coworkEvent.findFirst({ where: { occurredAt: { gte: month.start, lte: now } }, orderBy: { occurredAt: "asc" }, select: { occurredAt: true } }),
   ]);
 
+  const DAY = 86_400_000;
+  const measuredSince = firstThisMonth?.occurredAt ?? null;
+  const measuredDays = measuredSince ? (now.getTime() - measuredSince.getTime()) / DAY : 0;
+  const daysLeft = Math.max(0, (month.end.getTime() - now.getTime()) / DAY);
   const coworkIn = events.map(toCoworkIn);
   const callIn: ToolCallIn[] = calls;
   const byUser = <T extends { userId: string | null }>(rows: T[]) => {
@@ -301,7 +314,7 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
     const userCopies = copiesBy.get(u.id) ?? [];
     const seatUsd = settings.seats[u.id] ?? settings.defaultSeatUsd;
     const monthCost = round2(monthBy.get(u.id) ?? 0);
-    const seat = seatStatus({ monthCostUsd: monthCost, seatUsd, multiplier: settings.multiplier, dayOfMonth: month.dayOfMonth, daysInMonth: month.daysInMonth });
+    const seat = seatStatus({ monthCostUsd: monthCost, seatUsd, multiplier: settings.multiplier, measuredDays, daysLeft });
     const last = ev.reduce<Date | null>((d, e) => (!d || e.occurredAt > d ? e.occurredAt : d), null);
     const allInput = input + cacheRead + cacheCreation;
     return {
@@ -393,6 +406,7 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
 
   return {
     period: { days, from: from.toISOString(), to: now.toISOString() },
+    month: { measuredSince: measuredSince?.toISOString() ?? null, measuredDays: Math.round(measuredDays * 10) / 10 },
     settings,
     people,
     tools,
