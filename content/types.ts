@@ -305,6 +305,10 @@ export interface PagesContent {
     foundersLabel: string;
     foundersTitle: string;
     foundersLinkLabel: string;
+    memorialLabel: string;
+    memorialTitle: string;
+    memorialBody: string;
+    memorialLinkLabel: string;
     principlesLabel: string;
     principles: { title: string; body: string }[];
   };

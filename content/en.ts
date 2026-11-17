@@ -336,6 +336,10 @@ const en: Dictionary = {
       foundersLabel: "Founders",
       foundersTitle: "The people accountable for Ankora",
       foundersLinkLabel: "LinkedIn profile",
+      memorialLabel: "We remember",
+      memorialTitle: "In loving memory of Sgt. Nathanel Young",
+      memorialBody: "Ankora honors the memory of Sgt. Nathanel Young (2003-2023), a Golani Brigade soldier who fell on October 7, 2023 near Kibbutz Zikim, as part of the Next October initiative.",
+      memorialLinkLabel: "Visit the memorial page",
       principlesLabel: "Our principles",
       principles: [
         { title: "Reliability above all", body: "If we committed to it, we deliver. If there's a delay, you hear it from us before you ask." },
