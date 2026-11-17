@@ -2225,6 +2225,105 @@
     "retention": "The log is kept for two years and cannot be edited or deleted."
   },
   "claudeUsage": {
+    "summary": {
+      "title": "Managers' summary",
+      "verdict": {
+        "ok": "All well",
+        "attention": "Needs attention",
+        "partial": "Data missing"
+      },
+      "verdictLine": {
+        "ok": "Nobody got stuck and nobody is on pace to pass their threshold.",
+        "attention": "Someone got stuck or is on pace to pass their threshold. What to do is below.",
+        "partial": "No one got stuck or passed their threshold, but data is missing for some of the team."
+      },
+      "offCount": "{count, plural, =0 {Every leading indicator is on target.} one {One leading indicator is off target.} other {# leading indicators are off target.}}",
+      "kpisTitle": "Leading indicators",
+      "kpisAbout": "What predicts getting stuck or needing a dearer seat, before it happens",
+      "kpiState": {
+        "ok": "On target",
+        "watch": "Watch",
+        "off": "Off target",
+        "none": "No data"
+      },
+      "kpi": {
+        "limitHits": {
+          "label": "Limit hits",
+          "value": "{value}",
+          "target": "Target: 0 in the period"
+        },
+        "closestToThreshold": {
+          "label": "Closest to threshold",
+          "value": "{value}%",
+          "target": "Target: under 80% of the threshold",
+          "targetWho": "{who} · Target: under 80% of the threshold"
+        },
+        "cacheShare": {
+          "label": "Read from cache",
+          "value": "{value}%",
+          "target": "Target: at least 80%. Low: conversations that start from nothing"
+        },
+        "duplicateRate": {
+          "label": "Repeat connector reads",
+          "value": "{value}%",
+          "target": "Target: under 3%"
+        },
+        "heavyModelShare": {
+          "label": "Requests on the heaviest model",
+          "value": "{value}%",
+          "target": "Target: under 50%"
+        },
+        "avgCallKb": {
+          "label": "Average connector answer",
+          "value": "{value} KB",
+          "target": "Target: under 8 KB"
+        }
+      },
+      "teamTitle": "The team against the monthly threshold",
+      "noPace": "The pace appears after 3 days of measurement",
+      "seat": "Seat {seat}",
+      "note": {
+        "cost": "{cost} of {threshold}",
+        "hits": "{count, plural, =0 {no limit hits} one {one limit hit} other {# limit hits}}",
+        "cache": "{pct}% from cache",
+        "noTelemetry": "Uses the connector, but nothing arrives from Cowork",
+        "idle": "No activity in the period",
+        "nonCowork": "Does not work in Cowork. Only connector calls are measured"
+      },
+      "statusNone": "No Cowork data",
+      "actionsTitle": "What to do this week",
+      "actionsNone": "Nothing to do this week.",
+      "action": {
+        "limitHit": {
+          "title": "Check what got {name} stuck",
+          "detail": "{count, plural, one {One limit hit} other {# limit hits}} in the period. The heaviest window is in the details."
+        },
+        "nearThreshold": {
+          "title": "Check {name}'s usage",
+          "detail": "{cost} of {threshold} this month."
+        },
+        "shortenTool": {
+          "title": "Shorten {tool}",
+          "detail": "{share}% of everything the connector sent, {kb} KB."
+        },
+        "lighterModel": {
+          "title": "Suggest a lighter model for routine work",
+          "detail": "{share}% of requests on the heaviest model."
+        },
+        "repeatReads": {
+          "title": "Cut repeat connector reads",
+          "detail": "{rate}% of calls repeat a read just made."
+        },
+        "checkTelemetry": {
+          "title": "Check {name}'s desktop app",
+          "detail": "Uses the connector, but nothing arrives from Cowork."
+        }
+      },
+      "toolsTitle": "Where Ankora is heavy",
+      "toolsAbout": "Share of everything the connector sent Claude in the period",
+      "toolLine": "{size} · {share}%",
+      "details": "Details"
+    },
     "title": "Claude usage",
     "intro": "How much of Claude's allowance each person on the team uses, and how much of it Ankora causes. Cost is Cowork's estimate: on a Team plan it measures how heavy the work was, not a bill.",
     "period": "Period: {days} days",
@@ -2315,7 +2414,8 @@
       "seatFor": "Seat (USD a month)",
       "save": "Save",
       "saved": "Saved.",
-      "error": "Not saved: {message}"
+      "error": "Not saved: {message}",
+      "nonCowork": "Does not work in Cowork (do not flag missing data)"
     },
     "coverage": {
       "title": "Sources",

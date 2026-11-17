@@ -7,6 +7,7 @@ import { DomainError } from "@/lib/domain-error";
 import { dayStartInZone, localDateKey } from "@/lib/timezone";
 import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
 import { PROMPT_KINDS, type PromptKind } from "@/lib/claude-usage/prompt-kinds";
+import { managerSummary, type ManagerSummary } from "@/lib/claude-usage/summary";
 import {
   ankoraToolFor,
   briefThenFile,
@@ -51,9 +52,13 @@ export type ClaudeUsageSettings = {
   /// Off until the threshold is calibrated: the screen shows the status,
   /// nothing is sent.
   alertsLive: boolean;
+  /// People who do not work in Cowork (17.11.2026: Ankora Ops works in
+  /// Claude Code). Their missing telemetry is expected: they are not
+  /// flagged, and they do not make the summary "data missing".
+  nonCowork: string[];
 };
 
-export const DEFAULT_SETTINGS: ClaudeUsageSettings = { defaultSeatUsd: 20, seats: {}, multiplier: 1, alertsLive: false };
+export const DEFAULT_SETTINGS: ClaudeUsageSettings = { defaultSeatUsd: 20, seats: {}, multiplier: 1, alertsLive: false, nonCowork: [] };
 
 const SEAT_MIN = 1;
 const SEAT_MAX = 1000;
@@ -84,6 +89,7 @@ function readSettings(value: Prisma.JsonValue | undefined): ClaudeUsageSettings 
     seats,
     multiplier: num(v.multiplier, DEFAULT_SETTINGS.multiplier, MULTIPLIER_MIN, MULTIPLIER_MAX),
     alertsLive: v.alertsLive === true,
+    nonCowork: Array.isArray(v.nonCowork) ? v.nonCowork.filter((id): id is string => typeof id === "string") : [],
   };
 }
 
@@ -97,6 +103,9 @@ export type SettingsInput = {
   multiplier?: number;
   /// userId → seat. null puts the person back on the default seat.
   seats?: Record<string, number | null>;
+  /// userId → true when the person does not work in Cowork, false when
+  /// they do. People left out keep what they had.
+  nonCowork?: Record<string, boolean>;
 };
 
 export async function updateClaudeUsageSettings(actor: User, input: SettingsInput): Promise<ClaudeUsageSettings> {
@@ -117,11 +126,17 @@ export async function updateClaudeUsageSettings(actor: User, input: SettingsInpu
     else if (!seatOk(usd)) throw seatRefusal();
     else seats[id] = usd;
   }
+  const nonCowork = new Set(before.nonCowork);
+  for (const [id, off] of Object.entries(input.nonCowork ?? {})) {
+    if (off) nonCowork.add(id);
+    else nonCowork.delete(id);
+  }
   const after: ClaudeUsageSettings = {
     ...before,
     defaultSeatUsd: input.defaultSeatUsd ?? before.defaultSeatUsd,
     multiplier: input.multiplier ?? before.multiplier,
     seats,
+    nonCowork: [...nonCowork].sort(),
   };
   await prisma.appSetting.upsert({
     where: { key: CLAUDE_USAGE_SETTINGS_KEY },
@@ -166,6 +181,8 @@ export type PersonUsage = {
   /// Uses the connector in the period but nothing arrived from Cowork:
   /// probably an old desktop app, or Cowork not used at all.
   noTelemetry: boolean;
+  /// Marked on the screen as someone who does not work in Cowork.
+  nonCowork: boolean;
 };
 
 export type ToolUsage = {
@@ -187,6 +204,9 @@ export type ClaudeUsageReport = {
   /// Month figures and the pace cover only this stretch.
   month: { measuredSince: string | null; measuredDays: number };
   settings: ClaudeUsageSettings;
+  /// The managers' summary: one verdict, six leading indicators against
+  /// their targets, and at most three things to do (lib/claude-usage/summary.ts).
+  summary: ManagerSummary;
   people: PersonUsage[];
   tools: ToolUsage[];
   prompts: { kind: PromptKind; copies: number; avgChars: number; maxChars: number }[];
@@ -342,7 +362,8 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
       },
       prompts: { copies: userCopies.length, chars: userCopies.reduce((n, c) => n + c.chars, 0) },
       month: { costUsd: monthCost, ...seat },
-      noTelemetry: userCalls.length > 0 && ev.length === 0,
+      noTelemetry: !settings.nonCowork.includes(u.id) && userCalls.length > 0 && ev.length === 0,
+      nonCowork: settings.nonCowork.includes(u.id),
     };
   });
   // Busiest first; people with no activity at all stay, at the end, so a
@@ -404,25 +425,29 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
     .sort((a, b) => b.costUsd - a.costUsd)
     .slice(0, 10);
 
+  const signals = {
+    briefThenFile: briefThenFile(callIn),
+    duplicateReads: [...dups.values()].reduce((n, d) => n + d, 0),
+    truncatedAnswers: callIn.filter((c) => c.truncated).length,
+    limitHits: coworkIn.filter(isLimitHit).length,
+  };
+  const coverage = {
+    coworkEvents: events.length,
+    toolCalls: calls.length,
+    promptCopies: copies.length,
+    unmatchedEmails: unmatched.map((u) => u.userEmail!).filter(Boolean),
+  };
+
   return {
     period: { days, from: from.toISOString(), to: now.toISOString() },
     month: { measuredSince: measuredSince?.toISOString() ?? null, measuredDays: Math.round(measuredDays * 10) / 10 },
     settings,
+    summary: managerSummary({ people, tools, signals, coverage }),
     people,
     tools,
     prompts,
-    signals: {
-      briefThenFile: briefThenFile(callIn),
-      duplicateReads: [...dups.values()].reduce((n, d) => n + d, 0),
-      truncatedAnswers: callIn.filter((c) => c.truncated).length,
-      limitHits: coworkIn.filter(isLimitHit).length,
-    },
+    signals,
     heaviestRequests,
-    coverage: {
-      coworkEvents: events.length,
-      toolCalls: calls.length,
-      promptCopies: copies.length,
-      unmatchedEmails: unmatched.map((u) => u.userEmail!).filter(Boolean),
-    },
+    coverage,
   };
 }

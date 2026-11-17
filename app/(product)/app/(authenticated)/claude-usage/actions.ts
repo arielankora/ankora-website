@@ -7,7 +7,8 @@ import { domainErrorText } from "@/lib/i18n/domain-errors";
 
 // Claude usage measurement, stage 3 (17.11.2026): the "מושבים וסף" form on
 // /app/claude-usage. A plain form post: fields `defaultSeat`, `multiplier`
-// and `seat:<userId>` (empty puts the person back on the default seat).
+// `seat:<userId>` (empty puts the person back on the default seat), and
+// `nonCowork:<userId>` for someone who does not work in Cowork.
 // The domain checks the permission and the ranges.
 
 function num(v: FormDataEntryValue | null): number | undefined {
@@ -25,7 +26,16 @@ export async function saveClaudeUsageSettingsAction(formData: FormData) {
     const n = num(value);
     seats[key.slice("seat:".length)] = n === undefined ? null : n;
   }
-  const input: SettingsInput = { defaultSeatUsd: num(formData.get("defaultSeat")), multiplier: num(formData.get("multiplier")), seats };
+  // A checkbox that is not ticked is not sent, so the form lists everyone
+  // it shows (`listed:<userId>`) and ticks `nonCowork:<userId>`.
+  const nonCowork: Record<string, boolean> = {};
+  for (const [key] of formData.entries()) {
+    if (key.startsWith("listed:")) {
+      const id = key.slice("listed:".length);
+      nonCowork[id] = formData.has(`nonCowork:${id}`);
+    }
+  }
+  const input: SettingsInput = { defaultSeatUsd: num(formData.get("defaultSeat")), multiplier: num(formData.get("multiplier")), seats, nonCowork };
   let outcome = "saved=1";
   try {
     await updateClaudeUsageSettings(user, input);

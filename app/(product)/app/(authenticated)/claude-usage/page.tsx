@@ -6,6 +6,7 @@ import { can } from "@/lib/app-auth/permissions";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { getClaudeUsageReport, USAGE_PERIODS } from "@/lib/app-domain/claude-usage";
 import type { SeatStatus } from "@/lib/claude-usage/report-math";
+import type { KpiState, Verdict } from "@/lib/claude-usage/summary";
 import { saveClaudeUsageSettingsAction } from "./actions";
 
 // Claude usage measurement, stage 3 (17.11.2026): how much of Claude's
@@ -20,6 +21,9 @@ import { saveClaudeUsageSettingsAction } from "./actions";
 export const metadata = { robots: { index: false, follow: false } };
 
 const TONE: Record<SeatStatus, "green" | "amber" | "red"> = { ok: "green", near: "amber", over: "red" };
+const KPI_TONE: Record<KpiState, "green" | "amber" | "red" | "gray"> = { ok: "green", watch: "amber", off: "red", none: "gray" };
+const VERDICT_TONE: Record<Verdict, "green" | "amber" | "red"> = { ok: "green", partial: "amber", attention: "red" };
+const BAR: Record<SeatStatus | "none", string> = { ok: "bg-app-success", near: "bg-app-warning", over: "bg-app-error", none: "bg-app-border" };
 
 const cell = "px-2 py-2 font-jbmono text-[13px] text-app-text-primary";
 const head = "px-2 py-2 text-start font-medium";
@@ -39,6 +43,22 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
   const when = (iso: string) => f.dateTime(new Date(iso), { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
   const none = t("none");
   const hasData = report.coverage.coworkEvents + report.coverage.toolCalls + report.coverage.promptCopies > 0;
+  const sum = report.summary;
+  const offCount = sum.kpis.filter((k) => k.state === "off").length;
+  const sentBytes = report.tools.reduce((n, x) => n + x.totalBytes, 0);
+  const heavyTools = report.tools.slice(0, 3).map((x) => ({ tool: x.tool, size: bytes(x.totalBytes), share: sentBytes ? Math.round((x.totalBytes / sentBytes) * 100) : 0 }));
+  const personNote = (p: (typeof report.people)[number]) => {
+    if (p.noTelemetry) return t("summary.note.noTelemetry");
+    if (p.nonCowork && !p.cowork.requests) return t("summary.note.nonCowork");
+    if (!p.cowork.requests && !p.connector.calls) return t("summary.note.idle");
+    const parts = [t("summary.note.cost", { cost: usd(p.month.costUsd), threshold: usd(p.month.thresholdUsd) }), t("summary.note.hits", { count: p.cowork.limitHits })];
+    if (p.cowork.cacheSharePct !== null) parts.push(t("summary.note.cache", { pct: p.cowork.cacheSharePct }));
+    return parts.join(" · ");
+  };
+  const actionText = (a: (typeof sum.actions)[number]) => {
+    const v = a.key === "nearThreshold" ? { ...a.values, cost: usd(Number(a.values.cost)), threshold: usd(Number(a.values.threshold)) } : a.values;
+    return { title: t(`summary.action.${a.key}.title`, v), detail: t(`summary.action.${a.key}.detail`, v) };
+  };
 
   return (
     <div className="space-y-6">
@@ -62,6 +82,115 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
       </div>
 
       {!hasData && <p className="rounded-2xl border border-app-border bg-white p-5 text-sm text-app-text-tertiary">{t("empty")}</p>}
+
+      {/* Managers' summary (17.11.2026, "אפשרות ג"): the verdict, six
+          leading indicators, the team against the threshold, and what to
+          do. Everything below "פרטים" is the full report. */}
+      <section aria-label={t("summary.title")} className="flex flex-wrap items-center gap-3 rounded-2xl border border-app-border bg-white p-5" data-testid="usage-summary">
+        <StatusBadge label={t(`summary.verdict.${sum.verdict}`)} tone={VERDICT_TONE[sum.verdict]} />
+        <p className="flex-1 basis-80 text-sm text-app-text-primary">
+          {t(`summary.verdictLine.${sum.verdict}`)} {t("summary.offCount", { count: offCount })}
+        </p>
+      </section>
+
+      <section aria-label={t("summary.kpisTitle")} className="space-y-2" data-testid="usage-kpis">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-medium text-app-text-primary">{t("summary.kpisTitle")}</h2>
+          <span className="text-xs text-app-text-secondary">{t("summary.kpisAbout")}</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {sum.kpis.map((k) => (
+            <div key={k.key} className="rounded-2xl border border-app-border bg-white p-4">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm text-app-text-secondary">{t(`summary.kpi.${k.key}.label`)}</p>
+                <StatusBadge label={t(`summary.kpiState.${k.state}`)} tone={KPI_TONE[k.state]} />
+              </div>
+              <p className="mt-2 font-jbmono text-2xl text-app-text-primary">{k.value === null ? none : t(`summary.kpi.${k.key}.value`, { value: k.value })}</p>
+              <p className="mt-1 text-xs text-app-text-secondary">
+                {k.key === "closestToThreshold" && k.who ? t("summary.kpi.closestToThreshold.targetWho", { who: k.who }) : t(`summary.kpi.${k.key}.target`)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="flex flex-wrap items-start gap-5">
+        <section className="min-w-0 flex-[999_1_560px] rounded-2xl border border-app-border bg-white p-5" data-testid="usage-team">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-medium text-app-text-primary">{t("summary.teamTitle")}</h2>
+            {report.month.measuredDays < 3 && <span className="text-xs text-app-text-secondary">{t("summary.noPace")}</span>}
+          </div>
+          <ul className="mt-2 divide-y divide-app-border">
+            {report.people.map((p) => {
+              const state = p.noTelemetry || p.nonCowork || (!p.cowork.requests && !p.month.costUsd) ? "none" : p.month.status;
+              const pct = p.month.thresholdUsd ? Math.min(100, Math.round((p.month.costUsd / p.month.thresholdUsd) * 100)) : 0;
+              return (
+                <li key={p.userId} className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] items-center gap-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-app-text-primary" dir="auto">{p.name}</p>
+                    <p className="text-xs text-app-text-secondary">{t("summary.seat", { seat: usd(p.seatUsd) })}</p>
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <div className="h-2.5 overflow-hidden rounded-full bg-app-neutral-soft" role="img" aria-label={`${p.name}: ${pct}%`}>
+                      <div className={`h-full rounded-full ${BAR[state]}`} style={{ width: `${state === "none" ? 0 : Math.max(pct, 2)}%` }} />
+                    </div>
+                    <p className="text-xs text-app-text-secondary">{personNote(p)}</p>
+                  </div>
+                  {state === "none" ? <StatusBadge label={t("summary.statusNone")} tone="gray" /> : <StatusBadge label={t(`status.${state}`)} tone={TONE[state]} />}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+
+        <div className="flex flex-[1_1_320px] flex-col gap-5">
+          <section className="rounded-2xl border border-app-border bg-white p-5" data-testid="usage-actions">
+            <h2 className="text-sm font-medium text-app-text-primary">{t("summary.actionsTitle")}</h2>
+            {sum.actions.length === 0 ? (
+              <p className="mt-3 text-sm text-app-text-tertiary">{t("summary.actionsNone")}</p>
+            ) : (
+              <ol className="mt-3 space-y-2">
+                {sum.actions.map((a, i) => {
+                  const text = actionText(a);
+                  return (
+                    <li key={`${a.key}-${i}`} className="flex items-start gap-3 rounded-xl bg-app-accent-soft p-3">
+                      <span className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-app-text-accent text-xs font-medium text-white">{i + 1}</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-app-text-primary" dir="auto">{text.title}</p>
+                        <p className="mt-0.5 text-xs text-app-text-secondary" dir="auto">{text.detail}</p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-app-border bg-white p-5" data-testid="usage-heavy-tools">
+            <h2 className="text-sm font-medium text-app-text-primary">{t("summary.toolsTitle")}</h2>
+            <p className="mt-1 text-xs text-app-text-secondary">{t("summary.toolsAbout")}</p>
+            {heavyTools.length === 0 ? (
+              <p className="mt-3 text-sm text-app-text-tertiary">{t("tools.none")}</p>
+            ) : (
+              <ul className="mt-3 space-y-3">
+                {heavyTools.map((x) => (
+                  <li key={x.tool} className="space-y-1">
+                    <div className="flex justify-between gap-2 text-xs">
+                      <span className="font-jbmono text-app-text-primary" dir="ltr">{x.tool}</span>
+                      <span className="text-app-text-secondary">{t("summary.toolLine", { size: x.size, share: x.share })}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-app-neutral-soft">
+                      <div className="h-full rounded-full bg-app-accent" style={{ width: `${x.share}%` }} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
+
+      <h2 className="pt-2 text-base font-medium text-app-text-primary">{t("summary.details")}</h2>
 
       <section className="rounded-2xl border border-app-border bg-white p-5" data-testid="usage-people">
         <h2 className="text-sm font-medium text-app-text-primary">{t("people.title")}</h2>
@@ -271,20 +400,27 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {report.people.map((p) => (
-              <label key={p.userId} className="flex items-center justify-between gap-2 rounded-lg border border-app-border px-3 py-2 text-sm text-app-text-primary">
-                <span dir="auto">{p.name}</span>
-                <input
-                  name={`seat:${p.userId}`}
-                  type="number"
-                  min={1}
-                  max={1000}
-                  step="1"
-                  aria-label={`${t("settings.seatFor")}: ${p.name}`}
-                  placeholder={String(report.settings.defaultSeatUsd)}
-                  defaultValue={report.settings.seats[p.userId] ?? ""}
-                  className="w-24 rounded-lg border border-app-border px-2 py-1 font-jbmono text-sm"
-                />
-              </label>
+              <div key={p.userId} className="flex flex-col gap-2 rounded-lg border border-app-border px-3 py-2 text-sm text-app-text-primary">
+                <input type="hidden" name={`listed:${p.userId}`} value="1" />
+                <label className="flex items-center justify-between gap-2">
+                  <span dir="auto">{p.name}</span>
+                  <input
+                    name={`seat:${p.userId}`}
+                    type="number"
+                    min={1}
+                    max={1000}
+                    step="1"
+                    aria-label={`${t("settings.seatFor")}: ${p.name}`}
+                    placeholder={String(report.settings.defaultSeatUsd)}
+                    defaultValue={report.settings.seats[p.userId] ?? ""}
+                    className="w-24 rounded-lg border border-app-border px-2 py-1 font-jbmono text-sm"
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-xs text-app-text-secondary">
+                  <input type="checkbox" name={`nonCowork:${p.userId}`} defaultChecked={p.nonCowork} className="h-4 w-4" />
+                  {t("settings.nonCowork")}
+                </label>
+              </div>
             ))}
           </div>
           <button type="submit" className="rounded-full border border-app-border bg-white px-4 py-1.5 text-[12.5px] font-medium text-app-text-primary hover:border-gold">

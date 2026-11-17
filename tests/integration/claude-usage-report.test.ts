@@ -86,6 +86,27 @@ describe("the Claude usage report", () => {
     expect(report.heaviestRequests[0]).toMatchObject({ promptId: "p1", costUsd: 5, requests: 2, ankoraTools: ["get_client_file"] });
     expect(report.prompts).toEqual([{ kind: "advance_plan", copies: 1, avgChars: 9000, maxChars: 9000 }]);
     expect(report.coverage.unmatchedEmails).toEqual(["guest@example.com"]);
+
+    // The managers' summary reads the same numbers: a limit hit makes the
+    // week one that needs attention, and names who to look at.
+    expect(report.summary.verdict).toBe("attention");
+    expect(report.summary.kpis.find((k) => k.key === "limitHits")).toMatchObject({ value: 1, state: "watch" });
+    expect(report.summary.actions[0]).toMatchObject({ key: "limitHit", values: { count: 1 } });
+  });
+
+  it("lists active staff only, and dates the month from when measurement began", async () => {
+    const { ariel, hadas } = await seed();
+    const { user: invited } = await createTestUser({ role: "ANKORA_EMPLOYEE", status: "INVITED" });
+    const { user: suspended } = await createTestUser({ role: "ANKORA_EMPLOYEE", status: "SUSPENDED" });
+    const report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
+    const ids = report.people.map((p) => p.userId);
+    expect(ids).toContain(hadas.id);
+    expect(ids).not.toContain(invited.id);
+    expect(ids).not.toContain(suspended.id);
+    // The seed's first event this month is 55 minutes before NOW: too
+    // little to state a pace.
+    expect(report.month.measuredSince).toBe(ago(55).toISOString());
+    expect(report.people.find((p) => p.userId === hadas.id)!.month.projectedUsd).toBeNull();
   });
 
   it("lists active staff only, and dates the month from when measurement began", async () => {
@@ -114,6 +135,23 @@ describe("the Claude usage report", () => {
 
     await updateClaudeUsageSettings(ariel, { seats: { [hadas.id]: null } });
     expect((await claudeUsageSettings()).seats).toEqual({});
+  });
+
+  it("does not flag missing Cowork data for someone marked as not working in Cowork", async () => {
+    const { ariel } = await seed();
+    const { user: ops } = await createTestUser({ role: "SUPER_ADMIN" });
+    await prisma.mcpToolCall.create({ data: { userId: ops.id, tool: "get_task", ok: true, resultBytes: 10, resultChars: 10, argsHash: "c1", durationMs: 5, createdAt: ago(20) } });
+
+    let report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
+    expect(report.people.find((p) => p.userId === ops.id)).toMatchObject({ noTelemetry: true, nonCowork: false });
+
+    await updateClaudeUsageSettings(ariel, { nonCowork: { [ops.id]: true } });
+    report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
+    expect(report.people.find((p) => p.userId === ops.id)).toMatchObject({ noTelemetry: false, nonCowork: true });
+    expect(report.summary.actions.some((a) => a.key === "checkTelemetry" && a.values.name === ops.name)).toBe(false);
+
+    await updateClaudeUsageSettings(ariel, { nonCowork: { [ops.id]: false } });
+    expect((await claudeUsageSettings()).nonCowork).toEqual([]);
   });
 
   it("refuses a seat or multiplier out of range, and writes nothing", async () => {
