@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { DomainError } from "@/lib/domain-error";
-import { dayStartInZone, localDateKey } from "@/lib/timezone";
 import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
 import { PROMPT_KINDS, type PromptKind } from "@/lib/claude-usage/prompt-kinds";
 import { managerSummary, type ManagerSummary } from "@/lib/claude-usage/summary";
@@ -21,9 +20,7 @@ import {
   requestsBySource,
   type SourceKey,
   round2,
-  seatStatus,
   type CoworkEventIn,
-  type SeatStatus,
   type ToolCallIn,
 } from "@/lib/claude-usage/report-math";
 
@@ -46,29 +43,20 @@ export type UsagePeriod = (typeof USAGE_PERIODS)[number];
 
 export const CLAUDE_USAGE_SETTINGS_KEY = "claude_usage.settings";
 
+/// 18.11.2026: the seat price, the multiplier and the alerts switch are
+/// gone. Cowork's cost is what the work would cost at API list prices, not
+/// money spent, and on a Team seat the only limits are the five-hour window
+/// and the weekly limit, read by the browser extension. Comparing that cost
+/// with the seat price marked Ariel "over" at $270 on a $100 seat while he
+/// had used 9% of his window. Stored settings with those fields still read.
 export type ClaudeUsageSettings = {
-  /// The seat most people are on, in USD a month (17.11.2026: 20).
-  defaultSeatUsd: number;
-  /// Exceptions by user id (Ariel and ops: 100).
-  seats: Record<string, number>;
-  /// The threshold is seat × multiplier. 1 until two weeks of data say
-  /// what a normal month looks like next to the seat price.
-  multiplier: number;
-  /// Off until the threshold is calibrated: the screen shows the status,
-  /// nothing is sent.
-  alertsLive: boolean;
   /// People who do not work in Cowork (17.11.2026: Ankora Ops works in
   /// Claude Code). Their missing telemetry is expected: they are not
   /// flagged, and they do not make the summary "data missing".
   nonCowork: string[];
 };
 
-export const DEFAULT_SETTINGS: ClaudeUsageSettings = { defaultSeatUsd: 20, seats: {}, multiplier: 1, alertsLive: false, nonCowork: [] };
-
-const SEAT_MIN = 1;
-const SEAT_MAX = 1000;
-const MULTIPLIER_MIN = 0.1;
-const MULTIPLIER_MAX = 50;
+export const DEFAULT_SETTINGS: ClaudeUsageSettings = { nonCowork: [] };
 
 function assertCanView(actor: Pick<User, "role">) {
   if (!can(actor.role, "claude_usage.view")) {
@@ -81,21 +69,7 @@ function assertCanView(actor: Pick<User, "role">) {
 
 function readSettings(value: Prisma.JsonValue | undefined): ClaudeUsageSettings {
   const v = (value && typeof value === "object" && !Array.isArray(value) ? value : {}) as Record<string, unknown>;
-  const num = (x: unknown, fallback: number, min: number, max: number) =>
-    typeof x === "number" && Number.isFinite(x) && x >= min && x <= max ? x : fallback;
-  const seats: Record<string, number> = {};
-  if (v.seats && typeof v.seats === "object" && !Array.isArray(v.seats)) {
-    for (const [id, usd] of Object.entries(v.seats as Record<string, unknown>)) {
-      if (typeof usd === "number" && usd >= SEAT_MIN && usd <= SEAT_MAX) seats[id] = usd;
-    }
-  }
-  return {
-    defaultSeatUsd: num(v.defaultSeatUsd, DEFAULT_SETTINGS.defaultSeatUsd, SEAT_MIN, SEAT_MAX),
-    seats,
-    multiplier: num(v.multiplier, DEFAULT_SETTINGS.multiplier, MULTIPLIER_MIN, MULTIPLIER_MAX),
-    alertsLive: v.alertsLive === true,
-    nonCowork: Array.isArray(v.nonCowork) ? v.nonCowork.filter((id): id is string => typeof id === "string") : [],
-  };
+  return { nonCowork: Array.isArray(v.nonCowork) ? v.nonCowork.filter((id): id is string => typeof id === "string") : [] };
 }
 
 export async function claudeUsageSettings(): Promise<ClaudeUsageSettings> {
@@ -104,10 +78,6 @@ export async function claudeUsageSettings(): Promise<ClaudeUsageSettings> {
 }
 
 export type SettingsInput = {
-  defaultSeatUsd?: number;
-  multiplier?: number;
-  /// userId → seat. null puts the person back on the default seat.
-  seats?: Record<string, number | null>;
   /// userId → true when the person does not work in Cowork, false when
   /// they do. People left out keep what they had.
   nonCowork?: Record<string, boolean>;
@@ -116,33 +86,12 @@ export type SettingsInput = {
 export async function updateClaudeUsageSettings(actor: User, input: SettingsInput): Promise<ClaudeUsageSettings> {
   assertCanView(actor);
   const before = await claudeUsageSettings();
-  // Each refusal is written out, not built by a helper: the codes must be
-  // string literals so tests/unit/i18n-domain-errors.test.ts can check them.
-  const seatOk = (x: number) => Number.isFinite(x) && x >= SEAT_MIN && x <= SEAT_MAX;
-  const seatRefusal = () =>
-    new DomainError("claudeUsage.seatRange", `מחיר מושב הוא בין ${SEAT_MIN} ל-${SEAT_MAX} דולר.`, { min: SEAT_MIN, max: SEAT_MAX });
-  if (input.defaultSeatUsd !== undefined && !seatOk(input.defaultSeatUsd)) throw seatRefusal();
-  if (input.multiplier !== undefined && !(Number.isFinite(input.multiplier) && input.multiplier >= MULTIPLIER_MIN && input.multiplier <= MULTIPLIER_MAX)) {
-    throw new DomainError("claudeUsage.multiplierRange", `המכפיל הוא בין ${MULTIPLIER_MIN} ל-${MULTIPLIER_MAX}.`, { min: MULTIPLIER_MIN, max: MULTIPLIER_MAX });
-  }
-  const seats = { ...before.seats };
-  for (const [id, usd] of Object.entries(input.seats ?? {})) {
-    if (usd === null) delete seats[id];
-    else if (!seatOk(usd)) throw seatRefusal();
-    else seats[id] = usd;
-  }
   const nonCowork = new Set(before.nonCowork);
   for (const [id, off] of Object.entries(input.nonCowork ?? {})) {
     if (off) nonCowork.add(id);
     else nonCowork.delete(id);
   }
-  const after: ClaudeUsageSettings = {
-    ...before,
-    defaultSeatUsd: input.defaultSeatUsd ?? before.defaultSeatUsd,
-    multiplier: input.multiplier ?? before.multiplier,
-    seats,
-    nonCowork: [...nonCowork].sort(),
-  };
+  const after: ClaudeUsageSettings = { nonCowork: [...nonCowork].sort() };
   await prisma.appSetting.upsert({
     where: { key: CLAUDE_USAGE_SETTINGS_KEY },
     create: { key: CLAUDE_USAGE_SETTINGS_KEY, value: after as unknown as Prisma.InputJsonValue, updatedById: actor.id },
@@ -164,9 +113,11 @@ export async function updateClaudeUsageSettings(actor: User, input: SettingsInpu
 export type PersonUsage = {
   userId: string;
   name: string;
-  seatUsd: number;
   cowork: {
     requests: number;
+    /// What the work would cost at API list prices (Cowork's estimate): a
+    /// measure of how heavy it was, never money spent. A Team seat has a
+    /// fixed price; its limits are the five-hour window and the week.
     costUsd: number;
     inputTokens: number;
     outputTokens: number;
@@ -183,8 +134,6 @@ export type PersonUsage = {
   };
   connector: { calls: number; bytes: number; images: number; failures: number };
   prompts: { copies: number; chars: number };
-  /// projectedUsd is null until MIN_DAYS_FOR_PACE days were measured.
-  month: { costUsd: number; thresholdUsd: number; projectedUsd: number | null; status: SeatStatus };
   /// Uses the connector in the period but nothing arrived from Cowork:
   /// probably an old desktop app, or Cowork not used at all.
   noTelemetry: boolean;
@@ -213,9 +162,6 @@ export type ToolUsage = {
 
 export type ClaudeUsageReport = {
   period: { days: UsagePeriod; from: string; to: string };
-  /// When Cowork's telemetry began this month, and how many days that is.
-  /// Month figures and the pace cover only this stretch.
-  month: { measuredSince: string | null; measuredDays: number };
   settings: ClaudeUsageSettings;
   /// The managers' summary: one verdict, six leading indicators against
   /// their targets, and at most three things to do (lib/claude-usage/summary.ts).
@@ -232,14 +178,6 @@ export type ClaudeUsageReport = {
 };
 
 const isReadOnly = (tool: string) => (TOOL_ANNOTATIONS as Record<string, { readOnlyHint?: boolean }>)[tool]?.readOnlyHint === true;
-
-/// The first day of this month in Ankora's timezone.
-function monthStart(now: Date): { start: Date; end: Date } {
-  const [y, m] = localDateKey(now).split("-").map(Number);
-  const start = dayStartInZone(`${y}-${String(m).padStart(2, "0")}-01`)!;
-  const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
-  return { start, end: dayStartInZone(next)! };
-}
 
 function toCoworkIn(r: {
   eventName: string;
@@ -270,10 +208,9 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
   // The five-hour view always shows the past week, plus the window that
   // was open a week ago, whatever the period.
   const fiveFrom = new Date(Math.min(from.getTime(), now.getTime() - WEEK_MS - WINDOW_MS));
-  const month = monthStart(now);
   const settings = await claudeUsageSettings();
 
-  const [users, calls, events, copies, monthCosts, unmatched, firstThisMonth, limitSamples, unmatchedLimits] = await Promise.all([
+  const [users, calls, events, copies, unmatched, limitSamples, unmatchedLimits] = await Promise.all([
     prisma.user.findMany({
       // Active staff only: an invited or suspended person, or an old
       // duplicate account, has nothing to report and only confuses the list.
@@ -304,19 +241,12 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
       },
     }),
     prisma.claudePromptCopy.findMany({ where: { createdAt: { gte: from, lte: now } } }),
-    prisma.coworkEvent.groupBy({
-      by: ["userId"],
-      where: { eventName: "api_request", occurredAt: { gte: month.start, lte: now } },
-      _sum: { costUsd: true },
-    }),
     prisma.coworkEvent.findMany({
       where: { userId: null, userEmail: { not: null }, occurredAt: { gte: from, lte: now } },
       distinct: ["userEmail"],
       select: { userEmail: true },
       take: 20,
     }),
-    // When measurement began this month: the pace counts only measured days.
-    prisma.coworkEvent.findFirst({ where: { occurredAt: { gte: month.start, lte: now } }, orderBy: { occurredAt: "asc" }, select: { occurredAt: true } }),
     // The browser extension's limit readings (way 3).
     prisma.claudeLimitSample.findMany({
       where: { observedAt: { gte: fiveFrom, lte: now }, userId: { not: null } },
@@ -333,10 +263,6 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
     }),
   ]);
 
-  const DAY = 86_400_000;
-  const measuredSince = firstThisMonth?.occurredAt ?? null;
-  const measuredDays = measuredSince ? (now.getTime() - measuredSince.getTime()) / DAY : 0;
-  const daysLeft = Math.max(0, (month.end.getTime() - now.getTime()) / DAY);
   // Events and readings were read from fiveFrom; everything but the
   // five-hour view counts the period alone.
   const coworkAll = events.map(toCoworkIn);
@@ -354,7 +280,6 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
   const copiesBy = byUser(copies);
   const limitsBy = byUser(limitInPeriod);
   const allLimitsBy = byUser(limitSamples);
-  const monthBy = new Map(monthCosts.map((m) => [m.userId, Number(m._sum.costUsd ?? 0)]));
 
   const people: PersonUsage[] = users.map((u) => {
     const ev = eventsBy.get(u.id) ?? [];
@@ -374,15 +299,11 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
     const heavy = heaviestWindow(fiveHourWindows(ev));
     const userCalls = callsBy.get(u.id) ?? [];
     const userCopies = copiesBy.get(u.id) ?? [];
-    const seatUsd = settings.seats[u.id] ?? settings.defaultSeatUsd;
-    const monthCost = round2(monthBy.get(u.id) ?? 0);
-    const seat = seatStatus({ monthCostUsd: monthCost, seatUsd, multiplier: settings.multiplier, measuredDays, daysLeft });
     const last = ev.reduce<Date | null>((d, e) => (!d || e.occurredAt > d ? e.occurredAt : d), null);
     const allInput = input + cacheRead + cacheCreation;
     return {
       userId: u.id,
       name: u.name,
-      seatUsd,
       cowork: {
         requests: requests.length,
         costUsd: round2(sum((e) => e.costUsd)),
@@ -404,7 +325,6 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
         failures: userCalls.filter((c) => !c.ok).length,
       },
       prompts: { copies: userCopies.length, chars: userCopies.reduce((n, c) => n + c.chars, 0) },
-      month: { costUsd: monthCost, ...seat },
       noTelemetry: !settings.nonCowork.includes(u.id) && userCalls.length > 0 && ev.length === 0,
       nonCowork: settings.nonCowork.includes(u.id),
       limits: limitsBy.has(u.id) ? personLimits(limitsBy.get(u.id)!, now) : null,
@@ -487,7 +407,6 @@ export async function getClaudeUsageReport(actor: User, opts: { days?: number; n
 
   return {
     period: { days, from: from.toISOString(), to: now.toISOString() },
-    month: { measuredSince: measuredSince?.toISOString() ?? null, measuredDays: Math.round(measuredDays * 10) / 10 },
     settings,
     summary: managerSummary({ people, tools, signals, coverage }),
     fiveHour: teamFiveHour(people),
