@@ -1,0 +1,33 @@
+{
+  "$comment": [
+    "Findings of the iPhone checks (qa/checks/iphone.mjs) that were looked at and decided,",
+    "not ignored. A finding that matches an entry here reports as `info` with the reason;",
+    "anything not listed reports at its own severity. An entry that stops matching in a full",
+    "weekly run is reported as stale: remove it, the thing it excused is gone.",
+    "",
+    "Match fields (all given ones must match): check, route (exact), modal (substring of the",
+    "button that opened the dialog), text (substring of the element's text), severity.",
+    "",
+    "Shape: { match: {...}, reason, decidedBy, acceptedOn }"
+  ],
+  "accepted": [
+    {
+      "match": { "check": "modal-height", "modal": "עוד אפשרויות", "severity": "medium" },
+      "reason": "The bottom bar's \"more\" sheet is taller than the screen for roles with many links (44px rows since #557). It is capped at the screen and scrolls; a two-column layout was offered and declined.",
+      "decidedBy": "Ariel",
+      "acceptedOn": "2026-11-17"
+    },
+    {
+      "match": { "check": "modal-height", "route": "/app/clients/[clientId]/processes/[processId]", "modal": "שינוי", "severity": "medium" },
+      "reason": "The \"when does the process run\" dialog is taller than the smaller iPhones and scrolls; its save and cancel buttons are pinned to the bottom (#560).",
+      "decidedBy": "Ariel",
+      "acceptedOn": "2026-11-17"
+    },
+    {
+      "match": { "check": "rtl", "severity": "low", "text": "[DEMO]" },
+      "reason": "dir=\"auto\" turns left to right because the seeded rows start with the Latin \"[DEMO]\" prefix. Real data that starts in Hebrew does not.",
+      "decidedBy": "ops",
+      "acceptedOn": "2026-11-18"
+    }
+  ]
+}

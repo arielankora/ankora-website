@@ -110,6 +110,9 @@ export const SHARD_CHECKS = {
   "coverage-1": { checks: ["coverage"], split: [1, 3] },
   "coverage-2": { checks: ["coverage"], split: [2, 3] },
   "coverage-3": { checks: ["coverage"], split: [3, 3] },
+  // The full iPhone audit (checks/iphone.mjs): about 12 minutes of WebKit on its own, and the
+  // only shard that installs WebKit (.github/workflows/qa.yml).
+  iphone: { checks: ["iphone"] },
 };
 
 export const MAIN_SHARD = "main";
@@ -124,7 +127,7 @@ export const MAIN_SHARD = "main";
 export const PLAN = {
   1: null,
   2: [MAIN_SHARD, "integration-1", "integration-2", "integration-3", "integration-4", "integration-5"],
-  3: [MAIN_SHARD, "integration-1", "integration-2", "integration-3", "integration-4", "integration-5", "utc-1", "utc-2", "utc-3", "coverage-1", "coverage-2", "coverage-3"],
+  3: [MAIN_SHARD, "integration-1", "integration-2", "integration-3", "integration-4", "integration-5", "utc-1", "utc-2", "utc-3", "coverage-1", "coverage-2", "coverage-3", "iphone"],
 };
 
 /** The shard names for a level, or null when that level runs as one job. */

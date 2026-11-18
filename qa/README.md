@@ -25,9 +25,11 @@ how much of the product gets looked at.
 | Live production probe | ✓ | ✓ | ✓ |
 | Integration tests, production build | | ✓ | ✓ |
 | Browser end-to-end, dependency advisories | | ✓ | ✓ |
+| Phone layout of every product screen: crashes, sideways scroll, unreachable dialogs, fields under 16px (Chromium, 2 iPhones, 2 roles) | | ✓ | ✓ |
 | Boundary scan, entry-point guards (source scans) | ✓ | ✓ | ✓ |
 | Permission matrix by role, run against the app (not written yet) | | | ✓ |
 | Accessibility, RTL, performance budgets | | | ✓ |
+| Full iPhone audit: every role, 4 iPhones, tap targets, safe area, direction (WebKit, own shard) | | | ✓ |
 
 ## The three ideas this suite is built on
 
