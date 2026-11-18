@@ -434,6 +434,11 @@ function RevertButton({ p }: { p: ReviewProposal }) {
   );
 }
 
+/// The row's approve button: full width and 44px tall on a phone, a pill beside the links from sm up.
+const PRIMARY = "min-h-11 w-full rounded-full px-3.5 py-2 font-medium sm:min-h-0 sm:w-auto sm:py-1.5";
+/// The row's other actions: three equal 44px targets in one line on a phone, links from sm up.
+const SECONDARY = "flex min-h-11 flex-1 items-center justify-center text-sm font-medium sm:min-h-0 sm:flex-none sm:text-xs sm:font-normal";
+
 function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal; selected: boolean; onSelect: (on: boolean) => void; staff: ReviewStaff; meId: string }) {
   const t = useTranslations("knowledge");
   const format = useFormatter();
@@ -612,19 +617,25 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
             </p>
           ))}
         </div>
-        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-3 text-xs">
+        {/* On a phone the actions take a row of their own under the text,
+            the approval full width and the rest beside each other: in one
+            row with the text they left it a column one word wide, and the
+            approve button covered it (iPhone 15 Pro, 18.11.2026; the
+            options are on the design canvas of that day). From sm up the
+            row is as it was. */}
+        <div className="flex w-full flex-col gap-1 text-sm sm:w-auto sm:max-w-full sm:shrink-0 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:text-xs">
           {/* A problem that blocks approval (spec 5.2) is fixed in the edit,
               where the server checks the approved text again. */}
           {/* Already in the file: approving would make a second copy, or
               be refused. The primary action closes it onto the item there. */}
           {p.alreadyIn ? (
-            <button type="button" onClick={attach} className="rounded-full bg-app-accent px-3.5 py-1.5 font-medium text-app-text-primary">
+            <button type="button" onClick={attach} className={`${PRIMARY} bg-app-accent text-app-text-primary`}>
               {p.alreadyIn.addsSources ? t("proposal.alreadyInAddSource") : t("proposal.alreadyInClose")}
             </button>
           ) : (
             <>
               {suggested && (
-                <button type="button" onClick={approveSuggested} className="rounded-full bg-app-accent px-3.5 py-1.5 font-medium text-app-text-primary" data-testid="proposal-approve-suggested">
+                <button type="button" onClick={approveSuggested} className={`${PRIMARY} bg-app-accent text-app-text-primary`} data-testid="proposal-approve-suggested">
                   {p.combinedProcedure ? t("proposal.approveSuggestedCombined") : t("proposal.approveSuggested")}
                 </button>
               )}
@@ -634,26 +645,28 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
                 <button
                   type="button"
                   onClick={approve}
-                  className={`rounded-full px-3.5 py-1.5 font-medium ${doubtful || suggested ? "border border-app-border text-app-text-secondary" : "bg-app-accent text-app-text-primary"}`}
+                  className={`${PRIMARY} ${doubtful || suggested ? "border border-app-border text-app-text-secondary" : "bg-app-accent text-app-text-primary"}`}
                 >
                   {p.combinedProcedure ? t("proposal.approveCombined") : t("proposal.approve")}
                 </button>
               )}
             </>
           )}
-          <Drawer triggerLabel={t("proposal.editAndApprove")} title={t("proposal.editTitle")} variant="link">
-            <EditForm p={p} />
-          </Drawer>
-          {/* Not knowledge but something to do: a task, not a rejection
-              and not an item forced into the file. */}
-          {!p.taskBlocked ? (
-            <Drawer triggerLabel={t("proposal.toTask")} title={t("proposal.toTaskTitle")} variant="link">
-              <TaskForm p={p} staff={staff} meId={meId} />
+          <div className="flex sm:contents">
+            <Drawer triggerLabel={t("proposal.editAndApprove")} title={t("proposal.editTitle")} variant="link" triggerClassName={SECONDARY}>
+              <EditForm p={p} />
             </Drawer>
-          ) : null}
-          <Drawer triggerLabel={t("reject.submit")} title={t("reject.title")} variant="link">
-            <RejectForm p={p} />
-          </Drawer>
+            {/* Not knowledge but something to do: a task, not a rejection
+                and not an item forced into the file. */}
+            {!p.taskBlocked ? (
+              <Drawer triggerLabel={t("proposal.toTask")} title={t("proposal.toTaskTitle")} variant="link" triggerClassName={SECONDARY}>
+                <TaskForm p={p} staff={staff} meId={meId} />
+              </Drawer>
+            ) : null}
+            <Drawer triggerLabel={t("reject.submit")} title={t("reject.title")} variant="link" triggerClassName={SECONDARY}>
+              <RejectForm p={p} />
+            </Drawer>
+          </div>
         </div>
       </div>
     </li>

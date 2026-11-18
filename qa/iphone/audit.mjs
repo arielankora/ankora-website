@@ -13,9 +13,10 @@
 //   - from the QA runner: qa/checks/iphone.mjs imports `audit()` for the
 //     level-2 "Phone layout" check and the level-3 "iPhone layout" check.
 //
-// Read-only towards the product with one exception: if the seeded database
+// Read-only towards the product with two exceptions: if the seeded database
 // has no process for the demo client, one "[DEMO]" process is inserted so
-// the four process routes can be opened. Run it against a throwaway
+// the four process routes can be opened, and if it has no pending proposal,
+// one "[DEMO]" batch of two, so the approvals screen shows its rows. Run it against a throwaway
 // database only (npm run db:dev locally, the service container in CI).
 
 import fs from "node:fs";
@@ -63,6 +64,37 @@ async function resolveIds() {
       proc = await db.process.create({ data: { clientId: client.id, seq: 1, code: "P1", title: "[DEMO] תהליך לבדיקת תצוגה באייפון", purpose: "נוצר על ידי qa/iphone/audit.mjs כדי לפתוח את מסכי התהליך" } });
       createdProcess = true;
     }
+    // A proposal waiting for approval, so the approvals screen shows its rows: the seed has none,
+    // and a row whose actions squeezed the text to one word a line went unseen (18.11.2026).
+    let createdProposal = false;
+    const pending = await db.knowledgeProposal.findFirst({ where: { clientId: client.id, state: "PENDING" } });
+    if (!pending) {
+      await db.knowledgeBatch.create({
+        data: {
+          clientId: client.id,
+          note: "[DEMO] נוצר על ידי qa/iphone/audit.mjs כדי להציג שורת הצעה",
+          proposals: {
+            create: [
+              {
+                clientId: client.id,
+                target: "PROCESS",
+                payload: { title: "[DEMO] הקמת לקוח שחתם על הסכם במערכת הגבייה", purpose: "שכל לקוח שחתם על הסכם יוקם במערכת הגבייה לפני שמוציאים לו מקדמה, ולא ייפול בין הכיסאות", trigger: "לקוח עובר לסטטוס הסכם חתום בספריית הלקוחות" },
+                reason: "נאמר בפגישה, ונבדק מול התיק",
+                confidence: "MEDIUM",
+              },
+              {
+                clientId: client.id,
+                target: "FACT",
+                payload: { kind: "NOTE", body: "[DEMO] חשבוניות ספקים מאושרות רק אחרי שמנהלת הכספים בודקת אותן מול ההזמנה" },
+                reason: "נאמר בפגישה",
+                confidence: "HIGH",
+              },
+            ],
+          },
+        },
+      });
+      createdProposal = true;
+    }
     const category = await db.category.findFirst({ orderBy: { name: "asc" } });
     const date = (await db.importantDate.findFirst({ where: { clientId: client.id } })) ?? (await db.importantDate.findFirst());
     const user = await db.user.findFirst({ where: { email: ROLES.employee1.identifier } });
@@ -78,6 +110,7 @@ async function resolveIds() {
       // with an unknown token and show their "link not valid" state.
       token: "iphone-audit-unknown-token",
       createdProcess,
+      createdProposal,
     };
   } finally {
     await db.$disconnect();
@@ -95,8 +128,12 @@ function expand(route, ids) {
     .replace(/^\/app\/tasks\/\[id\]$/, `/app/tasks/${ids.taskId}`);
 }
 
-const slug = (route) => route.replace(/^\//, "").replace(/\[|\]/g, "").replace(/\//g, "__") || "root";
+const slug = (route) => route.replace(/^\//, "").replace(/\[|\]/g, "").replace(/\//g, "__").replace(/[?&=]/g, "_") || "root";
 const devSlug = (d) => d.toLowerCase().replace(/\s+/g, "-");
+
+/// The approvals screen opens on its overview; the proposal rows are on the knowledge tab, for
+/// one client (no "mine" filter), with the proposal resolveIds makes sure exists.
+const EXTRA_VIEWS = { "/app/approvals": ["/app/approvals?tab=knowledge&clientId=[clientId]"] };
 
 /** Every `screen:` capability in the manifest, optionally narrowed by route prefix. */
 export function manifestScreens(only = null) {
@@ -105,6 +142,8 @@ export function manifestScreens(only = null) {
     .filter(([, c]) => c.kind === "screen")
     .map(([id]) => id.slice("screen:".length))
     .sort();
+  // States a screen shows only on a tab: added beside the screen, opened like any other.
+  screens = screens.flatMap((s) => [s, ...(EXTRA_VIEWS[s] ?? [])]);
   if (only) screens = screens.filter((s) => only.some((o) => s === o || s.startsWith(o)));
   return screens;
 }
@@ -189,6 +228,11 @@ async function shoot(page, opts, file, fullPage, meta) {
   if (!opts.shots) return null;
   fs.mkdirSync(path.dirname(file), { recursive: true });
   // WebKit refuses screenshots taller than 32767px (the guide is). Keep the top 32000px then.
+  // Chromium: a full-page screenshot resizes the emulated screen and drops its touch emulation, so
+  // every later screen on that page reads as a desktop (pointer: fine) and the 16px field rule no
+  // longer applies (18.11.2026). The level-2 check takes no screenshots; by hand, Chromium keeps to
+  // the visible screen.
+  if (opts.engine === "chromium") fullPage = false;
   const tall = fullPage && (meta?.scrollHeight ?? 0) > 32000;
   await page.screenshot({ path: file, fullPage, type: "jpeg", quality: 75, scale: "css", ...(tall ? { clip: { x: 0, y: 0, width: meta.vw, height: 32000 } } : {}) });
   return path.relative(OUT, file);
@@ -342,6 +386,7 @@ export async function audit(options = {}) {
   const ids = await resolveIds();
   opts.log(`${screens.length} screens, roles ${opts.roles.join(",")}, devices ${opts.devices.join(" | ")}, ${opts.engine}`);
   if (ids.createdProcess) opts.log(`inserted a [DEMO] process ${ids.processId} (none was seeded)`);
+  if (ids.createdProposal) opts.log("inserted a [DEMO] batch of two proposals (none was pending)");
 
   const browser = await launcher.launch(exe ? { executablePath: exe } : {});
   const started = Date.now();

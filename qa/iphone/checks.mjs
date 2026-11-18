@@ -20,6 +20,9 @@ export function pageChecks() {
   const isVisible = (el) => {
     const cs = getComputedStyle(el);
     if (cs.display === "none" || cs.visibility === "hidden" || Number(cs.opacity) === 0) return false;
+    // Inside a closed <details>: Chromium still lays the content out (content-visibility), so it has
+    // a box, but nobody sees it. A filter chip there read as cut off (18.11.2026).
+    if (el.closest("details:not([open]) > :not(summary)")) return false;
     const r = el.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) return false;
     // sr-only and similar visually hidden helpers
@@ -179,6 +182,21 @@ export function pageChecks() {
     if (!ownText(el)) continue;
     if (el.scrollWidth > el.clientWidth + 2) {
       add("cut-off", "low", `text wider than its box and clipped without an ellipsis (${el.scrollWidth}px in ${el.clientWidth}px)`, el, { value: el.scrollWidth - el.clientWidth });
+    }
+  }
+  // Text squeezed into a narrow column: a sentence a word a line beside something that would not
+  // wrap. Nothing leaves the screen, so the checks above see nothing. Found on the approvals screen,
+  // a proposal's text beside its four actions (iPhone 15 Pro, 18.11.2026).
+  for (const el of leafish) {
+    const text = ownText(el);
+    if (text.split(/\s+/).filter(Boolean).length < 5) continue;
+    const r = el.getBoundingClientRect();
+    const line = parseFloat(getComputedStyle(el).lineHeight) || parseFloat(getComputedStyle(el).fontSize) * 1.4;
+    if (r.width < Math.min(120, vw * 0.3) && r.height > line * 4) {
+      // In a table the columns share out the width by design, and on a phone the table scrolls in its
+      // own box: worth seeing, not a blocker. The blocker is a flex row that would not wrap.
+      const inTable = !!el.closest("td, th");
+      add("squeezed", inTable ? "medium" : "high", `text squeezed into a ${Math.round(r.width)}px column, ${Math.round(r.height / line)} lines (${text.split(/\s+/).length} words)${inTable ? ", in a table cell" : ""}`, el, { value: Math.round(r.width) });
     }
   }
 

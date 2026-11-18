@@ -152,7 +152,9 @@ export function ApprovalRow({ row }: { row: RowView }) {
           </div>
         )}
       </div>
-      <div className="flex shrink-0 items-center gap-3 text-[12.5px]">
+      {/* A row of its own under the text on a phone: beside it, the actions left the text a column
+          a word or two wide (WebKit, iPhone SE, 18.11.2026). From sm up they sit beside it. */}
+      <div className="flex w-full flex-wrap items-center gap-3 text-[12.5px] sm:w-auto sm:shrink-0">
         {done ? (
           <span className="text-app-text-tertiary">{done}</span>
         ) : rejecting && reject && !reject.note ? (

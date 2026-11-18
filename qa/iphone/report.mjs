@@ -19,6 +19,7 @@ const CHECK_HE = {
   "horizontal-overflow": "גלילה אופקית",
   "off-screen": "יוצא מהמסך",
   "cut-off": "נחתך",
+  squeezed: "טקסט דחוס בעמודה צרה",
   "tap-target": "מטרת מגע קטנה",
   "input-font": "גופן שדה מתחת ל-16",
   "safe-area": "אזור בטוח",
@@ -42,6 +43,8 @@ function heMessage(f) {
       return `הרכיב חורג ${f.value}px מעבר ל${/right/.test(m) ? "קצה הימני" : "קצה השמאלי"} של המסך`;
     case "cut-off":
       return f.severity === "low" ? `טקסט רחב מהתיבה שלו (${f.value}px) ונחתך בלי שלוש נקודות` : `${f.value}px מהרכיב מוסתרים על ידי מיכל שחותך גלישה`;
+    case "squeezed":
+      return `טקסט דחוס לעמודה ברוחב ${f.value}px, מילה או שתיים בשורה, ליד רכיב שלא נשבר לשורה משלו`;
     case "tap-target": {
       const [w, h] = num(m, /(\d+)x(\d+)px/) ?? [0, 0];
       return `שטח מגע ${w}×${h}px, פחות מ-44×44`;
