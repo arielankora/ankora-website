@@ -96,6 +96,20 @@ export function pageChecks() {
     if (["IMG", "SVG", "INPUT", "SELECT", "TEXTAREA", "BUTTON", "A", "VIDEO", "CANVAS"].includes(el.tagName.toUpperCase())) return true;
     return ownText(el).length > 0;
   });
+  let widestCache = null;
+  const widest = () => {
+    if (widestCache) return widestCache;
+    const rows = [];
+    for (const el of document.body.querySelectorAll("*")) {
+      const r = el.getBoundingClientRect();
+      if (!r.width) continue;
+      const over = Math.max(r.right - vw, -r.left);
+      if (over > 1 && !inFixedLayer(el)) rows.push([over, describe(el)]);
+    }
+    rows.sort((a, b) => b[0] - a[0]);
+    widestCache = rows.slice(0, 3).map(([over, d]) => `${Math.round(over)}px ${d.tag}.${d.cls.split(" ").slice(0, 4).join(".")} "${d.text.slice(0, 30)}"`);
+    return widestCache;
+  };
   const offFlagged = new Set();
   for (const el of leafish) {
     if (el.closest("svg") && el.tagName.toLowerCase() !== "svg") continue;
@@ -134,7 +148,11 @@ export function pageChecks() {
       if (inFixedLayer(el) && (r.left >= vw || r.right <= 0)) continue; // closed off-canvas panel
       const past = Math.round(Math.max(r.right - vw, -r.left));
       offFlagged.add(el);
-      add("off-screen", past > 8 ? "high" : "medium", `element extends ${past}px past the ${r.right > vw ? "right" : "left"} edge of the viewport`, el, { value: past });
+      // The geometry goes into the message: a control pinned to the screen (the bottom bar) can only
+      // land off it when the layout viewport itself is wider than the screen, and the report should
+      // say so rather than leave the next person to guess (CI, 18.11.2026, calendar and credentials at 320).
+      const geo = `screen ${vw}, layout ${document.documentElement.clientWidth}, scrollWidth ${Math.max(document.documentElement.scrollWidth, document.body.scrollWidth)}, scrollX ${Math.round(window.scrollX)}, visual ${Math.round(window.visualViewport?.width ?? vw)}@${Math.round(window.visualViewport?.offsetLeft ?? 0)}`;
+      add("off-screen", past > 8 ? "high" : "medium", `element extends ${past}px past the ${r.right > vw ? "right" : "left"} edge of the viewport (${geo})`, el, { value: past, widest: widest() });
     }
   }
   // Text truncated without ellipsis (own text wider than the box, box clips).

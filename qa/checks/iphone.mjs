@@ -162,7 +162,8 @@ function summarise(result, pick, { staleCheck }) {
         continue;
       }
       const where = f.modal ? ` in the "${f.modal}" dialog` : "";
-      add(`${f.check}|${v.route}|${f.modal ?? ""}|${elKey(f.el)}`, sev, `${v.route}: ${CHECK_LABEL[f.check] ?? f.check}${where}, ${elName(f.el)}`, f.message, v.device, v.role);
+      const extra = f.widest?.length ? `\nWidest elements: ${f.widest.join("; ")}` : "";
+      add(`${f.check}|${v.route}|${f.modal ?? ""}|${elKey(f.el)}`, sev, `${v.route}: ${CHECK_LABEL[f.check] ?? f.check}${where}, ${elName(f.el)}`, f.message + extra, v.device, v.role);
     }
   }
 
