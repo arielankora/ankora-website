@@ -28,7 +28,7 @@ export function EmptyState({
         ("href" in action ? (
           <Link
             href={action.href}
-            className="mt-2 rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary"
+            className="tap-area mt-2 rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary"
           >
             {action.label}
           </Link>
@@ -36,7 +36,7 @@ export function EmptyState({
           <button
             type="button"
             onClick={action.onClick}
-            className="mt-2 rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary"
+            className="tap-area mt-2 rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary"
           >
             {action.label}
           </button>
