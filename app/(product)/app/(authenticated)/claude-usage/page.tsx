@@ -5,7 +5,6 @@ import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { getClaudeUsageReport, USAGE_PERIODS } from "@/lib/app-domain/claude-usage";
-import type { SeatStatus } from "@/lib/claude-usage/report-math";
 import type { KpiState, Verdict } from "@/lib/claude-usage/summary";
 import type { FiveHourState, WindowCell } from "@/lib/claude-usage/five-hour";
 import { saveClaudeUsageSettingsAction } from "./actions";
@@ -21,7 +20,6 @@ import { saveClaudeUsageSettingsAction } from "./actions";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-const TONE: Record<SeatStatus, "green" | "amber" | "red"> = { ok: "green", near: "amber", over: "red" };
 const KPI_TONE: Record<KpiState, "green" | "amber" | "red" | "gray"> = { ok: "green", watch: "amber", off: "red", none: "gray" };
 const VERDICT_TONE: Record<Verdict, "green" | "amber" | "red"> = { ok: "green", partial: "amber", attention: "red" };
 
@@ -60,11 +58,12 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
   const sentBytes = report.tools.reduce((n, x) => n + x.totalBytes, 0);
   const heavyTools = report.tools.slice(0, 3).map((x) => ({ tool: x.tool, size: bytes(x.totalBytes), share: sentBytes ? Math.round((x.totalBytes / sentBytes) * 100) : 0 }));
   const actionText = (a: (typeof sum.actions)[number]) => {
-    const v = a.key === "nearThreshold" ? { ...a.values, cost: usd(Number(a.values.cost)), threshold: usd(Number(a.values.threshold)) } : a.values;
+    const v = a.values;
     return { title: t(`summary.action.${a.key}.title`, v), detail: t(`summary.action.${a.key}.detail`, v) };
   };
 
   // Five-hour window helpers.
+  const weeklyTone = (pct: number | null) => (pct === null ? "text-app-text-tertiary" : pct >= 80 ? "text-app-error" : pct > 60 ? "text-app-warning" : "text-app-text-secondary");
   const five = report.fiveHour;
   const nowMs = Date.parse(report.period.to);
   const left = (iso: string) => {
@@ -82,7 +81,6 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
       if (c.hitAt) parts.push(t("five.note.hitAt", { time: clock(c.hitAt) }));
       parts.push(c.resetsAt ? t("five.note.resets", { time: left(c.resetsAt) }) : t("five.note.noWindow"));
     }
-    if (p.fiveHour.weeklyPct !== null) parts.push(t("five.note.weekly", { pct: Math.round(p.fiveHour.weeklyPct) }));
     return parts.join(" · ");
   };
   const cellLabel = (name: string, w: WindowCell) => {
@@ -198,7 +196,11 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
                 <li key={p.userId} className="grid grid-cols-1 items-center gap-3 py-3 md:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_minmax(0,13rem)_7rem] md:gap-4">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-app-text-primary" dir="auto">{p.name}</p>
-                    <p className={`text-xs ${p.month.status === "ok" ? "text-app-text-secondary" : "text-app-error"}`}>{t("five.month", { seat: usd(p.seatUsd), cost: usd(p.month.costUsd) })}</p>
+                    {/* The weekly limit, as the extension reads it (18.11.2026:
+                        replaced Cowork's cost against the seat price). */}
+                    <p className={`text-xs ${weeklyTone(p.fiveHour.weeklyPct)}`}>
+                      {p.fiveHour.weeklyPct === null ? t("five.weeklyNone") : t("five.weekly", { pct: Math.round(p.fiveHour.weeklyPct) })}
+                    </p>
                   </div>
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-3">
@@ -261,11 +263,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
               </div>
               <p className="mt-2 font-jbmono text-2xl text-app-text-primary">{k.value === null ? none : t(`summary.kpi.${k.key}.value`, { value: k.value })}</p>
               <p className="mt-1 text-xs text-app-text-secondary">
-                {k.key === "closestToThreshold" && k.who
-                  ? t("summary.kpi.closestToThreshold.targetWho", { who: k.who })
-                  : k.key === "closestToWeeklyLimit" && k.who
-                    ? t("summary.kpi.closestToWeeklyLimit.targetWho", { who: k.who })
-                    : t(`summary.kpi.${k.key}.target`)}
+                {k.key === "closestToWeeklyLimit" && k.who ? t("summary.kpi.closestToWeeklyLimit.targetWho", { who: k.who }) : t(`summary.kpi.${k.key}.target`)}
               </p>
             </div>
           ))}
@@ -322,19 +320,14 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
 
       <section className="rounded-2xl border border-app-border bg-white p-5" data-testid="usage-people">
         <h2 className="text-sm font-medium text-app-text-primary">{t("people.title")}</h2>
-        {!report.settings.alertsLive && <p className="mt-1 text-xs text-app-text-secondary">{t("people.alertsOff")}</p>}
-        {report.month.measuredSince && (
-          <p className="mt-1 text-xs text-app-text-secondary">{t("people.measuredSince", { date: f.dateTime(new Date(report.month.measuredSince), { day: "numeric", month: "numeric" }) })}</p>
-        )}
+        <p className="mt-1 text-xs text-app-text-secondary">{t("people.costAbout")}</p>
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[960px] text-sm">
+          <table className="w-full min-w-[820px] text-sm">
             <thead>
               <tr className="border-b border-app-border text-xs text-app-text-secondary">
                 <th className="py-2 pe-3 text-start font-medium">{t("people.name")}</th>
-                <th className={head}>{t("people.seat")}</th>
                 <th className={head}>{t("people.requests")}</th>
                 <th className={head}>{t("people.cost")}</th>
-                <th className={head}>{t("people.month")}</th>
                 <th className={head}>{t("people.limitHits")}</th>
                 <th className={head}>{t("people.window")}</th>
                 <th className={head}>{t("people.cache")}</th>
@@ -353,17 +346,8 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
                     {p.name}
                     {p.noTelemetry && <p className="text-xs text-app-warning">{t("people.noTelemetry")}</p>}
                   </td>
-                  <td className={cell}>{usd(p.seatUsd)}</td>
                   <td className={cell}>{int(p.cowork.requests)}</td>
                   <td className={cell}>{usd(p.cowork.costUsd)}</td>
-                  <td className="px-2 py-2">
-                    <StatusBadge label={t(`status.${p.month.status}`)} tone={TONE[p.month.status]} />
-                    <p className="mt-1 font-jbmono text-[12px] text-app-text-secondary">
-                      {p.month.projectedUsd === null
-                        ? t("people.monthValueNoPace", { cost: usd(p.month.costUsd), threshold: usd(p.month.thresholdUsd) })
-                        : t("people.monthValue", { cost: usd(p.month.costUsd), threshold: usd(p.month.thresholdUsd), projected: usd(p.month.projectedUsd) })}
-                    </p>
-                  </td>
                   <td className={`${cell} ${p.cowork.limitHits > 0 ? "text-app-error" : ""}`}>{int(p.cowork.limitHits)}</td>
                   <td className={cell}>{p.cowork.heaviestWindow ? `${usd(p.cowork.heaviestWindow.costUsd)} · ${when(p.cowork.heaviestWindow.start)}` : none}</td>
                   <td className={cell}>{p.cowork.cacheSharePct === null ? none : `${p.cowork.cacheSharePct}%`}</td>
@@ -526,34 +510,11 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
         )}
         <form action={saveClaudeUsageSettingsAction} className="mt-3 space-y-4">
           <input type="hidden" name="days" value={days} />
-          <div className="flex flex-wrap gap-4">
-            <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-              {t("settings.defaultSeat")}
-              <input name="defaultSeat" type="number" min={1} max={1000} step="1" defaultValue={report.settings.defaultSeatUsd} className="w-32 rounded-lg border border-app-border px-2 py-1 font-jbmono text-sm text-app-text-primary" />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-app-text-secondary">
-              {t("settings.multiplier")}
-              <input name="multiplier" type="number" min={0.1} max={50} step="0.1" defaultValue={report.settings.multiplier} className="w-32 rounded-lg border border-app-border px-2 py-1 font-jbmono text-sm text-app-text-primary" />
-            </label>
-          </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {report.people.map((p) => (
               <div key={p.userId} className="flex flex-col gap-2 rounded-lg border border-app-border px-3 py-2 text-sm text-app-text-primary">
                 <input type="hidden" name={`listed:${p.userId}`} value="1" />
-                <label className="flex items-center justify-between gap-2">
-                  <span dir="auto">{p.name}</span>
-                  <input
-                    name={`seat:${p.userId}`}
-                    type="number"
-                    min={1}
-                    max={1000}
-                    step="1"
-                    aria-label={`${t("settings.seatFor")}: ${p.name}`}
-                    placeholder={String(report.settings.defaultSeatUsd)}
-                    defaultValue={report.settings.seats[p.userId] ?? ""}
-                    className="w-24 rounded-lg border border-app-border px-2 py-1 font-jbmono text-sm"
-                  />
-                </label>
+                <span dir="auto">{p.name}</span>
                 <label className="tap-area flex items-center gap-2 text-xs text-app-text-secondary">
                   <input type="checkbox" name={`nonCowork:${p.userId}`} defaultChecked={p.nonCowork} className="h-4 w-4" />
                   {t("settings.nonCowork")}

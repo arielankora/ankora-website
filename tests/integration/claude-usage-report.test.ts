@@ -77,7 +77,6 @@ describe("the Claude usage report", () => {
     expect(h.cowork.heaviestWindow).toMatchObject({ costUsd: 5, requests: 2, limitHits: 1 });
     expect(h.connector).toMatchObject({ calls: 4, bytes: 338_000 });
     expect(h.prompts).toEqual({ copies: 1, chars: 9000 });
-    expect(h.seatUsd).toBe(20);
     expect(h.noTelemetry).toBe(false);
     // A tie on requests goes to the higher cost.
     expect(h.cowork.bySource).toEqual([
@@ -99,7 +98,7 @@ describe("the Claude usage report", () => {
     expect(report.summary.actions[0]).toMatchObject({ key: "limitHit", values: { count: 1 } });
   });
 
-  it("lists active staff only, and dates the month from when measurement began", async () => {
+  it("lists active staff only", async () => {
     const { ariel, hadas } = await seed();
     const { user: invited } = await createTestUser({ role: "ANKORA_EMPLOYEE", status: "INVITED" });
     const { user: suspended } = await createTestUser({ role: "ANKORA_EMPLOYEE", status: "SUSPENDED" });
@@ -108,38 +107,17 @@ describe("the Claude usage report", () => {
     expect(ids).toContain(hadas.id);
     expect(ids).not.toContain(invited.id);
     expect(ids).not.toContain(suspended.id);
-    // The seed's first event this month is 55 minutes before NOW: too
-    // little to state a pace.
-    expect(report.month.measuredSince).toBe(ago(55).toISOString());
-    expect(report.people.find((p) => p.userId === hadas.id)!.month.projectedUsd).toBeNull();
   });
 
-  it("lists active staff only, and dates the month from when measurement began", async () => {
+  it("reads stored settings from before 18.11.2026, and keeps only who does not work in Cowork", async () => {
     const { ariel, hadas } = await seed();
-    const { user: invited } = await createTestUser({ role: "ANKORA_EMPLOYEE", status: "INVITED" });
-    const { user: suspended } = await createTestUser({ role: "ANKORA_EMPLOYEE", status: "SUSPENDED" });
+    await prisma.appSetting.create({ data: { key: "claude_usage.settings", value: { defaultSeatUsd: 20, seats: { [hadas.id]: 100 }, multiplier: 1, alertsLive: false, nonCowork: [hadas.id] } } });
+    expect(await claudeUsageSettings()).toEqual({ nonCowork: [hadas.id] });
+    await updateClaudeUsageSettings(ariel, { nonCowork: { [hadas.id]: false } });
+    expect(await claudeUsageSettings()).toEqual({ nonCowork: [] });
     const report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
-    const ids = report.people.map((p) => p.userId);
-    expect(ids).toContain(hadas.id);
-    expect(ids).not.toContain(invited.id);
-    expect(ids).not.toContain(suspended.id);
-    // The seed's first event this month is 55 minutes before NOW: too
-    // little to state a pace.
-    expect(report.month.measuredSince).toBe(ago(55).toISOString());
-    expect(report.people.find((p) => p.userId === hadas.id)!.month.projectedUsd).toBeNull();
-  });
-
-  it("puts each person against their own seat", async () => {
-    const { ariel, hadas } = await seed();
-    await updateClaudeUsageSettings(ariel, { seats: { [hadas.id]: 100 }, multiplier: 1 });
-    const report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
-    const h = report.people.find((p) => p.userId === hadas.id)!;
-    expect(h.seatUsd).toBe(100);
-    expect(h.month.thresholdUsd).toBe(100);
-    expect(h.month.status).toBe("ok");
-
-    await updateClaudeUsageSettings(ariel, { seats: { [hadas.id]: null } });
-    expect((await claudeUsageSettings()).seats).toEqual({});
+    expect(report).not.toHaveProperty("month");
+    expect(report.people[0]).not.toHaveProperty("month");
   });
 
   it("does not flag missing Cowork data for someone marked as not working in Cowork", async () => {
@@ -206,13 +184,6 @@ describe("the Claude usage report", () => {
     const report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
     expect(report.coverage.unmatchedLimitEmails).toEqual(["alias@example.com"]);
   });
-
-  it("refuses a seat or multiplier out of range, and writes nothing", async () => {
-    const { user: ariel } = await createTestUser({ role: "SUPER_ADMIN" });
-    await expect(updateClaudeUsageSettings(ariel, { defaultSeatUsd: 0 })).rejects.toMatchObject({ code: "claudeUsage.seatRange" });
-    await expect(updateClaudeUsageSettings(ariel, { multiplier: 99 })).rejects.toMatchObject({ code: "claudeUsage.multiplierRange" });
-    expect(await prisma.appSetting.count({ where: { key: "claude_usage.settings" } })).toBe(0);
-  });
 });
 
 describe("get_claude_usage through the connector", () => {
@@ -239,6 +210,6 @@ describe("get_claude_usage through the connector", () => {
 
   it("refuses the screen's settings to anyone but a super admin", async () => {
     const { hadas } = await seed();
-    await expect(updateClaudeUsageSettings(hadas, { multiplier: 2 })).rejects.toMatchObject({ code: "claudeUsage.forbidden" });
+    await expect(updateClaudeUsageSettings(hadas, { nonCowork: {} })).rejects.toMatchObject({ code: "claudeUsage.forbidden" });
   });
 });

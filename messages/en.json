@@ -1920,9 +1920,7 @@
       "managerOnly": "Managers only."
     },
     "claudeUsage": {
-      "forbidden": "Only a super admin can see the team's Claude usage.",
-      "seatRange": "A seat costs between {min} and {max} dollars.",
-      "multiplierRange": "The multiplier is between {min} and {max}."
+      "forbidden": "Only a super admin can see the team's Claude usage."
     }
   },
   "auditLog": {
@@ -2256,12 +2254,6 @@
           "value": "{value}",
           "target": "Target: 0 in the period"
         },
-        "closestToThreshold": {
-          "label": "Closest to threshold",
-          "value": "{value}%",
-          "target": "Target: under 80% of the threshold",
-          "targetWho": "{who} · Target: under 80% of the threshold"
-        },
         "cacheShare": {
           "label": "Read from cache",
           "value": "{value}%",
@@ -2271,11 +2263,6 @@
           "label": "Repeat connector reads",
           "value": "{value}%",
           "target": "Target: under 3%"
-        },
-        "heavyModelShare": {
-          "label": "Requests on the heaviest model",
-          "value": "{value}%",
-          "target": "Target: under 50%"
         },
         "avgCallKb": {
           "label": "Average connector answer",
@@ -2296,17 +2283,9 @@
           "title": "Check what got {name} stuck",
           "detail": "{count, plural, one {One limit hit} other {# limit hits}} in the period. The heaviest window is in the details."
         },
-        "nearThreshold": {
-          "title": "Check {name}'s usage",
-          "detail": "{cost} of {threshold} this month."
-        },
         "shortenTool": {
           "title": "Shorten {tool}",
           "detail": "{share}% of everything the connector sent, {kb} KB."
-        },
-        "lighterModel": {
-          "title": "Suggest a lighter model for routine work",
-          "detail": "{share}% of requests on the heaviest model."
         },
         "repeatReads": {
           "title": "Cut repeat connector reads",
@@ -2339,17 +2318,15 @@
       "details": "Details"
     },
     "title": "Claude usage",
-    "intro": "How much of Claude's allowance each person on the team uses, and how much of it Ankora causes. Cost is Cowork's estimate: on a Team plan it measures how heavy the work was, not a bill.",
+    "intro": "How close each person is to Claude's limits, and how much of it comes from Ankora. On a Team plan a seat has a fixed price; the only limits are the five-hour window and the weekly limit.",
     "period": "Period: {days} days",
     "periodOption": "{days} days",
     "empty": "No data has arrived for this period yet.",
     "people": {
       "title": "By person",
       "name": "Person",
-      "seat": "Seat",
       "requests": "Requests",
-      "cost": "Estimated cost",
-      "month": "This month against the threshold",
+      "cost": "Work weight",
       "limitHits": "Limit hits",
       "window": "Heaviest 5-hour window",
       "cache": "From cache",
@@ -2358,10 +2335,6 @@
       "prompts": "Prompts copied",
       "last": "Last Cowork event",
       "noTelemetry": "Uses the connector, but nothing arrives from their Cowork. Probably an old desktop app, or they do not work in Cowork.",
-      "alertsOff": "Alerts are off until the threshold is calibrated. The status is shown here only.",
-      "monthValue": "{cost} of {threshold} (pace: {projected})",
-      "monthValueNoPace": "{cost} of {threshold} (pace: after 3 days of measurement)",
-      "measuredSince": "This month is measured from {date}. The pace counts only the days measured.",
       "limits": "Limits (5 hours / weekly)",
       "bySource": "Requests by source",
       "sourceCount": "{source} {count}",
@@ -2369,12 +2342,8 @@
         "cowork": "Cowork",
         "claudeCode": "Claude Code",
         "other": "Other"
-      }
-    },
-    "status": {
-      "ok": "Within threshold",
-      "near": "On pace to pass",
-      "over": "Over threshold"
+      },
+      "costAbout": "Work weight is what the same work would cost at API list prices, by Cowork's estimate. It is not money spent: a seat has a fixed price. Use it to compare people and requests."
     },
     "tools": {
       "title": "Connector tools",
@@ -2422,18 +2391,15 @@
       "intro": "Everything Cowork did for one message, heaviest first. No content: who, when, how much, and which Ankora tools ran.",
       "who": "Person",
       "when": "When",
-      "cost": "Estimated cost",
+      "cost": "Work weight",
       "requests": "Requests",
       "models": "Models",
       "tools": "Ankora tools",
       "none": "No data from Cowork yet."
     },
     "settings": {
-      "title": "Seats and threshold",
-      "intro": "Each person's threshold is their seat price times the multiplier. An empty seat means the default seat.",
-      "defaultSeat": "Default seat (USD a month)",
-      "multiplier": "Threshold multiplier",
-      "seatFor": "Seat (USD a month)",
+      "title": "Settings",
+      "intro": "Who does not work in Cowork or Claude Code, so they are not flagged as missing data.",
       "save": "Save",
       "saved": "Saved.",
       "error": "Not saved: {message}",
@@ -2448,7 +2414,7 @@
     "none": "·",
     "five": {
       "title": "The five-hour window",
-      "about": "How much of the current window each person has used, and the past week window by window. This is where people get stuck. The monthly threshold stays in the small line under each name.",
+      "about": "How much of the current window each person has used, and the past week window by window. This is where people get stuck. Under each name: the weekly limit.",
       "col": {
         "person": "Person",
         "now": "Current window",
@@ -2466,12 +2432,10 @@
       "note": {
         "resets": "Resets in {time}",
         "hitAt": "Stuck at {time}",
-        "weekly": "Weekly {pct}%",
         "noWindow": "No open window",
         "unknown": "No limit reading from the browser",
         "coworkOnly": "Per Cowork: stuck at {time}, resets in about {time2}"
       },
-      "month": "Seat {seat} · {cost} this month",
       "kpi": {
         "stuckNow": {
           "label": "Stuck now",
@@ -2511,7 +2475,9 @@
         "unknown": "{name}, {when}: window not measured"
       },
       "weekAria": "{name}: {count, plural, =0 {no windows this week} one {one window this week} other {# windows this week}}, {hits, plural, =0 {no limit hits} one {one limit hit} other {# limit hits}}",
-      "weekNone": "No windows this week"
+      "weekNone": "No windows this week",
+      "weekly": "Weekly limit {pct}%",
+      "weeklyNone": "Weekly limit: not measured"
     }
   },
   "brainMetrics": {
