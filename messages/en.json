@@ -2235,13 +2235,13 @@
         "partial": "Data missing"
       },
       "verdictLine": {
-        "ok": "Nobody got stuck and nobody is on pace to pass their threshold.",
-        "attention": "Someone got stuck or is on pace to pass their threshold. What to do is below.",
-        "partial": "No one got stuck or passed their threshold, but data is missing for some of the team."
+        "ok": "Nobody is stuck and nobody is on pace to get stuck.",
+        "attention": "Someone is stuck, or on pace to get stuck before the reset. What to do is below.",
+        "partial": "No one stuck or on pace to get stuck, but data is missing for part of the team."
       },
       "offCount": "{count, plural, =0 {Every leading indicator is on target.} one {One leading indicator is off target.} other {# leading indicators are off target.}}",
       "kpisTitle": "Leading indicators",
-      "kpisAbout": "What predicts getting stuck or needing a dearer seat, before it happens",
+      "kpisAbout": "What predicts getting stuck, before it happens",
       "kpiState": {
         "ok": "On target",
         "watch": "Watch",
@@ -2269,11 +2269,11 @@
           "value": "{value} KB",
           "target": "Target: under 8 KB"
         },
-        "closestToWeeklyLimit": {
-          "label": "Closest to the weekly limit",
-          "value": "{value}%",
-          "target": "Target: under 60% of the limit",
-          "targetWho": "{who} · Target: under 60% of the limit"
+        "weeklyPace": {
+          "label": "Furthest ahead of the weekly pace",
+          "value": "On track for {value}%",
+          "target": "Target: on track for 80% or less by the week's end",
+          "targetWho": "{who} · target: on track for 80% or less by the week's end"
         }
       },
       "actionsTitle": "What to do this week",
@@ -2296,16 +2296,16 @@
           "detail": "Uses the connector, but nothing arrives from Cowork."
         },
         "nearWeeklyLimit": {
-          "title": "{name} is close to the weekly limit",
-          "detail": "{pct}% of the weekly limit is used. Lighter work until it resets would help."
+          "title": "{name} is on pace to use up the weekly limit before it resets",
+          "detail": "{pct}% used with {elapsed}% of the week gone. At this pace it runs out: {hitAt}."
         },
         "checkExtension": {
           "title": "Check the extension for {name}",
           "detail": "There is activity, but no limit reading arrives from the browser. Maybe not signed in to Chrome with the work account."
         },
         "nearFiveHour": {
-          "title": "{name} is at {pct}% of the five-hour window",
-          "detail": "Likely to get stuck before it resets. Lighter work until the window resets would help."
+          "title": "{name} is heading to get stuck in the current window",
+          "detail": "{pct}% of the window used. At this pace it runs out: {hitAt}. Lighter work until the reset would help."
         },
         "unmatchedLimits": {
           "title": "{count, plural, one {A limit reading with no person} other {# limit-reading addresses with no person}}",
@@ -2414,7 +2414,7 @@
     "none": "·",
     "five": {
       "title": "The five-hour window",
-      "about": "How much of the current window each person has used, and the past week window by window. This is where people get stuck. Under each name: the weekly limit.",
+      "about": "How much of the current window each person has used against how much of its time is gone, and the past week window by window. The projection is where the window ends at the same pace. Under each name: the weekly limit and its pace.",
       "col": {
         "person": "Person",
         "now": "Current window",
@@ -2423,9 +2423,9 @@
       },
       "state": {
         "stuck": "Stuck",
-        "near": "Close to stuck",
+        "near": "Heading to stuck",
         "watch": "Watch",
-        "free": "Free",
+        "free": "On pace",
         "idle": "No open window",
         "unknown": "Not measured"
       },
@@ -2443,31 +2443,33 @@
           "subNoTime": "{name}",
           "none": "Nobody"
         },
-        "over70": {
-          "label": "Over 70% of the current window",
-          "none": "Nobody"
-        },
         "hits": {
           "label": "Limit hits this week",
           "peak": "Peak hours: {from} to {to}",
           "noPeak": "No cluster of hours"
         },
         "weekly": {
-          "label": "Closest to the weekly limit",
-          "sub": "{name} · target: under 60%",
+          "label": "Furthest ahead of the weekly pace",
+          "sub": "{name} · {pct}% of the limit, {elapsed}% of the week gone",
           "none": "No reading from the extension"
+        },
+        "fast": {
+          "label": "Ahead of the window's pace",
+          "item": "{name} {pct}% (on track for {projected}%)",
+          "none": "Nobody"
         }
       },
       "headline": {
         "stuck": "Stuck now: {names}.",
-        "near": "Close to stuck: {list}."
+        "near": "Heading to stuck in the current window: {list}."
       },
       "noExtension": "No reading has arrived from the browser extension yet, so only limit hits reported by Cowork and Claude Code show. The percentages appear once the extension is installed.",
       "legend": {
         "free": "Window up to 70%",
         "watch": "70% to 99%",
         "hit": "Stuck",
-        "unknown": "Window not measured (per Cowork)"
+        "unknown": "Window not measured (per Cowork)",
+        "time": "How much of the window's time is gone"
       },
       "cell": {
         "pct": "{name}, {when}: {pct}% of the window",
@@ -2476,8 +2478,18 @@
       },
       "weekAria": "{name}: {count, plural, =0 {no windows this week} one {one window this week} other {# windows this week}}, {hits, plural, =0 {no limit hits} one {one limit hit} other {# limit hits}}",
       "weekNone": "No windows this week",
-      "weekly": "Weekly limit {pct}%",
+      "weekly": "Weekly {pct}%",
       "weeklyNone": "Weekly limit: not measured"
+    },
+    "pace": {
+      "line": "{elapsed}% of the time gone · on track for {projected}%",
+      "overAt": "{elapsed}% of the time gone · at this pace it runs out: {when}",
+      "early": "{elapsed}% of the time gone · too early to project",
+      "stuck": "Used up",
+      "beforeReset": "before the reset",
+      "short": "on track for {projected}%",
+      "overShort": "runs out before the reset",
+      "earlyShort": "too early to project"
     }
   },
   "brainMetrics": {

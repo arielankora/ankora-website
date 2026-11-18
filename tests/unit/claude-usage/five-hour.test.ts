@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { personFiveHour, stateOf, teamFiveHour, type PersonFiveHour } from "@/lib/claude-usage/five-hour";
+import { paceOf, personFiveHour, stateOf, teamFiveHour, MIN_ELAPSED_FIVE_MS, MIN_ELAPSED_WEEK_MS, WEEK_LIMIT_MS, type Pace, type PersonFiveHour } from "@/lib/claude-usage/five-hour";
+import { WINDOW_MS } from "@/lib/claude-usage/report-math";
 import type { CoworkEventIn } from "@/lib/claude-usage/report-math";
 import type { LimitSampleIn } from "@/lib/claude-usage/limits";
 
@@ -54,7 +55,7 @@ describe("stateOf", () => {
 describe("personFiveHour", () => {
   it("takes the current window from a fresh extension reading", () => {
     const f = personFiveHour([sample("2026-11-17T09:50:00Z", 92, "2026-11-17T11:35:00Z", 61)], [], NOW);
-    expect(f.current).toEqual({ state: "near", pct: 92, resetsAt: "2026-11-17T11:35:00.000Z", hitAt: null, source: "extension" });
+    expect(f.current).toMatchObject({ state: "near", pct: 92, resetsAt: "2026-11-17T11:35:00.000Z", hitAt: null, source: "extension" });
     expect(f.weeklyPct).toBe(61);
     expect(f.week).toHaveLength(1);
     expect(f.week[0]).toMatchObject({ start: "2026-11-17T06:35:00.000Z", peakPct: 92, hit: false, measured: true });
@@ -98,7 +99,7 @@ describe("personFiveHour", () => {
 
   it("without the extension, a Cowork 429 marks the window stuck and estimates the reset", () => {
     const f = personFiveHour([], [ev("2026-11-17T07:00:00Z"), hit("2026-11-17T09:20:00Z")], NOW);
-    expect(f.current).toEqual({
+    expect(f.current).toMatchObject({
       state: "stuck",
       pct: 100,
       resetsAt: new Date(at("2026-11-17T07:00:00Z").getTime() + 5 * H).toISOString(),
@@ -125,12 +126,46 @@ describe("personFiveHour", () => {
   });
 });
 
+describe("paceOf", () => {
+  const NOW_P = new Date("2026-11-18T12:00:00Z");
+  const inMs = (ms: number) => new Date(NOW_P.getTime() + ms);
+  const H = 3_600_000;
+
+  it("87% of the week with a day left is on pace; with five days left it runs out", () => {
+    const late = paceOf(87, inMs(24 * H), NOW_P, WEEK_LIMIT_MS, MIN_ELAPSED_WEEK_MS)!;
+    expect(late).toMatchObject({ elapsedPct: 85.7, projectedPct: 102, state: "over" });
+    expect(late.projectedHitAt).not.toBeNull();
+    const ok = paceOf(87, inMs(6 * H), NOW_P, WEEK_LIMIT_MS, MIN_ELAPSED_WEEK_MS)!;
+    expect(ok).toMatchObject({ projectedPct: 90, state: "watch", projectedHitAt: null });
+    const early = paceOf(87, inMs(5 * 24 * H), NOW_P, WEEK_LIMIT_MS, MIN_ELAPSED_WEEK_MS)!;
+    expect(early.state).toBe("over");
+    // At this rate the rest lasts about 0.3 days: before the reset.
+    expect(Date.parse(early.projectedHitAt!)).toBeLessThan(NOW_P.getTime() + 5 * 24 * H);
+  });
+
+  it("is on pace at 80% projected or less, and watches up to 100%", () => {
+    expect(paceOf(40, inMs(2.5 * H), NOW_P, WINDOW_MS, MIN_ELAPSED_FIVE_MS)).toMatchObject({ elapsedPct: 50, projectedPct: 80, state: "ok" });
+    expect(paceOf(45, inMs(2.5 * H), NOW_P, WINDOW_MS, MIN_ELAPSED_FIVE_MS)).toMatchObject({ projectedPct: 90, state: "watch" });
+  });
+
+  it("is too early to project in the first half hour of a window, or the first day of a week", () => {
+    expect(paceOf(20, inMs(4.75 * H), NOW_P, WINDOW_MS, MIN_ELAPSED_FIVE_MS)).toMatchObject({ projectedPct: null, state: "early" });
+    expect(paceOf(20, inMs(6.5 * 24 * H), NOW_P, WEEK_LIMIT_MS, MIN_ELAPSED_WEEK_MS)).toMatchObject({ state: "early" });
+  });
+
+  it("says stuck at 100%, and nothing without a reset time", () => {
+    expect(paceOf(100, inMs(H), NOW_P, WINDOW_MS, MIN_ELAPSED_FIVE_MS)?.state).toBe("stuck");
+    expect(paceOf(50, null, NOW_P, WINDOW_MS, MIN_ELAPSED_FIVE_MS)).toBeNull();
+  });
+});
+
 describe("teamFiveHour", () => {
   const p = (name: string, over: Partial<PersonFiveHour["current"]>, rest: Partial<PersonFiveHour> = {}) => ({
     name,
     fiveHour: {
-      current: { state: "unknown", pct: null, resetsAt: null, hitAt: null, source: null, ...over },
+      current: { state: "unknown", pct: null, resetsAt: null, hitAt: null, source: null, pace: null, ...over },
       weeklyPct: null,
+      weekly: null,
       week: [],
       hitsThisWeek: 0,
       ...rest,
@@ -138,20 +173,24 @@ describe("teamFiveHour", () => {
   });
   const hitCell = (hitAt: string) => ({ start: hitAt, peakPct: 100, hit: true, hitAt, measured: true });
 
-  it("who is stuck now, who is over 70, and the closest to the weekly limit", () => {
+  const pace = (over: Partial<Pace>): Pace => ({ usedPct: 50, elapsedPct: 50, projectedPct: 100, state: "watch", projectedHitAt: null, resetsAt: "2026-11-20T00:00:00Z", ...over });
+
+  it("who is stuck now, who is ahead of the window's pace, and who is furthest ahead of the week's", () => {
     const team = teamFiveHour([
-      p("Anna", { state: "stuck", pct: 100, resetsAt: "2026-11-17T10:40:00Z", source: "extension" }, { weeklyPct: 77 }),
-      p("Hadas", { state: "near", pct: 92, source: "extension" }, { weeklyPct: 61 }),
-      p("Ariel", { state: "watch", pct: 74, source: "extension" }),
+      p("Anna", { state: "stuck", pct: 100, resetsAt: "2026-11-17T10:40:00Z", source: "extension" }, { weekly: pace({ usedPct: 77, projectedPct: 90 }) }),
+      p("Hadas", { state: "near", pct: 40, source: "extension", pace: pace({ usedPct: 40, elapsedPct: 20, projectedPct: 200, state: "over", projectedHitAt: "2026-11-17T11:00:00Z" }) }, { weekly: pace({ usedPct: 61, projectedPct: 140, state: "over" }) }),
+      p("Ariel", { state: "watch", pct: 74, source: "extension", pace: pace({ usedPct: 74, projectedPct: 90 }) }, { weekly: pace({ usedPct: 87, elapsedPct: 95, projectedPct: 92 }) }),
       p("Ops", { state: "free", pct: 22, source: "extension" }),
       p("Sagit", {}),
     ]);
     expect(team.stuckNow.map((x) => x.name)).toEqual(["Anna"]);
-    expect(team.over70Now).toEqual([
-      { name: "Hadas", pct: 92 },
-      { name: "Ariel", pct: 74 },
+    // By pace, not by share: Hadas at 40% early in the window comes first.
+    expect(team.fastNow).toEqual([
+      { name: "Hadas", pct: 40, projectedPct: 200, state: "near", projectedHitAt: "2026-11-17T11:00:00Z" },
+      { name: "Ariel", pct: 74, projectedPct: 90, state: "watch", projectedHitAt: null },
     ]);
-    expect(team.closestWeekly).toEqual({ name: "Anna", pct: 77 });
+    // Ariel is at 87% but near the reset; Hadas at 61% is the one ahead.
+    expect(team.fastestWeekly?.name).toBe("Hadas");
     expect(team.measuredNow).toBe(4);
   });
 

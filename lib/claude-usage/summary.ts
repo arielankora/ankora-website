@@ -17,9 +17,11 @@
 // The targets are a first guess, to be calibrated after two weeks of data
 // (lib/claude-usage/summary.ts is the one place they live).
 
+import type { Pace } from "@/lib/claude-usage/five-hour";
+
 export type KpiState = "ok" | "watch" | "off" | "none";
 
-export type KpiKey = "limitHits" | "closestToWeeklyLimit" | "cacheShare" | "duplicateRate" | "avgCallKb";
+export type KpiKey = "limitHits" | "weeklyPace" | "cacheShare" | "duplicateRate" | "avgCallKb";
 
 export type Kpi = {
   key: KpiKey;
@@ -44,9 +46,11 @@ export type ManagerSummary = {
 /// Targets and the band where an indicator is worth watching before it is
 /// off. Lower is better unless `higherIsBetter`.
 export const KPI_TARGETS: Record<Exclude<KpiKey, "limitHits">, { target: number; watch: number; higherIsBetter?: boolean }> = {
-  /// The highest weekly-limit share, read by the browser extension (way 3).
-  /// Past 80% a person is days, or hours, from getting stuck.
-  closestToWeeklyLimit: { target: 60, watch: 80 },
+  /// Where the person furthest ahead of the weekly pace would end the week
+  /// (18.11.2026: by pace, the share against the time gone). Up to 80 is
+  /// fine; past 100 they run out before the reset. Early in the week, when
+  /// there is no projection yet, the share itself is read on the same scale.
+  weeklyPace: { target: 80, watch: 100 },
   /// Percent of input read from the cache. Low means conversations that
   /// start from nothing again and again.
   cacheShare: { target: 80, watch: 60, higherIsBetter: true },
@@ -89,7 +93,10 @@ export type SummaryInput = {
     nonCowork?: boolean;
     /// The five-hour window now (lib/claude-usage/five-hour.ts); absent
     /// when unknown.
-    fiveHour?: { current: { pct: number | null; state: string } } | null;
+    fiveHour?: {
+      current: { pct: number | null; state: string; pace?: Pace | null };
+      weekly?: Pace | null;
+    } | null;
   }[];
   tools: { tool: string; totalBytes: number }[];
   signals: { duplicateReads: number; limitHits: number };
@@ -123,16 +130,19 @@ export function managerSummary(r: SummaryInput): ManagerSummary {
   // 2. The weekly limit, as the browser extension reads it: what actually
   // gets a person stuck. (18.11.2026: this replaced Cowork's cost against
   // the seat price, which says nothing on a fixed-price Team seat.)
+  // The figure is the projection, or the share while the week is early;
+  // a person already stuck on the week comes first.
+  const paceFigure = (x: Pace) => (x.state === "stuck" ? 100 : (x.projectedPct ?? x.usedPct));
   const weekly = r.people
-    .filter((p) => p.limits?.current?.sevenDayPct != null)
-    .map((p) => ({ name: p.name, pct: p.limits!.current!.sevenDayPct! }))
+    .filter((p) => p.fiveHour?.weekly)
+    .map((p) => ({ name: p.name, pct: paceFigure(p.fiveHour!.weekly!) }))
     .sort((a, b) => b.pct - a.pct)[0];
 
   const kpis: Kpi[] = [
     { key: "limitHits", value: hasLimitData ? limitHits : null, state: limitState },
     weekly
-      ? { key: "closestToWeeklyLimit", value: Math.round(weekly.pct), state: stateOf("closestToWeeklyLimit", weekly.pct), who: weekly.name }
-      : { key: "closestToWeeklyLimit", value: null, state: "none" },
+      ? { key: "weeklyPace", value: Math.round(weekly.pct), state: stateOf("weeklyPace", weekly.pct), who: weekly.name }
+      : { key: "weeklyPace", value: null, state: "none" },
     { key: "cacheShare", value: cacheShare, state: stateOf("cacheShare", cacheShare) },
     { key: "duplicateRate", value: duplicateRate, state: stateOf("duplicateRate", duplicateRate) },
     { key: "avgCallKb", value: avgCallKb, state: stateOf("avgCallKb", avgCallKb) },
@@ -144,12 +154,15 @@ export function managerSummary(r: SummaryInput): ManagerSummary {
   // manager can still prevent today.
   for (const p of r.people) {
     const c = p.fiveHour?.current;
-    if (c && c.pct !== null && c.state === "near") actions.push({ key: "nearFiveHour", values: { name: p.name, pct: Math.round(c.pct) } });
+    if (c && c.pct !== null && c.state === "near") actions.push({ key: "nearFiveHour", values: { name: p.name, pct: Math.round(c.pct), hitAt: c.pace?.projectedHitAt ?? "" } });
   }
   for (const p of r.people) if (personHits(p) > 0) actions.push({ key: "limitHit", values: { name: p.name, count: personHits(p) } });
+  // Ahead of the weekly pace: runs out before the reset at this rate.
+  const overWeekly = (p: SummaryInput["people"][number]) => p.fiveHour?.weekly?.state === "over";
   for (const p of r.people) {
-    const w = p.limits?.current?.sevenDayPct;
-    if (w != null && w >= KPI_TARGETS.closestToWeeklyLimit.watch && w < 100) actions.push({ key: "nearWeeklyLimit", values: { name: p.name, pct: Math.round(w) } });
+    const w = p.fiveHour?.weekly;
+    if (w && overWeekly(p))
+      actions.push({ key: "nearWeeklyLimit", values: { name: p.name, pct: Math.round(w.usedPct), elapsed: Math.round(w.elapsedPct), projected: w.projectedPct ?? 0, hitAt: w.projectedHitAt ?? "" } });
   }
   const top = [...r.tools].sort((a, b) => b.totalBytes - a.totalBytes)[0];
   if (top && bytes > 0) {
@@ -172,7 +185,7 @@ export function managerSummary(r: SummaryInput): ManagerSummary {
   // The verdict is about people: stuck, or close to a limit.
   // An indicator off target shows on its own card and in the actions; it
   // does not turn a quiet week into one that needs attention.
-  const nearWeekly = r.people.some((p) => (p.limits?.current?.sevenDayPct ?? 0) >= KPI_TARGETS.closestToWeeklyLimit.watch);
+  const nearWeekly = r.people.some(overWeekly);
   const nearFive = r.people.some((p) => p.fiveHour?.current.state === "near" || p.fiveHour?.current.state === "stuck");
   const needsAttention = limitHits > 0 || nearWeekly || nearFive;
   const verdict: Verdict = needsAttention ? "attention" : missing ? "partial" : "ok";

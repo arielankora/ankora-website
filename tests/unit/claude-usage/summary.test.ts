@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { managerSummary, type SummaryInput } from "@/lib/claude-usage/summary";
+import type { Pace } from "@/lib/claude-usage/five-hour";
 
 // The managers' summary at the top of "שימוש בקלוד" (17.11.2026). What a
 // manager reads first, so each rule is pinned: the verdict, the six
@@ -32,14 +33,14 @@ describe("managerSummary", () => {
     expect(s.verdict).toBe("ok");
     // Every indicator with data is on target; the weekly limit has none
     // until the extension reports.
-    expect(s.kpis.every((k) => k.state === "ok" || k.key === "closestToWeeklyLimit")).toBe(true);
+    expect(s.kpis.every((k) => k.state === "ok" || k.key === "weeklyPace")).toBe(true);
     expect(s.actions).toEqual([]);
   });
 
   it("computes the four indicators", () => {
     const s = managerSummary(base({ signals: { duplicateReads: 1, limitHits: 0 } }));
     expect(kpi(s, "limitHits").value).toBe(0);
-    expect(kpi(s, "closestToWeeklyLimit")).toMatchObject({ value: null, state: "none" });
+    expect(kpi(s, "weeklyPace")).toMatchObject({ value: null, state: "none" });
     expect(kpi(s, "cacheShare").value).toBe(90);
     expect(kpi(s, "duplicateRate")).toMatchObject({ value: 5, state: "watch" });
     expect(kpi(s, "avgCallKb")).toMatchObject({ value: 5, state: "ok" });
@@ -62,7 +63,7 @@ describe("managerSummary", () => {
     const opus = person({ name: "Ariel", cowork: { ...person({ name: "x" }).cowork, requests: 2000, models: [{ model: "claude-opus-5-5", requests: 2000 }] } });
     const s = managerSummary(base({ people: [opus] }));
     expect(s.verdict).toBe("ok");
-    expect(s.kpis.map((k) => k.key)).toEqual(["limitHits", "closestToWeeklyLimit", "cacheShare", "duplicateRate", "avgCallKb"]);
+    expect(s.kpis.map((k) => k.key)).toEqual(["limitHits", "weeklyPace", "cacheShare", "duplicateRate", "avgCallKb"]);
     expect(s.actions).toEqual([]);
   });
 
@@ -97,16 +98,35 @@ describe("managerSummary with the browser extension's readings (way 3)", () => {
     weeklyLimitHits: 0,
   });
 
-  it("reads the real weekly limit, and needs attention past 80%", () => {
+  const weekly = (over: Partial<Pace>): Pace => ({ usedPct: 50, elapsedPct: 50, projectedPct: 100, state: "watch", projectedHitAt: null, resetsAt: "2026-11-20T00:00:00Z", ...over });
+
+  it("reads the weekly limit against the time gone: ahead of the pace needs attention, a high share near the reset does not", () => {
     const s = managerSummary(
       base({
-        people: [person({ name: "Hadas", limits: limits(85) }), person({ name: "Ariel", limits: limits(20) })],
+        people: [
+          // 87% with 95% of the week gone: on track for 92%, worth watching only.
+          person({ name: "Ariel", limits: limits(87), fiveHour: { current: { pct: 10, state: "free" }, weekly: weekly({ usedPct: 87, elapsedPct: 95, projectedPct: 92, state: "watch" }) } }),
+          // 55% with 30% gone: on track for 183%, runs out before the reset.
+          person({ name: "Hadas", limits: limits(55), fiveHour: { current: { pct: 10, state: "free" }, weekly: weekly({ usedPct: 55, elapsedPct: 30, projectedPct: 183, state: "over", projectedHitAt: "2026-11-19T10:00:00Z" }) } }),
+        ],
         coverage: { coworkEvents: 40, toolCalls: 20, unmatchedEmails: [], limitReadings: 10 },
       })
     );
-    expect(s.kpis[1]).toMatchObject({ key: "closestToWeeklyLimit", value: 85, who: "Hadas", state: "off" });
+    expect(s.kpis[1]).toMatchObject({ key: "weeklyPace", value: 183, who: "Hadas", state: "off" });
     expect(s.verdict).toBe("attention");
-    expect(s.actions).toContainEqual({ key: "nearWeeklyLimit", values: { name: "Hadas", pct: 85 } });
+    expect(s.actions).toContainEqual({ key: "nearWeeklyLimit", values: { name: "Hadas", pct: 55, elapsed: 30, projected: 183, hitAt: "2026-11-19T10:00:00Z" } });
+    expect(s.actions.some((a) => a.key === "nearWeeklyLimit" && a.values.name === "Ariel")).toBe(false);
+  });
+
+  it("a high share near the reset alone does not need attention", () => {
+    const s = managerSummary(
+      base({
+        people: [person({ name: "Ariel", limits: limits(87), fiveHour: { current: { pct: 10, state: "free" }, weekly: weekly({ usedPct: 87, elapsedPct: 95, projectedPct: 92, state: "watch" }) } })],
+        coverage: { coworkEvents: 40, toolCalls: 20, unmatchedEmails: [], limitReadings: 10 },
+      })
+    );
+    expect(s.kpis[1]).toMatchObject({ value: 92, state: "watch" });
+    expect(s.verdict).toBe("ok");
   });
 
   it("counts a limit hit the extension saw, without adding it to Cowork's own count", () => {
@@ -130,7 +150,7 @@ describe("managerSummary with the browser extension's readings (way 3)", () => {
   it("asks nothing about the extension before it is rolled out", () => {
     const s = managerSummary(base());
     expect(s.actions.some((a) => a.key === "checkExtension")).toBe(false);
-    expect(s.kpis[1]).toMatchObject({ key: "closestToWeeklyLimit", value: null, state: "none" });
+    expect(s.kpis[1]).toMatchObject({ key: "weeklyPace", value: null, state: "none" });
   });
 });
 
@@ -153,7 +173,7 @@ describe("managerSummary and the five-hour window", () => {
       })
     );
     expect(s.verdict).toBe("attention");
-    expect(s.actions[0]).toEqual({ key: "nearFiveHour", values: { name: "Hadas", pct: 92 } });
+    expect(s.actions[0]).toEqual({ key: "nearFiveHour", values: { name: "Hadas", pct: 92, hitAt: "" } });
     expect(s.actions.some((a) => a.values.name === "Ariel")).toBe(false);
   });
 });

@@ -6,7 +6,7 @@ import { can } from "@/lib/app-auth/permissions";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { getClaudeUsageReport, USAGE_PERIODS } from "@/lib/app-domain/claude-usage";
 import type { KpiState, Verdict } from "@/lib/claude-usage/summary";
-import type { FiveHourState, WindowCell } from "@/lib/claude-usage/five-hour";
+import type { FiveHourState, Pace, WindowCell } from "@/lib/claude-usage/five-hour";
 import { saveClaudeUsageSettingsAction } from "./actions";
 
 // Claude usage measurement, stage 3 (17.11.2026): how much of Claude's
@@ -58,12 +58,28 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
   const sentBytes = report.tools.reduce((n, x) => n + x.totalBytes, 0);
   const heavyTools = report.tools.slice(0, 3).map((x) => ({ tool: x.tool, size: bytes(x.totalBytes), share: sentBytes ? Math.round((x.totalBytes / sentBytes) * 100) : 0 }));
   const actionText = (a: (typeof sum.actions)[number]) => {
-    const v = a.values;
+    // A projected time arrives as an ISO string; the reader gets a day and
+    // an hour, or "before the reset" when none was projected.
+    const v = "hitAt" in a.values ? { ...a.values, hitAt: a.values.hitAt ? dayClock(String(a.values.hitAt)) : t("pace.beforeReset") } : a.values;
     return { title: t(`summary.action.${a.key}.title`, v), detail: t(`summary.action.${a.key}.detail`, v) };
   };
 
   // Five-hour window helpers.
-  const weeklyTone = (pct: number | null) => (pct === null ? "text-app-text-tertiary" : pct >= 80 ? "text-app-error" : pct > 60 ? "text-app-warning" : "text-app-text-secondary");
+  // The pace (18.11.2026): the share against the time gone in the window.
+  const PACE_TEXT: Record<Pace["state"], string> = { ok: "text-app-text-secondary", watch: "text-app-warning", over: "text-app-error", stuck: "text-app-error", early: "text-app-text-secondary" };
+  const dayClock = (iso: string) => f.dateTime(new Date(iso), { weekday: "long", hour: "2-digit", minute: "2-digit" });
+  // Under a name there is room for little: the projection, or that it
+  // runs out before the reset. The full line is in the title.
+  const weeklyShort = (x: Pace) =>
+    x.state === "stuck" ? t("pace.stuck") : x.state === "early" ? t("pace.earlyShort") : x.state === "over" ? t("pace.overShort") : t("pace.short", { projected: x.projectedPct ?? 0 });
+  const paceLine = (x: Pace) =>
+    x.state === "stuck"
+      ? t("pace.stuck")
+      : x.state === "early"
+        ? t("pace.early", { elapsed: Math.round(x.elapsedPct) })
+        : x.projectedHitAt
+          ? t("pace.overAt", { elapsed: Math.round(x.elapsedPct), projected: x.projectedPct ?? 0, when: dayClock(x.projectedHitAt) })
+          : t("pace.line", { elapsed: Math.round(x.elapsedPct), projected: x.projectedPct ?? 0 });
   const five = report.fiveHour;
   const nowMs = Date.parse(report.period.to);
   const left = (iso: string) => {
@@ -80,6 +96,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
     else {
       if (c.hitAt) parts.push(t("five.note.hitAt", { time: clock(c.hitAt) }));
       parts.push(c.resetsAt ? t("five.note.resets", { time: left(c.resetsAt) }) : t("five.note.noWindow"));
+      if (c.pace && c.pace.state !== "stuck") parts.push(paceLine(c.pace));
     }
     return parts.join(" · ");
   };
@@ -91,13 +108,17 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
   };
   // Who is closest to getting stuck first, then the rest as before.
   const fiveRank: Record<FiveHourState, number> = { stuck: 0, near: 1, watch: 2, free: 3, idle: 4, unknown: 5 };
+  const projectionOf = (p: (typeof report.people)[number]) => p.fiveHour.current.pace?.projectedPct ?? p.fiveHour.current.pct ?? -1;
   const fivePeople = [...report.people].sort(
-    (a, b) => fiveRank[a.fiveHour.current.state] - fiveRank[b.fiveHour.current.state] || (b.fiveHour.current.pct ?? -1) - (a.fiveHour.current.pct ?? -1) || b.fiveHour.hitsThisWeek - a.fiveHour.hitsThisWeek
+    (a, b) => fiveRank[a.fiveHour.current.state] - fiveRank[b.fiveHour.current.state] || projectionOf(b) - projectionOf(a) || b.fiveHour.hitsThisWeek - a.fiveHour.hitsThisWeek
   );
+  const headingToStuck = five.fastNow.filter((x) => x.state === "near");
   const headline = [
     five.stuckNow.length ? t("five.headline.stuck", { names: five.stuckNow.map((x) => x.name).join(", ") }) : null,
-    five.over70Now.some((x) => x.pct >= 90) ? t("five.headline.near", { list: five.over70Now.filter((x) => x.pct >= 90).map((x) => `${x.name} ${x.pct}%`).join(", ") }) : null,
+    headingToStuck.length ? t("five.headline.near", { list: headingToStuck.map((x) => x.name).join(", ") }) : null,
   ].filter(Boolean).join(" ");
+  const fw = five.fastestWeekly;
+  const fwFigure = fw ? (fw.pace.state === "stuck" ? 100 : (fw.pace.projectedPct ?? fw.pace.usedPct)) : null;
   const fiveKpis = [
     {
       key: "stuckNow" as const,
@@ -108,10 +129,12 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
         : t("five.kpi.stuckNow.none"),
     },
     {
-      key: "over70" as const,
-      value: five.measuredNow ? String(five.over70Now.length) : none,
-      tone: five.over70Now.length ? "text-app-warning" : "text-app-text-primary",
-      sub: five.over70Now.length ? five.over70Now.map((x) => `${x.name} ${x.pct}%`).join(", ") : t("five.kpi.over70.none"),
+      key: "fast" as const,
+      value: five.measuredNow ? String(five.fastNow.length) : none,
+      tone: headingToStuck.length ? "text-app-error" : five.fastNow.length ? "text-app-warning" : "text-app-text-primary",
+      sub: five.fastNow.length
+        ? five.fastNow.map((x) => t("five.kpi.fast.item", { name: x.name, pct: x.pct, projected: x.projectedPct ?? x.pct })).join(", ")
+        : t("five.kpi.fast.none"),
     },
     {
       key: "hits" as const,
@@ -121,9 +144,9 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
     },
     {
       key: "weekly" as const,
-      value: five.closestWeekly ? `${five.closestWeekly.pct}%` : none,
-      tone: five.closestWeekly && five.closestWeekly.pct >= 80 ? "text-app-error" : five.closestWeekly && five.closestWeekly.pct > 60 ? "text-app-warning" : "text-app-text-primary",
-      sub: five.closestWeekly ? t("five.kpi.weekly.sub", { name: five.closestWeekly.name }) : t("five.kpi.weekly.none"),
+      value: fw && fwFigure !== null ? `${fwFigure}%` : none,
+      tone: fw ? PACE_TEXT[fw.pace.state].replace("text-app-text-secondary", "text-app-text-primary") : "text-app-text-primary",
+      sub: fw ? t("five.kpi.weekly.sub", { name: fw.name, pct: Math.round(fw.pace.usedPct), elapsed: Math.round(fw.pace.elapsedPct) }) : t("five.kpi.weekly.none"),
     },
   ];
 
@@ -198,16 +221,23 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
                     <p className="truncate text-sm font-medium text-app-text-primary" dir="auto">{p.name}</p>
                     {/* The weekly limit, as the extension reads it (18.11.2026:
                         replaced Cowork's cost against the seat price). */}
-                    <p className={`text-xs ${weeklyTone(p.fiveHour.weeklyPct)}`}>
-                      {p.fiveHour.weeklyPct === null ? t("five.weeklyNone") : t("five.weekly", { pct: Math.round(p.fiveHour.weeklyPct) })}
-                    </p>
+                    {p.fiveHour.weekly ? (
+                      <p className={`text-xs ${PACE_TEXT[p.fiveHour.weekly.state]}`} title={paceLine(p.fiveHour.weekly)}>
+                        {t("five.weekly", { pct: Math.round(p.fiveHour.weekly.usedPct) })} · {weeklyShort(p.fiveHour.weekly)}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-app-text-tertiary">
+                        {p.fiveHour.weeklyPct === null ? t("five.weeklyNone") : t("five.weekly", { pct: Math.round(p.fiveHour.weeklyPct) })}
+                      </p>
+                    )}
                   </div>
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-3">
                       <div className="relative h-3 flex-1 overflow-hidden rounded-full bg-app-neutral-soft" role="img" aria-label={`${p.name}: ${c.pct === null ? t("five.state.unknown") : `${pct}%`}`}>
                         <div className={`h-full rounded-full ${FIVE_BAR[c.state]}`} style={{ width: `${pct}%` }} />
-                        <div className="absolute inset-y-0 w-0.5 bg-white" style={{ insetInlineStart: "70%" }} />
-                        <div className="absolute inset-y-0 w-0.5 bg-white" style={{ insetInlineStart: "90%" }} />
+                        {/* Where the window is in time: a share past this mark is
+                            faster than the window allows. */}
+                        {c.pace && <div className="absolute inset-y-0 w-0.5 bg-app-text-primary" style={{ insetInlineStart: `${Math.min(100, c.pace.elapsedPct)}%` }} title={t("five.legend.time")} />}
                       </div>
                       <span className={`min-w-[2.75rem] font-jbmono text-sm font-medium ${FIVE_TEXT[c.state]}`}>{c.pct === null ? none : `${pct}%`}</span>
                     </div>
@@ -245,6 +275,10 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
                 {t(`five.legend.${key}`)}
               </span>
             ))}
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-3.5 w-0.5 bg-app-text-primary" aria-hidden="true" />
+              {t("five.legend.time")}
+            </span>
           </div>
         </div>
       </section>
@@ -263,7 +297,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
               </div>
               <p className="mt-2 font-jbmono text-2xl text-app-text-primary">{k.value === null ? none : t(`summary.kpi.${k.key}.value`, { value: k.value })}</p>
               <p className="mt-1 text-xs text-app-text-secondary">
-                {k.key === "closestToWeeklyLimit" && k.who ? t("summary.kpi.closestToWeeklyLimit.targetWho", { who: k.who }) : t(`summary.kpi.${k.key}.target`)}
+                {k.key === "weeklyPace" && k.who ? t("summary.kpi.weeklyPace.targetWho", { who: k.who }) : t(`summary.kpi.${k.key}.target`)}
               </p>
             </div>
           ))}

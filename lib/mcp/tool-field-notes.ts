@@ -79,3 +79,20 @@ export const UPDATE_TASK_NOTES: FieldNotes = {
     "The task had no category and one was chosen automatically (`categoryAutoPicked`). Tell the user which category was set (`categoryNote` says how sure the pick was), and if one of `categoryOptions` clearly fits the work better, set that one instead.",
   reminder: "Act on it: it says what the task still owes the client file.",
 };
+
+/// get_claude_usage (18.11.2026, with the weekly pace and without the
+/// monthly threshold).
+export const CLAUDE_USAGE_NOTES: FieldNotes = {
+  costUsd:
+    "What the work would cost at API list prices, by Cowork's estimate: a measure of how heavy it was, never money spent. A Team seat has a fixed price and no overage; its only limits are the five-hour window and the weekly limit. Never compare it with a seat price.",
+  limitHits: "Errors where a limit ran out (HTTP 429 from Cowork or Claude Code).",
+  heaviestWindow: "The five-hour window with the most work in the period, by its cost estimate.",
+  fiveHour:
+    "The five-hour window, where people get stuck: who is stuck now and when their window resets (`stuckNow`), who is ahead of the window's pace (`fastNow`), limit hits in the past week and the hours they cluster in (`peakHours`, Israel time), and on each person the past week window by window with the peak share. Shares come from the browser extension; without it only Cowork's limit errors show, and the share is null.",
+  pace:
+    "A share read against the time gone in its window: `usedPct` of the limit, `elapsedPct` of the time, `projectedPct` where it ends at the same pace (null while it is too early: the first half hour of a window, the first day of a week), and `state`: ok (on track for 80% or less), watch (80 to 100), over (runs out before the reset, at `projectedHitAt`), stuck, or early. Linear, so early in a week it leans pessimistic. Judge a person by the pace, not by the share: 87% of the week a few hours before the reset is fine.",
+  weekly: "The pace against the weekly limit (see `pace`).",
+  fastestWeekly: "The person furthest ahead of the weekly pace, by projection.",
+  unmatchedLimitEmails: "Addresses the browser extension sent that match no Ankora user, probably an alias of a work account: those people's limits are missing until matched.",
+  summary: "The managers' summary: a verdict, the leading indicators against their targets, and at most three things to do.",
+};

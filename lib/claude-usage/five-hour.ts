@@ -37,6 +37,66 @@ export type WindowCell = {
   measured: boolean;
 };
 
+// ---------------------------------------------------------------- pace
+//
+// 18.11.2026, Ariel: a share of a limit says nothing without where the
+// window is. 87% of the week with a day left is fine; 87% after two days
+// is not. The pace reads the share against the time gone, and projects
+// where the window would end at the same pace. Linear on purpose: people
+// work by day and on weekdays, so early in a week it leans pessimistic,
+// which is the safe side for "will someone get stuck".
+
+export const WEEK_LIMIT_MS = 7 * 86_400_000;
+/// A projection made earlier than this into a window is noise: half an
+/// hour of five, a day of seven.
+export const MIN_ELAPSED_FIVE_MS = 30 * 60_000;
+export const MIN_ELAPSED_WEEK_MS = 86_400_000;
+/// At this projected share or less the pace is fine; above 100 the person
+/// gets stuck before the reset.
+export const PACE_OK_PCT = 80;
+
+export type PaceState = "ok" | "watch" | "over" | "stuck" | "early";
+
+export type Pace = {
+  usedPct: number;
+  /// Share of the window's time already gone.
+  elapsedPct: number;
+  /// Where the window ends at the same pace; null while it is early.
+  projectedPct: number | null;
+  state: PaceState;
+  /// When the limit runs out at this pace, if before the reset.
+  projectedHitAt: string | null;
+  resetsAt: string;
+};
+
+/// The pace of one limit. Null when the reset time is not known.
+export function paceOf(usedPct: number, resetsAt: Date | null, now: Date, windowMs: number, minElapsedMs: number): Pace | null {
+  if (!resetsAt) return null;
+  const left = resetsAt.getTime() - now.getTime();
+  if (left <= 0) return null;
+  const elapsedMs = Math.min(windowMs, Math.max(0, windowMs - left));
+  const elapsedPct = Math.round((elapsedMs / windowMs) * 1000) / 10;
+  const base = { usedPct, elapsedPct, resetsAt: resetsAt.toISOString() };
+  if (usedPct >= LIMIT_HIT_PCT) return { ...base, projectedPct: null, state: "stuck", projectedHitAt: null };
+  if (elapsedMs < minElapsedMs) return { ...base, projectedPct: null, state: "early", projectedHitAt: null };
+  const projectedPct = Math.round((usedPct / elapsedMs) * windowMs);
+  const state: PaceState = projectedPct <= PACE_OK_PCT ? "ok" : projectedPct <= 100 ? "watch" : "over";
+  // At this rate, the rest of the limit lasts this long.
+  const msToHit = usedPct > 0 ? ((100 - usedPct) / usedPct) * elapsedMs : Infinity;
+  const projectedHitAt = state === "over" && msToHit < left ? new Date(now.getTime() + msToHit).toISOString() : null;
+  return { ...base, projectedPct, state, projectedHitAt };
+}
+
+/// The five-hour state from the pace: over the pace is "near" (heading to
+/// get stuck), between 80 and 100 projected is "watch". Early in a window
+/// the plain share decides, as before.
+function stateFromPace(pace: Pace | null, pct: number): FiveHourState {
+  if (!pace || pace.state === "early") return stateOf(pct);
+  if (pace.state === "stuck") return "stuck";
+  if (pct <= 0) return "idle";
+  return pace.state === "over" ? "near" : pace.state === "watch" ? "watch" : "free";
+}
+
 export type PersonFiveHour = {
   current: {
     state: FiveHourState;
@@ -46,8 +106,12 @@ export type PersonFiveHour = {
     hitAt: string | null;
     /// Where the figure came from: the extension, or Cowork's 429 alone.
     source: "extension" | "cowork" | null;
+    /// The pace in the current window (extension readings only).
+    pace: Pace | null;
   };
   weeklyPct: number | null;
+  /// The pace against the weekly limit.
+  weekly: Pace | null;
   /// The past week's windows, oldest first.
   week: WindowCell[];
   hitsThisWeek: number;
@@ -127,18 +191,20 @@ export function personFiveHour(samples: LimitSampleIn[], events: CoworkEventIn[]
     const reset = fresh.fiveHourResetsAt?.getTime() ?? null;
     const over = reset !== null && reset <= t;
     const pct = over ? 0 : fresh.fiveHourPct;
+    const pace = over ? null : paceOf(pct, fresh.fiveHourResetsAt, now, WINDOW_MS, MIN_ELAPSED_FIVE_MS);
     current = {
-      state: stateOf(pct),
+      state: stateFromPace(pace, pct),
       pct,
+      pace,
       resetsAt: over || reset === null ? null : new Date(reset).toISOString(),
       hitAt: !over && open?.hitAt ? new Date(open.hitAt).toISOString() : null,
       source: "extension",
     };
   } else if (open?.hitAt) {
     // No reading, but Cowork says the limit was hit in a window still open.
-    current = { state: "stuck", pct: LIMIT_HIT_PCT, resetsAt: new Date(open.end).toISOString(), hitAt: new Date(open.hitAt).toISOString(), source: "cowork" };
+    current = { state: "stuck", pct: LIMIT_HIT_PCT, resetsAt: new Date(open.end).toISOString(), hitAt: new Date(open.hitAt).toISOString(), source: "cowork", pace: null };
   } else {
-    current = { state: "unknown", pct: null, resetsAt: null, hitAt: null, source: null };
+    current = { state: "unknown", pct: null, resetsAt: null, hitAt: null, source: null, pace: null };
   }
 
   const week = wins
@@ -153,6 +219,7 @@ export function personFiveHour(samples: LimitSampleIn[], events: CoworkEventIn[]
   return {
     current,
     weeklyPct: fresh?.sevenDayPct ?? null,
+    weekly: fresh && fresh.sevenDayPct !== null ? paceOf(fresh.sevenDayPct, fresh.sevenDayResetsAt, now, WEEK_LIMIT_MS, MIN_ELAPSED_WEEK_MS) : null,
     week,
     hitsThisWeek: week.filter((w) => w.hit).length,
   };
@@ -169,12 +236,15 @@ export const PEAK_BAND_HOURS = 3;
 
 export type TeamFiveHour = {
   stuckNow: { name: string; resetsAt: string | null; hitAt: string | null }[];
-  /// At WATCH_PCT or more now, not yet stuck; highest first.
-  over70Now: { name: string; pct: number }[];
+  /// Faster than the window allows (18.11.2026: by pace, not by share):
+  /// heading to get stuck first, then watch; by projection.
+  fastNow: { name: string; pct: number; projectedPct: number | null; state: "near" | "watch"; projectedHitAt: string | null }[];
   hitsThisWeek: number;
   /// The hours most hits fell in, when at least two did and they cluster.
   peakHours: { from: number; to: number; hits: number } | null;
-  closestWeekly: { name: string; pct: number } | null;
+  /// The person furthest ahead of the weekly pace, by projection, or by
+  /// share while the week is early.
+  fastestWeekly: { name: string; pace: Pace } | null;
   /// Anyone measured by the extension in the past hour.
   measuredNow: number;
 };
@@ -184,10 +254,14 @@ export function teamFiveHour(people: { name: string; fiveHour: PersonFiveHour }[
     .filter((p) => p.fiveHour.current.state === "stuck")
     .map((p) => ({ name: p.name, resetsAt: p.fiveHour.current.resetsAt, hitAt: p.fiveHour.current.hitAt }))
     .sort((a, b) => (a.resetsAt ?? "~").localeCompare(b.resetsAt ?? "~"));
-  const over70Now = people
-    .filter((p) => p.fiveHour.current.pct !== null && p.fiveHour.current.pct >= WATCH_PCT && p.fiveHour.current.state !== "stuck")
-    .map((p) => ({ name: p.name, pct: Math.round(p.fiveHour.current.pct!) }))
-    .sort((a, b) => b.pct - a.pct);
+  const rank = { near: 0, watch: 1 } as const;
+  const fastNow = people
+    .filter((p) => p.fiveHour.current.state === "near" || p.fiveHour.current.state === "watch")
+    .map((p) => {
+      const c = p.fiveHour.current;
+      return { name: p.name, pct: Math.round(c.pct ?? 0), projectedPct: c.pace?.projectedPct ?? null, state: c.state as "near" | "watch", projectedHitAt: c.pace?.projectedHitAt ?? null };
+    })
+    .sort((a, b) => rank[a.state] - rank[b.state] || (b.projectedPct ?? b.pct) - (a.projectedPct ?? a.pct));
   const hits = people.flatMap((p) => p.fiveHour.week.filter((w) => w.hitAt).map((w) => w.hitAt!));
   const bands = new Map<number, number>();
   for (const h of hits) {
@@ -196,16 +270,17 @@ export function teamFiveHour(people: { name: string; fiveHour: PersonFiveHour }[
   }
   const top = [...bands.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
   const peakHours = top && hits.length >= 2 && top[1] >= 2 && top[1] * 2 >= hits.length ? { from: top[0] * PEAK_BAND_HOURS, to: (top[0] + 1) * PEAK_BAND_HOURS, hits: top[1] } : null;
+  const paceKey = (x: Pace) => (x.state === "stuck" ? 1000 : x.projectedPct ?? x.usedPct);
   const weekly = people
-    .filter((p) => p.fiveHour.weeklyPct !== null)
-    .map((p) => ({ name: p.name, pct: Math.round(p.fiveHour.weeklyPct!) }))
-    .sort((a, b) => b.pct - a.pct)[0];
+    .filter((p) => p.fiveHour.weekly)
+    .map((p) => ({ name: p.name, pace: p.fiveHour.weekly! }))
+    .sort((a, b) => paceKey(b.pace) - paceKey(a.pace))[0];
   return {
     stuckNow,
-    over70Now,
+    fastNow,
     hitsThisWeek: people.reduce((n, p) => n + p.fiveHour.hitsThisWeek, 0),
     peakHours,
-    closestWeekly: weekly ?? null,
+    fastestWeekly: weekly ?? null,
     measuredNow: people.filter((p) => p.fiveHour.current.source === "extension").length,
   };
 }
