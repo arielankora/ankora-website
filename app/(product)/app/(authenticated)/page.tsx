@@ -718,7 +718,7 @@ export default async function AppHomePage() {
               <div className="flex flex-col rounded-2xl border border-app-border bg-white p-5">
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-medium text-app-text-secondary">{t("dates.title")}</h2>
-                  <Link href="/app/important-dates" className="-my-2 py-2 text-xs text-app-text-accent hover:text-app-text-primary">
+                  <Link href="/app/important-dates" className="tap-area -my-2 py-2 text-xs text-app-text-accent hover:text-app-text-primary">
                     {t("dates.all")}
                   </Link>
                 </div>

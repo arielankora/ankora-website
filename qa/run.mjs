@@ -22,6 +22,7 @@ import { accessibility, buildPresent } from "./checks/a11y.mjs";
 import * as production from "./checks/production.mjs";
 import { preflight, needs } from "./checks/preflight.mjs";
 import { e2e } from "./checks/e2e.mjs";
+import { phoneQuick, iphoneFull, webkitMissing } from "./checks/iphone.mjs";
 import { urlNumbers } from "./checks/boundary.mjs";
 import { newVendors } from "./checks/vendors.mjs";
 import { permissionMatrix } from "./checks/rbac.mjs";
@@ -199,6 +200,24 @@ async function main() {
     e2e,
   );
 
+  // Phone layout of every product screen (18.11.2026). Level 2 because that is what gates a
+  // pull request that touches a screen: an iPhone audit found two crashing screens and over a
+  // thousand critical and high layout faults while every run here was green, because nothing
+  // opened a product screen at phone width. Chromium, two iPhones, two roles, and only what
+  // blocks use. The full WebKit audit is "iphone" at level 3. See checks/iphone.mjs.
+  await run.check(
+    "phone",
+    {
+      label: "Phone layout",
+      level: 2,
+      skipIf: async () =>
+        (await needs.browser()) ??
+        (await needs.database()) ??
+        (buildPresent() ? null : "no build to serve, run `next build` first"),
+    },
+    phoneQuick,
+  );
+
   // deps / rbac / boundary / perf land in a later stage; the runner
   // reserves their slots so adding one is a one-line change here. e2e and
   // a11y are no longer among them - both are implemented.
@@ -271,6 +290,19 @@ async function main() {
         (process.env.QA_BASE_URL || buildPresent() ? null : "no build to serve — run `next build` first, or set QA_BASE_URL"),
     },
     accessibility
+  );
+
+  // The whole iPhone audit, weekly: WebKit, every role, four iPhones, tap targets, safe area and
+  // direction as well. Its own shard (lib/shards.mjs), the only one that installs WebKit, and it
+  // builds for itself because that shard has no build. Decided findings: qa/iphone/accepted.json.
+  await run.check(
+    "iphone",
+    {
+      label: "iPhone layout (WebKit)",
+      level: 3,
+      skipIf: async () => (await needs.database()) ?? (await needs.prisma()) ?? (await webkitMissing()),
+    },
+    iphoneFull,
   );
 
   run.print();

@@ -332,6 +332,12 @@ jobs:
         if: needs.level.outputs.value != '1' && (matrix.shard == 'all' || matrix.shard == 'main')
         run: npx playwright install --with-deps chromium
 
+      # WebKit, Safari's engine, for the weekly iPhone audit (qa/checks/iphone.mjs), and only in
+      # the shard that runs it. Approved by Ariel, 18.11.2026.
+      - name: Install WebKit
+        if: matrix.shard == 'iphone'
+        run: npx playwright install --with-deps webkit
+
       # The demo fixtures the browser suite signs in as. Safe here and
       # nowhere else: this database is created empty by the service
       # container above and destroyed with the job, and every fixture is

@@ -2,54 +2,39 @@
 // iPhone display audit of the product screens.
 //
 // Signs in as each seeded demo role, opens every `screen:` capability in
-// qa/manifest.json (dynamic routes resolved from seeded rows) in WebKit with
-// the iPhone SE, iPhone 15 and iPhone 15 Pro Max device profiles, locale
-// he-IL, takes a full-page screenshot and runs the layout checks in
-// qa/iphone/checks.mjs. Writes qa/reports/iphone/results.json; then
-// qa/iphone/report.mjs turns that into report.md.
+// qa/manifest.json (dynamic routes resolved from seeded rows) with iPhone
+// device profiles, locale he-IL, and runs the layout checks in
+// qa/iphone/checks.mjs on each screen and on the dialogs it opens.
+//
+// Two ways in:
+//   - by hand: `node qa/iphone/audit.mjs` against a running server, writes
+//     qa/reports/iphone/results.json; qa/iphone/report.mjs turns that into
+//     report.md (see qa/iphone/README.md);
+//   - from the QA runner: qa/checks/iphone.mjs imports `audit()` for the
+//     level-2 "Phone layout" check and the level-3 "iPhone layout" check.
 //
 // Read-only towards the product with one exception: if the seeded database
 // has no process for the demo client, one "[DEMO]" process is inserted so
-// the four process routes can be opened. Run it against a throwaway local
-// database only (npm run db:dev), never against a shared one.
-//
-// Usage (server already running, env from the local env file, without AUTH_URL/NEXTAUTH_URL so
-// Auth.js follows the forwarded host):
-//   node qa/iphone/https-proxy.mjs &          # https://localhost:3443 -> http://127.0.0.1:3100
-//   node qa/iphone/audit.mjs [--base http://127.0.0.1:3100] [--roles admin,employee1]
-//        [--devices "iPhone SE"] [--only /app/tasks] [--concurrency 4] [--no-probe]
+// the four process routes can be opened. Run it against a throwaway
+// database only (npm run db:dev locally, the service container in CI).
 
 import fs from "node:fs";
 import path from "node:path";
-import { webkit, devices } from "playwright";
-import { PrismaClient } from "@prisma/client";
+import { pathToFileURL } from "node:url";
 import { pageChecks } from "./checks.mjs";
 
-const args = process.argv.slice(2);
-const arg = (name, def) => {
-  const i = args.indexOf(`--${name}`);
-  return i >= 0 ? args[i + 1] : def;
-};
-// https, through qa/iphone/https-proxy.mjs: WebKit applies the CSP's upgrade-insecure-requests
-// to http://127.0.0.1 (Chromium exempts loopback), so plain http loads no scripts at all.
-const BASE = arg("base", process.env.QA_BASE_URL ?? "https://localhost:3443");
-const DEVICES = arg("devices", "iPhone SE,iPhone SE (3rd gen),iPhone 15,iPhone 15 Pro Max").split(",").map((s) => s.trim());
-const ONLY = arg("only", null);
-const CONCURRENCY = Number(arg("concurrency", 4));
-const PROBE = !args.includes("--no-probe");
-const OUT = path.join("qa", "reports", "iphone");
-const AUTH_DIR = path.join(OUT, ".auth");
+export const ALL_DEVICES = ["iPhone SE", "iPhone SE (3rd gen)", "iPhone 15", "iPhone 15 Pro Max"];
+export const OUT = path.join("qa", "reports", "iphone");
 
 const PASSWORD = "DemoPass!2026";
 // Same accounts as qa/e2e/auth.setup.ts (DEMO). `name` is typed into the confidentiality gate.
-const ROLES = {
+export const ROLES = {
   superadmin: { identifier: "demo.superadmin@ankora.co.il", name: "[DEMO] מנהל-על" },
   admin: { identifier: "demo.admin@ankora.co.il", name: "[DEMO] מנהל Ankora" },
   employee1: { identifier: "demo.employee1@ankora.co.il", name: "[DEMO] עובד Ankora - נועה" },
   clientadmin: { identifier: "demo.clientadmin@ankora.co.il", name: null },
   anon: null, // public screens only
 };
-const ROLE_LIST = arg("roles", Object.keys(ROLES).join(",")).split(",").map((s) => s.trim());
 
 // Screens reachable without a session. Visited as `anon`; signed-in roles skip them.
 const PUBLIC_SCREENS = new Set([
@@ -67,6 +52,7 @@ const PUBLIC_SCREENS = new Set([
 // Dynamic ids from the seeded database.
 // ------------------------------------------------------------------
 async function resolveIds() {
+  const { PrismaClient } = await import("@prisma/client");
   const db = new PrismaClient();
   try {
     const client = (await db.client.findUnique({ where: { id: "demo-client-a" } })) ?? (await db.client.findFirst({ where: { name: { startsWith: "[DEMO]" } } }));
@@ -85,7 +71,6 @@ async function resolveIds() {
       clientId: client.id,
       processId: proc.id,
       categoryId: category?.id,
-      id: null, // ambiguous name, resolved per route below
       importantDateId: date?.id,
       userId: user?.id,
       taskId: task?.id,
@@ -113,37 +98,51 @@ function expand(route, ids) {
 const slug = (route) => route.replace(/^\//, "").replace(/\[|\]/g, "").replace(/\//g, "__") || "root";
 const devSlug = (d) => d.toLowerCase().replace(/\s+/g, "-");
 
+/** Every `screen:` capability in the manifest, optionally narrowed by route prefix. */
+export function manifestScreens(only = null) {
+  const manifest = JSON.parse(fs.readFileSync(path.join("qa", "manifest.json"), "utf8"));
+  let screens = Object.entries(manifest.capabilities)
+    .filter(([, c]) => c.kind === "screen")
+    .map(([id]) => id.slice("screen:".length))
+    .sort();
+  if (only) screens = screens.filter((s) => only.some((o) => s === o || s.startsWith(o)));
+  return screens;
+}
+
 // ------------------------------------------------------------------
 // Sign-in, once per role, saved as storage state.
 // ------------------------------------------------------------------
-async function signIn(browser, role) {
+async function signIn(browser, devices, base, authDir, role) {
   const acct = ROLES[role];
-  const file = path.join(AUTH_DIR, `${role}.json`);
   if (!acct) return null;
-  const ctx = await browser.newContext({ ...devices["iPhone SE"], locale: "he-IL", timezoneId: "Asia/Jerusalem", baseURL: BASE, ignoreHTTPSErrors: true });
-  const page = await ctx.newPage();
-  await page.goto("/app/login");
-  await page.fill('input[name="identifier"]', acct.identifier);
-  await page.fill('input[name="password"]', PASSWORD);
-  await page.click('button[type="submit"]');
-  await page.waitForURL((u) => u.pathname.startsWith("/app") && !u.pathname.includes("/login"), { timeout: 30_000 });
-  await page.waitForLoadState("networkidle").catch(() => {});
-  if (acct.name) {
-    if (!new URL(page.url()).pathname.startsWith("/app/agreements/confidentiality")) {
-      await page.goto("/app/agreements/confidentiality").catch(() => page.goto("/app/agreements/confidentiality"));
-    }
+  const file = path.join(authDir, `${role}.json`);
+  const ctx = await browser.newContext({ ...devices["iPhone SE"], locale: "he-IL", timezoneId: "Asia/Jerusalem", baseURL: base, ignoreHTTPSErrors: true });
+  try {
+    const page = await ctx.newPage();
+    await page.goto("/app/login");
+    await page.fill('input[name="identifier"]', acct.identifier);
+    await page.fill('input[name="password"]', PASSWORD);
+    await page.click('button[type="submit"]');
+    await page.waitForURL((u) => u.pathname.startsWith("/app") && !u.pathname.includes("/login"), { timeout: 30_000 });
     await page.waitForLoadState("networkidle").catch(() => {});
-    if (new URL(page.url()).pathname.startsWith("/app/agreements/confidentiality")) {
-      await page.getByLabel("קראתי את ההתחייבות ואני מסכים/ה לה").check();
-      await page.locator('input[name="signedName"]').fill(acct.name);
-      await page.getByRole("button", { name: "אישור וחתימה" }).click();
-      await page.waitForURL((u) => !u.pathname.startsWith("/app/agreements"), { timeout: 30_000 });
+    if (acct.name) {
+      if (!new URL(page.url()).pathname.startsWith("/app/agreements/confidentiality")) {
+        await page.goto("/app/agreements/confidentiality").catch(() => page.goto("/app/agreements/confidentiality"));
+      }
+      await page.waitForLoadState("networkidle").catch(() => {});
+      if (new URL(page.url()).pathname.startsWith("/app/agreements/confidentiality")) {
+        await page.getByLabel("קראתי את ההתחייבות ואני מסכים/ה לה").check();
+        await page.locator('input[name="signedName"]').fill(acct.name);
+        await page.getByRole("button", { name: "אישור וחתימה" }).click();
+        await page.waitForURL((u) => !u.pathname.startsWith("/app/agreements"), { timeout: 30_000 });
+      }
     }
+    fs.mkdirSync(authDir, { recursive: true });
+    await ctx.storageState({ path: file });
+    return file;
+  } finally {
+    await ctx.close();
   }
-  fs.mkdirSync(AUTH_DIR, { recursive: true });
-  await ctx.storageState({ path: file });
-  await ctx.close();
-  return file;
 }
 
 // ------------------------------------------------------------------
@@ -177,7 +176,25 @@ async function tagDialogFindings(page, findings) {
   }, findings);
 }
 
-async function visit(page, { role, device, route, url, shotDir }) {
+async function hasDialog(page) {
+  return page.evaluate(() => {
+    const d = document.querySelector('[role=dialog], [aria-modal="true"], dialog[open]');
+    if (!d) return false;
+    const r = d.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  });
+}
+
+async function shoot(page, opts, file, fullPage, meta) {
+  if (!opts.shots) return null;
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  // WebKit refuses screenshots taller than 32767px (the guide is). Keep the top 32000px then.
+  const tall = fullPage && (meta?.scrollHeight ?? 0) > 32000;
+  await page.screenshot({ path: file, fullPage, type: "jpeg", quality: 75, scale: "css", ...(tall ? { clip: { x: 0, y: 0, width: meta.vw, height: 32000 } } : {}) });
+  return path.relative(OUT, file);
+}
+
+async function visit(page, opts, { role, device, route, url, shotDir }) {
   const rec = { role, device, route, url, status: null, finalUrl: null, outcome: null, findings: [], meta: null, shot: null, modals: [], pageErrors: [] };
   const errs = [];
   const onErr = (e) => errs.push(String(e.message || e).slice(0, 200));
@@ -187,7 +204,7 @@ async function visit(page, { role, device, route, url, shotDir }) {
     rec.status = resp?.status() ?? null;
     await settle(page);
     rec.finalUrl = page.url();
-    const want = new URL(url, BASE).pathname.replace(/\/$/, "");
+    const want = new URL(url, opts.base).pathname.replace(/\/$/, "");
     const got = new URL(page.url()).pathname.replace(/\/$/, "");
     if (got !== want) {
       rec.outcome = "redirected";
@@ -207,15 +224,8 @@ async function visit(page, { role, device, route, url, shotDir }) {
     const res = await runChecks(page);
     rec.findings = res.findings;
     rec.meta = res.meta;
-    fs.mkdirSync(shotDir, { recursive: true });
-    const shot = path.join(shotDir, `${slug(route)}.jpg`);
-    // WebKit refuses screenshots taller than 32767px (the guide is). Keep the top 32000px then.
-    const tall = (res.meta?.scrollHeight ?? 0) > 32000;
-    await page.screenshot({ path: shot, fullPage: true, type: "jpeg", quality: 75, scale: "css", ...(tall ? { clip: { x: 0, y: 0, width: res.meta.vw, height: 32000 } } : {}) });
-    if (tall) rec.shotNote = `cropped to the top 32000px of ${res.meta.scrollHeight}px`;
-    rec.shot = path.relative(OUT, shot);
-
-    if (PROBE) await probeModals(page, rec, url, shotDir, route);
+    rec.shot = await shoot(page, opts, path.join(shotDir, `${slug(route)}.jpg`), true, res.meta);
+    if (opts.probe) await probeModals(page, opts, rec, url, shotDir, route);
   } catch (e) {
     rec.outcome = "error";
     rec.error = String(e.message || e).split("\n")[0].slice(0, 300);
@@ -226,16 +236,7 @@ async function visit(page, { role, device, route, url, shotDir }) {
   return rec;
 }
 
-async function hasDialog(page) {
-  return page.evaluate(() => {
-    const d = document.querySelector('[role=dialog], [aria-modal="true"], dialog[open]');
-    if (!d) return false;
-    const r = d.getBoundingClientRect();
-    return r.width > 0 && r.height > 0;
-  });
-}
-
-async function probeModals(page, rec, url, shotDir, route) {
+async function probeModals(page, opts, rec, url, shotDir, route) {
   // Candidates: the bottom-nav "more" button plus up to 4 plain buttons that look like they open
   // something (not inside a form, not in a destructive or submitting wording).
   const handles = await page.evaluateHandle((denySrc) => {
@@ -263,7 +264,7 @@ async function probeModals(page, rec, url, shotDir, route) {
       await el.scrollIntoViewIfNeeded().catch(() => {});
       await el.click({ timeout: 3_000 });
       await page.waitForTimeout(700);
-      if (new URL(page.url()).pathname !== new URL(url, BASE).pathname) {
+      if (new URL(page.url()).pathname !== new URL(url, opts.base).pathname) {
         await page.goto(url, { waitUntil: "load" });
         await settle(page);
         break; // handles are stale now
@@ -272,16 +273,15 @@ async function probeModals(page, rec, url, shotDir, route) {
       await page.waitForTimeout(300);
       const res = await runChecks(page);
       const tagged = (await tagDialogFindings(page, res.findings)).filter((f) => f.inDialog);
-      const shot = path.join(shotDir, `${slug(route)}__modal-${rec.modals.length + 1}.jpg`);
-      await page.screenshot({ path: shot, type: "jpeg", quality: 75, scale: "css" });
-      rec.modals.push({ trigger: label, shot: path.relative(OUT, shot), findings: tagged });
+      const shot = await shoot(page, opts, path.join(shotDir, `${slug(route)}__modal-${rec.modals.length + 1}.jpg`), false);
+      rec.modals.push({ trigger: label, shot, findings: tagged });
       await page.keyboard.press("Escape");
       await page.waitForTimeout(300);
       if (await hasDialog(page)) {
         // Close through its close button, else reload.
         const closed = await page.evaluate(() => {
           const d = document.querySelector('[role=dialog], [aria-modal="true"], dialog[open]');
-          const b = d?.querySelector('button[aria-label]');
+          const b = d?.querySelector("button[aria-label]");
           if (b) b.click();
           return !!b;
         });
@@ -298,7 +298,6 @@ async function probeModals(page, rec, url, shotDir, route) {
   }
 }
 
-// ------------------------------------------------------------------
 async function pool(items, n, fn) {
   const results = [];
   let i = 0;
@@ -313,73 +312,130 @@ async function pool(items, n, fn) {
   return results;
 }
 
-async function main() {
-  const manifest = JSON.parse(fs.readFileSync(path.join("qa", "manifest.json"), "utf8"));
-  let screens = Object.entries(manifest.capabilities)
-    .filter(([, c]) => c.kind === "screen")
-    .map(([id]) => id.slice("screen:".length))
-    .sort();
-  if (ONLY) screens = screens.filter((s) => ONLY.split(",").some((o) => s === o || s.startsWith(o)));
-
+/**
+ * Runs the audit and returns { ids, devices, roles, seconds, visits }.
+ *
+ * engine: "webkit" (the real thing, needs https in front of the server, see
+ *   https-proxy.mjs) or "chromium" (iPhone viewport and touch, but Chrome's
+ *   layout: right for overflow, crashes and sizes, blind to Safari-only
+ *   behaviour such as input zoom; it can talk to plain http on loopback).
+ */
+export async function audit(options = {}) {
+  const opts = {
+    base: "https://localhost:3443",
+    engine: "webkit",
+    devices: ALL_DEVICES,
+    roles: Object.keys(ROLES),
+    only: null,
+    concurrency: 4,
+    probe: true,
+    shots: true,
+    log: () => {},
+    ...options,
+  };
+  opts.base = opts.base.replace(/\/$/, "");
+  const pw = await import("playwright");
+  const launcher = pw[opts.engine];
+  const exe = opts.engine === "chromium" ? process.env.PLAYWRIGHT_CHROMIUM : undefined;
+  const authDir = path.join(OUT, ".auth", opts.engine);
+  const screens = manifestScreens(opts.only);
   const ids = await resolveIds();
-  fs.mkdirSync(OUT, { recursive: true });
-  console.log(`[iphone] ${screens.length} screens, roles ${ROLE_LIST.join(",")}, devices ${DEVICES.join(" | ")}`);
-  if (ids.createdProcess) console.log(`[iphone] inserted a [DEMO] process ${ids.processId} (none was seeded)`);
+  opts.log(`${screens.length} screens, roles ${opts.roles.join(",")}, devices ${opts.devices.join(" | ")}, ${opts.engine}`);
+  if (ids.createdProcess) opts.log(`inserted a [DEMO] process ${ids.processId} (none was seeded)`);
 
-  const browser = await webkit.launch();
-  const states = {};
-  for (const role of ROLE_LIST) states[role] = await signIn(browser, role);
-
-  const jobs = [];
-  for (const role of ROLE_LIST)
-    for (const device of DEVICES) {
-      const list = screens.filter((s) => (role === "anon" ? PUBLIC_SCREENS.has(s) || s === "/app/oauth/consent" : !PUBLIC_SCREENS.has(s) || s === "/upload"));
-      jobs.push({ role, device, list });
-    }
-
+  const browser = await launcher.launch(exe ? { executablePath: exe } : {});
   const started = Date.now();
-  const all = (
-    await pool(jobs, CONCURRENCY, async ({ role, device, list }) => {
-      const ctx = await browser.newContext({
-        ...devices[device],
-        locale: "he-IL",
-        timezoneId: "Asia/Jerusalem",
-        baseURL: BASE,
-        ignoreHTTPSErrors: true,
-        storageState: states[role] ?? undefined,
-      });
-      const page = await ctx.newPage();
-      const shotDir = path.join(OUT, "shots", devSlug(device), role);
-      const recs = [];
-      for (const route of list) {
-        const url = expand(route, ids);
-        const rec = await visit(page, { role, device, route, url, shotDir });
-        recs.push(rec);
-        const n = rec.findings.length + rec.modals.reduce((a, m) => a + m.findings.length, 0);
-        console.log(`[iphone] ${device.padEnd(18)} ${role.padEnd(11)} ${rec.outcome.padEnd(10)} ${String(n).padStart(3)}  ${route}`);
-      }
-      await ctx.close();
-      return recs;
-    })
-  ).flat();
-  await browser.close();
+  try {
+    const states = {};
+    for (const role of opts.roles) states[role] = await signIn(browser, pw.devices, opts.base, authDir, role);
 
-  // --append: add these visits to an earlier results.json (e.g. one more device), replacing any
-  // visit for the same role, device and screen.
-  if (args.includes("--append") && fs.existsSync(path.join(OUT, "results.json"))) {
-    const prev = JSON.parse(fs.readFileSync(path.join(OUT, "results.json"), "utf8"));
-    const key = (v) => `${v.role}|${v.device}|${v.route}`;
-    const fresh = new Set(all.map(key));
-    all.unshift(...prev.visits.filter((v) => !fresh.has(key(v))));
-    DEVICES.splice(0, DEVICES.length, ...new Set([...prev.devices, ...DEVICES]));
-    ROLE_LIST.splice(0, ROLE_LIST.length, ...new Set([...prev.roles, ...ROLE_LIST]));
+    const jobs = [];
+    for (const role of opts.roles)
+      for (const device of opts.devices) {
+        const list = screens.filter((s) => (role === "anon" ? PUBLIC_SCREENS.has(s) || s === "/app/oauth/consent" : !PUBLIC_SCREENS.has(s) || s === "/upload"));
+        jobs.push({ role, device, list });
+      }
+
+    const visits = (
+      await pool(jobs, opts.concurrency, async ({ role, device, list }) => {
+        // Chromium cannot take Safari's user agent and still be Chromium; keep the
+        // viewport, scale and touch of the device, and Chromium's own engine.
+        const { defaultBrowserType, ...profile } = pw.devices[device];
+        const ctx = await browser.newContext({
+          ...profile,
+          locale: "he-IL",
+          timezoneId: "Asia/Jerusalem",
+          baseURL: opts.base,
+          ignoreHTTPSErrors: true,
+          storageState: states[role] ?? undefined,
+        });
+        try {
+          const page = await ctx.newPage();
+          const shotDir = path.join(OUT, "shots", devSlug(device), role);
+          const recs = [];
+          for (const route of list) {
+            const rec = await visit(page, opts, { role, device, route, url: expand(route, ids), shotDir });
+            recs.push(rec);
+            const n = rec.findings.length + rec.modals.reduce((a, m) => a + m.findings.length, 0);
+            opts.log(`${device.padEnd(18)} ${role.padEnd(11)} ${rec.outcome.padEnd(10)} ${String(n).padStart(3)}  ${route}`);
+          }
+          return recs;
+        } finally {
+          await ctx.close();
+        }
+      })
+    ).flat();
+    return { ids, devices: opts.devices, roles: opts.roles, engine: opts.engine, seconds: Math.round((Date.now() - started) / 1000), visits };
+  } finally {
+    await browser.close();
   }
-  const out = { generatedAt: new Date().toISOString(), base: BASE, devices: DEVICES, roles: ROLE_LIST, ids, seconds: Math.round((Date.now() - started) / 1000), visits: all };
-  fs.writeFileSync(path.join(OUT, "results.json"), JSON.stringify(out, null, 1));
-  console.log(`[iphone] ${all.length} visits in ${out.seconds}s -> ${path.join(OUT, "results.json")}`);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+// ------------------------------------------------------------------
+// By hand.
+//   node qa/iphone/audit.mjs [--base https://localhost:3443] [--engine webkit|chromium]
+//        [--roles admin,employee1] [--devices "iPhone SE"] [--only /app/tasks]
+//        [--concurrency 4] [--no-probe] [--no-shots] [--append]
+// ------------------------------------------------------------------
+async function main() {
+  const args = process.argv.slice(2);
+  const arg = (name, def) => {
+    const i = args.indexOf(`--${name}`);
+    return i >= 0 ? args[i + 1] : def;
+  };
+  const list = (v) => (v ? v.split(",").map((s) => s.trim()) : null);
+  const result = await audit({
+    base: arg("base", process.env.QA_BASE_URL ?? "https://localhost:3443"),
+    engine: arg("engine", "webkit"),
+    devices: list(arg("devices", null)) ?? ALL_DEVICES,
+    roles: list(arg("roles", null)) ?? Object.keys(ROLES),
+    only: list(arg("only", null)),
+    concurrency: Number(arg("concurrency", 4)),
+    probe: !args.includes("--no-probe"),
+    shots: !args.includes("--no-shots"),
+    log: (m) => console.log(`[iphone] ${m}`),
+  });
+  fs.mkdirSync(OUT, { recursive: true });
+  const file = path.join(OUT, "results.json");
+  let { visits, devices, roles } = result;
+  // --append: add these visits to an earlier results.json (e.g. one more device), replacing any
+  // visit for the same role, device and screen.
+  if (args.includes("--append") && fs.existsSync(file)) {
+    const prev = JSON.parse(fs.readFileSync(file, "utf8"));
+    const key = (v) => `${v.role}|${v.device}|${v.route}`;
+    const fresh = new Set(visits.map(key));
+    visits = [...prev.visits.filter((v) => !fresh.has(key(v))), ...visits];
+    devices = [...new Set([...prev.devices, ...devices])];
+    roles = [...new Set([...prev.roles, ...roles])];
+  }
+  const out = { generatedAt: new Date().toISOString(), base: arg("base", "https://localhost:3443"), ...result, devices, roles, visits };
+  fs.writeFileSync(file, JSON.stringify(out, null, 1));
+  console.log(`[iphone] ${visits.length} visits in ${result.seconds}s -> ${file}`);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
