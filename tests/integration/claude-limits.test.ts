@@ -25,18 +25,32 @@ describe("the browser extension's limit readings", () => {
     expect(rows.map((r) => r.userId)).toEqual([hadas.id, hadas.id, null]);
   });
 
-  it("show in the report as the person's current limits, and drive the summary", async () => {
+  it("show in the report as the person's current limits, and drive the summary by pace", async () => {
     const { user: ariel } = await createTestUser({ role: "SUPER_ADMIN" });
     const { user: hadas } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    const DAY = 86_400_000;
+    // 86% of the week with only two of seven days gone: runs out before the reset.
     await prisma.claudeLimitSample.create({
-      data: { userId: hadas.id, email: "h@x.co", fiveHourPct: 35, sevenDayPct: 86, observedAt: new Date(NOW.getTime() - 10 * 60_000) },
+      data: { userId: hadas.id, email: "h@x.co", fiveHourPct: 35, sevenDayPct: 86, sevenDayResetsAt: new Date(NOW.getTime() + 5 * DAY), observedAt: new Date(NOW.getTime() - 10 * 60_000) },
     });
     const report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
     const h = report.people.find((p) => p.userId === hadas.id)!;
     expect(h.limits?.current).toMatchObject({ fiveHourPct: 35, sevenDayPct: 86 });
+    expect(h.fiveHour.weekly).toMatchObject({ usedPct: 86, state: "over" });
     expect(report.coverage.limitReadings).toBe(1);
     expect(report.summary.verdict).toBe("attention");
-    expect(report.summary.kpis[1]).toMatchObject({ key: "closestToWeeklyLimit", value: 86 });
+    expect(report.summary.kpis[1]).toMatchObject({ key: "weeklyPace", value: h.fiveHour.weekly!.projectedPct, state: "off" });
+  });
+
+  it("do not need attention for a high share a few hours before the weekly reset (18.11.2026)", async () => {
+    const { user: ariel } = await createTestUser({ role: "SUPER_ADMIN" });
+    const { user: hadas } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await prisma.claudeLimitSample.create({
+      data: { userId: hadas.id, email: "h@x.co", fiveHourPct: 5, sevenDayPct: 86, sevenDayResetsAt: new Date(NOW.getTime() + 6 * 3_600_000), observedAt: new Date(NOW.getTime() - 10 * 60_000) },
+    });
+    const report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
+    expect(report.people.find((p) => p.userId === hadas.id)!.fiveHour.weekly).toMatchObject({ projectedPct: 89, state: "watch" });
+    expect(report.summary.verdict).not.toBe("attention");
   });
 
   it("leave after 90 days", async () => {
