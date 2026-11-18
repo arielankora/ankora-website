@@ -259,9 +259,12 @@ input[type="datetime-local"]::-webkit-date-and-time-value {
 /* A select is as wide as its longest option. With client names in the options, one long name
    pushed the calendar and the credentials screens 77px past a 320px phone (CI phone check,
    18.11.2026). No select should outgrow its container, on any screen. In the base layer, so a
-   width utility on a particular select still wins. */
+   width utility on a particular select still wins. min-width 0 lets a select that is itself a
+   flex item shrink below its longest option, and the ellipsis shows where the name was cut. */
 @layer base {
   select {
     max-width: 100%;
+    min-width: 0;
+    text-overflow: ellipsis;
   }
 }
