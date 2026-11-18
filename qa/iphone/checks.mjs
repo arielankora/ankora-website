@@ -181,6 +181,18 @@ export function pageChecks() {
       add("cut-off", "low", `text wider than its box and clipped without an ellipsis (${el.scrollWidth}px in ${el.clientWidth}px)`, el, { value: el.scrollWidth - el.clientWidth });
     }
   }
+  // Text squeezed into a narrow column: a sentence a word a line beside something that would not
+  // wrap. Nothing leaves the screen, so the checks above see nothing. Found on the approvals screen,
+  // a proposal's text beside its four actions (iPhone 15 Pro, 18.11.2026).
+  for (const el of leafish) {
+    const text = ownText(el);
+    if (text.split(/\s+/).filter(Boolean).length < 5) continue;
+    const r = el.getBoundingClientRect();
+    const line = parseFloat(getComputedStyle(el).lineHeight) || parseFloat(getComputedStyle(el).fontSize) * 1.4;
+    if (r.width < Math.min(120, vw * 0.3) && r.height > line * 4) {
+      add("squeezed", "high", `text squeezed into a ${Math.round(r.width)}px column, ${Math.round(r.height / line)} lines (${text.split(/\s+/).length} words)`, el, { value: Math.round(r.width) });
+    }
+  }
 
   // ---------------------------------------------------------------
   // 3. Tap targets under 44 x 44 (Apple HIG).

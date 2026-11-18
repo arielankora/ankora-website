@@ -13,7 +13,8 @@
 // ones, as the Ankora Admin and as a Client Admin, on the narrowest iPhone
 // (320) and on the 15 Pro Max (430). Blocks on: a screen that crashes, a page
 // that scrolls sideways, a dialog whose overflow cannot be reached, a field
-// under 16px (iOS zooms the page on it), a control pushed off the screen.
+// under 16px (iOS zooms the page on it), a control pushed off the screen,
+// text squeezed a word a line beside something that would not wrap.
 //
 // "iphone" (level 3, the Sunday hunt, its own shard): the whole audit. WebKit
 // (Safari's engine, installed for that shard only), all roles, four iPhones,
@@ -39,6 +40,7 @@ const CHECK_LABEL = {
   "horizontal-overflow": "scrolls sideways",
   "off-screen": "off the screen",
   "cut-off": "cut off",
+  squeezed: "text squeezed into a narrow column",
   "tap-target": "tap target under 44x44",
   "input-font": "field under 16px (iOS zooms in)",
   "safe-area": "no safe-area inset",
@@ -187,6 +189,7 @@ export async function phoneQuick() {
     const result = await audit({ base, engine: "chromium", devices: QUICK_DEVICES, roles: QUICK_ROLES, shots: false, concurrency: 4 });
     const blocking = (f) => {
       if (f.check === "horizontal-overflow") return "blocker";
+      if (f.check === "squeezed") return "blocker";
       if (f.check === "modal-height" && f.severity === "critical") return "blocker";
       if (f.check === "input-font") return "blocker";
       if (f.check === "off-screen" && f.severity === "high") return "blocker";

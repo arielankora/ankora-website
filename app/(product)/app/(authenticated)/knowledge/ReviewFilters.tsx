@@ -156,8 +156,11 @@ function Select({
   onChange: () => void;
 }) {
   return (
-    <label className="flex items-center gap-2 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px]">
-      <span className="text-app-text-tertiary">{label}</span>
+    // overflow-hidden and min-w-0: in Safari a select's long options widen the box it sits in past
+    // the select's own max width. A client with a long name made the whole knowledge tab 661px wide
+    // on a phone (WebKit, 18.11.2026).
+    <label className="flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px]">
+      <span className="shrink-0 text-app-text-tertiary">{label}</span>
       <select
         // Unset contributes nothing to the URL rather than `?source=`.
         name={value ? name : undefined}
@@ -168,7 +171,7 @@ function Select({
           e.currentTarget.name = e.currentTarget.value ? name : "";
           onChange();
         }}
-        className="max-w-[200px] cursor-pointer truncate bg-transparent font-medium text-app-text-primary outline-none"
+        className="min-w-0 max-w-[200px] cursor-pointer truncate bg-transparent font-medium text-app-text-primary outline-none"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
