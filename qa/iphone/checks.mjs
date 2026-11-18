@@ -6,7 +6,11 @@
 // enough to find it again (tag, classes, text, a short CSS path).
 
 export function pageChecks() {
-  const vw = window.innerWidth;
+  // The layout width, not innerWidth. In Chromium's phone emulation a page wider than the device
+  // grows the layout viewport to fit it, innerWidth follows (333 on a 320 iPhone SE, CI 18.11.2026),
+  // and the sideways scroll then compares equal to the "screen" and goes unreported, while the bottom
+  // bar is pushed off. clientWidth stays the device width in both engines.
+  const vw = Math.min(window.innerWidth, document.documentElement.clientWidth || window.innerWidth);
   const vh = window.innerHeight;
   const TOL = 1;
   const out = [];
