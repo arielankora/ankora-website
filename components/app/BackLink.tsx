@@ -18,7 +18,7 @@ export function BackLink({ href, label, testId }: { href: string; label: string;
       data-testid={testId}
       title={label}
       aria-label={t("backTo", { label })}
-      className="tap-area inline-flex max-w-[28rem] items-center gap-1.5 rounded-full border border-app-border-strong bg-white px-3 py-1.5 text-[13px] font-medium text-app-text-primary transition-colors hover:border-app-text-primary"
+      className="tap-area inline-flex max-w-[min(28rem,100%)] items-center gap-1.5 rounded-full border border-app-border-strong bg-white px-3 py-1.5 text-[13px] font-medium text-app-text-primary transition-colors hover:border-app-text-primary"
     >
       <ArrowRight size={14} aria-hidden="true" className="shrink-0 ltr:rotate-180" />
       <span className="truncate">{label}</span>

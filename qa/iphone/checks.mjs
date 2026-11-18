@@ -120,8 +120,19 @@ export function pageChecks() {
     const r = el.getBoundingClientRect();
     let verdict = null;
     let clipper = null;
+    // A fixed element escapes overflow:hidden on its ancestors, unless one of them is its
+    // containing block (transform, filter, contain). A dialog rendered inside a list row is
+    // not cut off by the row's rounded card (false positive found 18.11.2026).
+    let escaped = getComputedStyle(el).position === "fixed";
     for (let a = el.parentElement; a && a !== document.documentElement; a = a.parentElement) {
-      const ox = getComputedStyle(a).overflowX;
+      const acs = getComputedStyle(a);
+      if (escaped) {
+        const contains = acs.transform !== "none" || acs.filter !== "none" || /paint|strict|content|layout/.test(acs.contain);
+        if (!contains) continue;
+        escaped = false;
+      }
+      if (acs.position === "fixed") escaped = true;
+      const ox = acs.overflowX;
       if (ox === "visible") continue;
       if (a === document.body) break;
       const ar = a.getBoundingClientRect();
