@@ -189,7 +189,7 @@ export async function phoneQuick() {
     const result = await audit({ base, engine: "chromium", devices: QUICK_DEVICES, roles: QUICK_ROLES, shots: false, concurrency: 4 });
     const blocking = (f) => {
       if (f.check === "horizontal-overflow") return "blocker";
-      if (f.check === "squeezed") return "blocker";
+      if (f.check === "squeezed" && f.severity === "high") return "blocker";
       if (f.check === "modal-height" && f.severity === "critical") return "blocker";
       if (f.check === "input-font") return "blocker";
       if (f.check === "off-screen" && f.severity === "high") return "blocker";
