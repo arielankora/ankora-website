@@ -124,9 +124,9 @@ export function DocumentsPanel({
                   {d.taskTitle ? ` · ${d.taskTitle}` : ""}
                 </span>
               </span>
-              <span className="flex items-center gap-2.5 text-[11.5px] text-app-text-tertiary">
-                {d.uploadedByName && <span>{d.uploadedByName}</span>}
-                <span dir="ltr" className="font-jbmono">
+              <span className="flex min-w-0 items-center gap-2.5 text-[11.5px] text-app-text-tertiary">
+                {d.uploadedByName && <span dir="auto" className="truncate">{d.uploadedByName}</span>}
+                <span dir="ltr" className="shrink-0 font-jbmono">
                   {formatSize(d.sizeBytes)}
                 </span>
                 <button
