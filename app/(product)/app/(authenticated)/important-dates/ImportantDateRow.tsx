@@ -77,7 +77,7 @@ export function ImportantDateRow({ date, listQuery }: { date: DateRow; listQuery
         <span className="block text-[10.5px]">{date.month}</span>
       </span>
       <div className="min-w-0 flex-1 basis-[220px]">
-        <Link href={withFrom(`/app/important-dates/${date.id}`, listQuery)} dir="auto" className="block truncate text-sm text-app-text-primary hover:text-app-text-accent">
+        <Link href={withFrom(`/app/important-dates/${date.id}`, listQuery)} dir="auto" className="-my-3 block truncate py-3 text-sm text-app-text-primary hover:text-app-text-accent">
           {date.title}
         </Link>
         <p className="mt-0.5 truncate text-[11.5px] text-app-text-tertiary"><bdi>{date.clientName}</bdi> · {date.meta}</p>
@@ -90,7 +90,7 @@ export function ImportantDateRow({ date, listQuery }: { date: DateRow; listQuery
         type="button"
         disabled={pending}
         onClick={() => changeStatus(isHandled ? date.previousStatus : "HANDLED_CURRENT")}
-        className="rounded-full border border-app-border px-3.5 py-2 text-xs text-app-text-primary hover:border-gold disabled:opacity-50"
+        className="tap-area rounded-full border border-app-border px-3.5 py-2 text-xs text-app-text-primary hover:border-gold disabled:opacity-50"
       >
         {isHandled ? t("reopen") : t("markHandled")}
       </button>
