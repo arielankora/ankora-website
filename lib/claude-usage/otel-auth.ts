@@ -29,7 +29,9 @@ export type OtelAuthResult = { ok: true } | { ok: false; status: 401 | 503; erro
 const SECRET_ENVS = ["COWORK_OTEL_SECRET", "CLAUDE_CODE_OTEL_SECRET"] as const;
 
 export function authorizeOtelRequest(request: Request): OtelAuthResult {
-  const secrets = SECRET_ENVS.map((name) => process.env[name]).filter((v): v is string => !!v);
+  // Trimmed (18.11.2026): a value pasted with its line break, as
+  // `openssl rand -hex 32 | pbcopy` copies it, would never match.
+  const secrets = SECRET_ENVS.map((name) => process.env[name]?.trim()).filter((v): v is string => !!v);
   // Not configured yet: say so plainly. 503 tells the exporter to try
   // later, so nothing is lost while the setting is half done.
   if (secrets.length === 0) return { ok: false, status: 503, error: "Telemetry intake is not configured" };
