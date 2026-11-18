@@ -22,7 +22,9 @@ export function CalendarClientSelect({
       data-testid="calendar-client"
       value={value}
       onChange={(e) => router.push(hrefs[e.target.value] ?? hrefs[""])}
-      className="rounded-full border border-app-border-strong bg-white px-4 py-2 text-[13.5px] text-app-text-primary"
+      // max-w-full + truncate: a select is as wide as its longest option, so one client with a
+      // long name pushed the whole screen sideways on a phone (CI phone check, 18.11.2026).
+      className="min-w-0 max-w-full truncate rounded-full border border-app-border-strong bg-white px-4 py-2 text-[13.5px] text-app-text-primary"
     >
       <option value="">{t("all")}</option>
       {clients.map((c) => (
