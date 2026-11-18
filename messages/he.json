@@ -4076,7 +4076,11 @@
         "incomplete": "התרגום לא שלם: {gaps}. צריך להשלים לפני אישור.",
         "retranslate": "תרגום מחדש עם קלוד",
         "approvedState": "תרגום מאושר",
-        "approvedBy": "על ידי {name}"
+        "approvedBy": "על ידי {name}",
+        "noProcedureTitle": "לתהליך הזה עוד אין נוהל",
+        "noProcedureBody": "הנוהל נוצר מהשלבים של התהליך. כשהשלבים ייכתבו ויאושרו, המסמך יופיע כאן.",
+        "noProcedureAction": "כתיבת השלבים",
+        "backToProcess": "חזרה לתהליך"
       },
       "translation": {
         "copied": "הפרומט הועתק. הדביקו אותו בשיחה חדשה בחשבון הארגוני של אנקורה בקלוד.",

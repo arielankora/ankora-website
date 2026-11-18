@@ -4076,7 +4076,11 @@
         "incomplete": "The translation is incomplete: {gaps}. Complete it before approving.",
         "retranslate": "Translate again with Claude",
         "approvedState": "Approved translation",
-        "approvedBy": "by {name}"
+        "approvedBy": "by {name}",
+        "noProcedureTitle": "This process has no procedure yet",
+        "noProcedureBody": "The procedure is built from the process steps. Once the steps are written and approved, the document appears here.",
+        "noProcedureAction": "Write the steps",
+        "backToProcess": "Back to the process"
       },
       "translation": {
         "copied": "Prompt copied. Paste it into a new chat in Ankora's organization account in Claude.",

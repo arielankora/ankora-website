@@ -326,11 +326,14 @@ export function CenterDialog({
             <div
               ref={(el) => el?.focus()}
               tabIndex={-1}
+              // overflow-clip, not hidden: it still rounds the corners, but it
+              // is not a scroll container, so a `sticky` footer inside (the
+              // rhythm editor's buttons) sticks to the scrolling overlay.
               // On a phone this dialog is the whole screen, so its header
               // and its end carry the safe-area insets (iPhone audit,
               // 17.11.2026). From sm up it is a floating card and they
               // are not needed.
-              className={`relative flex min-h-screen w-full ${size === "small" ? "max-w-[560px]" : "max-w-[1100px]"} flex-col overflow-hidden bg-white pb-[env(safe-area-inset-bottom)] outline-none sm:min-h-0 sm:rounded-[18px] sm:pb-0 sm:shadow-xl`}
+              className={`relative flex min-h-screen w-full ${size === "small" ? "max-w-[560px]" : "max-w-[1100px]"} flex-col overflow-clip bg-white pb-[env(safe-area-inset-bottom)] outline-none sm:min-h-0 sm:rounded-[18px] sm:pb-0 sm:shadow-xl`}
             >
               <div className="flex items-center justify-between gap-4 border-b border-app-border px-5 pb-5 pt-[calc(1.25rem+env(safe-area-inset-top))] sm:px-8 sm:py-6">
                 <div className="flex flex-col gap-1">
