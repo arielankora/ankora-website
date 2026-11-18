@@ -16,7 +16,10 @@ function constantTimeEquals(a: string, b: string): boolean {
 export type LimitsAuthResult = { ok: true } | { ok: false; status: 401 | 503; error: string };
 
 export function authorizeLimitsRequest(request: Request): LimitsAuthResult {
-  const secret = process.env.CLAUDE_LIMITS_SECRET;
+  // Trimmed (18.11.2026): `openssl rand -hex 32 | pbcopy` copies the line
+  // break too, Vercel kept it as part of the value, and every reading got
+  // 401 until the value was pasted again.
+  const secret = process.env.CLAUDE_LIMITS_SECRET?.trim();
   if (!secret) return { ok: false, status: 503, error: "Limit intake is not configured" };
   const header = request.headers.get("authorization") ?? "";
   if (!constantTimeEquals(header, `Bearer ${secret}`)) return { ok: false, status: 401, error: "Unauthorized" };

@@ -34,6 +34,13 @@ describe("POST /api/claude-limits", () => {
     expect(ingest.ingestLimitReading).not.toHaveBeenCalled();
   });
 
+  it("accepts a secret stored with a line break around it (18.11.2026: pasted from pbcopy)", async () => {
+    process.env.CLAUDE_LIMITS_SECRET = `${SECRET}\n`;
+    expect((await route.POST(post(reading))).status).toBe(200);
+    process.env.CLAUDE_LIMITS_SECRET = "  \n";
+    expect((await route.POST(post(reading))).status).toBe(503);
+  });
+
   it("says it is not configured while the secret is unset", async () => {
     delete process.env.CLAUDE_LIMITS_SECRET;
     expect((await route.POST(post(reading))).status).toBe(503);

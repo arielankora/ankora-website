@@ -79,6 +79,11 @@ describe("POST /api/otel/v1/logs", () => {
     expect((await route.POST(post("{}"))).status).toBe(401);
   });
 
+  it("accepts a secret stored with a line break after it", async () => {
+    process.env.COWORK_OTEL_SECRET = `${SECRET}\n`;
+    expect((await route.POST(post("{}"))).status).toBe(200);
+  });
+
   it("refuses a wrong secret and stores nothing", async () => {
     const res = await route.POST(post(JSON.stringify(coworkExport()), { authorization: "Bearer nope" }));
     expect(res.status).toBe(401);
