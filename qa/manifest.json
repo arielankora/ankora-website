@@ -2384,8 +2384,24 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-17",
       "riskReason": "Public URL every employee's browser posts usage-limit readings to (tools/claude-limits-extension). Behind CLAUDE_LIMITS_SECRET; stores two percentages, two reset times and an email, nothing else."
+    },
+    "mcp:delete_time_entry": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-19",
+      "riskReason": "Removes an entry from a client's billed hours through the connector (soft delete, audit kept). Same domain function as the app's delete; only the caller's own finished entries."
+    },
+    "mcp:update_time_entry": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-19",
+      "riskReason": "Changes a person's billed hours through the connector. Same domain function as the my-time edit form (48-hour window, overlap, closed bank, revisions); only the caller's own finished entries."
     }
   },
   "waivers": {},
-  "lastScan": "2026-11-17"
+  "lastScan": "2026-11-19"
 }
