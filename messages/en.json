@@ -2228,75 +2228,25 @@
   },
   "claudeUsage": {
     "summary": {
-      "title": "Managers' summary",
-      "verdict": {
-        "ok": "All well",
-        "attention": "Needs attention",
-        "partial": "Data missing"
-      },
-      "verdictLine": {
-        "ok": "Nobody is stuck and nobody is on pace to get stuck.",
-        "attention": "Someone is stuck, or on pace to get stuck before the reset. What to do is below.",
-        "partial": "No one stuck or on pace to get stuck, but data is missing for part of the team."
-      },
-      "offCount": "{count, plural, =0 {Every leading indicator is on target.} one {One leading indicator is off target.} other {# leading indicators are off target.}}",
-      "kpisTitle": "Leading indicators",
-      "kpisAbout": "What predicts getting stuck, before it happens",
-      "kpiState": {
-        "ok": "On target",
-        "watch": "Watch",
-        "off": "Off target",
-        "none": "No data"
-      },
-      "kpi": {
-        "limitHits": {
-          "label": "Limit hits",
-          "value": "{value}",
-          "target": "Target: 0 in the period"
-        },
-        "cacheShare": {
-          "label": "Read from cache",
-          "value": "{value}%",
-          "target": "Target: at least 80%. Low: conversations that start from nothing"
-        },
-        "duplicateRate": {
-          "label": "Repeat connector reads",
-          "value": "{value}%",
-          "target": "Target: under 3%"
-        },
-        "avgCallKb": {
-          "label": "Average connector answer",
-          "value": "{value} KB",
-          "target": "Target: under 8 KB"
-        },
-        "weeklyPace": {
-          "label": "Furthest ahead of the weekly pace",
-          "value": "On track for {value}%",
-          "target": "Target: on track for 80% or less by the week's end",
-          "targetWho": "{who} · target: on track for 80% or less by the week's end"
-        }
-      },
-      "actionsTitle": "What to do this week",
-      "actionsNone": "Nothing to do this week.",
       "action": {
         "limitHit": {
           "title": "Check what got {name} stuck",
-          "detail": "{count, plural, one {One limit hit} other {# limit hits}} in the period. The heaviest window is in the details."
+          "detail": "{count, plural, one {One limit hit} other {# limit hits}} in the period. When they happened is in the detail, under \"This week's windows\"."
         },
         "shortenTool": {
-          "title": "Shorten {tool}",
-          "detail": "{share}% of everything the connector sent, {kb} KB."
+          "title": "Shorten the tool {tool}",
+          "detail": "{share}% of everything Ankora sent Claude, {kb} KB."
         },
         "repeatReads": {
-          "title": "Cut repeat connector reads",
-          "detail": "{rate}% of calls repeat a read just made."
+          "title": "Cut repeat calls to Ankora",
+          "detail": "{rate}% of calls asked again for information already read."
         },
         "checkTelemetry": {
           "title": "Check {name}'s desktop app",
           "detail": "Uses the connector, but nothing arrives from Cowork."
         },
         "nearWeeklyLimit": {
-          "title": "{name} is on pace to use up the weekly limit before it resets",
+          "title": "{name}'s weekly limit may run out before it resets",
           "detail": "{pct}% used with {elapsed}% of the week gone. At this pace it runs out: {hitAt}."
         },
         "checkExtension": {
@@ -2304,24 +2254,19 @@
           "detail": "There is activity, but no limit reading arrives from the browser. Maybe not signed in to Chrome with the work account."
         },
         "nearFiveHour": {
-          "title": "{name} is heading to get stuck in the current window",
+          "title": "{name}'s window may run out before it resets",
           "detail": "{pct}% of the window used. At this pace it runs out: {hitAt}. Lighter work until the reset would help."
         },
         "unmatchedLimits": {
           "title": "{count, plural, one {A limit reading with no person} other {# limit-reading addresses with no person}}",
           "detail": "The extension sent a reading from {emails}, and no Ankora user has that address. Probably an alias of a work account. Until it is matched, that person's limits do not show on the screen."
         }
-      },
-      "toolsTitle": "Where Ankora is heavy",
-      "toolsAbout": "Share of everything the connector sent Claude in the period",
-      "toolLine": "{size} · {share}%",
-      "details": "Details"
+      }
     },
     "title": "Claude usage",
-    "intro": "How close each person is to Claude's limits, and how much of it comes from Ankora. On a Team plan a seat has a fixed price; the only limits are the five-hour window and the weekly limit.",
+    "intro": "Who in the team is close to getting stuck in Claude's limits, and what in Ankora sends Claude the most.",
     "period": "Period: {days} days",
     "periodOption": "{days} days",
-    "empty": "No data has arrived for this period yet.",
     "people": {
       "title": "By person",
       "name": "Person",
@@ -2346,7 +2291,7 @@
       "costAbout": "Work weight is what the same work would cost at API list prices, by Cowork's estimate. It is not money spent: a seat has a fixed price. Use it to compare people and requests."
     },
     "tools": {
-      "title": "Connector tools",
+      "title": "Ankora's tools",
       "intro": "What each Ankora tool sent Claude in the period, largest first. The answer's size is what enters Claude's context.",
       "tool": "Tool",
       "calls": "Calls",
@@ -2375,17 +2320,6 @@
         "client_activity": "Client summary"
       }
     },
-    "signals": {
-      "title": "Signs of waste",
-      "briefThenFile": "Brief, then the whole file",
-      "briefThenFileAbout": "Claude read the client brief and asked for the whole file within 15 minutes. The brief was not enough.",
-      "duplicateReads": "Reading the same thing again",
-      "duplicateReadsAbout": "The same tool with the same arguments, by the same person, within half an hour.",
-      "truncated": "Truncated answers",
-      "truncatedAbout": "The tool sent the most it can and cut the rest. Usually a long document.",
-      "limitHits": "Limit hits",
-      "limitHitsAbout": "Cowork errors that show the five-hour window ran out."
-    },
     "heavy": {
       "title": "Heaviest requests",
       "intro": "Everything Cowork did for one message, heaviest first. No content: who, when, how much, and which Ankora tools ran.",
@@ -2399,97 +2333,157 @@
     },
     "settings": {
       "title": "Settings",
-      "intro": "Who does not work in Cowork or Claude Code, so they are not flagged as missing data.",
+      "intro": "Mark who does not work in Cowork or Claude Code, so their missing data is not flagged as a problem.",
       "save": "Save",
       "saved": "Saved.",
-      "error": "Not saved: {message}",
-      "nonCowork": "Works in neither Cowork nor Claude Code (do not flag missing data)"
+      "error": "Not saved: {message}"
     },
     "coverage": {
       "title": "Sources",
-      "line": "{events} Cowork events, {calls} connector calls, {copies} prompt copies.",
+      "line": "Sources: {events} events from Cowork and Claude Code, {calls} calls to Ankora, {copies} prompt copies.",
       "unmatched": "Addresses that came from Cowork with no Ankora user: {emails}",
       "unmatchedLimits": "Addresses the browser extension sent with no Ankora user: {emails}"
     },
     "none": "·",
-    "five": {
-      "title": "The five-hour window",
-      "about": "How much of the current window each person has used against how much of its time is gone, and the past week window by window. The projection is where the window ends at the same pace. Under each name: the weekly limit and its pace.",
-      "col": {
-        "person": "Person",
-        "now": "Current window",
-        "week": "This week, window by window",
-        "state": "State"
+    "top": {
+      "title": "Where things stand now",
+      "numbers": "The numbers right now",
+      "verdict": {
+        "attention": "Needs attention",
+        "partial": "Data missing",
+        "ok": "All good"
       },
-      "state": {
-        "stuck": "Stuck",
-        "near": "Heading to stuck",
-        "watch": "Watch",
-        "free": "On pace",
+      "stuck": "Stuck now: {names}.",
+      "atRisk": "May get stuck before the reset: {names}.",
+      "calm": "Nobody is stuck, and nobody is on pace to get stuck before the reset.",
+      "missing": "Data is missing for part of the team.",
+      "todoLink": "{count, plural, one {One thing to do} other {# things to do}}",
+      "nobody": "Nobody",
+      "stuckNow": {
+        "label": "Stuck now"
+      },
+      "atRiskNow": {
+        "label": "May get stuck before the reset",
+        "noReadings": "No reading from the browser extension yet"
+      },
+      "where": {
+        "both": "window and week",
+        "window": "window",
+        "week": "week"
+      },
+      "hits": {
+        "label": "Limit hits in the last 7 days",
+        "peak": "{hits} of them between {from} and {to}",
+        "noPeak": "At different hours",
+        "none": "None"
+      }
+    },
+    "person": {
+      "title": "Who is close to getting stuck",
+      "about": "Each person has two limits: a 5-hour window and a weekly limit. In each bar, the color is how much is used, and the dark mark is how much of the time has gone. Color past the mark: used faster than the time.",
+      "legend": {
+        "used": "Used",
+        "pace": "Where it gets to at this pace",
+        "time": "Time gone"
+      },
+      "window": "5-hour window",
+      "week": "Weekly limit",
+      "used": "{pct}% used",
+      "short": {
         "idle": "No open window",
-        "unknown": "Not measured"
+        "none": "Not measured"
       },
-      "note": {
-        "resets": "Resets in {time}",
-        "hitAt": "Stuck at {time}",
-        "noWindow": "No open window",
-        "unknown": "No limit reading from the browser",
-        "coworkOnly": "Per Cowork: stuck at {time}, resets in about {time2}"
+      "aria": "{limit}: {used}% used, {elapsed}% of the time gone",
+      "state": {
+        "stuck": "Stuck now",
+        "over": "May get stuck",
+        "watch": "Watch",
+        "ok": "Fine",
+        "early": "Too early to tell",
+        "idle": "No open window",
+        "none": "Not measured"
+      },
+      "elapsed": "{pct}% of the time gone",
+      "hitAt": "Stuck at {time}",
+      "resetsIn": "Resets in {time}",
+      "resetsOn": "Resets {when}",
+      "beforeReset": "before the reset",
+      "verdict": {
+        "stuck": "Used up. Work resumes after the reset.",
+        "overAt": "At this pace it runs out: {when}",
+        "over": "At this pace it runs out before the reset",
+        "watch": "At this pace it reaches {projected}% by the reset: close to the limit",
+        "ok": "At this pace it reaches {projected}% by the reset",
+        "early": "Too early to project: little time has gone",
+        "idle": "The window opens with the next message to Claude",
+        "noneWindow": "No reading from the browser extension",
+        "noneWeek": "No reading from the browser extension"
+      }
+    },
+    "todo": {
+      "title": "What to do",
+      "none": "Nothing to do right now."
+    },
+    "saving": {
+      "title": "Where to save",
+      "about": "What makes Claude read more than the work needs, in the last {days} days. Each figure with its target.",
+      "noData": "No data yet",
+      "state": {
+        "ok": "On target",
+        "watch": "Watch",
+        "off": "Off target",
+        "none": "No data"
       },
       "kpi": {
-        "stuckNow": {
-          "label": "Stuck now",
-          "sub": "{name}, resets in {time}",
-          "subNoTime": "{name}",
-          "none": "Nobody"
+        "cacheShare": {
+          "label": "Conversations that pick up where they left off",
+          "value": "{value}%",
+          "about": "How much of the conversation Claude read from memory rather than anew. A very long conversation, or a new one for every small question, lowers it.",
+          "target": "Target: 80% or more"
         },
-        "hits": {
-          "label": "Limit hits this week",
-          "peak": "Peak hours: {from} to {to}",
-          "noPeak": "No cluster of hours"
+        "duplicateRate": {
+          "label": "Repeat calls to Ankora",
+          "value": "{value}%",
+          "about": "Claude asked Ankora for the same information again within half an hour.",
+          "target": "Target: up to 3%"
         },
-        "weekly": {
-          "label": "Furthest ahead of the weekly pace",
-          "sub": "{name} · {pct}% of the limit, {elapsed}% of the week gone",
-          "none": "No reading from the extension"
-        },
-        "fast": {
-          "label": "Ahead of the window's pace",
-          "item": "{name} {pct}% (on track for {projected}%)",
-          "none": "Nobody"
+        "avgCallKb": {
+          "label": "Average answer size from Ankora",
+          "value": "{value} KB",
+          "about": "How much text each call to Ankora adds to the conversation.",
+          "target": "Target: up to 8 KB"
         }
       },
-      "headline": {
-        "stuck": "Stuck now: {names}.",
-        "near": "Heading to stuck in the current window: {list}."
-      },
-      "noExtension": "No reading has arrived from the browser extension yet, so only limit hits reported by Cowork and Claude Code show. The percentages appear once the extension is installed.",
-      "legend": {
-        "free": "Window up to 70%",
-        "watch": "70% to 99%",
-        "hit": "Stuck",
-        "unknown": "Window not measured (per Cowork)",
-        "time": "How much of the window's time is gone"
-      },
-      "cell": {
-        "pct": "{name}, {when}: {pct}% of the window",
-        "hit": "{name}, {when}: stuck",
-        "unknown": "{name}, {when}: window not measured"
-      },
-      "weekAria": "{name}: {count, plural, =0 {no windows this week} one {one window this week} other {# windows this week}}, {hits, plural, =0 {no limit hits} one {one limit hit} other {# limit hits}}",
-      "weekNone": "No windows this week",
-      "weekly": "Weekly {pct}%",
-      "weeklyNone": "Weekly limit: not measured"
+      "topTool": {
+        "label": "The heaviest tool",
+        "about": "{share}% of everything Ankora sent Claude ({size}). First in line to shorten.",
+        "none": "No calls to Ankora in the period."
+      }
     },
-    "pace": {
-      "line": "{elapsed}% of the time gone · on track for {projected}%",
-      "overAt": "{elapsed}% of the time gone · at this pace it runs out: {when}",
-      "early": "{elapsed}% of the time gone · too early to project",
-      "stuck": "Used up",
-      "beforeReset": "before the reset",
-      "short": "on track for {projected}%",
-      "overShort": "runs out before the reset",
-      "earlyShort": "too early to project"
+    "details": {
+      "title": "Detail",
+      "periodLabel": "Period:",
+      "periodNote": "The period applies to the detail and to \"Where to save\". The limits above are always now.",
+      "peopleSub": "requests, work weight, limit hits and source",
+      "toolsSub": "how much each Ankora tool sent Claude",
+      "promptsSub": "prompts copied from the screens",
+      "heavySub": "the heaviest messages",
+      "settingsSub": "who does not work in Cowork",
+      "signals": "Brief then full file: {briefThenFile} · Repeat calls: {duplicates} · Truncated answers: {truncated}",
+      "week": {
+        "title": "This week's windows",
+        "sub": "each square is one 5-hour window",
+        "aria": "{name}: {count, plural, =0 {no windows this week} one {one window this week} other {# windows this week}}, {hits, plural, =0 {no limit hits} one {one limit hit} other {# limit hits}}",
+        "none": "No windows this week",
+        "hit": "Stuck",
+        "unknown": "Not measured",
+        "legend": {
+          "free": "Up to 70%",
+          "watch": "70% to 99%",
+          "hit": "Stuck",
+          "unknown": "Not measured (per Cowork)"
+        }
+      }
     }
   },
   "brainMetrics": {
