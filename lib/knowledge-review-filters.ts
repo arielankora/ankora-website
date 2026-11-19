@@ -79,10 +79,11 @@ export function proposalKindLabel(key: string): string {
 type AttentionLike = KindLike & { action: ProposalActionLike; flags: ProposalFlag[]; hiddenFor: string | null; confidence: { level: ConfidenceLike } };
 
 /// What a person should look at closely: what is approved one at a time
-/// (a change, a possible duplicate, sensitive, a low review level), anything a rule flagged,
-/// and a sensitive item waiting for someone else.
+/// (a change, a possible duplicate, a low review level), anything a rule
+/// flagged, anything sensitive (approved together since 19.11.2026, still
+/// worth a close read), and a sensitive item waiting for someone else.
 export function needsAttention(p: AttentionLike): boolean {
-  return !!p.hiddenFor || p.flags.length > 0 || !!bulkApproveBlocker({ ...p, level: p.confidence.level });
+  return !!p.hiddenFor || p.flags.length > 0 || p.payload.sensitivity === "SENSITIVE" || !!bulkApproveBlocker({ ...p, level: p.confidence.level });
 }
 
 export type FilterableBatch = { clientId: string; sourceKind: string | null; createdById: string | null; createdAt: Date };

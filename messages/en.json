@@ -6550,7 +6550,7 @@
       "approving": "Approving...",
       "approveCount": "Approve {count}",
       "rejectCount": "Reject {count}",
-      "someAlone": "{count} of the selected are approved one at a time: they change an existing item, may already be in the file, or are sensitive."
+      "someAlone": "{count} of the selected are approved one at a time: {reasons}."
     },
     "summary": {
       "allTogether": "{count, plural, =1 {One proposal, ready to approve.} other {All # can be approved together.}}",

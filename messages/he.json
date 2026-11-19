@@ -6550,7 +6550,7 @@
       "approving": "מאשר...",
       "approveCount": "אישור {count}",
       "rejectCount": "דחיית {count}",
-      "someAlone": "{count} מהנבחרות מאשרים אחת אחת: משנות פריט קיים, אולי כבר בתיק, או רגישות."
+      "someAlone": "{count} מהנבחרות מאשרים אחת אחת: {reasons}."
     },
     "summary": {
       "allTogether": "{count, plural, =1 {הצעה אחת, אפשר לאשר ישר.} other {אפשר לאשר את כל ה-# יחד.}}",
