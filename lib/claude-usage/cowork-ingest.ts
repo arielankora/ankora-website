@@ -1,11 +1,14 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { CoworkEventRow } from "@/lib/claude-usage/otlp";
+import { claudeAliasMap } from "@/lib/app-domain/claude-usage";
 
 // Claude usage measurement, stage 2 (17.11.2026): writes the rows that
 // lib/claude-usage/otlp.ts read from Cowork's telemetry. Each event is
 // matched to an Ankora user by email when it arrives; an address with no
 // user (a guest, a typo in the workspace) keeps its email and no user.
+// 19.11.2026: an extra Claude address listed in the screen's settings
+// counts as the person's too.
 
 export async function ingestCoworkEvents(rows: CoworkEventRow[]): Promise<{ stored: number; duplicates: number }> {
   if (rows.length === 0) return { stored: 0, duplicates: 0 };
@@ -14,10 +17,11 @@ export async function ingestCoworkEvents(rows: CoworkEventRow[]): Promise<{ stor
   const users = emails.length
     ? await prisma.user.findMany({ where: { email: { in: emails, mode: "insensitive" } }, select: { id: true, email: true } })
     : [];
-  const byEmail = new Map(users.map((u) => [u.email.toLowerCase(), u.id]));
+  const byEmail = await claudeAliasMap();
+  for (const u of users) byEmail.set(u.email.toLowerCase(), u.id);
 
   const { count } = await prisma.coworkEvent.createMany({
-    data: rows.map((r) => ({ ...r, userId: r.userEmail ? (byEmail.get(r.userEmail) ?? null) : null })),
+    data: rows.map((r) => ({ ...r, userId: r.userEmail ? (byEmail.get(r.userEmail.toLowerCase()) ?? null) : null })),
     // The exporter retries a batch it thinks failed; dedupeKey is unique.
     skipDuplicates: true,
   });
@@ -25,10 +29,13 @@ export async function ingestCoworkEvents(rows: CoworkEventRow[]): Promise<{ stor
 }
 
 /// Stores one reading from the browser extension (way 3), matched to an
-/// Ankora user by the Claude account's email, else the Chrome profile's.
+/// Ankora user by the Claude account's email, else an extra address listed
+/// for someone, else the Chrome profile's.
 export async function ingestLimitReading(r: import("@/lib/claude-usage/limits").LimitReading): Promise<{ matched: boolean }> {
   const emails = [r.email, r.altEmail].filter((e): e is string => !!e);
-  const user = await prisma.user.findFirst({ where: { email: { in: emails, mode: "insensitive" }, deletedAt: null }, select: { id: true } });
+  const own = await prisma.user.findFirst({ where: { email: { equals: r.email, mode: "insensitive" }, deletedAt: null }, select: { id: true } });
+  const aliased = own ? null : (await claudeAliasMap()).get(r.email.toLowerCase());
+  const user = own ?? (aliased ? { id: aliased } : await prisma.user.findFirst({ where: { email: { in: emails, mode: "insensitive" }, deletedAt: null }, select: { id: true } }));
   await prisma.claudeLimitSample.create({
     data: {
       userId: user?.id ?? null,

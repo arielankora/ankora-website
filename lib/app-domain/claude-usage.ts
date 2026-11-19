@@ -54,9 +54,16 @@ export type ClaudeUsageSettings = {
   /// Claude Code). Their missing telemetry is expected: they are not
   /// flagged, and they do not make the summary "data missing".
   nonCowork: string[];
+  /// 19.11.2026: Claude accounts under another address than the person's
+  /// Ankora email (Maor works in Claude as office@nux.ai). userId → the
+  /// extra addresses, lowercased. Cowork's telemetry and the browser
+  /// extension are matched against them too.
+  aliases: Record<string, string[]>;
 };
 
-export const DEFAULT_SETTINGS: ClaudeUsageSettings = { nonCowork: [] };
+export const DEFAULT_SETTINGS: ClaudeUsageSettings = { nonCowork: [], aliases: {} };
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function assertCanView(actor: Pick<User, "role">) {
   if (!can(actor.role, "claude_usage.view")) {
@@ -69,7 +76,27 @@ function assertCanView(actor: Pick<User, "role">) {
 
 function readSettings(value: Prisma.JsonValue | undefined): ClaudeUsageSettings {
   const v = (value && typeof value === "object" && !Array.isArray(value) ? value : {}) as Record<string, unknown>;
-  return { nonCowork: Array.isArray(v.nonCowork) ? v.nonCowork.filter((id): id is string => typeof id === "string") : [] };
+  const aliases: Record<string, string[]> = {};
+  if (v.aliases && typeof v.aliases === "object" && !Array.isArray(v.aliases)) {
+    for (const [id, list] of Object.entries(v.aliases as Record<string, unknown>)) {
+      const emails = Array.isArray(list) ? list.filter((e): e is string => typeof e === "string" && e.length > 0) : [];
+      if (emails.length) aliases[id] = emails;
+    }
+  }
+  return { nonCowork: Array.isArray(v.nonCowork) ? v.nonCowork.filter((id): id is string => typeof id === "string") : [], aliases };
+}
+
+/// Every extra Claude address, lowercased, to the person it belongs to.
+export async function claudeAliasMap(): Promise<Map<string, string>> {
+  const { aliases } = await claudeUsageSettings();
+  const m = new Map<string, string>();
+  for (const [id, emails] of Object.entries(aliases)) for (const e of emails) m.set(e.toLowerCase(), id);
+  return m;
+}
+
+/// "a@x, b@y" or one per line → clean lowercased addresses.
+export function parseAliasList(text: string): string[] {
+  return [...new Set(text.split(/[\s,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean))];
 }
 
 export async function claudeUsageSettings(): Promise<ClaudeUsageSettings> {
@@ -81,6 +108,9 @@ export type SettingsInput = {
   /// userId → true when the person does not work in Cowork, false when
   /// they do. People left out keep what they had.
   nonCowork?: Record<string, boolean>;
+  /// userId → the person's extra Claude addresses, the whole list (an
+  /// empty list clears it). People left out keep what they had.
+  aliases?: Record<string, string[]>;
 };
 
 export async function updateClaudeUsageSettings(actor: User, input: SettingsInput): Promise<ClaudeUsageSettings> {
@@ -91,7 +121,14 @@ export async function updateClaudeUsageSettings(actor: User, input: SettingsInpu
     if (off) nonCowork.add(id);
     else nonCowork.delete(id);
   }
-  const after: ClaudeUsageSettings = { nonCowork: [...nonCowork].sort() };
+  const aliases: Record<string, string[]> = { ...before.aliases };
+  for (const [id, list] of Object.entries(input.aliases ?? {})) {
+    const clean = [...new Set(list.map((e) => e.trim().toLowerCase()).filter(Boolean))].sort();
+    if (clean.length) aliases[id] = clean;
+    else delete aliases[id];
+  }
+  await checkAliases(aliases);
+  const after: ClaudeUsageSettings = { nonCowork: [...nonCowork].sort(), aliases };
   await prisma.appSetting.upsert({
     where: { key: CLAUDE_USAGE_SETTINGS_KEY },
     create: { key: CLAUDE_USAGE_SETTINGS_KEY, value: after as unknown as Prisma.InputJsonValue, updatedById: actor.id },
@@ -105,7 +142,44 @@ export async function updateClaudeUsageSettings(actor: User, input: SettingsInpu
     before: before as unknown as Prisma.InputJsonValue,
     after: after as unknown as Prisma.InputJsonValue,
   });
+  await linkAliasedRows(after.aliases);
   return after;
+}
+
+/// An extra address must look like one, belong to one person only, and not
+/// be another Ankora user's own email: that would move their usage.
+async function checkAliases(aliases: Record<string, string[]>) {
+  const owner = new Map<string, string>();
+  for (const [id, emails] of Object.entries(aliases)) {
+    for (const e of emails) {
+      if (!EMAIL_RE.test(e)) {
+        throw new DomainError("claudeUsage.aliasInvalid", `"${e}" אינה כתובת מייל תקינה.`, { email: e });
+      }
+      if (owner.has(e) && owner.get(e) !== id) {
+        throw new DomainError("claudeUsage.aliasTwice", `הכתובת ${e} רשומה אצל שני אנשים. כל כתובת שייכת לאדם אחד.`, { email: e });
+      }
+      owner.set(e, id);
+    }
+  }
+  if (owner.size === 0) return;
+  const taken = await prisma.user.findMany({
+    where: { email: { in: [...owner.keys()], mode: "insensitive" }, deletedAt: null },
+    select: { id: true, email: true, name: true },
+  });
+  for (const u of taken) {
+    if (owner.get(u.email.toLowerCase()) !== u.id) {
+      throw new DomainError("claudeUsage.aliasTaken", `הכתובת ${u.email.toLowerCase()} היא הכתובת של ${u.name} באנקורה, ולא אפשר לשייך אותה למישהו אחר.`, { email: u.email.toLowerCase(), name: u.name });
+    }
+  }
+}
+
+/// Rows that arrived before the address was listed kept their email and no
+/// person; they are given the person now, so the past week shows too.
+async function linkAliasedRows(aliases: Record<string, string[]>) {
+  for (const [userId, emails] of Object.entries(aliases)) {
+    await prisma.coworkEvent.updateMany({ where: { userId: null, userEmail: { in: emails, mode: "insensitive" } }, data: { userId } });
+    await prisma.claudeLimitSample.updateMany({ where: { userId: null, email: { in: emails, mode: "insensitive" } }, data: { userId } });
+  }
 }
 
 // ------------------------------------------------------------------ report
