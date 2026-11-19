@@ -81,6 +81,10 @@ export function parseLimitReading(body: unknown, now: Date = new Date()): ParseL
 /// A reading older than this says nothing about now: the browser is closed,
 /// or the extension stopped (claude.ai changed its endpoint, or signed out).
 export const LIMIT_READING_FRESH_MS = 60 * 60_000;
+/// 19.11.2026: an older reading is still shown, marked with its age, up to
+/// this long. Hadas's laptop closed at 11:15 and the page went blank,
+/// hiding that she was on pace to run out of the week the next day.
+export const LIMIT_READING_KEEP_MS = 24 * 60 * 60_000;
 
 /// A limit counts as hit at this share.
 export const LIMIT_HIT_PCT = 100;

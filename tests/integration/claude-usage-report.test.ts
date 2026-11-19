@@ -244,6 +244,8 @@ describe("get_claude_usage through the connector", () => {
     // 19.11.2026: the other Claude addresses, and what they mean.
     expect(body.settings.aliases).toEqual({});
     expect(body.fieldNotes.aliases).toMatch(/other addresses/);
+    // 19.11.2026: a reading over an hour old is kept, and says so.
+    expect(body.fieldNotes.reading).toMatch(/stale/);
     expect(body).not.toHaveProperty("month");
     expect(body.period.days).toBe(30);
     expect(Array.isArray(body.people)).toBe(true);

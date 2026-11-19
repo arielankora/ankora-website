@@ -61,11 +61,31 @@ describe("personFiveHour", () => {
     expect(f.week[0]).toMatchObject({ start: "2026-11-17T06:35:00.000Z", peakPct: 92, hit: false, measured: true });
   });
 
-  it("a reading over an hour old says nothing about now", () => {
+  it("a reading over an hour old is kept, marked stale, and read as of when it was taken (19.11.2026)", () => {
     const f = personFiveHour([sample("2026-11-17T08:30:00Z", 92, "2026-11-17T11:35:00Z")], [], NOW);
+    expect(f.reading).toEqual({ observedAt: "2026-11-17T08:30:00.000Z", stale: true, windowReset: false });
+    expect(f.current.pct).toBe(92);
+    expect(f.current.state).not.toBe("unknown");
+    // As of 08:30: 1:55 of the window had gone, not 3:25.
+    expect(f.current.pace?.elapsedPct).toBeCloseTo(38.3, 0);
+    expect(f.weeklyPct).toBe(40);
+    expect(f.weekly?.usedPct).toBe(40);
+    expect(f.week[0].peakPct).toBe(92);
+  });
+
+  it("a stale reading whose window reset since leaves the window unknown, and keeps the week", () => {
+    const f = personFiveHour([sample("2026-11-17T08:30:00Z", 70, "2026-11-17T09:00:00Z", 70)], [], NOW);
+    expect(f.reading).toMatchObject({ stale: true, windowReset: true });
+    expect(f.current.state).toBe("unknown");
+    expect(f.current.pct).toBeNull();
+    expect(f.weeklyPct).toBe(70);
+  });
+
+  it("a reading over a day old says nothing about now", () => {
+    const f = personFiveHour([sample("2026-11-16T08:30:00Z", 92, "2026-11-16T11:35:00Z")], [], NOW);
+    expect(f.reading).toBeNull();
     expect(f.current.state).toBe("unknown");
     expect(f.weeklyPct).toBeNull();
-    expect(f.week[0].peakPct).toBe(92);
   });
 
   it("a window that already reset is no open window", () => {
@@ -178,6 +198,7 @@ describe("teamFiveHour", () => {
       weekly: null,
       week: [],
       hitsThisWeek: 0,
+      reading: over.source === "extension" ? { observedAt: "2026-11-17T09:55:00Z", stale: false, windowReset: false } : null,
       ...rest,
     } as PersonFiveHour,
   });
@@ -192,6 +213,8 @@ describe("teamFiveHour", () => {
       p("Ariel", { state: "watch", pct: 74, source: "extension", pace: pace({ usedPct: 74, projectedPct: 90 }) }, { weekly: pace({ usedPct: 87, elapsedPct: 95, projectedPct: 92 }) }),
       p("Ops", { state: "free", pct: 22, source: "extension" }),
       p("Sagit", {}),
+      // Measured, but over an hour ago: not "measured now".
+      p("Maor", { state: "free", pct: 10, source: "extension" }, { reading: { observedAt: "2026-11-17T07:00:00Z", stale: true, windowReset: false } }),
     ]);
     expect(team.stuckNow.map((x) => x.name)).toEqual(["Anna"]);
     // By pace, not by share: Hadas at 40% early in the window comes first.

@@ -2402,9 +2402,13 @@
       "used": "{pct}% used",
       "short": {
         "idle": "No open window",
-        "none": "Not measured"
+        "none": "Not measured",
+        "reset": "Reset"
       },
       "aria": "{limit}: {used}% used, {elapsed}% of the time gone",
+      "stale": "Last reading at {time}, {ago} ago. None since: Chrome is probably closed.",
+      "agoMin": "{min} minutes",
+      "agoHours": "{time} hours",
       "state": {
         "stuck": "Stuck now",
         "over": "May get stuck",
@@ -2429,7 +2433,8 @@
         "earlyWeek": "Too early to project: less than a day into the week",
         "idle": "The window opens with the next message to Claude",
         "noneWindow": "No reading from the browser extension",
-        "noneWeek": "No reading from the browser extension"
+        "noneWeek": "No reading from the browser extension",
+        "resetSince": "The window reset since the last reading; how much of it is used now is not known"
       }
     },
     "todo": {
