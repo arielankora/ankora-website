@@ -13,7 +13,7 @@
 
 import { TIMEZONE } from "@/lib/timezone";
 import { WINDOW_MS, fiveHourWindows, isLimitHit, type CoworkEventIn } from "@/lib/claude-usage/report-math";
-import { LIMIT_HIT_PCT, LIMIT_READING_FRESH_MS, type LimitSampleIn } from "@/lib/claude-usage/limits";
+import { LIMIT_HIT_PCT, LIMIT_READING_FRESH_MS, LIMIT_READING_KEEP_MS, type LimitSampleIn } from "@/lib/claude-usage/limits";
 
 /// From this share a window is worth watching, and from NEAR_PCT the
 /// person is likely to get stuck before it resets.
@@ -116,6 +116,11 @@ export type PersonFiveHour = {
   weeklyPct: number | null;
   /// The pace against the weekly limit.
   weekly: Pace | null;
+  /// The extension reading behind `current` and `weekly`, up to a day old.
+  /// Stale: over an hour old (the browser is closed), so both are as of
+  /// `observedAt`. windowReset: the five-hour window reset since, so its
+  /// share now is not known.
+  reading: { observedAt: string; stale: boolean; windowReset: boolean } | null;
   /// The past week's windows, oldest first.
   week: WindowCell[];
   hitsThisWeek: number;
@@ -186,16 +191,22 @@ export function personFiveHour(samples: LimitSampleIn[], events: CoworkEventIn[]
   }
   wins.sort((a, b) => a.start - b.start);
 
-  // Now: the freshest extension reading, unless its window already reset.
+  // Now: the latest extension reading, up to a day old. A stale one is read
+  // as of when it was taken, and its window counts only if it has not reset.
   const latest = [...samples].sort((a, b) => b.observedAt.getTime() - a.observedAt.getTime())[0];
-  const fresh = latest && t - latest.observedAt.getTime() <= LIMIT_READING_FRESH_MS ? latest : null;
+  const age = latest ? t - latest.observedAt.getTime() : Infinity;
+  const fresh = latest && age <= LIMIT_READING_KEEP_MS ? latest : null;
+  const stale = !!fresh && age > LIMIT_READING_FRESH_MS;
+  const asOf = fresh && stale ? fresh.observedAt : now;
+  const fiveReset = fresh?.fiveHourResetsAt?.getTime() ?? null;
+  const windowReset = stale && (fiveReset !== null ? fiveReset <= t : age >= WINDOW_MS);
   let current: PersonFiveHour["current"];
   const open = wins.find((w) => w.start <= t && t < w.end);
-  if (fresh && fresh.fiveHourPct !== null) {
-    const reset = fresh.fiveHourResetsAt?.getTime() ?? null;
+  if (fresh && fresh.fiveHourPct !== null && !windowReset) {
+    const reset = fiveReset;
     const over = reset !== null && reset <= t;
     const pct = over ? 0 : fresh.fiveHourPct;
-    const pace = over ? null : paceOf(pct, fresh.fiveHourResetsAt, now, WINDOW_MS, MIN_ELAPSED_FIVE_MS);
+    const pace = over ? null : paceOf(pct, fresh.fiveHourResetsAt, asOf, WINDOW_MS, MIN_ELAPSED_FIVE_MS);
     current = {
       state: stateFromPace(pace, pct),
       pct,
@@ -211,6 +222,8 @@ export function personFiveHour(samples: LimitSampleIn[], events: CoworkEventIn[]
     current = { state: "unknown", pct: null, resetsAt: null, hitAt: null, source: null, pace: null };
   }
 
+  // A stale weekly share whose week has reset since says nothing.
+  const weekKept = fresh && !(stale && fresh.sevenDayResetsAt && fresh.sevenDayResetsAt.getTime() <= t) ? fresh : null;
   const week = wins
     .filter((w) => w.end > t - WEEK_MS && w.start <= t)
     .map((w) => ({
@@ -222,8 +235,9 @@ export function personFiveHour(samples: LimitSampleIn[], events: CoworkEventIn[]
     }));
   return {
     current,
-    weeklyPct: fresh?.sevenDayPct ?? null,
-    weekly: fresh && fresh.sevenDayPct !== null ? paceOf(fresh.sevenDayPct, fresh.sevenDayResetsAt, now, WEEK_LIMIT_MS, MIN_ELAPSED_WEEK_MS) : null,
+    weeklyPct: weekKept ? weekKept.sevenDayPct : null,
+    weekly: weekKept && weekKept.sevenDayPct !== null ? paceOf(weekKept.sevenDayPct, weekKept.sevenDayResetsAt, asOf, WEEK_LIMIT_MS, MIN_ELAPSED_WEEK_MS) : null,
+    reading: fresh ? { observedAt: fresh.observedAt.toISOString(), stale, windowReset } : null,
     week,
     hitsThisWeek: week.filter((w) => w.hit).length,
   };
@@ -285,6 +299,6 @@ export function teamFiveHour(people: { name: string; fiveHour: PersonFiveHour }[
     hitsThisWeek: people.reduce((n, p) => n + p.fiveHour.hitsThisWeek, 0),
     peakHours,
     fastestWeekly: weekly ?? null,
-    measuredNow: people.filter((p) => p.fiveHour.current.source === "extension").length,
+    measuredNow: people.filter((p) => p.fiveHour.reading && !p.fiveHour.reading.stale).length,
   };
 }

@@ -36,6 +36,11 @@ type LimitView = {
   resetsAt: string | null;
   /// When the limit was hit, for a window that is stuck now.
   hitAt: string | null;
+  /// 19.11.2026: the reading is over an hour old (the browser is closed),
+  /// so the figures are as of then.
+  staleAt?: string;
+  /// The window reset after that stale reading: its share now is unknown.
+  resetSince?: boolean;
 };
 
 const RANK: Record<LimitState, number> = { stuck: 0, over: 1, watch: 2, ok: 3, early: 4, idle: 5, none: 6 };
@@ -84,6 +89,13 @@ function fromPace(x: Pace): LimitView {
 
 /// The five-hour window of a person, from the report.
 function windowOf(p: PersonUsage): LimitView {
+  const r = p.fiveHour.reading;
+  const view = windowView(p);
+  if (r?.windowReset) return { ...view, state: "none", staleAt: r.observedAt, resetSince: true };
+  return r?.stale && view.state !== "none" ? { ...view, staleAt: r.observedAt } : view;
+}
+
+function windowView(p: PersonUsage): LimitView {
   const c = p.fiveHour.current;
   const blank = { usedPct: null, elapsedPct: null, projectedPct: null, projectedHitAt: null, resetsAt: null, hitAt: null };
   if (c.state === "unknown") return { state: "none", ...blank };
@@ -97,6 +109,12 @@ function windowOf(p: PersonUsage): LimitView {
 
 /// The weekly limit of a person.
 function weekOf(p: PersonUsage): LimitView {
+  const view = weekView(p);
+  const r = p.fiveHour.reading;
+  return r?.stale && view.state !== "none" ? { ...view, staleAt: r.observedAt } : view;
+}
+
+function weekView(p: PersonUsage): LimitView {
   if (p.fiveHour.weekly) return fromPace(p.fiveHour.weekly);
   const blank = { elapsedPct: null, projectedPct: null, projectedHitAt: null, resetsAt: null, hitAt: null };
   if (p.fiveHour.weeklyPct !== null) return { ...blank, state: p.fiveHour.weeklyPct >= 100 ? "stuck" : "ok", usedPct: p.fiveHour.weeklyPct };
@@ -169,6 +187,12 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
     return { title: t(`summary.action.${a.key}.title`, v), detail: t(`summary.action.${a.key}.detail`, v) };
   };
 
+  // "35 minutes" under an hour, "1:17 hours" beyond it.
+  const agoText = (iso: string) => {
+    const min = Math.max(0, Math.round((nowMs - Date.parse(iso)) / 60_000));
+    return min < 60 ? t("person.agoMin", { min }) : t("person.agoHours", { time: `${Math.floor(min / 60)}:${String(min % 60).padStart(2, "0")}` });
+  };
+
   // One limit's lines under its bar.
   const facts = (l: LimitView) => {
     const parts: string[] = [];
@@ -192,6 +216,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
       case "idle":
         return t("person.verdict.idle");
       case "none":
+        if (l.resetSince) return t("person.verdict.resetSince");
         return kind === "window" ? t("person.verdict.noneWindow") : t("person.verdict.noneWeek");
     }
   };
@@ -303,7 +328,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
                   <div key={kind} className="flex min-w-0 flex-[2_1_16rem] flex-col gap-2">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="text-sm font-medium text-app-text-primary">{t(`person.${kind}`)}</span>
-                      <span className={`text-sm font-medium ${PCT_TEXT[l.state]}`}>{used === null ? t(`person.short.${l.state === "idle" ? "idle" : "none"}`) : t("person.used", { pct: used })}</span>
+                      <span className={`text-sm font-medium ${PCT_TEXT[l.state]}`}>{used === null ? t(`person.short.${l.state === "idle" ? "idle" : l.resetSince ? "reset" : "none"}`) : t("person.used", { pct: used })}</span>
                     </div>
                     <div
                       className="relative h-3.5 rounded-full bg-app-neutral-soft"
@@ -318,6 +343,11 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
                     </div>
                     {facts(l) && <p className="text-xs text-app-text-secondary">{facts(l)}</p>}
                     {verdict && <p className={`text-xs font-medium ${VERDICT_TEXT[l.state]}`}>{verdict}</p>}
+                    {l.staleAt && (
+                      <p className="text-xs text-app-warning" data-testid="usage-stale">
+                        {t("person.stale", { time: clock(l.staleAt), ago: agoText(l.staleAt) })}
+                      </p>
+                    )}
                   </div>
                 );
               })}
