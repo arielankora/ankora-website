@@ -367,6 +367,57 @@ export async function removeClientFact(actor: User, id: string) {
   return removed;
 }
 
+/// "ביטול" of an approved replacement (19.11.2026, revertProposal): the
+/// new version leaves the file and the old one is current again, with the
+/// status it had before it was replaced (`status`, read from the audit
+/// row of the replacement). In one transaction, so the file never shows
+/// two current versions or none. The caller checked that nothing changed
+/// either since.
+export async function undoFactSupersede(actor: User, oldId: string, status: ClientFact["knowledgeStatus"]) {
+  assertCan(actor.role, "time_entry.create_self");
+  const old = await prisma.clientFact.findUnique({ where: { id: oldId } });
+  if (!old || old.deletedAt || old.knowledgeStatus !== "SUPERSEDED" || !old.supersededById) throw new DomainError("clientFacts.notSuperseded", "הגרסה הקודמת כבר לא מוחלפת, אז אין מה להחזיר.");
+  await assertClientAccess(actor, old.clientId);
+  const replacement = await findLive(old.supersededById);
+  assertCurrent(replacement);
+  if (status === "SUPERSEDED") throw new DomainError("clientFacts.notSuperseded", "הגרסה הקודמת כבר לא מוחלפת, אז אין מה להחזיר.");
+  const now = new Date();
+  const [removed, restored] = await prisma.$transaction([
+    prisma.clientFact.update({ where: { id: replacement.id }, data: { deletedAt: now } }),
+    prisma.clientFact.update({ where: { id: old.id }, data: { knowledgeStatus: status, supersededById: null, supersededAt: null } }),
+  ]);
+  await recordAudit({ actorId: actor.id, action: "client_fact.remove", entityType: "ClientFact", entityId: replacement.id, clientId: old.clientId, before: replacement });
+  await recordAudit({ actorId: actor.id, action: "client_fact.restore", entityType: "ClientFact", entityId: old.id, clientId: old.clientId, before: old, after: restored });
+  return { removed, restored };
+}
+
+/// The fields of a fact that a change made in place, and "ביטול" writes
+/// back (19.11.2026): a contradiction's alternative and status, or a
+/// question's answer.
+export const RESTORABLE_FACT_FIELDS = ["alternatives", "knowledgeStatus", "toResolve", "sources", "answer", "answeredAt", "verifiedAt"] as const;
+export type RestorableFactFields = Partial<Pick<ClientFact, (typeof RESTORABLE_FACT_FIELDS)[number]>>;
+
+/// "ביטול" of an approved change a proposal made to a fact in place: its
+/// fields as they were before it, read from the audit row of the change.
+export async function restoreClientFact(actor: User, id: string, values: RestorableFactFields) {
+  assertCan(actor.role, "time_entry.create_self");
+  const fact = await findLive(id);
+  await assertClientAccess(actor, fact.clientId);
+  assertCurrent(fact);
+  const { alternatives, sources, ...rest } = values;
+  const updated = await prisma.clientFact.update({
+    where: { id },
+    data: {
+      ...rest,
+      // Both are lists that are never null: an empty one is [].
+      ...(alternatives !== undefined ? { alternatives: (alternatives ?? []) as Prisma.InputJsonValue } : {}),
+      ...(sources !== undefined ? { sources: (sources ?? []) as Prisma.InputJsonValue } : {}),
+    },
+  });
+  await recordAudit({ actorId: actor.id, action: "client_fact.restore", entityType: "ClientFact", entityId: id, clientId: fact.clientId, before: fact, after: updated });
+  return updated;
+}
+
 /// Current facts and their history, each filtered by its own audience.
 /// Oldest first within a kind, the way the file reads.
 export async function listClientFacts(actor: User, clientId: string) {

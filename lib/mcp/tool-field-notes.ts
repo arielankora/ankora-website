@@ -15,7 +15,7 @@ export const PROPOSAL_STATS_NOTES: FieldNotes = {
     'One row per proposal with its metadata: source kind, Claude\'s confidence and the review screen\'s level, flags, whether it is sensitive, client-visible or carries a "do not disclose", why it could not be approved together with others (`aloneBecause`), the outcome and how long the decision took. Rows are written short: a field that is false, null or an empty list is left out (so a missing `autoError` on an auto-applied row means no error), `rejected` is left out (state REJECTED says it), `decidedAt` is left out (createdAt plus hoursToDecision), and createdAt is to the minute.',
   autoApplied: "The server approved it with no person.",
   autoReviewed: "Auto-applied, and a person looked at it after and marked it right.",
-  reverted: "Its item was taken out of the file again.",
+  reverted: "Taken back (\"ביטול\"): a new item was taken out of the file again, or a change (SUPERSEDE, CONTRADICT) was undone and the item put back as it was.",
   autoError:
     "For an auto-applied proposal, the error it counted as: its `type` (REVERTED, or SUPERSEDED, CONTRADICTED, UPDATED or REMOVED within 30 days of entering) and `fields`, the names of the fields changed in the file. A replacement or contradiction that came from an approved proposal of a different, later source (a later meeting or message) is new information and not an error.",
   autoChange: "NEWER_SOURCE: a later-source replacement or contradiction happened, and was not counted as an error.",
@@ -33,7 +33,7 @@ export const LIST_APPROVALS_NOTES: FieldNotes = {
   proposals:
     "Each proposal has its own `proposalId` (for decide_knowledge_proposals) and `url`. An update to an item already in the file (action SUPERSEDE) has `changes`: each field it changes, with `before` (what the file says now) and `after` (what it will say once approved). Approving changes only those fields; the item stays, with everything else as it is. `says` is then the item it updates.",
   enteredAutomatically:
-    'Items that entered a client file on their own and still need a person to look: each with `proposalId`, `result` (the item in the file), `url` (its row) and `decisions`: what decide_knowledge_proposals can do with it ("reviewed_ok" for "תקין", "revert" for "ביטול").',
+    'Items that entered a client file on their own and still need a person to look: each with `proposalId`, `result` (the item in the file), `url` (its row) and `decisions`: what decide_knowledge_proposals can do with it ("reviewed_ok" for "תקין", "revert" for "ביטול"). `action` CREATE: "revert" takes the new item out of the file. SUPERSEDE or CONTRADICT: "revert" puts the item it changed back as it was before (a fact\'s old version is current again, or the alternative and the uncertain mark are taken off), and is refused, with why, when the item changed after.',
   autoApplyPauses:
     "For a manager: the kinds and clients sent back to a person after too many errors, each with `label`, `since`, `errors` and `url` (its row, where the manager lifts it on the screen).",
 };
