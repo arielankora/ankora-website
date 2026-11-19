@@ -188,7 +188,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
       case "ok":
         return l.projectedPct === null ? "" : t("person.verdict.ok", { projected: l.projectedPct });
       case "early":
-        return t("person.verdict.early");
+        return kind === "window" ? t("person.verdict.earlyWindow") : t("person.verdict.earlyWeek");
       case "idle":
         return t("person.verdict.idle");
       case "none":

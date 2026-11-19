@@ -153,6 +153,16 @@ describe("paceOf", () => {
     expect(paceOf(20, inMs(6.5 * 24 * H), NOW_P, WEEK_LIMIT_MS, MIN_ELAPSED_WEEK_MS)).toMatchObject({ state: "early" });
   });
 
+  it("is not early once half the limit is used: 68% of the week after 17 hours runs out", () => {
+    const week = paceOf(68, inMs(7 * 24 * H - 17 * H), NOW_P, WEEK_LIMIT_MS, MIN_ELAPSED_WEEK_MS)!;
+    expect(week.state).toBe("over");
+    expect(week.projectedPct).toBeGreaterThan(100);
+    // 32% left at 4% an hour: about 8 hours.
+    expect(Date.parse(week.projectedHitAt!) - NOW_P.getTime()).toBeCloseTo(8 * H, -5);
+    expect(paceOf(55, inMs(4.75 * H), NOW_P, WINDOW_MS, MIN_ELAPSED_FIVE_MS)).toMatchObject({ state: "over" });
+    expect(paceOf(49, inMs(6.5 * 24 * H), NOW_P, WEEK_LIMIT_MS, MIN_ELAPSED_WEEK_MS)).toMatchObject({ state: "early" });
+  });
+
   it("says stuck at 100%, and nothing without a reset time", () => {
     expect(paceOf(100, inMs(H), NOW_P, WINDOW_MS, MIN_ELAPSED_FIVE_MS)?.state).toBe("stuck");
     expect(paceOf(50, null, NOW_P, WINDOW_MS, MIN_ELAPSED_FIVE_MS)).toBeNull();
