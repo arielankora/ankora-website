@@ -22,8 +22,8 @@ export const READ_ONLY = {
 /// Tools that write.
 ///
 /// `destructiveHint: false` is accurate and deliberate: almost every write
-/// in this surface creates or amends, and nothing else deletes. The single
-/// exception, replace_task_steps, says so in its own entry below.
+/// in this surface creates or amends. The exceptions (replace_task_steps,
+/// apply_task_plan_steps, delete_time_entry) say so in their own entries.
 ///
 /// `idempotentHint: false` matters most on create_time_entry: calling it
 /// twice makes two entries, and a client that assumed otherwise could
@@ -51,6 +51,15 @@ export const TOOL_ANNOTATIONS = {
   // unlike the other writes this one is genuinely idempotent.
   update_timer_note: { ...WRITES, idempotentHint: true },
   create_time_entry: WRITES,
+  // 19.11.2026: correcting one's own finished entry through the same domain
+  // functions as the "הזמן שלי" screen. An update that sets the same values
+  // twice leaves the same entry (one more revision row, nothing a person
+  // sees change), so it is idempotent like update_task.
+  update_time_entry: { ...WRITES, idempotentHint: true },
+  // Removes an entry from the client's hours (a soft delete, kept in the
+  // audit history). Marked destructive so a client asks before calling it.
+  // A second call finds nothing to delete and changes nothing.
+  delete_time_entry: { ...WRITES, destructiveHint: true, idempotentHint: true },
   // Phase 16 (MCP tasks).
   list_tasks: READ_ONLY,
   list_assignable_people: READ_ONLY,
@@ -209,6 +218,8 @@ export const WRITE_TOOLS = [
   "stop_timer",
   "update_timer_note",
   "create_time_entry",
+  "update_time_entry",
+  "delete_time_entry",
   "create_task",
   "update_task",
   "add_task_steps",
