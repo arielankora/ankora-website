@@ -45,6 +45,18 @@ describe("blockingChecks", () => {
     expect(blockingChecks({ steps: [step({ mode: "MANUAL", actionTags: ["CONTRACT"] })] }, [])).toEqual([]);
   });
 
+  // 19.11.2026: the line says which tag blocks, why, and both ways out.
+  it("R1: names the tag, the reason and both fixes, with one tag or several", () => {
+    const [assisted] = blockingChecks({ steps: [step({ mode: "ASSISTED", actionTags: ["SUPPLIER_NEW"] })] }, []);
+    expect(assisted.message).toBe(
+      'שלב 1 מסומן בסוג הפעולה "ספק חדש", ו-Claude מכין אותו. פעולה כזו דורשת אישור של אדם לפני הביצוע, ולכן אי אפשר לאשר את הנוהל. אפשר לתקן בשתי דרכים: לסמן בשלב "דורש אישור לפני ביצוע", או להוריד ממנו את "ספק חדש" אם הפעולה לא נעשית בו, ולסמן אותה בשלב שבו אדם מחליט.'
+    );
+    const [automated] = blockingChecks({ steps: [step({ mode: "AUTOMATED", actionTags: ["PAYMENT", "REFUND"], verification: "x" })] }, []);
+    expect(automated.message).toBe(
+      'שלב 1 מסומן בסוג הפעולה "תשלום, זיכוי או החזר" ומוגדר כאוטומטי. פעולה כזו היא החלטה של אדם, ולכן אי אפשר לאשר את הנוהל. אפשר לתקן בשתי דרכים: לשנות את השלב ל"Claude מכין, אדם בודק" ולסמן "דורש אישור לפני ביצוע", או להוריד ממנו את "תשלום, זיכוי או החזר" אם הפעולה לא נעשית בו, ולסמן אותה בשלב שבו אדם מחליט.'
+    );
+  });
+
   it("R1: a message to the client is checked by a person, so never automated", () => {
     expect(blockingChecks({ steps: [step({ mode: "AUTOMATED", actionTags: ["CLIENT_MESSAGE"], verification: "x" })] }, []).map((c) => c.code)).toEqual(["R1"]);
     expect(blockingChecks({ steps: [step({ mode: "ASSISTED", actionTags: ["CLIENT_MESSAGE"] })] }, [])).toEqual([]);

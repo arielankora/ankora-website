@@ -111,7 +111,7 @@ describe("a procedure on the approvals screen (ADR 0006)", () => {
       { title: "בדיקה", mode: "MANUAL", verification: "רואים את הקבלה" },
     ]);
     const checks: PreviewCheck[] = [
-      { code: "R1", step: 1, severity: "BLOCK", message: "שלב 1: תשלום לא נעשה אוטומטית. לפי ספר הנהלים זו החלטה של אדם.", keyed: { key: "humanOnlyAutomated", step: 1, tags: ["PAYMENT"] } },
+      { code: "R1", step: 1, severity: "BLOCK", message: 'שלב 1 מסומן בסוג הפעולה "תשלום" ומוגדר כאוטומטי. פעולה כזו היא החלטה של אדם, ולכן אי אפשר לאשר את הנוהל. אפשר לתקן בשתי דרכים: לשנות את השלב ל"Claude מכין, אדם בודק" ולסמן "דורש אישור לפני ביצוע", או להוריד ממנו את "תשלום" אם הפעולה לא נעשית בו, ולסמן אותה בשלב שבו אדם מחליט.', keyed: { key: "humanOnlyAutomated", step: 1, tags: ["PAYMENT"] } },
       { code: "R3", step: 1, severity: "BLOCK", message: "שלב 1 אוטומטי: צריך לכתוב איך אדם מוודא שזה קרה.", keyed: { key: "automatedNoVerification", step: 1 } },
       { code: "R3", step: 2, severity: "BLOCK", message: "שלב 2 אוטומטי: צריך לכתוב איך אדם מוודא שזה קרה.", keyed: { key: "automatedNoVerification", step: 2 } },
       { code: "R9", severity: "EXCEPTION", excepted: false, message: "כלל של הלקוח." },

@@ -64,6 +64,17 @@ export function StepsEditor({ data }: { data: StepsEditorData }) {
     ...(view === "flow" ? flowIssues(flow).map((i) => ({ text: issueText(tp, i), step: undefined as number | undefined })) : []),
   ];
 
+  /// A check names its step by its number among the steps with a title (the
+  /// checks skip blank ones), so a click finds that step in either view:
+  /// the row in the list, the box in the flow (19.11.2026).
+  const openStep = (n: number) => {
+    const titled = current.map((s, i) => (s.title.trim() ? i : -1)).filter((i) => i >= 0);
+    const i = titled[n - 1];
+    if (i === undefined) return;
+    if (view === "list") setPicked(i);
+    else setNode((flowOrder(flow) ?? flow.nodes).filter((x) => x.kind === "ACTION" && x.step)[i]?.id ?? null);
+  };
+
   const doer = (st: ProcessStep) =>
     st.owner?.userId ? staffName.get(st.owner.userId) ?? "" : st.owner?.contactId ? personName.get(st.owner.contactId) ?? "" : st.owner?.text || data.executor || "";
   const gate = (st: ProcessStep) =>
@@ -462,7 +473,7 @@ export function StepsEditor({ data }: { data: StepsEditorData }) {
               {issues.map((c, k) => (
                 <li key={k} className="text-sm text-app-error">
                   {c.step ? (
-                    <button type="button" onClick={() => view === "list" && setPicked(c.step! - 1)} className="text-start hover:underline">
+                    <button type="button" onClick={() => openStep(c.step!)} className="text-start hover:underline">
                       {c.text}
                     </button>
                   ) : (

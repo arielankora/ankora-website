@@ -196,6 +196,20 @@ export type KeyedCheck = { key: CheckKey; step?: number; tags?: ActionTag[]; thr
 
 export type CheckResult = { code: string; message: string; step?: number; keyed?: KeyedCheck };
 
+/// R1 on a step tagged with an action only a person decides (19.11.2026):
+/// the sentence says which tag set it off, why it blocks, and both ways out,
+/// because the tag is often on the wrong step (P8 had "ספק חדש" on the step
+/// Claude prepares instead of the step where a person decides). It takes no
+/// value beyond {step} and {tags}, so flags already stored with proposals
+/// still word it.
+export function humanOnlyMessage(step: number, tags: ActionTag[], mode: "ASSISTED" | "AUTOMATED"): string {
+  const names = tags.map((t) => ACTION_TAG_LABELS[t]).join(", ");
+  const move = `להוריד ממנו את "${names}" אם הפעולה לא נעשית בו, ולסמן אותה בשלב שבו אדם מחליט.`;
+  return mode === "ASSISTED"
+    ? `שלב ${step} מסומן בסוג הפעולה "${names}", ו-Claude מכין אותו. פעולה כזו דורשת אישור של אדם לפני הביצוע, ולכן אי אפשר לאשר את הנוהל. אפשר לתקן בשתי דרכים: לסמן בשלב "דורש אישור לפני ביצוע", או ${move}`
+    : `שלב ${step} מסומן בסוג הפעולה "${names}" ומוגדר כאוטומטי. פעולה כזו היא החלטה של אדם, ולכן אי אפשר לאשר את הנוהל. אפשר לתקן בשתי דרכים: לשנות את השלב ל"Claude מכין, אדם בודק" ולסמן "דורש אישור לפני ביצוע", או ${move}`;
+}
+
 /// The checks that block approval of a procedure (R1 to R4). `thresholds`
 /// are the titles of the client's approval rules in force (THRESHOLD,
 /// APPROVAL_REQUIRED), proposed ones included through their interim rule.
@@ -208,9 +222,9 @@ export function blockingChecks(
     const n = i + 1;
     const humanOnly = st.actionTags.filter((t) => HUMAN_ONLY_TAGS.includes(t));
     if (humanOnly.length && st.mode === "AUTOMATED") {
-      out.push({ code: "R1", step: n, message: `שלב ${n}: ${humanOnly.map((t) => ACTION_TAG_LABELS[t]).join(", ")} לא נעשה אוטומטית. לפי ספר הנהלים זו החלטה של אדם.`, keyed: { key: "humanOnlyAutomated", step: n, tags: humanOnly } });
+      out.push({ code: "R1", step: n, message: humanOnlyMessage(n, humanOnly, "AUTOMATED"), keyed: { key: "humanOnlyAutomated", step: n, tags: humanOnly } });
     } else if (humanOnly.length && st.mode === "ASSISTED" && !st.requiresApproval) {
-      out.push({ code: "R1", step: n, message: `שלב ${n}: כש-Claude מכין ${humanOnly.map((t) => ACTION_TAG_LABELS[t]).join(", ")}, אדם מאשר לפני הביצוע. צריך לסמן "דורש אישור".`, keyed: { key: "humanOnlyAssisted", step: n, tags: humanOnly } });
+      out.push({ code: "R1", step: n, message: humanOnlyMessage(n, humanOnly, "ASSISTED"), keyed: { key: "humanOnlyAssisted", step: n, tags: humanOnly } });
     }
     if (st.mode === "AUTOMATED" && !st.fixedMessage && st.actionTags.some((t) => HUMAN_REVIEWED_TAGS.includes(t))) {
       out.push({ code: "R1", step: n, message: `שלב ${n}: הודעה ללקוח עוברת בדיקה של אדם לפני שהיא יוצאת, ולכן לא נשלחת אוטומטית.`, keyed: { key: "clientMessageAutomated", step: n } });

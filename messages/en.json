@@ -3685,8 +3685,8 @@
         }
       },
       "checks": {
-        "humanOnlyAutomated": "Step {step}: {tags} is never done automatically. By the procedures book, that is a person's decision.",
-        "humanOnlyAssisted": "Step {step}: when Claude prepares {tags}, a person approves before it is done. Tick \"Needs approval\".",
+        "humanOnlyAutomated": "Step {step} is tagged \"{tags}\" and set to automated. This action is a person's decision, so the procedure can't be approved. Two ways to fix it: switch the step to \"Claude prepares, a person checks\" and tick \"Needs approval before it is done\", or remove \"{tags}\" from it if the action doesn't happen there, and tag the step where a person decides.",
+        "humanOnlyAssisted": "Step {step} is tagged \"{tags}\" and Claude prepares it. This action needs a person's approval before it is done, so the procedure can't be approved. Two ways to fix it: tick \"Needs approval before it is done\" on the step, or remove \"{tags}\" from it if the action doesn't happen there, and tag the step where a person decides.",
         "clientMessageAutomated": "Step {step}: a message to the client is checked by a person before it goes out, so it is not sent automatically.",
         "automatedNoVerification": "Step {step} is automated: write how a person makes sure it happened.",
         "moneyNoApproval": "The procedure has a payment or a purchase, and the client's approval rules ({thresholds}) have no approval step in it.",
