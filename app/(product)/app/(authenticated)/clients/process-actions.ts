@@ -342,9 +342,9 @@ export async function saveStepsAction(input: {
   }
 }
 
-export async function approveProcessVersionAction(processId: string, version: number, clientId: string): Promise<FormState> {
+export async function approveProcessVersionAction(processId: string, version: number, clientId: string, lessonIds: string[] = []): Promise<FormState> {
   const user = await requireUser();
-  return run(clientId, () => approveProcessVersion(user, processId, version));
+  return run(clientId, () => approveProcessVersion(user, processId, version, lessonIds));
 }
 
 export async function setProcessStatusAction(processId: string, status: "ACTIVE" | "PAUSED" | "RETIRED", clientId: string): Promise<FormState> {

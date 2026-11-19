@@ -93,6 +93,9 @@ export type ApprovalItem = {
   id: string;
   /// A procedure and a plan are decided by version.
   version?: number;
+  /// A procedure: the lessons still open on its process. Approving asks
+  /// which of them went into this version (19.11.2026).
+  openLessons?: { id: string; body: string; version: number | null }[];
   clientId: string | null;
   clientName: string | null;
   title: string;

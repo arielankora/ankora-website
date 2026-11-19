@@ -630,6 +630,13 @@
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
+        "appliedLessonIds": {
+          "description": "Approving a procedure: the ids of the row's `openLessons` this version covers, as the user said. They close as applied in this version; the rest stay open.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "decision": {
           "enum": [
             "approve",

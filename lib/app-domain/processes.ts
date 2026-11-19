@@ -789,7 +789,11 @@ export async function reconfirmProcedure(actor: User, processId: string) {
   return { version: approved.version };
 }
 
-export async function approveProcessVersion(actor: User, processId: string, version: number) {
+/// `appliedLessonIds`: open lessons on this process that went into this
+/// version, closed with it as applied ("גרסה N"). Approving a version never
+/// closes a lesson by itself (19.11.2026): the approver says which went in,
+/// and the rest stay open for the next version.
+export async function approveProcessVersion(actor: User, processId: string, version: number, appliedLessonIds: string[] = []) {
   const process = await findProcess(actor, processId);
   // 31.10.2026: a manager, or the client's account manager; with the
   // client's separation on, not whoever wrote the version.
@@ -809,6 +813,11 @@ export async function approveProcessVersion(actor: User, processId: string, vers
     const failing = blocking.map((b) => b.message).join(" ");
     throw new DomainError("processes.failsChecks", `הנוהל לא עובר את הבדיקות: ${failing}`, { checks: failing });
   }
+  const lessonIds = [...new Set(appliedLessonIds)];
+  if (lessonIds.length) {
+    const open = await prisma.processLesson.count({ where: { id: { in: lessonIds }, processId, status: "OPEN" } });
+    if (open !== lessonIds.length) throw new DomainError("processes.lessonNotOpen", "אחת ההערות שסימנתם כבר לא פתוחה בתהליך הזה. רעננו ונסו שוב.");
+  }
   const now = new Date();
   // 23.10.2026: the document as approved, names and all, so version N
   // reads the same next year (lib/app-domain/procedure-documents.ts).
@@ -823,8 +832,14 @@ export async function approveProcessVersion(actor: User, processId: string, vers
       where: { id: processId },
       data: { status: process.status === "DRAFT" ? "ACTIVE" : undefined, lastReviewedAt: now, needsReview: false, reviewReason: null },
     }),
+    ...(lessonIds.length
+      ? [prisma.processLesson.updateMany({ where: { id: { in: lessonIds }, processId, status: "OPEN" }, data: { status: "APPLIED", resolution: `גרסה ${version}`, resolvedById: actor.id, resolvedAt: now } })]
+      : []),
   ]);
-  await recordAudit({ actorId: actor.id, action: "process.version_approve", entityType: "Process", entityId: processId, clientId: process.clientId, after: { version, checks: checks.length } });
+  await recordAudit({ actorId: actor.id, action: "process.version_approve", entityType: "Process", entityId: processId, clientId: process.clientId, after: { version, checks: checks.length, lessons: lessonIds.length } });
+  for (const lessonId of lessonIds) {
+    await recordAudit({ actorId: actor.id, action: "process.lesson_applied", entityType: "Process", entityId: processId, clientId: process.clientId, after: { lessonId, resolution: `גרסה ${version}` } });
+  }
 }
 
 /// What approving a process proposal did to its procedure (3.11.2026):

@@ -8,6 +8,7 @@ import { startProcessRun } from "@/lib/app-domain/process-runs";
 import { LESSON_ARRIVED, listLessons, recordRunLesson, resolveLesson } from "@/lib/app-domain/process-lessons";
 import { buildClientFile } from "@/lib/app-domain/client-file-view";
 import { toMarkdown } from "@/lib/client-file-document";
+import { collectApprovals } from "@/lib/app-domain/approvals";
 
 // Learning from runs (claude/org-brain-spec-2026-10-12.md, 5.4).
 //
@@ -103,5 +104,41 @@ describe("learning from runs", () => {
     expect((await call(ana, "record_run_lesson", { taskId: run.id, lesson: "חסר מי מאשר בהיעדר אורן" })).json).toMatchObject({ recorded: "lesson" });
     const detail = await call(hadas, "get_process", { client: "NUX", process: process.code });
     expect(detail.json.openLessons).toEqual([expect.objectContaining({ lesson: "חסר מי מאשר בהיעדר אורן", fromVersion: 1 })]);
+  });
+
+  // 19.11.2026: approving a new version never closed a lesson, so the
+  // row "הערה אחת מריצות" waited on, version after version. The approver
+  // now says which lessons the version covers; "להערות" opens the tab.
+  it("approving a version closes the lessons it covers, and only those", async () => {
+    const { client, hadas, ana, ariel, process } = await setup();
+    const first = await recordRunLesson(ana, (await closedRun(ana, process.id, "2026-11-25")).id, "שלב 1 צריך להתחיל יום קודם");
+    const second = await recordRunLesson(ana, (await closedRun(ana, process.id, "2026-12-10")).id, "חסר שלב של בדיקת תשלום");
+
+    // "להערות" on the approvals screen leads to the lessons tab.
+    const lessonsRow = (await collectApprovals(ariel)).find((i) => i.kind === "process" && i.id === `${process.id}:lessons`);
+    expect(lessonsRow?.go?.href).toBe(`/app/clients/${client.id}/processes/${process.id}?view=lessons`);
+
+    // Approving without saying leaves them open, as before.
+    await saveProcessVersion(hadas, process.id, { steps: [{ title: "מעלים חשבוניות יום קודם", actionTags: ["INVOICE"] }], baseVersion: 1 });
+    await approveProcessVersion(ariel, process.id, 2);
+    expect((await prisma.processLesson.findMany({ where: { processId: process.id, status: "OPEN" } })).length).toBe(2);
+
+    // The procedure row lists them; a lesson of another process is refused.
+    await saveProcessVersion(hadas, process.id, { steps: [{ title: "מעלים חשבוניות יום קודם", actionTags: ["INVOICE"] }, { title: "בודקים תשלום" }], baseVersion: 2 });
+    const row = (await collectApprovals(ariel)).find((i) => i.kind === "procedure" && i.id === process.id);
+    expect(row?.openLessons?.map((l) => l.id)).toEqual([first.id, second.id]);
+    await expect(approveProcessVersion(ariel, process.id, 3, ["nope"])).rejects.toThrow("כבר לא פתוחה");
+    expect((await prisma.processVersion.findFirstOrThrow({ where: { processId: process.id, version: 3 } })).status).toBe("DRAFT");
+
+    // Through the connector: list_approvals shows them, decide_approval closes the ticked one.
+    const listed = await call(ariel, "list_approvals", {});
+    const procRow = listed.json.approvals.find((r: { kind: string; id: string }) => r.kind === "procedure" && r.id === process.id);
+    expect(procRow.openLessons.map((l: { id: string }) => l.id)).toEqual([first.id, second.id]);
+    const decided = await call(ariel, "decide_approval", { kind: "procedure", id: process.id, decision: "approve", appliedLessonIds: [second.id] });
+    expect(decided.json).toMatchObject({ done: true, lessonsApplied: 1, lessonsStillOpen: 1 });
+
+    expect(await prisma.processLesson.findUniqueOrThrow({ where: { id: second.id } })).toMatchObject({ status: "APPLIED", resolution: "גרסה 3", resolvedById: ariel.id });
+    expect((await prisma.processLesson.findUniqueOrThrow({ where: { id: first.id } })).status).toBe("OPEN");
+    expect(await prisma.auditEvent.count({ where: { action: "process.lesson_applied", entityId: process.id } })).toBe(1);
   });
 });

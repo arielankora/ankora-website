@@ -30,6 +30,8 @@ export const PROPOSAL_STATS_NOTES: FieldNotes = {
 export const LIST_APPROVALS_NOTES: FieldNotes = {
   approvals:
     "Each row has its kind and id (pass them to decide_approval), Ankora's recommendation and why, `approve` and `reject` (the button's label, or null when the row has none here; `reject.needsReason` when rejecting needs a reason), and `url`: a direct link that opens the screen on that very row. Give the user the links as they are.",
+  openLessons:
+    "On a procedure row: the lessons people left on its process when closing runs, still open. Approving the version never closes them by itself. Ask the user which of them this version covers, and pass those ids to decide_approval as `appliedLessonIds`; they close as applied in this version, and the rest stay open.",
   proposals:
     "Each proposal has its own `proposalId` (for decide_knowledge_proposals) and `url`. An update to an item already in the file (action SUPERSEDE) has `changes`: each field it changes, with `before` (what the file says now) and `after` (what it will say once approved). Approving changes only those fields; the item stays, with everything else as it is. `says` is then the item it updates.",
   enteredAutomatically:

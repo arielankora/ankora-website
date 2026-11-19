@@ -101,6 +101,8 @@ function serializeItem(base: string, i: ApprovalItem, timeZone: string, proposal
     blocked: i.blocked ?? undefined,
     // A procedure held back: each check it fails, as the client's file says it.
     failing: i.failing?.length ? i.failing : undefined,
+    // A procedure: the lessons still open on its process (appliedLessonIds).
+    openLessons: i.openLessons?.length ? i.openLessons.map((l) => ({ id: l.id, lesson: l.body, fromVersion: l.version })) : undefined,
     // What decide_approval can do with it, in the screen's own words.
     // Always present, null when the row has no such button here (a process
     // step fixed on the process, a batch decided proposal by proposal), so
@@ -200,10 +202,11 @@ export function registerApprovalTools(server: McpServer): void {
         id: z.string().min(1).describe("The row's id, from list_approvals. Never typed or guessed."),
         decision: z.enum(["approve", "reject"]),
         reason: z.string().optional().describe("Why, in a line. Required where the row says `needsReason` (rejecting an exception or a guide version); kept with the decision otherwise where the screen keeps one."),
+        appliedLessonIds: z.array(z.string()).optional().describe("Approving a procedure: the ids of the row's `openLessons` this version covers, as the user said. They close as applied in this version; the rest stay open."),
       }),
       annotations: TOOL_ANNOTATIONS.decide_approval,
     },
-    async (args: { kind: ApprovalKind; id: string; decision: "approve" | "reject"; reason?: string }, ctx: ServerContext) => {
+    async (args: { kind: ApprovalKind; id: string; decision: "approve" | "reject"; reason?: string; appliedLessonIds?: string[] }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
         const base = appBaseUrl();
@@ -218,10 +221,14 @@ export function registerApprovalTools(server: McpServer): void {
         if (args.decision === "reject" && row.actions.reject?.note && !args.reason?.trim()) {
           return toolText("Rejecting this needs a reason in a line. Ask the user why, then call again with `reason`. Nothing was changed.");
         }
-        await decideApproval(actor, { kind: row.kind, id: row.id, version: row.version, decision: args.decision, note: args.reason, clientId: row.clientId, op: row.op ?? null });
+        if (args.appliedLessonIds?.length && row.kind !== "procedure") return toolText("`appliedLessonIds` is only for approving a procedure. Nothing was changed.");
+        await decideApproval(actor, { kind: row.kind, id: row.id, version: row.version, decision: args.decision, note: args.reason, clientId: row.clientId, op: row.op ?? null, lessonIds: args.appliedLessonIds });
+        const stillOpen = row.kind === "procedure" ? (row.openLessons ?? []).filter((l) => !args.appliedLessonIds?.includes(l.id)).length : 0;
         return toolJson({
           done: true,
           did: offered,
+          lessonsApplied: args.appliedLessonIds?.length || undefined,
+          lessonsStillOpen: stillOpen || undefined,
           kind: KIND_LABELS[row.kind],
           title: row.title,
           client: row.clientName,
