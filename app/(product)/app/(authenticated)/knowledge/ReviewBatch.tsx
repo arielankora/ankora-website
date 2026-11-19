@@ -832,7 +832,16 @@ export function ReviewBatch({
               <Drawer triggerLabel={t("batch.rejectCount", { count: chosen.length })} title={t("rejectMany.title")} variant="link">
                 <RejectManyForm ids={chosen.map((p) => p.id)} />
               </Drawer>
-              {approvable.length < chosen.length && <span className="text-app-text-tertiary">{t("batch.someAlone", { count: chosen.length - approvable.length })}</span>}
+              {/* Why, as it is for the ones chosen (19.11.2026): not every
+                  reason there is. */}
+              {approvable.length < chosen.length && (
+                <span className="text-app-text-tertiary">
+                  {t("batch.someAlone", {
+                    count: chosen.length - approvable.length,
+                    reasons: [...new Set(chosen.flatMap((p) => (p.aloneBecause ? [p.aloneBecause] : [])))].map((r) => t(`tierReasons.${r}`)).join(", "),
+                  })}
+                </span>
+              )}
             </>
           )}
         </div>

@@ -544,8 +544,9 @@ export const MAX_BULK = 60;
 /// null when it may be. Approving together is still a person approving on
 /// the screen (decision 1); what stays one at a time is what the approval
 /// tiers put there (approvalTier, INDIVIDUAL): what changes an item
-/// already in the file, what may already be there, what is sensitive or
-/// shown to the client, a task (it opens work for someone), a domain, and
+/// already in the file, what may already be there, what is shown to the
+/// client or carries a "do not tell" (sensitive goes together since
+/// 19.11.2026: only its approvers see it), a task (it opens work for someone), a domain, and
 /// anything the review reads as low. Rejecting together is always
 /// allowed: nothing enters the file.
 export function bulkApproveBlocker(p: TierInput): string | null {
@@ -617,12 +618,17 @@ function tierOf(p: TierInput): { tier: ApprovalTier; reason: string; code: TierR
   if (p.flags.some((f) => f.block)) return one("blocked", "יש בה משהו שחוסם אישור");
   if (p.action !== "CREATE") return one("changesExisting", "משנה פריט שכבר בתיק");
   if (p.flags.some((f) => f.code === "DUPLICATE" || f.code === "SIMILAR")) return one("maybeInFile", "ייתכן שכבר בתיק");
-  if (p.flags.some((f) => f.code === "R6") || p.payload.sensitivity === "SENSITIVE") return one("sensitive", "מידע רגיש");
   if (typeof p.payload.doNotDisclose === "string" && p.payload.doNotDisclose.trim()) return one("doNotDisclose", "יש בה מה לא לספר");
   if (p.payload.clientVisible === true) return one("clientVisible", "גלוי ללקוח");
   if (p.target === "TASK") return one("taskForOther", "משימה נפתחת לאדם אחר");
   if (p.target === "DOMAIN") return one("domain", "דומיין משנה אילו פגישות שייכות ללקוח");
   if (p.level === "LOW") return one("lowLevel", "רמת בדיקה נמוכה");
+  // 19.11.2026 (Ariel): sensitive is approved with others, never on its
+  // own: only a person who approves sensitive information sees it at all
+  // (R6), and sees all of it on the card, so a click per item checked
+  // nothing more. approveProposal still refuses anyone else. It never
+  // enters on arrival.
+  if (p.flags.some((f) => f.code === "R6") || p.payload.sensitivity === "SENSITIVE") return { tier: "QUICK", reason: "מידע רגיש", code: "sensitive" };
   const simple = isSimpleTarget(p.target, p.payload);
   if (simple && p.level === "HIGH") return { tier: "AUTO", reason: "פריט חדש ופשוט, ברמת בדיקה גבוהה", code: "simpleHigh" };
   if (simple) return { tier: "QUICK", reason: "רמת בדיקה בינונית", code: "medium" };

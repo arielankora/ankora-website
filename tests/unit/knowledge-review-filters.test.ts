@@ -54,7 +54,7 @@ describe("review filters", () => {
     expect(proposalKindKey(p({ payload: { kind: "NOPE" } }))).toBe("FACT");
   });
 
-  it("needs attention: sensitive, a change, a possible duplicate, any flag, or hidden from me", () => {
+  it("needs attention: sensitive (even approved together), a change, a possible duplicate, any flag, or hidden from me", () => {
     expect(needsAttention(p())).toBe(false);
     expect(needsAttention(p({ action: "SUPERSEDE" }))).toBe(true);
     expect(needsAttention(p({ flags: [{ code: "DUPLICATE", message: "" }] }))).toBe(true);
