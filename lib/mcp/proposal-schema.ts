@@ -33,7 +33,7 @@ const NOT_PUBLISHED: Partial<Record<ProposalTargetLike, string[]>> & { all: stri
 /// Shown as the description of that payload in the published schema.
 const PAYLOAD_NOTES: Record<ProposalTargetLike, string> = {
   FACT: "A fact about the client. TEMPORARY needs validUntil or validUntilEvent; ONE_OFF_DECISION needs decidedAt; PREFERENCE takes subjectName (whose preference: a contact or firm in the file, by name). Never an action item: that is a TASK.",
-  CONTACT: "A person. Needs name or role. entityName: the client's legal entity they work with.",
+  CONTACT: "A person. Needs name or role. entityName: the client's legal entity they work with. endedAt: the day they leave or left the client or the role, only when a day was said; a leaving with no day goes in context.",
   ORGANIZATION: "A supplier, provider, advisor or investor. monthlyCostMinor in agorot or cents. Its name never changes on SUPERSEDE.",
   SYSTEM: "A system the client uses. billingCostMinor in agorot or cents; cardLast4 is the last four digits only, never more; invoiceTo: where the invoice arrives.",
   REQUEST_TYPE: "What comes in, from whom, and how it is answered. routeToNames: the contacts it goes to; processName: the process it sets off (P3 or title).",

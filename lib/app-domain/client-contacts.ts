@@ -313,6 +313,7 @@ export async function addClientContact(actor: User, input: ClientContactInput) {
     isDecisionMaker: input.isDecisionMaker ?? false,
     clientSideAddress: input.clientSideAddress?.trim() || null,
     userId: await ankoraUser(input.relationship, input.userId),
+    endedAt: endedAtOf(input.endedAt ?? null),
     ...knowledgeData(input),
     ...sourced,
   };
