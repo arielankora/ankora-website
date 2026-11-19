@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AUTO_FACT_KINDS, approvalTier, bulkApproveBlocker, revertBlocker, type TierInput } from "@/lib/knowledge-proposals";
+import { AUTO_FACT_KINDS, approvalTier, bulkApproveBlocker, revertBlocker, revertBlockerOf, type TierInput } from "@/lib/knowledge-proposals";
 
 // "ממתין לאישור" (spec 5.2): which proposals may be approved together, and
 // the approval tiers (3.11.2026): what may enter on its own (AUTO), what
@@ -15,11 +15,17 @@ describe("bulkApproveBlocker", () => {
     // An Ankora source or a proposed rule: information, not a reason to wait.
     expect(bulkApproveBlocker({ ...p, flags: [{ code: "R14", message: "" }, { code: "POLICY", message: "" }] })).toBeNull();
   });
-  it("what changes an existing item, may already be there, or is sensitive, one at a time", () => {
+  it("what changes an existing item or may already be there, one at a time", () => {
     expect(bulkApproveBlocker({ ...p, action: "SUPERSEDE" })).toContain("בתיק");
     expect(bulkApproveBlocker({ ...p, action: "CONTRADICT" })).toContain("בתיק");
     expect(bulkApproveBlocker({ ...p, flags: [{ code: "DUPLICATE", message: "" }] })).toContain("כבר");
-    expect(bulkApproveBlocker({ ...p, payload: { sensitivity: "SENSITIVE" } })).toContain("רגיש");
+  });
+  it("19.11.2026: sensitive goes with others, since only its approvers see it", () => {
+    expect(bulkApproveBlocker({ ...p, payload: { kind: "NOTE", sensitivity: "SENSITIVE" } })).toBeNull();
+    expect(bulkApproveBlocker({ ...p, flags: [{ code: "R6", message: "" }] })).toBeNull();
+    // What else keeps it on its own still does.
+    expect(bulkApproveBlocker({ ...p, action: "SUPERSEDE", payload: { sensitivity: "SENSITIVE" } })).toContain("בתיק");
+    expect(bulkApproveBlocker({ ...p, level: "LOW", payload: { kind: "NOTE", sensitivity: "SENSITIVE" } })).toBe("רמת בדיקה נמוכה");
   });
   it("3.11.2026: a task and a low review level are no longer approved together", () => {
     expect(bulkApproveBlocker({ ...p, target: "TASK", payload: { title: "לשלוח חוזה" } })).toBe("משימה נפתחת לאדם אחר");
@@ -52,14 +58,15 @@ describe("approvalTier", () => {
     }
   });
 
-  it("INDIVIDUAL: a change, a task, a domain, sensitive, not to tell, client-visible, blocked, maybe in the file, or low", () => {
+  it("INDIVIDUAL: a change, a task, a domain, not to tell, client-visible, blocked, maybe in the file, or low", () => {
     const one = (over: Partial<TierInput>) => approvalTier({ ...p, ...over });
     expect(one({ action: "SUPERSEDE" })).toEqual({ tier: "INDIVIDUAL", reason: "משנה פריט שכבר בתיק" });
     expect(one({ action: "CONTRADICT" }).tier).toBe("INDIVIDUAL");
     expect(one({ target: "TASK", payload: { title: "x" } })).toEqual({ tier: "INDIVIDUAL", reason: "משימה נפתחת לאדם אחר" });
     expect(one({ target: "DOMAIN", payload: { domain: "nux.ai", kind: "CLIENT" } }).tier).toBe("INDIVIDUAL");
-    expect(one({ payload: { kind: "NOTE", sensitivity: "SENSITIVE" } })).toEqual({ tier: "INDIVIDUAL", reason: "מידע רגיש" });
-    expect(one({ flags: [{ code: "R6", message: "" }] }).reason).toBe("מידע רגיש");
+    // 19.11.2026: sensitive is QUICK, never AUTO.
+    expect(one({ payload: { kind: "NOTE", sensitivity: "SENSITIVE" } })).toEqual({ tier: "QUICK", reason: "מידע רגיש" });
+    expect(one({ flags: [{ code: "R6", message: "" }] })).toEqual({ tier: "QUICK", reason: "מידע רגיש" });
     expect(one({ payload: { kind: "NOTE", doNotDisclose: "לא לספר לאורן" } })).toEqual({ tier: "INDIVIDUAL", reason: "יש בה מה לא לספר" });
     expect(one({ payload: { kind: "NOTE", clientVisible: true } })).toEqual({ tier: "INDIVIDUAL", reason: "גלוי ללקוח" });
     expect(one({ flags: [{ code: "R17", message: "", block: true }] })).toEqual({ tier: "INDIVIDUAL", reason: "יש בה משהו שחוסם אישור" });
@@ -91,10 +98,32 @@ describe("revertBlocker", () => {
   it("anything else is refused, with why", () => {
     expect(revertBlocker({ ...ok, state: "PENDING" })).toContain("שאושרה");
     expect(revertBlocker({ ...ok, state: "REJECTED" })).toContain("שאושרה");
-    expect(revertBlocker({ ...ok, action: "SUPERSEDE" })).toContain("לא לשינוי");
     expect(revertBlocker({ ...ok, attached: true })).toContain("כבר היה בתיק");
     expect(revertBlocker({ ...ok, resultId: null })).toContain("אין מה לבטל");
     expect(revertBlocker({ ...ok, target: "TASK" })).toContain("משימה");
     expect(revertBlocker({ ...ok, target: "DATE" })).toContain("מועד");
+    // A new system or request type is not taken out (no CREATE revert for them).
+    expect(revertBlocker({ ...ok, target: "SYSTEM" })).toContain("למערכת");
+    expect(revertBlocker({ ...ok, target: "REQUEST_TYPE" })).toContain("לסוג פנייה");
+  });
+  it("19.11.2026: an approved change of a fact, contact, provider, entity, system or request type is put back, once", () => {
+    for (const action of ["SUPERSEDE", "CONTRADICT"]) {
+      for (const target of ["FACT", "CONTACT", "ORGANIZATION", "ENTITY", "SYSTEM", "REQUEST_TYPE"]) expect(revertBlocker({ ...ok, action, target })).toBeNull();
+      expect(revertBlocker({ ...ok, action, revertedAt: new Date() })).toBe("ההצעה כבר בוטלה.");
+      expect(revertBlocker({ ...ok, action, state: "PENDING" })).toContain("שאושרה");
+    }
+  });
+  it("a change of a process or a rule is a decision by hand, and says why", () => {
+    for (const action of ["SUPERSEDE", "CONTRADICT"]) {
+      expect(revertBlockerOf({ ...ok, action, target: "PROCESS" })).toEqual({ code: "manualUndo", message: expect.stringContaining("טיוטת נוהל") });
+      expect(revertBlockerOf({ ...ok, action, target: "POLICY" })).toEqual({ code: "manualUndo", message: expect.stringContaining("מוצע") });
+    }
+  });
+  it("a change that changed nothing, or of another kind, is refused", () => {
+    expect(revertBlockerOf({ ...ok, action: "SUPERSEDE", target: "CONTACT", attached: true })?.code).toBe("nothingChanged");
+    expect(revertBlockerOf({ ...ok, action: "SUPERSEDE", target: "CONTACT", resultId: null })?.code).toBe("nothingChanged");
+    expect(revertBlockerOf({ ...ok, action: "SUPERSEDE", target: "NARRATIVE" })).toEqual({ code: "changeWrongKind", message: expect.stringContaining("לסקירה") });
+    // A PROCESS change is refused for being a process, before anything else.
+    expect(revertBlockerOf({ ...ok, action: "SUPERSEDE", target: "PROCESS", attached: true })?.code).toBe("manualUndo");
   });
 });

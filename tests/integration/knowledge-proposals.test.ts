@@ -702,3 +702,35 @@ describe("a task Claude proposes", () => {
     await expect(proposalToTask(user, call.id)).rejects.toThrow("כבר הוחלט");
   });
 });
+
+// 19.11.2026 (S7, Maya): four sensitive proposals had to be approved one
+// by one by the only people who could see them. They go together now; the
+// approval itself still refuses anyone who does not approve sensitive
+// information.
+describe("sensitive proposals approved together", () => {
+  it("go together for an approver, and are refused to anyone else", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [
+        { target: "FACT", reason: "נאמר", confidence: "HIGH", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "התרופות מגיעות מישראל", sensitivity: "SENSITIVE" } },
+        { target: "FACT", reason: "נאמר", confidence: "HIGH", payload: { knowledgeStatus: "CONFIRMED", kind: "FINANCE", body: "תושבת מס ישראלית", sensitivity: "SENSITIVE" } },
+      ],
+    });
+    const ids = (await prisma.knowledgeProposal.findMany({ where: { batchId: r.batchId! }, select: { id: true } })).map((p) => p.id);
+    expect(ids).toHaveLength(2);
+
+    // Not an approver: each is refused, by the approval itself.
+    const refused = await decideProposals(user, ids, { approve: true });
+    expect(refused.done).toEqual([]);
+    expect(refused.failed.map((f) => f.code)).not.toContain("knowledgeProposals.approveOneByOne");
+    expect(refused.failed).toHaveLength(2);
+
+    await prisma.user.update({ where: { id: user.id }, data: { canApproveExceptions: true } });
+    const approver = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    const approved = await decideProposals(approver, ids, { approve: true });
+    expect(approved.done.sort()).toEqual([...ids].sort());
+    expect(await prisma.clientFact.count({ where: { clientId: client.id, sensitivity: "SENSITIVE", deletedAt: null } })).toBe(2);
+  });
+});

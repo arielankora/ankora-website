@@ -62,6 +62,7 @@ import { duplicateFlag, findExisting, keepsSources, withLiveDuplicate, type Exis
 import { dateProposalKey, dateSchedule } from "@/lib/date-proposals";
 import { entityByName, resolveLinks, withoutLinkNames } from "@/lib/app-domain/proposal-links";
 import { applyContradiction, applyUpdate, currentFields, currentItem, isUpdatable } from "@/lib/app-domain/proposal-updates";
+import { planUndo } from "@/lib/app-domain/proposal-revert";
 import { noChangeReason, proposalChanges, type ProposalChange } from "@/lib/proposal-changes";
 import { isInternalClient } from "@/lib/app-domain/internal-client-id";
 import { assertCanApproveForClient, canApproveForClient, notifyRuleApprovers, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
@@ -1273,8 +1274,13 @@ export async function batchSource(batchId: string): Promise<{ kind: SourceKind; 
 /// proposal created is taken out of the file again, through the file's own
 /// soft delete, as the person reverting. The proposal stays APPROVED and
 /// is marked reverted, so what was approved and what was taken back are
-/// both known. Only a new fact, contact, provider or entity, once
+/// both known. A new fact, contact, provider or entity, once
 /// (revertBlocker); the same access as approving it.
+///
+/// 19.11.2026: an approved change (SUPERSEDE, CONTRADICT) of a fact,
+/// contact, provider, entity, system or request type is taken back too:
+/// the item goes back to what it was before it (lib/app-domain/proposal-revert.ts),
+/// unless it changed since. A process and a rule are not (revertBlocker).
 export async function revertProposal(actor: User, id: string) {
   assertCan(actor.role, "time_entry.create_self");
   const proposal = await prisma.knowledgeProposal.findUnique({ where: { id } });
@@ -1284,6 +1290,9 @@ export async function revertProposal(actor: User, id: string) {
   const why = revertBlockerOf(proposal);
   if (why) throw new DomainError("knowledgeProposals.cannotRevert", why.message, { reason: why.code, target: proposal.target });
   const resultId = proposal.resultId!;
+  // A change: what the item was, read and checked before anything is
+  // marked, so a refusal says why in its own words.
+  const undo = proposal.action === "CREATE" ? null : await planUndo(proposal);
   // Claimed first, so two presses take the item out once.
   const now = new Date();
   const claimed = await prisma.knowledgeProposal.updateMany({
@@ -1292,15 +1301,17 @@ export async function revertProposal(actor: User, id: string) {
   });
   if (claimed.count === 0) throw new DomainError("knowledgeProposals.alreadyReverted", "ההצעה כבר בוטלה.");
   try {
-    if (proposal.target === "FACT") await removeClientFact(actor, resultId);
+    if (undo) await undo.run(actor);
+    else if (proposal.target === "FACT") await removeClientFact(actor, resultId);
     else if (proposal.target === "CONTACT") await removeClientContact(actor, resultId);
     else if (proposal.target === "ORGANIZATION") await removeClientOrganization(actor, resultId);
     else if (proposal.target === "ENTITY") await removeClientEntity(actor, resultId);
   } catch (err) {
     // Not taken out (removed by hand already, or an entity something now
-    // points at): the proposal goes back to what it was.
+    // points at), or not put back: the proposal goes back to what it was.
     await prisma.knowledgeProposal.update({ where: { id }, data: { revertedAt: null, revertedById: null } });
     const message = err instanceof Error ? err.message : "אירעה שגיאה.";
+    if (undo) throw new DomainError("knowledgeProposals.notRestored", `הפריט לא הוחזר למה שהיה: ${message}`, { error: message });
     throw new DomainError("knowledgeProposals.notRemoved", `הפריט לא הוסר מהתיק: ${message}`, { error: message });
   }
   await recordAudit({
@@ -1309,7 +1320,13 @@ export async function revertProposal(actor: User, id: string) {
     entityType: "KnowledgeProposal",
     entityId: id,
     clientId: proposal.clientId,
-    after: { resultId, target: proposal.target, autoApplied: proposal.autoApplied, headline: proposalHeadline(proposal.target, proposal.payload as Record<string, unknown>) },
+    after: {
+      resultId,
+      target: proposal.target,
+      autoApplied: proposal.autoApplied,
+      headline: proposalHeadline(proposal.target, proposal.payload as Record<string, unknown>),
+      ...(undo ? { action: proposal.action, restored: undo.restored } : {}),
+    },
   });
   // An auto-applied item taken out is an error of auto-apply: its kind or
   // its client may now go back to a person (lib/auto-apply.ts).

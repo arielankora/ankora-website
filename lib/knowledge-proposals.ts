@@ -544,8 +544,9 @@ export const MAX_BULK = 60;
 /// null when it may be. Approving together is still a person approving on
 /// the screen (decision 1); what stays one at a time is what the approval
 /// tiers put there (approvalTier, INDIVIDUAL): what changes an item
-/// already in the file, what may already be there, what is sensitive or
-/// shown to the client, a task (it opens work for someone), a domain, and
+/// already in the file, what may already be there, what is shown to the
+/// client or carries a "do not tell" (sensitive goes together since
+/// 19.11.2026: only its approvers see it), a task (it opens work for someone), a domain, and
 /// anything the review reads as low. Rejecting together is always
 /// allowed: nothing enters the file.
 export function bulkApproveBlocker(p: TierInput): string | null {
@@ -575,7 +576,7 @@ export type TierInput = {
 /// runs out (temporary information).
 export const AUTO_FACT_KINDS = ["NOTE", "PREFERENCE", "REQUIREMENT", "FINANCE", "LOCATION", "SCOPE_IN", "SCOPE_OUT", "ONE_OFF_DECISION"] as const;
 
-/// The items an approval may create on its own, and the only ones a
+/// The items an approval may create on its own, and the only new items a
 /// "ביטול" takes out again (revertBlocker): each has a soft delete.
 export const AUTO_TARGETS: readonly ProposalTargetLike[] = ["FACT", "CONTACT", "ORGANIZATION", "ENTITY"] as const;
 
@@ -617,12 +618,17 @@ function tierOf(p: TierInput): { tier: ApprovalTier; reason: string; code: TierR
   if (p.flags.some((f) => f.block)) return one("blocked", "יש בה משהו שחוסם אישור");
   if (p.action !== "CREATE") return one("changesExisting", "משנה פריט שכבר בתיק");
   if (p.flags.some((f) => f.code === "DUPLICATE" || f.code === "SIMILAR")) return one("maybeInFile", "ייתכן שכבר בתיק");
-  if (p.flags.some((f) => f.code === "R6") || p.payload.sensitivity === "SENSITIVE") return one("sensitive", "מידע רגיש");
   if (typeof p.payload.doNotDisclose === "string" && p.payload.doNotDisclose.trim()) return one("doNotDisclose", "יש בה מה לא לספר");
   if (p.payload.clientVisible === true) return one("clientVisible", "גלוי ללקוח");
   if (p.target === "TASK") return one("taskForOther", "משימה נפתחת לאדם אחר");
   if (p.target === "DOMAIN") return one("domain", "דומיין משנה אילו פגישות שייכות ללקוח");
   if (p.level === "LOW") return one("lowLevel", "רמת בדיקה נמוכה");
+  // 19.11.2026 (Ariel): sensitive is approved with others, never on its
+  // own: only a person who approves sensitive information sees it at all
+  // (R6), and sees all of it on the card, so a click per item checked
+  // nothing more. approveProposal still refuses anyone else. It never
+  // enters on arrival.
+  if (p.flags.some((f) => f.code === "R6") || p.payload.sensitivity === "SENSITIVE") return { tier: "QUICK", reason: "מידע רגיש", code: "sensitive" };
   const simple = isSimpleTarget(p.target, p.payload);
   if (simple && p.level === "HIGH") return { tier: "AUTO", reason: "פריט חדש ופשוט, ברמת בדיקה גבוהה", code: "simpleHigh" };
   if (simple) return { tier: "QUICK", reason: "רמת בדיקה בינונית", code: "medium" };
@@ -638,10 +644,24 @@ export function bulkApproveBlockerCode(p: TierInput): TierReasonCode | null {
   return t.tier === "INDIVIDUAL" ? t.code : null;
 }
 
-/// Why the item an approved proposal created cannot be taken out again
-/// with "ביטול", or null when it can. Only a new item of the kinds an
-/// approval may create on its own, that the approval itself created (not
-/// "כבר בתיק"), and only once.
+/// The kinds whose approved change (SUPERSEDE, CONTRADICT) "ביטול" puts
+/// back as it was (19.11.2026): a fact gets its old version back, or its
+/// alternative taken off; any other item gets back the fields the change
+/// wrote, from the audit row of the approval. A process and a rule are
+/// not here (MANUAL_UNDO_TARGETS).
+export const REVERTIBLE_CHANGE_TARGETS: readonly ProposalTargetLike[] = ["FACT", "CONTACT", "ORGANIZATION", "ENTITY", "SYSTEM", "REQUEST_TYPE"] as const;
+
+/// A change to a process adds a draft of its procedure, and a change to a
+/// rule sends it back to "proposed": what to do with them is a person's
+/// decision on their own screen, not an automatic undo.
+export const MANUAL_UNDO_TARGETS: readonly ProposalTargetLike[] = ["PROCESS", "POLICY"] as const;
+
+/// Why an approved proposal cannot be taken back with "ביטול", or null
+/// when it can. A new item of the kinds an approval may create on its
+/// own, that the approval itself created (not "כבר בתיק"); or a change
+/// (SUPERSEDE, CONTRADICT) of one of REVERTIBLE_CHANGE_TARGETS. Only once.
+/// Whether the item changed since is read when it is taken back
+/// (revertProposal): this rule needs no database.
 export function revertBlocker(p: {
   state: string;
   action: string;
@@ -653,16 +673,23 @@ export function revertBlocker(p: {
   return revertBlockerOf(p)?.message ?? null;
 }
 
-export type RevertBlockerCode = "notApproved" | "alreadyReverted" | "notCreate" | "nothingCreated" | "wrongKind";
+export type RevertBlockerCode = "notApproved" | "alreadyReverted" | "nothingCreated" | "nothingChanged" | "manualUndo" | "changeWrongKind" | "wrongKind";
 
 /// revertBlocker with its code (ADR 0006): the screen words the code, the
 /// message stays for Claude and for callers that already show it.
 export function revertBlockerOf(p: Parameters<typeof revertBlocker>[0]): { code: RevertBlockerCode; message: string } | null {
   if (p.state !== "APPROVED") return { code: "notApproved", message: "אפשר לבטל רק הצעה שאושרה." };
   if (p.revertedAt) return { code: "alreadyReverted", message: "ההצעה כבר בוטלה." };
-  if (p.action !== "CREATE") return { code: "notCreate", message: "ביטול אפשרי רק להצעה שהוסיפה פריט חדש, לא לשינוי של פריט קיים." };
+  const target = p.target as ProposalTargetLike;
+  if (p.action === "SUPERSEDE" || p.action === "CONTRADICT") {
+    if (target === "PROCESS") return { code: "manualUndo", message: "שינוי בתהליך לא מתבטל מכאן: הוא הוסיף טיוטת נוהל, ומה לעשות בה מחליטים ביד, במסך התהליך." };
+    if (target === "POLICY") return { code: "manualUndo", message: "שינוי בכלל של הלקוח לא מתבטל מכאן: הכלל חזר ל\"מוצע\", ומה לעשות בו מחליטים ביד, במסך הכללים." };
+    if (p.attached || !p.resultId) return { code: "nothingChanged", message: "ההצעה לא שינתה את הפריט (כבר היה בתיק), אז אין מה לבטל." };
+    if (!REVERTIBLE_CHANGE_TARGETS.includes(target)) return { code: "changeWrongKind", message: `ביטול של שינוי אפשרי רק לעובדה, איש קשר, ספק, ישות משפטית, מערכת או סוג פנייה, לא ל${TARGET_LABELS[target] ?? "פריט מהסוג הזה"}.` };
+    return null;
+  }
   if (p.attached || !p.resultId) return { code: "nothingCreated", message: "ההצעה לא יצרה פריט חדש (כבר היה בתיק), אז אין מה לבטל." };
-  if (!AUTO_TARGETS.includes(p.target as ProposalTargetLike)) return { code: "wrongKind", message: `ביטול אפשרי רק לעובדה, איש קשר, ספק או ישות משפטית, לא ל${TARGET_LABELS[p.target as ProposalTargetLike] ?? "פריט מהסוג הזה"}.` };
+  if (!AUTO_TARGETS.includes(target)) return { code: "wrongKind", message: `ביטול אפשרי רק לעובדה, איש קשר, ספק או ישות משפטית, לא ל${TARGET_LABELS[target] ?? "פריט מהסוג הזה"}.` };
   return null;
 }
 

@@ -1693,6 +1693,7 @@
       "shape": "{problem, select, body {Write the fact itself.} temporaryValidity {Temporary information needs an end: a date, or an event (\"until they join the organization\").} other {A one-off decision needs a date.}}",
       "notFound": "Item not found.",
       "alreadySuperseded": "This item has already been replaced. Work on its new version.",
+      "notSuperseded": "The earlier version is no longer replaced, so there is nothing to put back.",
       "sameKindOnly": "A replacement keeps the same kind of item. A different kind is a new item.",
       "questionNotConfirmed": "A question is closed by an answer, not by confirming it.",
       "alternativeRequired": "Write what was said differently.",
@@ -1793,9 +1794,13 @@
       "tooMany": "Up to {max} proposals at a time.",
       "bulkRejectReasonRequired": "Write in one line why the proposals are rejected.",
       "approveOneByOne": "Approve one at a time: {reason, select, blocked {something in it blocks approval} changesExisting {it changes an item already in the file} maybeInFile {it may already be in the file} sensitive {sensitive information} doNotDisclose {it has something not to tell} clientVisible {visible to the client} taskForOther {it opens a task for someone else} domain {a domain changes which meetings belong to the client} other {low review level}}.",
-      "cannotRevert": "{reason, select, notApproved {Only an approved proposal can be undone.} alreadyReverted {The proposal was already undone.} notCreate {Undo is only possible for a proposal that added a new item, not for a change to an existing one.} nothingCreated {The proposal did not create a new item (it was already in the file), so there is nothing to undo.} other {Undo is only possible for a fact, contact, vendor or legal entity, not for {target, select, SYSTEM {a system} REQUEST_TYPE {a request type} POLICY {a client rule} NARRATIVE {an overview, background or our role} PROCESS {a process} DOMAIN {a domain} TASK {a task} DATE {a date} FACT {a fact} CONTACT {a contact} ORGANIZATION {a vendor or service provider} ENTITY {a legal entity} other {an item of this kind}}.}}",
+      "cannotRevert": "{reason, select, notApproved {Only an approved proposal can be undone.} alreadyReverted {The proposal was already undone.} nothingCreated {The proposal did not create a new item (it was already in the file), so there is nothing to undo.} nothingChanged {The proposal did not change the item (it was already in the file), so there is nothing to undo.} manualUndo {{target, select, PROCESS {A change to a process is not undone from here: it added a procedure draft, and what to do with it is decided by hand, on the process screen.} other {A change to a client rule is not undone from here: the rule went back to \"proposed\", and what to do with it is decided by hand, on the rules screen.}}} changeWrongKind {Undoing a change is only possible for a fact, contact, vendor, legal entity, system or request type, not for {target, select, SYSTEM {a system} REQUEST_TYPE {a request type} POLICY {a client rule} NARRATIVE {an overview, background or our role} PROCESS {a process} DOMAIN {a domain} TASK {a task} DATE {a date} FACT {a fact} CONTACT {a contact} ORGANIZATION {a vendor or service provider} ENTITY {a legal entity} other {an item of this kind}}.} other {Undo is only possible for a fact, contact, vendor or legal entity, not for {target, select, SYSTEM {a system} REQUEST_TYPE {a request type} POLICY {a client rule} NARRATIVE {an overview, background or our role} PROCESS {a process} DOMAIN {a domain} TASK {a task} DATE {a date} FACT {a fact} CONTACT {a contact} ORGANIZATION {a vendor or service provider} ENTITY {a legal entity} other {an item of this kind}}.}}",
       "alreadyReverted": "The proposal was already undone.",
       "notRemoved": "The item was not removed from the file: {error}",
+      "changedSince": "The item changed after the approval, so undo does not put it back: that would overwrite what was done to it since. Fix it by hand in the file.",
+      "noSnapshot": "The audit log has no record of the item before the approval, so there is nothing to put it back to. Fix it by hand in the file.",
+      "fieldsNotRestorable": "The proposal changed fields that undo cannot put back ({fields}). Fix them by hand in the file.",
+      "notRestored": "The item was not put back as it was: {error}",
       "managersOnly": "Managers only.",
       "updatedItemGone": "The item this proposal updates is no longer in the file. Reject the proposal.",
       "sourceNotInRegister": "Source {code} isn't in the client's register.",
@@ -1972,6 +1977,7 @@
       "clientFactDismissQuestion": "Open question closed as not relevant",
       "clientFactClose": "Temporary information in the client file closed",
       "clientFactRemove": "Item removed from the client file",
+      "clientFactRestore": "Client file item put back as it was (proposal undone)",
       "clientEntityAdd": "Legal entity added to a client",
       "clientEntityUpdate": "Client legal entity updated",
       "clientEntityRemove": "Client legal entity removed",
@@ -1984,7 +1990,7 @@
       "knowledgeProposalReject": "Client file proposal rejected",
       "knowledgeProposalAttach": "Proposal already in the file: source added to the existing item",
       "knowledgeProposalToTask": "Client file proposal turned into a task",
-      "knowledgeProposalRevert": "Approved proposal undone: item removed from the client file",
+      "knowledgeProposalRevert": "Approved proposal undone: item removed from the client file or put back as it was",
       "knowledgeProposalAutoApply": "Client file proposal added to the file automatically",
       "knowledgeProposalAutoReview": "Automatically added item reviewed and marked correct",
       "knowledgeAutoApplySwitch": "Automatic adding to client files turned on or off",
@@ -6396,7 +6402,13 @@
       "confirm": "Remove the item from the file?",
       "removing": "Removing...",
       "remove": "Remove",
-      "keep": "Keep"
+      "keep": "Keep",
+      "change": {
+        "done": "Undone: the item is back as it was",
+        "confirm": "Put the item back as it was before the proposal?",
+        "restoring": "Restoring...",
+        "restore": "Put back"
+      }
     },
     "decided": {
       "reverted": "Approved and undone:",
@@ -6555,7 +6567,7 @@
       "approving": "Approving...",
       "approveCount": "Approve {count}",
       "rejectCount": "Reject {count}",
-      "someAlone": "{count} of the selected are approved one at a time: they change an existing item, may already be in the file, or are sensitive."
+      "someAlone": "{count} of the selected are approved one at a time: {reasons}."
     },
     "summary": {
       "allTogether": "{count, plural, =1 {One proposal, ready to approve.} other {All # can be approved together.}}",
