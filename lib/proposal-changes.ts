@@ -101,6 +101,7 @@ export const CHANGE_FIELD_LABELS: Record<string, string> = {
   channelOrder: "ערוצים",
   isPrimary: "איש קשר ראשי",
   isDecisionMaker: "מקבל החלטות",
+  endedAt: "מסיים ב",
   knowledgeStatus: "סטטוס",
   toResolve: "מה יסגור את זה",
   importance: "חשיבות",

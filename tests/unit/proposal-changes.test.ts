@@ -58,3 +58,12 @@ describe("changesForAi", () => {
     ]);
   });
 });
+
+describe("a contact's leaving day (19.11.2026)", () => {
+  it("is a change against the day in the file, and a detail on a new contact", async () => {
+    const { proposalDetailParts } = await import("@/lib/knowledge-proposals");
+    expect(proposalChanges({ endedAt: "2027-06-30" }, { endedAt: new Date("2027-06-30T12:00:00Z") })).toEqual([]);
+    expect(proposalChanges({ endedAt: "2027-06-30" }, { endedAt: null })).toEqual([{ field: "endedAt", before: null, beforeKnown: true, after: "2027-06-30" }]);
+    expect(proposalDetailParts("CONTACT", { name: "חיים", endedAt: "2027-06-30" })).toContainEqual({ kind: "key", key: "endedAt", values: { date: "2027-06-30" } });
+  });
+});

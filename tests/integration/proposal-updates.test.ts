@@ -90,7 +90,7 @@ describe("what an update changes", () => {
       clientId: client.id,
       source: MEETING,
       items: [
-        { target: "CONTACT", action: "SUPERSEDE", targetId: ayala.id, reason: "נאמר", payload: { knowledgeStatus: "CONFIRMED", role: "רואת החשבון", context: "מלווה 6 שנים" } },
+        { target: "CONTACT", action: "SUPERSEDE", targetId: ayala.id, reason: "נאמר", payload: { knowledgeStatus: "CONFIRMED", role: "רואת החשבון", context: "מלווה 6 שנים", endedAt: "2027-06-30" } },
         { target: "CONTACT", action: "SUPERSEDE", targetId: ayala.id, reason: "נאמר", payload: { knowledgeStatus: "CONFIRMED", name: "איילה מנצור", role: "מנהלת חשבונות" } },
         { target: "CONTACT", action: "SUPERSEDE", targetId: ayala.id, reason: "לא ברור", payload: { knowledgeStatus: "UNCERTAIN", toResolve: "לשאול אם היא רואת החשבון" } },
       ],
@@ -104,6 +104,12 @@ describe("what an update changes", () => {
     expect(c.changes).toEqual([
       { field: "role", before: "מנהלת חשבונות", beforeKnown: true, after: "רואת החשבון" },
       { field: "context", before: null, beforeKnown: true, after: "מלווה 6 שנים" },
+      { field: "endedAt", before: null, beforeKnown: true, after: "2027-06-30" },
     ]);
+    // The day they leave, as set_contact_ended sets it.
+    await approveProposal(user, c.id);
+    const after = await prisma.clientContact.findUniqueOrThrow({ where: { id: ayala.id } });
+    expect(after.endedAt?.toISOString().slice(0, 10)).toBe("2027-06-30");
+    expect(after.role).toBe("רואת החשבון");
   });
 });

@@ -66,6 +66,9 @@ export const ContactPayload = z.object({
   isDecisionMaker: z.boolean().optional(),
   /// The client's legal entity this person works with, by name.
   entityName: z.string().max(200).nullish(),
+  /// 19.11.2026 (S7): the day they leave or left the client or the role,
+  /// when it was said. Same field as set_contact_ended.
+  endedAt: day,
   ...knowledge,
 });
 
@@ -923,6 +926,7 @@ function itemDetails(target: ProposalTargetLike, payload: Record<string, unknown
       s("notes"),
     ].filter((x): x is string => !!x);
   }
+  if (target === "CONTACT") return [s("endedAt") && `מסיים ב-${s("endedAt")}`].filter((x): x is string => !!x);
   if (target === "ENTITY") {
     return [s("registrationNumber"), s("country"), s("currency"), s("parentName") && `בת של ${s("parentName")}`].filter((x): x is string => !!x);
   }
@@ -949,6 +953,7 @@ export type DetailKey =
   | "approvalPolicies"
   | "invoiceTo"
   | "dueDate"
+  | "endedAt"
   | "assignee"
   | "trigger"
   | "sla"
@@ -1007,6 +1012,8 @@ export function proposalDetailParts(target: ProposalTargetLike, payload: Record<
     if (s("responsibleName")) items.push(key("responsible", { name: s("responsibleName") }));
     if (days !== null) items.push(days === 0 ? key("taskSameDay") : key("taskDaysBefore", { days: String(days) }));
     items.push(...text(s("notes")));
+  } else if (target === "CONTACT") {
+    if (s("endedAt")) items.push(key("endedAt", { date: s("endedAt") }));
   } else if (target === "ENTITY") {
     items.push(...text(s("registrationNumber")), ...text(s("country")), ...text(s("currency")));
     if (s("parentName")) items.push(key("parent", { name: s("parentName") }));
