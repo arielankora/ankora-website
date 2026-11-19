@@ -64,7 +64,7 @@ const RULE = {
 const EXCEPTION = { ...RULE, kind: "exception", id: "ex1", href: "/app/clients/c-nux?tab=file#item-pol1", actions: { approve: "אישור החריגה", reject: { label: "דחייה", note: true } } };
 const PROCEDURE = { ...RULE, kind: "procedure", id: "p1", version: 3, actions: { approve: null, reject: null }, blocked: "הנוהל לא עובר את הבדיקות." };
 const BATCH = { ...RULE, kind: "knowledge", id: "b52", title: "2 הצעות לתיק", href: "/app/approvals?tab=knowledge&clientId=c-nux", actions: { approve: null, reject: null } };
-const PROPOSAL = { id: "pr1", batchId: "b52", clientId: "c-nux", kind: "כספים", action: "SUPERSEDE", headline: "החלטה רשמית של אורן", reason: null, quote: null, flags: [], aloneBecause: "משנה פריט שכבר בתיק", alreadyInFile: null, hiddenFor: null };
+const PROPOSAL = { id: "pr1", batchId: "b52", clientId: "c-nux", kind: "כספים", action: "SUPERSEDE", headline: "החלטה רשמית של אורן", reason: null, quote: null, flags: [], aloneBecause: "משנה פריט שכבר בתיק", alreadyInFile: null, changes: null, hiddenFor: null };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -101,6 +101,14 @@ describe("list_approvals", () => {
     expect(batch.reject).toBeNull();
     expect(rule.reject).toEqual({ label: "הסרה", needsReason: false });
     expect(batch.proposals[0]).toMatchObject({ proposalId: "pr1", approveAlone: "משנה פריט שכבר בתיק", url: `${BASE}/app/approvals?tab=knowledge&clientId=c-nux#proposal-pr1` });
+  });
+
+  it("gives an update the fields it changes, before and after (19.11.2026)", async () => {
+    const changes = [{ field: "תפקיד", before: "לא כתוב", after: "רואה החשבון של מאיה" }];
+    domain.listApprovalsForAi.mockResolvedValue({ items: [BATCH], proposals: new Map([["b52", [{ ...PROPOSAL, kind: "איש קשר", headline: "חיים אוליאל", changes }]]]) });
+    const out = await call("list_approvals", {});
+    expect(out.approvals[0].proposals[0]).toMatchObject({ action: "SUPERSEDE", says: "חיים אוליאל", changes });
+    expect(out.fieldNotes.proposals).toContain("`changes`");
   });
 
   it("lists what entered a file on its own and waits for a look, with links, only for knowledge (3.11.2026)", async () => {

@@ -30,7 +30,8 @@ export const PROPOSAL_STATS_NOTES: FieldNotes = {
 export const LIST_APPROVALS_NOTES: FieldNotes = {
   approvals:
     "Each row has its kind and id (pass them to decide_approval), Ankora's recommendation and why, `approve` and `reject` (the button's label, or null when the row has none here; `reject.needsReason` when rejecting needs a reason), and `url`: a direct link that opens the screen on that very row. Give the user the links as they are.",
-  proposals: "Each proposal has its own `proposalId` (for decide_knowledge_proposals) and `url`.",
+  proposals:
+    "Each proposal has its own `proposalId` (for decide_knowledge_proposals) and `url`. An update to an item already in the file (action SUPERSEDE) has `changes`: each field it changes, with `before` (what the file says now) and `after` (what it will say once approved). Approving changes only those fields; the item stays, with everything else as it is. `says` is then the item it updates.",
   enteredAutomatically:
     'Items that entered a client file on their own and still need a person to look: each with `proposalId`, `result` (the item in the file), `url` (its row) and `decisions`: what decide_knowledge_proposals can do with it ("reviewed_ok" for "תקין", "revert" for "ביטול").',
   autoApplyPauses:

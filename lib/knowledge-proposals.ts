@@ -250,7 +250,7 @@ export const TARGET_LABELS: Record<ProposalTargetLike, string> = {
 
 export const ACTION_LABELS: Record<ProposalActionLike, string> = {
   CREATE: "חדש",
-  SUPERSEDE: "גרסה חדשה לפריט קיים",
+  SUPERSEDE: "עדכון לפריט שבתיק",
   CONTRADICT: "סותר פריט קיים",
 };
 

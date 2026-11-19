@@ -11,6 +11,7 @@ import { autoDecisionBlocker, type AutoAppliedDecision } from "@/lib/auto-apply"
 import { onlyMine, type ApprovalItem, type ApprovalKind } from "@/lib/approvals";
 import { bulkApproveBlocker, proposalHeadline, proposalReviewLevel, type ProposalFlag, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { proposalKindKey, proposalKindLabel } from "@/lib/knowledge-review-filters";
+import { changesForAi } from "@/lib/proposal-changes";
 import { AI_EXCLUDED_TOOL_MESSAGE } from "@/lib/ai-exclusion";
 
 // "אישורים" for Claude (2.11.2026): what waits on the signed-in person,
@@ -47,6 +48,9 @@ export type ProposalForAi = {
   /// Why it is approved on its own, never with others.
   aloneBecause: string | null;
   alreadyInFile: string | null;
+  /// An update's fields: what the file says now and after approval, in
+  /// words (lib/proposal-changes.ts). Null for anything else.
+  changes: { field: string; before: string; after: string }[] | null;
   /// A sensitive proposal this person may not read: who decides it.
   hiddenFor: string | null;
 };
@@ -78,7 +82,7 @@ export async function listApprovalsForAi(
             const flags = (Array.isArray(p.flags) ? p.flags : []) as ProposalFlag[];
             const target = p.target as ProposalTargetLike;
             if (p.hiddenFor) {
-              return { id: p.id, batchId: b.id, clientId: b.clientId, kind: proposalKindLabel(proposalKindKey({ target, payload })), action: p.action, headline: null, reason: null, quote: null, flags: [], aloneBecause: "פריט רגיש", alreadyInFile: null, hiddenFor: p.hiddenFor };
+              return { id: p.id, batchId: b.id, clientId: b.clientId, kind: proposalKindLabel(proposalKindKey({ target, payload })), action: p.action, headline: null, reason: null, quote: null, flags: [], aloneBecause: "פריט רגיש", alreadyInFile: null, changes: null, hiddenFor: p.hiddenFor };
             }
             return {
               id: p.id,
@@ -86,12 +90,14 @@ export async function listApprovalsForAi(
               clientId: b.clientId,
               kind: proposalKindLabel(proposalKindKey({ target, payload })),
               action: p.action,
-              headline: proposalHeadline(target, payload),
+              // An update names only what changes: called by its item.
+              headline: proposalHeadline(target, payload) || p.existing?.body || "",
               reason: p.reason,
               quote: p.quote,
               flags: flags.map((f) => f.message),
               aloneBecause: bulkApproveBlocker({ target, action: p.action, flags, payload, level: proposalReviewLevel({ confidence: p.confidence, flags, payload }, b.source) }),
               alreadyInFile: p.alreadyIn?.body ?? null,
+              changes: p.changes ? changesForAi(p.changes) : null,
               hiddenFor: null,
             };
           })

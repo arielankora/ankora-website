@@ -22,6 +22,8 @@ import {
 } from "@/lib/knowledge-proposals";
 import type { ProcedureAlongside } from "@/lib/app-domain/processes";
 import type { FlagText } from "@/lib/knowledge-flag-words";
+import { ProposalChanges } from "./ProposalChanges";
+import type { ProposalChange } from "@/lib/proposal-changes";
 import { detailLine, sourceKindLabel, targetLabel as kindLabelOf, type KnowledgeT } from "./labels";
 import { approveProposalAction, approveEditedProposalAction, approveWithSuggestionAction, approveProposalsAction, attachProposalAction, mergeProposalAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction, revertProposalAction } from "./actions";
 
@@ -45,6 +47,9 @@ export type ReviewProposal = {
   flags: (ProposalFlag & { text?: FlagText })[];
   link: string | null;
   existing: { body: string } | null;
+  /// An update's fields, what the file says now and after approval
+  /// (lib/proposal-changes.ts). Null for anything else.
+  changes: ProposalChange[] | null;
   /// A new item that is already in the file, as it stands now: what is
   /// there, and whether "כבר בתיק" adds this proposal's sources to it.
   alreadyIn: { body: string; addsSources: boolean } | null;
@@ -550,11 +555,17 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
               <bdi className="text-app-text-secondary">{p.alreadyIn.body}</bdi>
             </p>
           )}
-          {p.existing && (
-            <p className="mt-1 text-xs text-app-text-secondary">
-              {t("proposal.inFileToday")}{" "}
-              <bdi className={p.action === "SUPERSEDE" ? "line-through" : ""}>{p.existing.body}</bdi>
-            </p>
+          {/* An update shows what it changes, before and after (19.11.2026):
+              a struck-out line read as deleting the item. A contradiction,
+              and an update whose item could not be read, show the item. */}
+          {p.action === "SUPERSEDE" && p.changes ? (
+            <ProposalChanges changes={p.changes} />
+          ) : (
+            p.existing && (
+              <p className="mt-1 text-xs text-app-text-secondary">
+                {t("proposal.inFileToday")} <bdi>{p.existing.body}</bdi>
+              </p>
+            )
           )}
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-app-text-secondary">
             {status !== "CONFIRMED" && (status === "UNCERTAIN" || status === "MISSING" || status === "SUPERSEDED") && (

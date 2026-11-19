@@ -64,6 +64,7 @@ function serializeProposal(base: string, p: ProposalForAi) {
           quote: p.quote,
           flags: p.flags.length ? p.flags : undefined,
           alreadyInFile: p.alreadyInFile ?? undefined,
+          changes: p.changes ?? undefined,
           approveAlone: p.aloneBecause ?? undefined,
         }),
     url: proposalUrl(base, p.clientId, p.id),

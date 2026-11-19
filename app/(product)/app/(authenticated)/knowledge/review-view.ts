@@ -50,7 +50,9 @@ export function reviewProposals(b: OpenBatch, render?: (w: FlagWords) => string)
       target: p.target as ProposalTargetLike,
       action: p.action,
       state: p.state,
-      headline: proposalHeadline(p.target as ProposalTargetLike, payload),
+      // An update names only what changes: a contact whose name stays has
+      // none, and is called by the item it updates.
+      headline: proposalHeadline(p.target as ProposalTargetLike, payload) || p.existing?.body || "",
       payload,
       sources: readSourceRefs(payload.sources).map(formatSourceRef),
       reason: p.reason,
@@ -58,6 +60,7 @@ export function reviewProposals(b: OpenBatch, render?: (w: FlagWords) => string)
       flags: render ? flags.map((f) => ({ ...f, text: flagText(f, render) })) : flags,
       link: fireflies ? firefliesLink(fireflies, at) : null,
       existing: p.existing ? { body: p.existing.body } : null,
+      changes: p.changes,
       alreadyIn: p.alreadyIn ? { body: p.alreadyIn.body, addsSources: p.alreadyIn.addsSources } : null,
       attached: p.attached,
       // 3.11.2026: an approved new item can be taken out again ("ביטול").
