@@ -98,9 +98,11 @@ export default async function BrainMetricsPage() {
             <table className="w-full min-w-[720px] text-sm" data-testid="metrics-clients">
               <thead>
                 <tr className="border-b border-app-border text-xs text-app-text-secondary">
-                  <th className="py-2 pe-3 text-start font-medium">{t("clientColumn")}</th>
+                  <th className="min-w-[12rem] py-2 pe-3 text-start font-medium">{t("clientColumn")}</th>
                   {report.all.map((m) => (
-                    <th key={m.key} className="px-2 py-2 text-start font-medium" title={about(m)}>
+                    // One line: the table scrolls sideways in its box, and a header squeezed into its
+                    // column read a word a line (phone check, 18.11.2026).
+                    <th key={m.key} className="whitespace-nowrap px-2 py-2 text-start font-medium" title={about(m)}>
                       {label(m)}
                     </th>
                   ))}

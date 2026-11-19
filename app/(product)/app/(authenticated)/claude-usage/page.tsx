@@ -36,7 +36,9 @@ function squareClass(w: Pick<WindowCell, "hit" | "peakPct">): string {
 }
 
 const cell = "px-2 py-2 font-jbmono text-[13px] text-app-text-primary";
-const head = "px-2 py-2 text-start font-medium";
+// One line: the table scrolls sideways in its box, and "מכסה (5 שעות / שבועית)" squeezed into its
+// column read a word a line (phone check, 18.11.2026).
+const head = "whitespace-nowrap px-2 py-2 text-start font-medium";
 
 export default async function ClaudeUsagePage({ searchParams }: { searchParams: Promise<{ days?: string; saved?: string; error?: string }> }) {
   const user = await requireUser();
@@ -359,7 +361,7 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
           <table className="w-full min-w-[820px] text-sm">
             <thead>
               <tr className="border-b border-app-border text-xs text-app-text-secondary">
-                <th className="py-2 pe-3 text-start font-medium">{t("people.name")}</th>
+                <th className="min-w-[12rem] py-2 pe-3 text-start font-medium">{t("people.name")}</th>
                 <th className={head}>{t("people.requests")}</th>
                 <th className={head}>{t("people.cost")}</th>
                 <th className={head}>{t("people.limitHits")}</th>
