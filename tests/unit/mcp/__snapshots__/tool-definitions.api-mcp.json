@@ -760,6 +760,34 @@
     "name": "decide_vendor_check",
     "title": "Decide whether a task connects a new vendor (P8)"
   },
+  "delete_time_entry": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Deletes one of the signed-in employee's own finished time entries, as the delete button in the app does. Pass the entryId from list_my_time_entries or create_time_entry. Before calling, show the user the entry (client, date, times, note) and ask them to confirm the deletion. The entry stops counting toward the client's hours; Ankora keeps it in its audit history. Use update_time_entry instead when only the times or the note are wrong. A running timer is not deleted here: stop it with stop_timer, or discard it in the app.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "closedBankOverrideReason": {
+          "description": "Only for SUPER_ADMIN or ANKORA_ADMIN, and only after the user saw Ankora's warning about changing a closed hour bank and confirmed it: why the entry must be deleted anyway. Recorded in the audit log.",
+          "type": "string"
+        },
+        "entryId": {
+          "description": "The entry's id, from list_my_time_entries or create_time_entry. Never typed or guessed.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "entryId"
+      ],
+      "type": "object"
+    },
+    "name": "delete_time_entry",
+    "title": "Delete one of my time entries"
+  },
   "dismiss_pdf_upload": {
     "annotations": {
       "destructiveHint": false,
@@ -5371,6 +5399,69 @@
     },
     "name": "update_task",
     "title": "Update a task"
+  },
+  "update_time_entry": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Changes one of the signed-in employee's own finished time entries: its times, note, category or task. Pass the entryId from list_my_time_entries or create_time_entry, and only the fields that change. To change the times pass date, start and end together, as the wall clock in Asia/Jerusalem. Confirm the change with the user before calling. Ankora applies the same rules as the app's edit form: an employee can change their own entry only within 48 hours of its start, and time that overlaps an entry on another client is not saved on the first call: ask the user whether to keep both in parallel, and only then call again with confirmParallel: true. A running timer is changed with update_timer_note or stop_timer, not here.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "category": {
+          "description": "New category name, when the user wants a different one. Leave it out to keep the current one.",
+          "type": "string"
+        },
+        "closedBankOverrideReason": {
+          "description": "Only for SUPER_ADMIN or ANKORA_ADMIN, and only after the user saw Ankora's warning about changing a closed hour bank and confirmed it: why the entry must change anyway. Recorded in the audit log.",
+          "type": "string"
+        },
+        "confirmParallel": {
+          "description": "Set to true only after Ankora refused the change because the new times overlap an entry on another client, and the user explicitly agreed to keep both in parallel. Never on a first attempt.",
+          "type": "boolean"
+        },
+        "date": {
+          "description": "The day of the corrected times, YYYY-MM-DD. Pass with start and end.",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "end": {
+          "description": "Corrected end time, 24-hour HH:MM. Must be after start. Pass with date and start.",
+          "pattern": "^\\d{2}:\\d{2}$",
+          "type": "string"
+        },
+        "entryId": {
+          "description": "The entry's id, from list_my_time_entries or create_time_entry. Never typed or guessed.",
+          "type": "string"
+        },
+        "note": {
+          "description": "The new note. Replaces the existing one entirely.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Why the entry is being corrected, in a few words. Saved in the entry's history.",
+          "type": "string"
+        },
+        "start": {
+          "description": "Corrected start time, 24-hour HH:MM. Pass with date and end.",
+          "pattern": "^\\d{2}:\\d{2}$",
+          "type": "string"
+        },
+        "task": {
+          "description": "Title of an existing task on the same client to link this time to, as the user referred to it.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "entryId"
+      ],
+      "type": "object"
+    },
+    "name": "update_time_entry",
+    "title": "Correct one of my time entries"
   },
   "update_timer_note": {
     "annotations": {

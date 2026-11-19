@@ -48,12 +48,14 @@ import {
   updateActiveTimerNote,
   closedBankForStoppedEntry,
   moveEntryIntoOpenBank,
+  updateTimeEntry,
+  deleteTimeEntry,
 } from "@/lib/app-domain/time-entries";
 import { localDateTimeToUtc } from "@/lib/timezone";
 import { ClosedBankError, OVERRIDE_WARNING, stoppedAcrossClosureMessage } from "@/lib/app-domain/closed-bank-guard";
 import { prisma } from "@/lib/prisma";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
-import { READ_ONLY, WRITES } from "@/lib/mcp/annotations";
+import { READ_ONLY, TOOL_ANNOTATIONS, WRITES } from "@/lib/mcp/annotations";
 import { FIELD_NOTES_SENTENCE, withFieldNotes } from "@/lib/mcp/field-notes";
 import { UPDATE_TASK_NOTES } from "@/lib/mcp/tool-field-notes";
 import { registerTaskExtraTools } from "@/lib/mcp/task-extra-tools";
@@ -148,8 +150,8 @@ async function guardRunning(
 
 /// 3.11.2026, "לא רושמים בחבילה סגורה": what the model is told when an
 /// entry lands in a closed hour bank. Nothing was written.
-function closedBankToolText(err: ClosedBankError): string {
-  const lines = [`Nothing was recorded. Ankora says (Hebrew, show it to the user): "${err.message}"`];
+function closedBankToolText(err: ClosedBankError, nothingDone = "Nothing was recorded."): string {
+  const lines = [`${nothingDone} Ankora says (Hebrew, show it to the user): "${err.message}"`];
   if (err.canMoveToOpen) {
     lines.push(
       "Ask the user whether to record it in the open hour bank instead. Only if they agree, call create_time_entry again with the same values and intoOpenBank: true. In a scheduled run with nobody to ask, do that and say so in the run's report."
@@ -208,13 +210,46 @@ function overlapConflictFields(o: OverlapLike) {
   };
 }
 
-function overlapToolText(o: OverlapLike, clientName: string): string {
+/// 19.11.2026: shared by create_time_entry and update_time_entry. Both
+/// carry the same confirmParallel argument and the same promise.
+function overlapToolText(
+  o: OverlapLike,
+  clientName: string,
+  tool: "create_time_entry" | "update_time_entry" = "create_time_entry"
+): string {
   const c = overlapConflictFields(o);
   const range = c.end ? `${c.start}-${c.end}` : `${c.start} (a timer that is still running)`;
+  const nothing = tool === "create_time_entry" ? "Nothing was recorded." : "Nothing was changed.";
   if (o.sameClient) {
-    return `Nothing was recorded. This time overlaps an entry the user already has for ${clientName} at ${range}, and one client cannot have two entries at the same time. Tell the user, and ask which times they meant. Do not retry with confirmParallel: it does not apply to the same client.`;
+    return `${nothing} This time overlaps an entry the user already has for ${clientName} at ${range}, and one client cannot have two entries at the same time. Tell the user, and ask which times they meant. If that other entry is the wrong one, update_time_entry or delete_time_entry can correct it once the user agrees. Do not retry with confirmParallel: it does not apply to the same client.`;
   }
-  return `Nothing was recorded. This time overlaps an entry the user already has for ${c.client ?? "another client"} at ${range}. Recording both bills each client the full time, which Ankora allows once the user agrees, as in the app's manual-entry form. Ask the user whether to record it in parallel. Only if they agree, call create_time_entry again with the same values and confirmParallel: true.`;
+  return `${nothing} This time overlaps an entry the user already has for ${c.client ?? "another client"} at ${range}. Recording both bills each client the full time, which Ankora allows once the user agrees, as in the app's manual-entry form. Ask the user whether to record it in parallel. Only if they agree, call ${tool} again with the same values and confirmParallel: true.`;
+}
+
+/// 19.11.2026: the entry update_time_entry or delete_time_entry acts on.
+/// Only the caller's own, not deleted, not running, and not on a "בלי AI"
+/// task or client (the same guard move_time_entry_to_open_bank has).
+async function ownFinishedEntry(actor: User, entryId: string, verb: "change" | "delete") {
+  const entry = await prisma.timeEntry.findFirst({
+    where: { id: entryId, userId: actor.id, deletedAt: null },
+    include: { client: true, category: true, task: true },
+  });
+  const nothing = verb === "change" ? "Nothing was changed." : "Nothing was deleted.";
+  if (!entry) {
+    return {
+      ok: false as const,
+      text: `${nothing} No entry of yours with that id. Call list_my_time_entries for that day and use the id it returns. Only your own entries can be changed here; a manager corrects someone else's hours on Ankora's time entries screen.`,
+    };
+  }
+  if (entry.endAt === null) {
+    return {
+      ok: false as const,
+      text: `${nothing} This entry is a timer that is still running. Use update_timer_note to change its note or stop_timer to stop it${verb === "delete" ? "; discarding a running timer is done in the app" : ""}.`,
+    };
+  }
+  const [redacted] = await redactEntriesForAi([entry], { keepExcludedClients: true });
+  if (redacted.aiExcluded) return { ok: false as const, text: `${AI_EXCLUDED_TOOL_MESSAGE} ${nothing}` };
+  return { ok: true as const, entry };
 }
 
 function actorOf(ctx: ServerContext): User {
@@ -890,6 +925,209 @@ export function registerAnkoraTools(server: McpServer): void {
       } catch (err) {
         if (err instanceof ClosedBankError) return toolText(closedBankToolText(err));
         console.error("[mcp] create_time_entry failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  // ------------------------------------------------- correcting an entry
+  //
+  // 19.11.2026: until now a wrong entry made through Claude could only be
+  // fixed on the screen. Claude recorded an entry at the wrong hours to
+  // dodge an overlap, and the only way forward from the connector was a
+  // second entry, which would have billed the same work twice. These two
+  // tools call the same domain functions as the "הזמן שלי" screen
+  // (updateTimeEntry, deleteTimeEntry), so the 48-hour self-edit window,
+  // the overlap rule, the closed hour bank, the revision history and the
+  // audit row all apply exactly as they do there.
+  //
+  // Only the caller's own finished entries. A running timer is changed
+  // with update_timer_note and stop_timer; a manager correcting someone
+  // else's hours does it on the time entries screen.
+
+  server.registerTool(
+    "update_time_entry",
+    {
+      title: "Correct one of my time entries",
+      description:
+        "Changes one of the signed-in employee's own finished time entries: its times, note, category or task. Pass the entryId from list_my_time_entries or create_time_entry, and only the fields that change. To change the times pass date, start and end together, as the wall clock in Asia/Jerusalem. Confirm the change with the user before calling. Ankora applies the same rules as the app's edit form: an employee can change their own entry only within 48 hours of its start, and time that overlaps an entry on another client is not saved on the first call: ask the user whether to keep both in parallel, and only then call again with confirmParallel: true. A running timer is changed with update_timer_note or stop_timer, not here.",
+      inputSchema: z.object({
+        entryId: z.string().describe("The entry's id, from list_my_time_entries or create_time_entry. Never typed or guessed."),
+        date: DATE.optional().describe("The day of the corrected times, YYYY-MM-DD. Pass with start and end."),
+        start: CLOCK.optional().describe("Corrected start time, 24-hour HH:MM. Pass with date and end."),
+        end: CLOCK.optional().describe("Corrected end time, 24-hour HH:MM. Must be after start. Pass with date and start."),
+        note: z.string().optional().describe("The new note. Replaces the existing one entirely."),
+        category: z.string().optional().describe("New category name, when the user wants a different one. Leave it out to keep the current one."),
+        task: z
+          .string()
+          .optional()
+          .describe("Title of an existing task on the same client to link this time to, as the user referred to it."),
+        reason: z.string().optional().describe("Why the entry is being corrected, in a few words. Saved in the entry's history."),
+        confirmParallel: z
+          .boolean()
+          .optional()
+          .describe(
+            "Set to true only after Ankora refused the change because the new times overlap an entry on another client, and the user explicitly agreed to keep both in parallel. Never on a first attempt."
+          ),
+        closedBankOverrideReason: z
+          .string()
+          .optional()
+          .describe(
+            "Only for SUPER_ADMIN or ANKORA_ADMIN, and only after the user saw Ankora's warning about changing a closed hour bank and confirmed it: why the entry must change anyway. Recorded in the audit log."
+          ),
+      }),
+      annotations: TOOL_ANNOTATIONS.update_time_entry,
+    },
+    async (
+      args: {
+        entryId: string;
+        date?: string;
+        start?: string;
+        end?: string;
+        note?: string;
+        category?: string;
+        task?: string;
+        reason?: string;
+        confirmParallel?: boolean;
+        closedBankOverrideReason?: string;
+      },
+      ctx: ServerContext
+    ) => {
+      try {
+        const actor = actorOf(ctx);
+        const found = await ownFinishedEntry(actor, args.entryId, "change");
+        if (!found.ok) return toolText(found.text);
+        const entry = found.entry;
+
+        const timeArgs = [args.date, args.start, args.end].filter((v) => v !== undefined).length;
+        if (timeArgs !== 0 && timeArgs !== 3) {
+          return toolText("Nothing was changed. To change the times, pass date, start and end together.");
+        }
+        let startAt: Date | undefined;
+        let endAt: Date | undefined;
+        if (timeArgs === 3) {
+          // The same helper the edit form uses, for the reason create_time_entry gives.
+          startAt = combineWallClockTime(args.date!, args.start!);
+          endAt = combineWallClockTime(args.date!, args.end!);
+          if (endAt <= startAt) {
+            return toolText(
+              `Nothing was changed. The end time (${args.end}) is not after the start time (${args.start}). Ankora does not record entries that span midnight as one row.`
+            );
+          }
+        }
+
+        let taskId: string | undefined;
+        let taskTitle: string | null = entry.task?.title ?? null;
+        if (args.task?.trim()) {
+          const task = await lookupTask(actor, args.task, { clientId: entry.clientId });
+          if (!task.ok) return toolText(task.message);
+          taskId = task.value.id;
+          taskTitle = task.value.name;
+        }
+
+        let categoryId: string | undefined;
+        let categoryName: string | null = entry.category?.name ?? null;
+        if (args.category?.trim()) {
+          const category = await lookupCategory(actor, entry.clientId, args.category);
+          if (!category.ok) return toolText(category.message);
+          categoryId = category.value.id;
+          categoryName = category.value.name;
+        }
+
+        if (startAt === undefined && args.note === undefined && taskId === undefined && categoryId === undefined) {
+          return toolText("Nothing was changed: no new times, note, category or task were given.");
+        }
+
+        const input = {
+          startAt,
+          endAt,
+          note: args.note,
+          taskId,
+          categoryId,
+          reason: args.reason?.trim() || null,
+          closedBankOverride: args.closedBankOverrideReason?.trim() ? { reason: args.closedBankOverrideReason.trim() } : null,
+        };
+
+        // Tried without the override first, as in create_time_entry: the
+        // domain's override also pushes a same-client overlap through for
+        // a manager, which is more than the user agreed to.
+        let updated: Awaited<ReturnType<typeof updateTimeEntry>>;
+        let parallelWith: ReturnType<typeof overlapConflictFields> | null = null;
+        try {
+          updated = await updateTimeEntry(actor, entry.id, { ...input, allowOverlapOverride: false });
+        } catch (err) {
+          const overlap = overlapOf(err);
+          if (!overlap) throw err;
+          if (overlap.sameClient || args.confirmParallel !== true) {
+            return toolText(overlapToolText(overlap, entry.client.name, "update_time_entry"));
+          }
+          updated = await updateTimeEntry(actor, entry.id, { ...input, allowOverlapOverride: true });
+          parallelWith = overlapConflictFields(overlap);
+        }
+
+        return toolJson({
+          updated: true,
+          ...(parallelWith ? { parallel: true, parallelWith } : {}),
+          entryId: updated.id,
+          client: entry.client.name,
+          category: categoryName,
+          task: taskTitle,
+          startAt: updated.startAt.toISOString(),
+          endAt: updated.endAt ? updated.endAt.toISOString() : null,
+          actualMinutes: updated.actualSeconds === null ? null : Math.round(updated.actualSeconds / 60),
+          billableMinutes: updated.billableSeconds === null ? null : Math.round(updated.billableSeconds / 60),
+          note: updated.note,
+        });
+      } catch (err) {
+        if (err instanceof ClosedBankError) return toolText(closedBankToolText(err, "Nothing was changed."));
+        console.error("[mcp] update_time_entry failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "delete_time_entry",
+    {
+      title: "Delete one of my time entries",
+      description:
+        "Deletes one of the signed-in employee's own finished time entries, as the delete button in the app does. Pass the entryId from list_my_time_entries or create_time_entry. Before calling, show the user the entry (client, date, times, note) and ask them to confirm the deletion. The entry stops counting toward the client's hours; Ankora keeps it in its audit history. Use update_time_entry instead when only the times or the note are wrong. A running timer is not deleted here: stop it with stop_timer, or discard it in the app.",
+      inputSchema: z.object({
+        entryId: z.string().describe("The entry's id, from list_my_time_entries or create_time_entry. Never typed or guessed."),
+        closedBankOverrideReason: z
+          .string()
+          .optional()
+          .describe(
+            "Only for SUPER_ADMIN or ANKORA_ADMIN, and only after the user saw Ankora's warning about changing a closed hour bank and confirmed it: why the entry must be deleted anyway. Recorded in the audit log."
+          ),
+      }),
+      annotations: TOOL_ANNOTATIONS.delete_time_entry,
+    },
+    async (args: { entryId: string; closedBankOverrideReason?: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const found = await ownFinishedEntry(actor, args.entryId, "delete");
+        if (!found.ok) return toolText(found.text);
+        const entry = found.entry;
+
+        await deleteTimeEntry(actor, entry.id, {
+          closedBankOverride: args.closedBankOverrideReason?.trim() ? { reason: args.closedBankOverrideReason.trim() } : null,
+        });
+
+        return toolJson({
+          deleted: true,
+          entryId: entry.id,
+          client: entry.client.name,
+          category: entry.category?.name ?? null,
+          task: entry.task?.title ?? null,
+          startAt: entry.startAt.toISOString(),
+          endAt: entry.endAt ? entry.endAt.toISOString() : null,
+          actualMinutes: entry.actualSeconds === null ? null : Math.round(entry.actualSeconds / 60),
+          note: entry.note,
+        });
+      } catch (err) {
+        if (err instanceof ClosedBankError) return toolText(closedBankToolText(err, "Nothing was deleted."));
+        console.error("[mcp] delete_time_entry failed", err);
         return toolFailure(err);
       }
     }
