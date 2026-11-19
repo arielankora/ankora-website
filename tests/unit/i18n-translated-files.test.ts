@@ -184,6 +184,7 @@ const TRANSLATED_FILES = [
   "app/(product)/app/(authenticated)/knowledge/AutoApplied.tsx",
   "app/(product)/app/(authenticated)/knowledge/AwaitingAssignment.tsx",
   "app/(product)/app/(authenticated)/knowledge/KnowledgeReview.tsx",
+  "app/(product)/app/(authenticated)/knowledge/ProposalChanges.tsx",
   "app/(product)/app/(authenticated)/knowledge/ReviewBatch.tsx",
   "app/(product)/app/(authenticated)/knowledge/ReviewFilters.tsx",
   "app/(product)/app/(authenticated)/knowledge/actions.ts",

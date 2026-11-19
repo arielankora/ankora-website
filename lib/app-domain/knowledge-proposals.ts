@@ -61,7 +61,8 @@ import { createImportantDate } from "@/lib/app-domain/important-dates";
 import { duplicateFlag, findExisting, keepsSources, withLiveDuplicate, type ExistingItem } from "@/lib/app-domain/proposal-existing";
 import { dateProposalKey, dateSchedule } from "@/lib/date-proposals";
 import { entityByName, resolveLinks, withoutLinkNames } from "@/lib/app-domain/proposal-links";
-import { applyContradiction, applyUpdate, currentItem, isUpdatable } from "@/lib/app-domain/proposal-updates";
+import { applyContradiction, applyUpdate, currentFields, currentItem, isUpdatable } from "@/lib/app-domain/proposal-updates";
+import { noChangeReason, proposalChanges, type ProposalChange } from "@/lib/proposal-changes";
 import { isInternalClient } from "@/lib/app-domain/internal-client-id";
 import { assertCanApproveForClient, canApproveForClient, notifyRuleApprovers, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
 import { datesInFile, isNamedTarget, listsOf, nameFieldOf, namesInFile } from "@/lib/app-domain/name-duplicates";
@@ -402,6 +403,13 @@ export async function proposeKnowledge(
         dropped.push({ index, reason: "הפריט שההצעה מעדכנת לא נמצא בתיק. targetId הוא המזהה שמופיע בתיק (id: ...)." });
         continue;
       }
+      if (item.action === "SUPERSEDE") {
+        const unchanged = noChangeReason(parsed.data as Record<string, unknown>, (await currentFields(input.clientId, item.target, item.targetId)) ?? {});
+        if (unchanged) {
+          dropped.push({ index, reason: unchanged });
+          continue;
+        }
+      }
     } else if (item.action !== "CREATE") {
       if (item.target !== "FACT" || !item.targetId) {
         dropped.push({ index, reason: "עדכון (SUPERSEDE) וסתירה (CONTRADICT) הם של פריט קיים: עובדה, איש קשר, ארגון, מערכת, סוג פנייה, כלל, ישות או תהליך, עם המזהה שלו." });
@@ -411,6 +419,13 @@ export async function proposeKnowledge(
       if (!fact) {
         dropped.push({ index, reason: "הפריט שההצעה מתייחסת אליו לא נמצא בתיק, או שכבר הוחלף." });
         continue;
+      }
+      if (item.action === "SUPERSEDE") {
+        const unchanged = noChangeReason(parsed.data as Record<string, unknown>, (await currentFields(input.clientId, "FACT", item.targetId)) ?? {});
+        if (unchanged) {
+          dropped.push({ index, reason: unchanged });
+          continue;
+        }
       }
     }
     // The batch's source, at the minute, and any other register codes
@@ -615,6 +630,17 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
     approverList.set(clientId, (await ruleApproversFor(clientId)).map((u) => u.name));
     approverNames.set(clientId, (approverList.get(clientId) ?? []).join(" או "));
   }
+  // What a pending update changes, field by field, against the item as it
+  // is now (19.11.2026): the card shows before and after, not a struck-out
+  // line with nothing in its place.
+  const changesOf = new Map<string, ProposalChange[]>();
+  for (const b of batches) {
+    for (const pr of b.proposals) {
+      if (pr.state !== "PENDING" || pr.action !== "SUPERSEDE" || !pr.targetId) continue;
+      const now = await currentFields(b.clientId, pr.target, pr.targetId);
+      if (now) changesOf.set(pr.id, proposalChanges((pr.payload ?? {}) as Record<string, unknown>, now));
+    }
+  }
   // "Already in the file", as it stands now (proposal-existing.ts): an
   // item that entered after the proposal arrived is found too, and one
   // that left is no longer said to be there.
@@ -668,6 +694,7 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
             reason: null,
             quote: null,
             existing: null,
+            changes: null as ProposalChange[] | null,
             alreadyIn: null as (ExistingItem & { addsSources: boolean }) | null,
             hiddenFor: approverNames.get(b.clientId) || "מי שמאשר מידע רגיש",
             /// ADR 0006: who decides it, by name, for a screen in another
@@ -678,6 +705,7 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
             ...p,
             flags: liveFlags(p),
             existing: p.targetId ? targetById.get(p.targetId) ?? null : null,
+            changes: changesOf.get(p.id) ?? null,
             alreadyIn: alreadyIn.get(p.id) ? { ...alreadyIn.get(p.id)!, addsSources: keepsSources(p.target) && readSourceRefs((p.payload as Record<string, unknown>).sources).length > 0 } : null,
             hiddenFor: null as string | null,
             hiddenApprovers: [] as string[],

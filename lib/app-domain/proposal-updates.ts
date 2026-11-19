@@ -65,6 +65,75 @@ export async function currentItem(clientId: string, target: string, id: string):
   return null;
 }
 
+/// The item's fields as it is now, by the names a proposal gives them, to
+/// say what an update changes (lib/proposal-changes.ts). A name the file
+/// keeps by id is read back where one join finds it (an owner, an entity,
+/// an organization); the rest are left out, and the card says so. Null
+/// when the item is not in this client's file.
+export async function currentFields(clientId: string, target: string, id: string): Promise<Record<string, unknown> | null> {
+  const base = { id, clientId, deletedAt: null };
+  const ownerOf = async (ownerId: string | null | undefined) =>
+    ownerId ? ((await prisma.user.findUnique({ where: { id: ownerId }, select: { name: true } }))?.name ?? null) : null;
+  // Columns that are the proposal's own names, without the bookkeeping.
+  const scalars = (row: Record<string, unknown>) => {
+    const { id: _i, clientId: _c, ownerId: _o, sources: _s, fieldStatus: _f, alternatives: _a, createdById: _b, createdAt: _t, updatedAt: _u, deletedAt: _d, ...rest } = row;
+    return rest;
+  };
+  if (target === "FACT") {
+    const f = await prisma.clientFact.findFirst({ where: base });
+    return f ? { ...scalars(f as unknown as Record<string, unknown>), ownerName: await ownerOf(f.ownerId) } : null;
+  }
+  if (target === "CONTACT") {
+    const c = await prisma.clientContact.findFirst({ where: base, include: { person: { include: { organization: { select: { name: true } } } }, entity: { select: { name: true } } } });
+    if (!c) return null;
+    const { person, entity, ...row } = c;
+    return {
+      ...scalars(row as unknown as Record<string, unknown>),
+      name: person.name,
+      emails: person.emails,
+      phones: person.phones,
+      organizationName: person.organization?.name ?? null,
+      entityName: entity?.name ?? null,
+      ownerName: await ownerOf(c.ownerId),
+    };
+  }
+  if (target === "ORGANIZATION") {
+    const o = await prisma.clientOrganization.findFirst({ where: base, include: { organization: { select: { name: true, domains: true } } } });
+    if (!o) return null;
+    const { organization, ...row } = o;
+    return { ...scalars(row as unknown as Record<string, unknown>), name: organization.name, domains: organization.domains, ownerName: await ownerOf(o.ownerId) };
+  }
+  if (target === "SYSTEM") {
+    const s = await prisma.systemAccess.findFirst({ where: base, include: { entity: { select: { name: true } } } });
+    if (!s) return null;
+    const { entity, ...row } = s;
+    return { ...scalars(row as unknown as Record<string, unknown>), entityName: entity?.name ?? null, ownerName: await ownerOf(s.ownerId) };
+  }
+  if (target === "REQUEST_TYPE") {
+    const r = await prisma.requestType.findFirst({ where: base, include: { entity: { select: { name: true } }, process: { select: { title: true } } } });
+    if (!r) return null;
+    const { entity, process, ...row } = r;
+    return { ...scalars(row as unknown as Record<string, unknown>), entityName: entity?.name ?? null, processName: process?.title ?? null, ownerName: await ownerOf(r.ownerId) };
+  }
+  if (target === "POLICY") {
+    const r = await prisma.clientPolicy.findFirst({ where: { ...base, status: { not: "RETIRED" } } });
+    return r ? { ...scalars(r as unknown as Record<string, unknown>), ownerName: await ownerOf(r.ownerId) } : null;
+  }
+  if (target === "ENTITY") {
+    const e = await prisma.clientEntity.findFirst({ where: base, include: { parent: { select: { name: true } } } });
+    if (!e) return null;
+    const { parent, ...row } = e;
+    return { ...scalars(row as unknown as Record<string, unknown>), parentName: parent?.name ?? null, ownerName: await ownerOf(e.ownerId) };
+  }
+  if (target === "PROCESS") {
+    const p = await prisma.process.findFirst({ where: { ...base, status: { not: "RETIRED" } } });
+    if (!p) return null;
+    const entity = p.entityId ? await prisma.clientEntity.findUnique({ where: { id: p.entityId }, select: { name: true } }) : null;
+    return { ...scalars(p as unknown as Record<string, unknown>), entityName: entity?.name ?? null, ownerName: await ownerOf(p.ownerId) };
+  }
+  return null;
+}
+
 /// The sources an item ends with: what it had, and what the proposal adds.
 function mergedSources(before: unknown, added: SourceRef[]): SourceRef[] {
   const out = [...readSourceRefs(before)];

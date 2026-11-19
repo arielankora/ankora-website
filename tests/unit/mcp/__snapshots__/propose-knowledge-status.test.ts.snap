@@ -166,7 +166,7 @@ exports[`propose_knowledge payloads, as tools/list publishes them > matches the 
                 "type": "object",
               },
               {
-                "description": "When target is CONTACT. A person. Needs name or role. entityName: the client's legal entity they work with.",
+                "description": "When target is CONTACT. A person. Needs name or role. entityName: the client's legal entity they work with. endedAt: the day they leave or left the client or the role, only when a day was said; a leaving with no day goes in context.",
                 "properties": {
                   "channelOrder": {
                     "items": {
@@ -194,6 +194,10 @@ exports[`propose_knowledge payloads, as tools/list publishes them > matches the 
                     },
                     "maxItems": 10,
                     "type": "array",
+                  },
+                  "endedAt": {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string",
                   },
                   "entityName": {
                     "maxLength": 200,
