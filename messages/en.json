@@ -1920,7 +1920,10 @@
       "managerOnly": "Managers only."
     },
     "claudeUsage": {
-      "forbidden": "Only a super admin can see the team's Claude usage."
+      "forbidden": "Only a super admin can see the team's Claude usage.",
+      "aliasInvalid": "\"{email}\" is not a valid email address.",
+      "aliasTwice": "The address {email} is listed for two people. Each address belongs to one person.",
+      "aliasTaken": "{email} is {name}'s own address in Ankora, so it cannot be assigned to someone else."
     }
   },
   "auditLog": {
@@ -2333,7 +2336,9 @@
     },
     "settings": {
       "title": "Settings",
-      "intro": "Mark who does not work in Cowork or Claude Code, so their missing data is not flagged as a problem.",
+      "intro": "For each person: whether they work in Cowork or Claude Code, and which other addresses they use in Claude.",
+      "nonCowork": "Does not work in Cowork or Claude Code (missing data is not flagged)",
+      "aliases": "Other addresses they sign in to Claude with, comma separated. Data already received from them is assigned to this person.",
       "save": "Save",
       "saved": "Saved.",
       "error": "Not saved: {message}"
@@ -2468,7 +2473,7 @@
       "toolsSub": "how much each Ankora tool sent Claude",
       "promptsSub": "prompts copied from the screens",
       "heavySub": "the heaviest messages",
-      "settingsSub": "who does not work in Cowork",
+      "settingsSub": "who does not work in Cowork, and other Claude addresses",
       "signals": "Brief then full file: {briefThenFile} · Repeat calls: {duplicates} · Truncated answers: {truncated}",
       "week": {
         "title": "This week's windows",

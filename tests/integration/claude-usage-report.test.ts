@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { User } from "@prisma/client";
 import { prisma } from "./setup";
 import { createTestUser } from "./factories";
-import { claudeUsageSettings, getClaudeUsageReport, updateClaudeUsageSettings } from "@/lib/app-domain/claude-usage";
+import { claudeUsageSettings, getClaudeUsageReport, parseAliasList, updateClaudeUsageSettings } from "@/lib/app-domain/claude-usage";
+import { ingestCoworkEvents, ingestLimitReading } from "@/lib/claude-usage/cowork-ingest";
 
 // Claude usage measurement, stage 3 (17.11.2026): the report behind the
 // "שימוש בקלוד" screen and get_claude_usage, through the connector as
@@ -112,9 +113,9 @@ describe("the Claude usage report", () => {
   it("reads stored settings from before 18.11.2026, and keeps only who does not work in Cowork", async () => {
     const { ariel, hadas } = await seed();
     await prisma.appSetting.create({ data: { key: "claude_usage.settings", value: { defaultSeatUsd: 20, seats: { [hadas.id]: 100 }, multiplier: 1, alertsLive: false, nonCowork: [hadas.id] } } });
-    expect(await claudeUsageSettings()).toEqual({ nonCowork: [hadas.id] });
+    expect(await claudeUsageSettings()).toEqual({ nonCowork: [hadas.id], aliases: {} });
     await updateClaudeUsageSettings(ariel, { nonCowork: { [hadas.id]: false } });
-    expect(await claudeUsageSettings()).toEqual({ nonCowork: [] });
+    expect(await claudeUsageSettings()).toEqual({ nonCowork: [], aliases: {} });
     const report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
     expect(report).not.toHaveProperty("month");
     expect(report.people[0]).not.toHaveProperty("month");
@@ -190,6 +191,43 @@ describe("the Claude usage report", () => {
     const report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
     expect(report.coverage.unmatchedLimitEmails).toEqual(["alias@example.com"]);
   });
+
+  it("matches another Claude address to its person: what already came, and what comes next (19.11.2026)", async () => {
+    const { ariel, hadas } = await seed();
+    await prisma.claudeLimitSample.create({ data: { userId: null, email: "Office@Nux.ai", fiveHourPct: 40, sevenDayPct: 20, observedAt: ago(30) } });
+    await prisma.coworkEvent.create({ data: { dedupeKey: "alias-old", eventName: "api_request", userId: null, userEmail: "office@nux.ai", occurredAt: ago(40), costUsd: 2 } });
+    let report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
+    expect(report.coverage.unmatchedLimitEmails).toEqual(["Office@Nux.ai"]);
+
+    await updateClaudeUsageSettings(ariel, { aliases: { [hadas.id]: parseAliasList(" Office@Nux.ai, office@nux.ai ") } });
+    expect((await claudeUsageSettings()).aliases).toEqual({ [hadas.id]: ["office@nux.ai"] });
+    expect(await prisma.claudeLimitSample.count({ where: { userId: null } })).toBe(0);
+    expect(await prisma.coworkEvent.count({ where: { dedupeKey: "alias-old", userId: hadas.id } })).toBe(1);
+
+    // Arriving from now on.
+    expect(
+      await ingestLimitReading({ email: "office@nux.ai", altEmail: null, fiveHourPct: 50, fiveHourResetsAt: null, sevenDayPct: 22, sevenDayResetsAt: null, observedAt: ago(5), extensionVersion: null } as never),
+    ).toEqual({ matched: true });
+    await ingestCoworkEvents([{ dedupeKey: "alias-new", eventName: "api_request", userEmail: "OFFICE@nux.ai", occurredAt: ago(4), costUsd: 1 } as never]);
+    expect(await prisma.coworkEvent.findUnique({ where: { dedupeKey: "alias-new" }, select: { userId: true } })).toEqual({ userId: hadas.id });
+
+    report = await getClaudeUsageReport(ariel, { days: 7, now: NOW });
+    expect(report.coverage.unmatchedLimitEmails).toEqual([]);
+    expect(report.settings.aliases[hadas.id]).toEqual(["office@nux.ai"]);
+    expect(report.people.find((p) => p.userId === hadas.id)!.limits?.current?.fiveHourPct).toBe(50);
+
+    // An empty list clears it.
+    await updateClaudeUsageSettings(ariel, { aliases: { [hadas.id]: [] } });
+    expect((await claudeUsageSettings()).aliases).toEqual({});
+  });
+
+  it("refuses an address that is not one, that is listed twice, or that is another person's own", async () => {
+    const { ariel, hadas } = await seed();
+    await expect(updateClaudeUsageSettings(ariel, { aliases: { [hadas.id]: ["not-an-email"] } })).rejects.toMatchObject({ code: "claudeUsage.aliasInvalid" });
+    await expect(updateClaudeUsageSettings(ariel, { aliases: { [hadas.id]: ["x@nux.ai"], [ariel.id]: ["x@nux.ai"] } })).rejects.toMatchObject({ code: "claudeUsage.aliasTwice" });
+    await expect(updateClaudeUsageSettings(ariel, { aliases: { [hadas.id]: [ariel.email.toLowerCase()] } })).rejects.toMatchObject({ code: "claudeUsage.aliasTaken" });
+    expect((await claudeUsageSettings()).aliases).toEqual({});
+  });
 });
 
 describe("get_claude_usage through the connector", () => {
@@ -203,6 +241,9 @@ describe("get_claude_usage through the connector", () => {
     // spent, and the pace reads a share against the time gone.
     expect(body.fieldNotes.costUsd).toMatch(/never money spent/);
     expect(body.fieldNotes.fiveHour).toBeDefined();
+    // 19.11.2026: the other Claude addresses, and what they mean.
+    expect(body.settings.aliases).toEqual({});
+    expect(body.fieldNotes.aliases).toMatch(/other addresses/);
     expect(body).not.toHaveProperty("month");
     expect(body.period.days).toBe(30);
     expect(Array.isArray(body.people)).toBe(true);

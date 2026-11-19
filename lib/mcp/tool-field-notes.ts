@@ -94,6 +94,7 @@ export const CLAUDE_USAGE_NOTES: FieldNotes = {
     "A share read against the time gone in its window: `usedPct` of the limit, `elapsedPct` of the time, `projectedPct` where it ends at the same pace (null while it is too early: the first half hour of a window, the first day of a week), and `state`: ok (on track for 80% or less), watch (80 to 100), over (runs out before the reset, at `projectedHitAt`), stuck, or early. Linear, so early in a week it leans pessimistic. Judge a person by the pace, not by the share: 87% of the week a few hours before the reset is fine.",
   weekly: "The pace against the weekly limit (see `pace`).",
   fastestWeekly: "The person furthest ahead of the weekly pace, by projection.",
-  unmatchedLimitEmails: "Addresses the browser extension sent that match no Ankora user, probably an alias of a work account: those people's limits are missing until matched.",
+  unmatchedLimitEmails: "Addresses the browser extension sent that match no Ankora user, probably an alias of a work account: those people's limits are missing until matched. A super admin matches one by adding it to the person's other Claude addresses in the screen's settings (`settings.aliases`).",
+  aliases: "In `settings`: userId to the other addresses that person signs in to Claude with. Cowork's telemetry and the browser extension under those addresses count as that person's.",
   summary: "The managers' summary: a verdict, the leading indicators against their targets, and at most three things to do.",
 };

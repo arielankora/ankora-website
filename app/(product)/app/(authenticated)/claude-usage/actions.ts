@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { updateClaudeUsageSettings, type SettingsInput } from "@/lib/app-domain/claude-usage";
+import { parseAliasList, updateClaudeUsageSettings, type SettingsInput } from "@/lib/app-domain/claude-usage";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
 
 // Claude usage measurement, stage 3 (17.11.2026): the settings form on
@@ -16,14 +16,19 @@ export async function saveClaudeUsageSettingsAction(formData: FormData) {
   const days = formData.get("days") === "30" ? "30" : "7";
   // A checkbox that is not ticked is not sent, so the form lists everyone
   // it shows (`listed:<userId>`) and ticks `nonCowork:<userId>`.
+  // 19.11.2026: and `aliases:<userId>`, the person's extra Claude
+  // addresses, comma separated; an empty field clears them.
   const nonCowork: Record<string, boolean> = {};
+  const aliases: Record<string, string[]> = {};
   for (const [key] of formData.entries()) {
     if (key.startsWith("listed:")) {
       const id = key.slice("listed:".length);
       nonCowork[id] = formData.has(`nonCowork:${id}`);
+      const text = formData.get(`aliases:${id}`);
+      if (typeof text === "string") aliases[id] = parseAliasList(text);
     }
   }
-  const input: SettingsInput = { nonCowork };
+  const input: SettingsInput = { nonCowork, aliases };
   let outcome = "saved=1";
   try {
     await updateClaudeUsageSettings(user, input);

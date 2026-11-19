@@ -628,13 +628,31 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
           )}
           <form action={saveClaudeUsageSettingsAction} className="mt-3 space-y-4">
             <input type="hidden" name="days" value={days} />
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-2 lg:grid-cols-2">
               {report.people.map((p) => (
-                <label key={p.userId} className="tap-area flex items-center gap-2 rounded-lg border border-app-border px-3 py-2 text-sm text-app-text-primary">
+                <fieldset key={p.userId} className="space-y-2 rounded-lg border border-app-border px-3 py-2 text-sm text-app-text-primary" data-testid={`usage-settings-${p.userId}`}>
+                  <legend className="px-1 font-medium" dir="auto">
+                    {p.name}
+                  </legend>
                   <input type="hidden" name={`listed:${p.userId}`} value="1" />
-                  <input type="checkbox" name={`nonCowork:${p.userId}`} defaultChecked={p.nonCowork} className="h-4 w-4" />
-                  <span dir="auto">{p.name}</span>
-                </label>
+                  <label className="tap-area flex items-center gap-2">
+                    <input type="checkbox" name={`nonCowork:${p.userId}`} defaultChecked={p.nonCowork} className="h-4 w-4" />
+                    <span>{t("settings.nonCowork")}</span>
+                  </label>
+                  <label className="block space-y-1">
+                    <span className="text-xs text-app-text-secondary">{t("settings.aliases")}</span>
+                    <input
+                      type="text"
+                      name={`aliases:${p.userId}`}
+                      dir="ltr"
+                      inputMode="email"
+                      autoComplete="off"
+                      defaultValue={(report.settings.aliases[p.userId] ?? []).join(", ")}
+                      placeholder="name@example.com"
+                      className="w-full rounded-lg border border-app-border bg-white px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                </fieldset>
               ))}
             </div>
             <button type="submit" className="tap-area rounded-full border border-app-border bg-white px-4 py-1.5 text-[12.5px] font-medium text-app-text-primary hover:border-gold">
