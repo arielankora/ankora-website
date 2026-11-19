@@ -80,14 +80,17 @@ export function EntriesTable({ entries }: { entries: Entry[] }) {
       )}
 
       <div className="overflow-x-auto rounded-2xl border border-app-border bg-white">
+        {/* Name columns have a floor: the table scrolls in its box, and a long client, employee or
+            category name squeezed into its share of 900px took a dozen lines (phone check,
+            18.11.2026). */}
         <table className="w-full min-w-[900px] text-start text-sm">
           <thead>
             <tr className="border-b border-app-border text-xs text-app-text-tertiary">
               <th className="w-10 px-5 py-3"></th>
               <th className="px-5 py-3 font-medium">{t("date")}</th>
-              <th className="px-5 py-3 font-medium">{t("employee")}</th>
-              <th className="px-5 py-3 font-medium">{t("client")}</th>
-              <th className="px-5 py-3 font-medium">{t("category")}</th>
+              <th className="min-w-[12rem] px-5 py-3 font-medium">{t("employee")}</th>
+              <th className="min-w-[12rem] px-5 py-3 font-medium">{t("client")}</th>
+              <th className="min-w-[12rem] px-5 py-3 font-medium">{t("category")}</th>
               <th className="px-5 py-3 font-medium">{t("duration")}</th>
               <th className="px-5 py-3 font-medium">{t("note")}</th>
               <th className="px-5 py-3 font-medium">{t("source")}</th>
