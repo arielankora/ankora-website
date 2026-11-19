@@ -20,7 +20,8 @@ import { TaskListView } from "./TaskListView";
 import { TasksViewSwitch } from "./TasksViewSwitch";
 import { TASKS_VIEW_COOKIE, resolveTasksView } from "@/lib/tasks-view";
 import { listQueryOf } from "./list-query";
-import { MINE_SCOPES, mineFilters, mineParam, parseMineScope, type MineScope } from "./mine-scope";
+import { MINE_SCOPES, TASKS_MINE_COOKIE, explicitMineParam, mineFilters, resolveMineScope, type MineScope } from "./mine-scope";
+import { MineScopeLink } from "./MineScopeLink";
 import { ListChecks } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 
@@ -125,8 +126,9 @@ export default async function TasksPage(props: {
   // opening this screen wants is their own list. `mine=0` turns it off;
   // `mine=1` still means on, so every link written before today works.
   // "Mine" is assignee OR supervisor - see TaskFilters.involvedUserId.
-  // Since 15.10.2026 each half can be shown on its own: see mine-scope.ts.
-  const mineScope = parseMineScope(searchParams.mine);
+  // Since 15.10.2026 each half can be shown on its own, and since
+  // 19.11.2026 the last choice is remembered: see mine-scope.ts.
+  const mineScope = resolveMineScope(searchParams.mine, (await cookies()).get(TASKS_MINE_COOKIE)?.value);
   const personFilters = mineFilters(mineScope, user.id);
   /// "הושלמו" only: the whole history instead of the last month.
   const allClosed = searchParams.closed === "all";
@@ -220,9 +222,9 @@ export default async function TasksPage(props: {
       params.set("categoryId", searchParams.categoryId);
     const nextStatus = next.status ?? activePill ?? "ACTIVE";
     if (nextStatus !== "ACTIVE") params.set("status", nextStatus);
-    // "שלי" is the default, so only the other three need saying.
-    const nextMine = mineParam(next.mine ?? mineScope);
-    if (nextMine) params.set("mine", nextMine);
+    // Always said, like `view` below: a bare address shows the
+    // remembered choice, which may not be the one this link means.
+    params.set("mine", explicitMineParam(next.mine ?? mineScope));
     // Carried through every pill and toggle, so narrowing by status does
     // not silently throw away what somebody searched for.
     if (q) params.set("q", q);
@@ -329,8 +331,9 @@ export default async function TasksPage(props: {
               className="flex max-w-full overflow-x-auto rounded-full border border-app-border bg-white p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               {MINE_SCOPES.map((scope) => ({ scope, label: t(`mine.${scope}`) })).map((option) => (
-                <Link
+                <MineScopeLink
                   key={option.scope}
+                  scope={option.scope}
                   href={href({ mine: option.scope })}
                   aria-current={mineScope === option.scope ? "true" : undefined}
                   aria-label={
@@ -355,7 +358,7 @@ export default async function TasksPage(props: {
                       {supervision.pending}
                     </span>
                   )}
-                </Link>
+                </MineScopeLink>
               ))}
             </div>
 

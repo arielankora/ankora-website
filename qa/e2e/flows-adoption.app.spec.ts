@@ -69,7 +69,9 @@ test("the tasks screen opens on this person's active work, and can show everyone
   // its count ("בפיקוח, 2 ממתינות לאישורך").
   scope.getByRole("link", { name: /^בפיקוח/ })).toHaveAttribute("href", "/app/tasks?mine=supervising&view=list");
   await expect(scope.getByRole("link", { name: "כולם", exact: true })).toHaveAttribute("href", "/app/tasks?mine=0&view=list");
-  await expect(page.getByRole("link", { name: "פעילות", exact: true })).toHaveAttribute("href", "/app/tasks?view=list");
+  // "שלי" is said out loud since 19.11.2026 (`mine=1`): a bare address
+  // shows the remembered choice, which may be another one.
+  await expect(page.getByRole("link", { name: "פעילות", exact: true })).toHaveAttribute("href", "/app/tasks?mine=1&view=list");
   // "הכל" is gone: a list that grows with every closed task is not a
   // working view.
   await expect(page.getByRole("link", { name: "הכל", exact: true })).toHaveCount(0);
@@ -86,7 +88,7 @@ test("the tasks screen opens on this person's active work, and can show everyone
   );
   await expect(page.getByTestId("mine-scope").getByRole("link", { name: "שלי", exact: true })).toHaveAttribute(
     "href",
-    "/app/tasks?view=list"
+    "/app/tasks?mine=1&view=list"
   );
 });
 
