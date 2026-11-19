@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AUTO_FACT_KINDS, approvalTier, bulkApproveBlocker, revertBlocker, type TierInput } from "@/lib/knowledge-proposals";
+import { AUTO_FACT_KINDS, approvalTier, bulkApproveBlocker, revertBlocker, revertBlockerOf, type TierInput } from "@/lib/knowledge-proposals";
 
 // "ממתין לאישור" (spec 5.2): which proposals may be approved together, and
 // the approval tiers (3.11.2026): what may enter on its own (AUTO), what
@@ -91,10 +91,32 @@ describe("revertBlocker", () => {
   it("anything else is refused, with why", () => {
     expect(revertBlocker({ ...ok, state: "PENDING" })).toContain("שאושרה");
     expect(revertBlocker({ ...ok, state: "REJECTED" })).toContain("שאושרה");
-    expect(revertBlocker({ ...ok, action: "SUPERSEDE" })).toContain("לא לשינוי");
     expect(revertBlocker({ ...ok, attached: true })).toContain("כבר היה בתיק");
     expect(revertBlocker({ ...ok, resultId: null })).toContain("אין מה לבטל");
     expect(revertBlocker({ ...ok, target: "TASK" })).toContain("משימה");
     expect(revertBlocker({ ...ok, target: "DATE" })).toContain("מועד");
+    // A new system or request type is not taken out (no CREATE revert for them).
+    expect(revertBlocker({ ...ok, target: "SYSTEM" })).toContain("למערכת");
+    expect(revertBlocker({ ...ok, target: "REQUEST_TYPE" })).toContain("לסוג פנייה");
+  });
+  it("19.11.2026: an approved change of a fact, contact, provider, entity, system or request type is put back, once", () => {
+    for (const action of ["SUPERSEDE", "CONTRADICT"]) {
+      for (const target of ["FACT", "CONTACT", "ORGANIZATION", "ENTITY", "SYSTEM", "REQUEST_TYPE"]) expect(revertBlocker({ ...ok, action, target })).toBeNull();
+      expect(revertBlocker({ ...ok, action, revertedAt: new Date() })).toBe("ההצעה כבר בוטלה.");
+      expect(revertBlocker({ ...ok, action, state: "PENDING" })).toContain("שאושרה");
+    }
+  });
+  it("a change of a process or a rule is a decision by hand, and says why", () => {
+    for (const action of ["SUPERSEDE", "CONTRADICT"]) {
+      expect(revertBlockerOf({ ...ok, action, target: "PROCESS" })).toEqual({ code: "manualUndo", message: expect.stringContaining("טיוטת נוהל") });
+      expect(revertBlockerOf({ ...ok, action, target: "POLICY" })).toEqual({ code: "manualUndo", message: expect.stringContaining("מוצע") });
+    }
+  });
+  it("a change that changed nothing, or of another kind, is refused", () => {
+    expect(revertBlockerOf({ ...ok, action: "SUPERSEDE", target: "CONTACT", attached: true })?.code).toBe("nothingChanged");
+    expect(revertBlockerOf({ ...ok, action: "SUPERSEDE", target: "CONTACT", resultId: null })?.code).toBe("nothingChanged");
+    expect(revertBlockerOf({ ...ok, action: "SUPERSEDE", target: "NARRATIVE" })).toEqual({ code: "changeWrongKind", message: expect.stringContaining("לסקירה") });
+    // A PROCESS change is refused for being a process, before anything else.
+    expect(revertBlockerOf({ ...ok, action: "SUPERSEDE", target: "PROCESS", attached: true })?.code).toBe("manualUndo");
   });
 });

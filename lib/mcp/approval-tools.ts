@@ -160,6 +160,7 @@ export function registerApprovalTools(server: McpServer): void {
                 client: a.clientName,
                 kind: a.kindLabel,
                 says: a.headline,
+                action: a.action,
                 enteredOn: localDateKey(a.decidedAt, actor.timezone),
                 why: a.why,
                 url: autoReviewUrl(base, a.clientId, a.id),

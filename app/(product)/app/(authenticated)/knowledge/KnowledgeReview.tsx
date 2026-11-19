@@ -146,6 +146,7 @@ export async function KnowledgeReview({ searchParams, mineOnly = false }: { sear
           clientName: r.clientName,
           kindKey: r.kindKey,
           headline: r.headline,
+          action: r.action,
           // A plain path: the screen is on the same site.
           itemHref: r.resultId ? fileItemUrl("", r.clientId, r.resultId) : null,
           enteredAt: r.decidedAt,

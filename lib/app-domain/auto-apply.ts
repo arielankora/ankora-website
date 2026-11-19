@@ -423,6 +423,8 @@ export type AutoReviewItem = {
   whyCode: NonNullable<ReturnType<typeof autoReviewReasonCode>>;
   /// "ביטול" may still take its item out (revertBlocker).
   revertible: boolean;
+  /// CREATE, or a change (SUPERSEDE, CONTRADICT) that "ביטול" puts back.
+  action: string;
 };
 
 /// "נכנס אוטומטית": auto-applied items a person still looks at, newest
@@ -467,6 +469,7 @@ export async function listAutoReview(actor: User, filter: { clientId?: string | 
       why,
       whyCode,
       revertible: revertBlocker(r) === null,
+      action: r.action,
     });
   }
   return out;

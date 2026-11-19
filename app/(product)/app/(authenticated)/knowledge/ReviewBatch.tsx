@@ -25,6 +25,7 @@ import type { FlagText } from "@/lib/knowledge-flag-words";
 import { ProposalChanges } from "./ProposalChanges";
 import type { ProposalChange } from "@/lib/proposal-changes";
 import { detailLine, sourceKindLabel, targetLabel as kindLabelOf, type KnowledgeT } from "./labels";
+import { revertWords } from "./revert-words";
 import { approveProposalAction, approveEditedProposalAction, approveWithSuggestionAction, approveProposalsAction, attachProposalAction, mergeProposalAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction, revertProposalAction } from "./actions";
 
 // One batch: one meeting or one document, and what Claude proposed from
@@ -406,11 +407,13 @@ function RejectManyForm({ ids }: { ids: string[] }) {
 /// "ביטול" on an approved new item (3.11.2026): the item is taken out of
 /// the file again, and the proposal stays approved, marked reverted. Two
 /// steps on the row, not the browser's confirm() (see SetupForms.tsx).
+/// On an approved change (19.11.2026) the item goes back to what it was.
 function RevertButton({ p }: { p: ReviewProposal }) {
   const t = useTranslations("knowledge");
   const { showToast } = useToast();
   const [asking, setAsking] = useState(false);
   const [pending, setPending] = useState(false);
+  const words = revertWords(p.action);
   if (!asking) {
     return (
       <button type="button" onClick={() => setAsking(true)} className="ms-1.5 text-app-text-accent hover:underline" data-testid="proposal-revert">
@@ -424,13 +427,13 @@ function RevertButton({ p }: { p: ReviewProposal }) {
     setPending(false);
     setAsking(false);
     if (r.error) showToast({ tone: "error", title: t("revert.failed"), description: r.error });
-    else showToast({ tone: "info", title: t("revert.done"), description: p.headline.slice(0, 80) });
+    else showToast({ tone: "info", title: t(words.done), description: p.headline.slice(0, 80) });
   }
   return (
     <span className="ms-1.5 inline-flex flex-wrap items-center gap-2">
-      <span className="text-app-text-secondary">{t("revert.confirm")}</span>
+      <span className="text-app-text-secondary">{t(words.confirm)}</span>
       <button type="button" disabled={pending} onClick={revert} className="font-medium text-app-error disabled:opacity-50" data-testid="proposal-revert-confirm">
-        {pending ? t("revert.removing") : t("revert.remove")}
+        {pending ? t(words.removing) : t(words.remove)}
       </button>
       <button type="button" disabled={pending} onClick={() => setAsking(false)} className="text-app-text-secondary">
         {t("revert.keep")}

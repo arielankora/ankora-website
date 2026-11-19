@@ -6,6 +6,7 @@ import { autoReviewAnchor, pauseAnchor } from "@/lib/approval-links";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { kindKeyLabel } from "./labels";
 import { pauseErrorsLine, type AutoErrorType } from "@/lib/auto-apply";
+import { revertWords } from "./revert-words";
 import { liftAutoApplyPauseAction, markAutoReviewedAction, revertProposalAction, setAutoApplyAction } from "./actions";
 
 // "נכנס אוטומטית" (3.11.2026, approval tiers part 2): the items that
@@ -19,6 +20,8 @@ export type AutoReviewRow = {
   /// lib/knowledge-review-filters.ts, proposalKindKey.
   kindKey: string;
   headline: string;
+  /// CREATE, or a change that "ביטול" puts back as it was (revertWords).
+  action?: string;
   /// The item in the client's file.
   itemHref: string | null;
   enteredAt: Date | null;
@@ -73,13 +76,14 @@ function ReviewRow({ row }: { row: AutoReviewRow }) {
   const { showToast } = useToast();
   const [pending, setPending] = useState<"ok" | "revert" | null>(null);
   const [asking, setAsking] = useState(false);
+  const words = revertWords(row.action);
   async function run(kind: "ok" | "revert") {
     setPending(kind);
     const r = kind === "ok" ? await markAutoReviewedAction(row.id) : await revertProposalAction(row.id);
     setPending(null);
     setAsking(false);
     if (r.error) showToast({ tone: "error", title: kind === "ok" ? t("markFailed") : tk("revert.failed"), description: r.error });
-    else showToast({ tone: "info", title: kind === "ok" ? t("marked") : tk("revert.done"), description: row.headline.slice(0, 80) });
+    else showToast({ tone: "info", title: kind === "ok" ? t("marked") : tk(words.done), description: row.headline.slice(0, 80) });
   }
   const why = row.why.code === "firstDays" ? t("why.firstDays", { days: row.why.days }) : row.why.code === "newGuide" ? t("why.newGuide") : t("why.sample", { percent: row.why.percent });
   return (
@@ -103,9 +107,9 @@ function ReviewRow({ row }: { row: AutoReviewRow }) {
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {asking ? (
           <>
-            <span className="text-app-text-secondary">{tk("revert.confirm")}</span>
+            <span className="text-app-text-secondary">{tk(words.confirm)}</span>
             <button type="button" disabled={!!pending} onClick={() => run("revert")} className="font-medium text-app-error disabled:opacity-50" data-testid="auto-review-revert-confirm">
-              {pending === "revert" ? tk("revert.removing") : tk("revert.remove")}
+              {pending === "revert" ? tk(words.removing) : tk(words.remove)}
             </button>
             <button type="button" disabled={!!pending} onClick={() => setAsking(false)} className="text-app-text-secondary">
               {tk("revert.keep")}
