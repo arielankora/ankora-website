@@ -51,6 +51,10 @@ export const WEEK_LIMIT_MS = 7 * 86_400_000;
 /// hour of five, a day of seven.
 export const MIN_ELAPSED_FIVE_MS = 30 * 60_000;
 export const MIN_ELAPSED_WEEK_MS = 86_400_000;
+/// Early, but already this much used: that is not noise. 68% of the week
+/// after 17 hours read "too early to tell" next to "fine" (19.11.2026), so
+/// from this share up the pace is read even in the first stretch.
+export const EARLY_MAX_USED_PCT = 50;
 /// At this projected share or less the pace is fine; above 100 the person
 /// gets stuck before the reset.
 export const PACE_OK_PCT = 80;
@@ -78,7 +82,7 @@ export function paceOf(usedPct: number, resetsAt: Date | null, now: Date, window
   const elapsedPct = Math.round((elapsedMs / windowMs) * 1000) / 10;
   const base = { usedPct, elapsedPct, resetsAt: resetsAt.toISOString() };
   if (usedPct >= LIMIT_HIT_PCT) return { ...base, projectedPct: null, state: "stuck", projectedHitAt: null };
-  if (elapsedMs < minElapsedMs) return { ...base, projectedPct: null, state: "early", projectedHitAt: null };
+  if (elapsedMs < minElapsedMs && usedPct < EARLY_MAX_USED_PCT) return { ...base, projectedPct: null, state: "early", projectedHitAt: null };
   const projectedPct = Math.round((usedPct / elapsedMs) * windowMs);
   const state: PaceState = projectedPct <= PACE_OK_PCT ? "ok" : projectedPct <= 100 ? "watch" : "over";
   // At this rate, the rest of the limit lasts this long.

@@ -27,6 +27,8 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   move_time_entry_to_open_bank: "refuses an entry on a marked task or client (redactEntriesForAi), and only the caller's own entries",
   update_timer_note: "refuses a running timer on a marked task or client (guardRunning)",
   create_time_entry: "lookupClient and lookupTask",
+  update_time_entry: "refuses an entry on a marked task or client (ownFinishedEntry, redactEntriesForAi), only the caller's own entries; a new task through lookupTask",
+  delete_time_entry: "refuses an entry on a marked task or client (ownFinishedEntry, redactEntriesForAi), and only the caller's own entries",
   list_tasks: "listTasks forAi; lookupClient",
   list_assignable_people: "lookupClient",
   create_task: "lookupClient; category evidence leaves out marked tasks and their notes (autoPickCategory)",

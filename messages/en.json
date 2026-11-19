@@ -2419,7 +2419,8 @@
         "over": "At this pace it runs out before the reset",
         "watch": "At this pace it reaches {projected}% by the reset: close to the limit",
         "ok": "At this pace it reaches {projected}% by the reset",
-        "early": "Too early to project: little time has gone",
+        "earlyWindow": "Too early to project: less than half an hour into the window",
+        "earlyWeek": "Too early to project: less than a day into the week",
         "idle": "The window opens with the next message to Claude",
         "noneWindow": "No reading from the browser extension",
         "noneWeek": "No reading from the browser extension"
