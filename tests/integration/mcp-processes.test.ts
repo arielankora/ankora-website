@@ -113,6 +113,19 @@ describe("list_processes and get_process", () => {
     expect(detail.json.draft.failsRules).toEqual(["שלבים 1 ו-3 אוטומטיים: צריך לכתוב בכל אחד איך אדם מוודא שהשלב קרה."]);
   });
 
+  // 19.11.2026: in P8 the R1 line only said "צריך לסמן דורש אישור", and the
+  // right fix was moving "ספק חדש" to the step where a person decides.
+  // Claude reads the same sentence, so it gets the reason and both ways out.
+  it("says why a step tagged with a person's action blocks the draft, and both ways to fix it", async () => {
+    const { client, hadas } = await setup();
+    const p2 = await addProcess(hadas, { clientId: client.id, title: "ספק חדש", triggerKinds: ["ON_DEMAND"], sources: S1 });
+    await saveProcessVersion(hadas, p2.id, { steps: [{ title: "בדיקת הספק" }, { title: "הכנת ההסכם", mode: "ASSISTED", actionTags: ["SUPPLIER_NEW"] }], baseVersion: 0 });
+    const detail = await call(hadas, "get_process", { client: "NUX", process: p2.code });
+    expect(detail.json.draft.failsRules).toEqual([
+      'שלב 2 מסומן בסוג הפעולה "ספק חדש", ו-Claude מכין אותו. פעולה כזו דורשת אישור של אדם לפני הביצוע, ולכן אי אפשר לאשר את הנוהל. אפשר לתקן בשתי דרכים: לסמן בשלב "דורש אישור לפני ביצוע", או להוריד ממנו את "ספק חדש" אם הפעולה לא נעשית בו, ולסמן אותה בשלב שבו אדם מחליט.',
+    ]);
+  });
+
   it("an approved procedure with no draft has draft null", async () => {
     const { hadas, p1 } = await setup();
     const detail = await call(hadas, "get_process", { client: "NUX", process: p1.code });

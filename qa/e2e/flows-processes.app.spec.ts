@@ -51,13 +51,13 @@ test.describe("clients/process-actions", () => {
 
     const draft = page.getByTestId("process-draft");
     await expect(draft).toContainText("טיוטה 1 מחכה לאישור", { timeout: 15_000 });
-    await expect(draft).toContainText("לא נעשה אוטומטית");
+    await expect(draft).toContainText("ומוגדר כאוטומטי. פעולה כזו היא החלטה של אדם");
     await expect(draft.getByRole("button", { name: "אישור הנוהל" })).toHaveCount(0);
 
     await page.getByTestId("process-edit-steps").click();
     await expect(page.getByTestId("steps-editor")).toBeVisible({ timeout: 15_000 });
     // 28.10.2026: the editor says what holds the approval, and where.
-    await expect(page.getByTestId("procedure-issues")).toContainText("לא נעשה אוטומטית");
+    await expect(page.getByTestId("procedure-issues")).toContainText("ומוגדר כאוטומטי. פעולה כזו היא החלטה של אדם");
     await expect(page.getByTestId("procedure-issues")).toContainText("איך אדם מוודא שזה קרה");
     await expect(page.getByLabel("שלב 1: איך יודעים שבוצע")).toHaveAttribute("aria-invalid", "true");
     await page.getByRole("radiogroup", { name: "שלב 1: איך" }).getByRole("radio", { name: "ידני" }).click();
