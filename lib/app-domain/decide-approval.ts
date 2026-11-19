@@ -28,6 +28,8 @@ export type DecideInput = {
   clientId?: string | null;
   /// A process decision: the step to carry out (lib/next-steps.ts).
   op?: StepOp | null;
+  /// A procedure: the open lessons that went into this version.
+  lessonIds?: string[];
 };
 
 export async function decideApproval(user: User, input: DecideInput): Promise<void> {
@@ -47,7 +49,7 @@ export async function decideApproval(user: User, input: DecideInput): Promise<vo
       return;
     case "procedure":
       if (!approve || input.version === undefined) throw new DomainError("decideApproval.procedureHere", "נוהל מאשרים כאן, ומתקנים אותו בתהליך עצמו.");
-      await approveProcessVersion(user, input.id, input.version);
+      await approveProcessVersion(user, input.id, input.version, input.lessonIds ?? []);
       return;
     case "plan":
       if (!approve || input.version === undefined) throw new DomainError("decideApproval.planHere", "תוכנית מאשרים כאן, ומתקנים אותה במשימה עצמה.");

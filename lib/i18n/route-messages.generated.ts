@@ -41,6 +41,7 @@ export const AREA_MESSAGE_PATHS = {
     "categories.edit",
   ],
   "clients": [
+    "approvals.row.lessonsInVersion",
     "clients.connections",
     "clients.control",
     "clients.create",

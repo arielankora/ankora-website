@@ -133,6 +133,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
       kind: i.kind,
       id: i.id,
       version: i.version,
+      openLessons: i.openLessons,
       clientId: i.clientId,
       clientName: i.clientName,
       title: w.title ? say(w.title) : i.title,

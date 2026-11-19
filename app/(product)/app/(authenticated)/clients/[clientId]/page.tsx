@@ -146,7 +146,7 @@ function serverNow(): number {
   return Date.now();
 }
 
-export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }>; searchParams?: Promise<{ tab?: string; section?: string; from?: string | string[]; fromApprovals?: string | string[]; process?: string; rhythm?: string }> }) {
+export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }>; searchParams?: Promise<{ tab?: string; section?: string; from?: string | string[]; fromApprovals?: string | string[]; process?: string; rhythm?: string; view?: string }> }) {
   const params = await props.params;
   // Two tabs (org-brain spec 6.1): the day-to-day work, and the client
   // file. The file has a dozen sections, and on one long page they would
@@ -623,6 +623,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         upcoming={upcoming}
         canApprove={can(user.role, "client.manage")}
         openRhythm={sp.rhythm === "open"}
+        initialTab={sp.view === "lessons" ? "lessons" : undefined}
         userId={user.id}
         back={viaApprovals ? { href: viaApprovals.href, label: viaApprovals.label } : null}
       />

@@ -28,6 +28,7 @@ import { CheckLines, Lessons, ProcessForm, StartRunForm, type FormOptions, type 
 import { ProcessCheckForm } from "./ProcessCheckForm";
 import { RhythmEditor } from "./RhythmEditor";
 import { DocumentTab } from "./DocumentTab";
+import { LessonsInVersion } from "../../approvals/LessonsInVersion";
 import type { DocumentTab as DocumentTabData } from "@/lib/app-domain/procedure-audit";
 
 type Tx = (key: string, values?: Record<string, string | number>) => string;
@@ -49,6 +50,7 @@ export function ProcessPage({
   upcoming,
   canApprove,
   openRhythm,
+  initialTab,
   userId,
   back = null,
   docTab,
@@ -65,6 +67,8 @@ export function ProcessPage({
   upcoming: Upcoming[];
   canApprove: boolean;
   openRhythm: boolean;
+  /// `?view=lessons`: the tab the page opens on (19.11.2026).
+  initialTab?: Tab;
 }) {
   const t = useTranslations("clients.processes.page") as unknown as Tx;
   const tp = useTranslations("clients.processes") as unknown as Tx;
@@ -72,7 +76,9 @@ export function ProcessPage({
   const format = useFormatter();
   const router = useRouter();
   const { showToast } = useToast();
-  const [tab, setTab] = useState<Tab>("steps");
+  // The open lessons the version about to be approved covers (19.11.2026).
+  const [lessonIds, setLessonIds] = useState<string[]>([]);
+  const [tab, setTab] = useState<Tab>(initialTab === "lessons" && p.kind !== "GUIDE" ? "lessons" : "steps");
   // "?rhythm=open" opens the rhythm editor once, after a new process is
   // added; taken off the address so a reload does not open it again.
   useEffect(() => {
@@ -389,9 +395,17 @@ export function ProcessPage({
                   <p className="font-bold text-app-text-primary">{t("draftWaits", { version: p.draft.version })}</p>
                   {p.draft.checks.length > 0 && <CheckLines checks={p.draft.checks} />}
                   {p.draft.mayApprove && !p.draft.checks.some((c) => c.severity === "BLOCK" && !c.excepted) && (
-                    <button type="button" onClick={() => act(() => approveProcessVersionAction(p.id, p.draft!.version, clientId), t("approved"))} className="self-start rounded-[9px] bg-app-surface-nav px-4 py-2 text-sm font-bold text-white">
-                      {t("approve")}
-                    </button>
+                    <>
+                      {!guide && <LessonsInVersion lessons={openLessons.map((l) => ({ id: l.id, body: l.body ?? "", version: l.version }))} version={p.draft.version} checked={lessonIds} onChange={setLessonIds} />}
+                      <button
+                        type="button"
+                        onClick={() => act(() => approveProcessVersionAction(p.id, p.draft!.version, clientId, guide ? [] : lessonIds), t("approved"), () => setLessonIds([]))}
+                        className="self-start rounded-[9px] bg-app-surface-nav px-4 py-2 text-sm font-bold text-white"
+                        data-testid="process-approve-version"
+                      >
+                        {t("approve")}
+                      </button>
+                    </>
                   )}
                 </div>
               )}

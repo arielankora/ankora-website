@@ -1514,6 +1514,7 @@
       "notApprover": "Only a manager or the client's account manager approves a procedure.",
       "separationRequired": "This client requires separation: whoever wrote the procedure version does not approve it. Someone else approves.",
       "notLatestVersion": "This is not the latest version of the procedure. Refresh and try again.",
+      "lessonNotOpen": "One of the remarks you marked is no longer open on this process. Refresh and try again.",
       "alreadyApproved": "This version is already approved.",
       "failsChecks": "The procedure fails the checks: {checks}",
       "notApplicableNotAllowed": "Only a manager or the process owner marks a field not relevant.",
@@ -6032,7 +6033,12 @@
       "done": "Done",
       "approved": "Approved",
       "rejected": "Rejected",
-      "blockingTitle": "What is holding up approval"
+      "blockingTitle": "What is holding up approval",
+      "lessonsInVersion": {
+        "title": "Went into version {version}? Tick the remarks from the field this version covers:",
+        "fromVersion": "written on version {version}",
+        "rest": "A remark left unticked stays open, for the next version."
+      }
     },
     "preview": {
       "toggle": {

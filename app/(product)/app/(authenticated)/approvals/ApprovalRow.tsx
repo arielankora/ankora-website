@@ -8,6 +8,7 @@ import type { ApprovalKind, KindTone, RowActions } from "@/lib/approvals";
 import type { ApprovalPreview } from "@/lib/approvals-preview";
 import type { StepOp } from "@/lib/next-steps";
 import { decideApprovalAction } from "./actions";
+import { LessonsInVersion, type OpenLesson } from "./LessonsInVersion";
 
 // One row of "אישורים": what it is, for whom, how long it has waited,
 // and the decision in place. A reject that removes something (a proposed
@@ -34,6 +35,8 @@ export type RowView = {
   kind: ApprovalKind;
   id: string;
   version?: number;
+  /// A procedure: lessons open on its process (LessonsInVersion).
+  openLessons?: OpenLesson[];
   clientId: string | null;
   clientName: string | null;
   title: string;
@@ -64,10 +67,11 @@ export function ApprovalRow({ row }: { row: RowView }) {
   const [note, setNote] = useState("");
   const [done, setDone] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [lessonIds, setLessonIds] = useState<string[]>([]);
 
   const decide = (decision: "approve" | "reject") =>
     start(async () => {
-      const r = await decideApprovalAction({ kind: row.kind, id: row.kind === "process" ? row.id.split(":")[0] : row.id, version: row.version, decision, note, clientId: row.clientId, op: row.op ?? null });
+      const r = await decideApprovalAction({ kind: row.kind, id: row.kind === "process" ? row.id.split(":")[0] : row.id, version: row.version, decision, note, clientId: row.clientId, op: row.op ?? null, lessonIds: row.kind === "procedure" ? lessonIds : undefined });
       if (r.error) {
         showToast({ tone: "error", title: decision === "approve" ? t("row.approveFailed") : t("row.actionFailed"), description: r.error });
         return;
@@ -131,6 +135,9 @@ export function ApprovalRow({ row }: { row: RowView }) {
           </button>
         )}
         {row.preview && open && <PreviewBody preview={row.preview} />}
+        {row.kind === "procedure" && row.actions.approve && !done && row.version !== undefined && row.openLessons && (
+          <LessonsInVersion lessons={row.openLessons} version={row.version} checked={lessonIds} onChange={setLessonIds} />
+        )}
         <p className="mt-1 text-[11.5px] text-app-text-tertiary">
           {[row.clientName, row.by ? t("row.from", { name: row.by }) : null, row.waited].filter(Boolean).join(" · ")}
         </p>

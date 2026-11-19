@@ -210,6 +210,14 @@ async function procedures(s: Scope): Promise<ApprovalItem[]> {
   const newest = new Map(latest.map((l) => [l.processId, l._max.version]));
   const current = drafts.filter((d) => newest.get(d.processId) === d.version);
   const names = await namesOf(current.map((d) => d.createdById));
+  // The lessons still open on each process: the approver says which went
+  // into the version (approveProcessVersion, 19.11.2026).
+  const lessonRows = await prisma.processLesson.findMany({
+    where: { processId: { in: current.map((d) => d.processId) }, status: "OPEN" },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, processId: true, body: true, version: true },
+  });
+  const lessonsOf = (processId: string) => lessonRows.filter((l) => l.processId === processId).map((l) => ({ id: l.id, body: l.body ?? "", version: l.version }));
   // The same checks approveProcessVersion runs, read once per client, so
   // the row says what holds it back instead of a button that fails.
   const clientIds = [...new Set(current.map((d) => d.process.clientId))];
@@ -251,6 +259,7 @@ async function procedures(s: Scope): Promise<ApprovalItem[]> {
       since: d.createdAt,
       by: names.get(d.createdById ?? "") ?? null,
       href: processHref(d.process.clientId, d.processId),
+      openLessons: lessonsOf(d.processId),
       preview,
       blocked: held ? "הנוהל לא עובר את הבדיקות. מתקנים אותו בתהליך, ואז מאשרים." : separated,
       failing: held ? preview.problems : undefined,
@@ -467,7 +476,9 @@ async function processes(s: Scope): Promise<ApprovalItem[]> {
         recommend: step.recommend ? { text: step.recommend, why: step.why } : null,
         stepText: step.text,
         op: step.fix.kind === "op" ? step.fix.op : null,
-        go: step.fix.kind === "op" ? null : { label: step.fix.label, href },
+        // "להערות" opens the lessons tab, where each one is decided, not
+        // the steps, where the procedure is approved (19.11.2026).
+        go: step.fix.kind === "op" ? null : { label: step.fix.label, href: step.kind === "lessons" ? `${href}?view=lessons` : href },
         blocking: step.blocking,
         deadline: r.deadline,
       });
