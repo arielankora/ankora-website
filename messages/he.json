@@ -1990,6 +1990,7 @@
       "knowledgeProposalMerge": "הוספת הצעה לפריט קיים בתיק",
       "knowledgeProposalReject": "דחיית הצעה לתיק הלקוח",
       "knowledgeProposalAttach": "הצעה שכבר בתיק: המקור נוסף לפריט הקיים",
+      "knowledgeProposalRetarget": "הצעה עברה לגרסה החדשה של הפריט",
       "knowledgeProposalToTask": "הצעה לתיק הלקוח הפכה למשימה",
       "knowledgeProposalRevert": "ביטול הצעה שאושרה: הפריט הוסר מתיק הלקוח או חזר למה שהיה",
       "knowledgeProposalAutoApply": "הצעה לתיק הלקוח נכנסה לתיק אוטומטית",

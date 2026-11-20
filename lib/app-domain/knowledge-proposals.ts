@@ -245,10 +245,32 @@ async function registerCodes(clientId: string): Promise<string[]> {
   return (await prisma.clientSource.findMany({ where: { clientId, deletedAt: null }, select: { code: true } })).map((s) => s.code);
 }
 
+/// A new version of a fact keeps what the version in force has and it does
+/// not say (20.11.2026): a temporary fact its end, a one-off decision its
+/// date. Claude rewrote the text of a temporary fact and the card stopped
+/// at "מידע זמני צריך תוקף", though the fact had one.
+const KEPT_FACT_FIELDS = ["validUntil", "validUntilEvent", "decidedAt"] as const;
+export async function withKeptFactFields(p: { target: string; action: string; targetId: string | null }, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (p.target !== "FACT" || p.action !== "SUPERSEDE" || !p.targetId) return payload;
+  const missing = KEPT_FACT_FIELDS.filter((k) => payload[k] === undefined || payload[k] === null || payload[k] === "");
+  if (missing.length === 0) return payload;
+  const live = await currentFactVersion(p.targetId);
+  if (!live) return payload;
+  const fact = await prisma.clientFact.findUnique({ where: { id: live }, select: { kind: true, validUntil: true, validUntilEvent: true, decidedAt: true } });
+  if (!fact || (payload.kind !== undefined && payload.kind !== fact.kind)) return payload;
+  const kept: Record<string, unknown> = {};
+  for (const k of missing) {
+    const v = fact[k];
+    if (v instanceof Date) kept[k] = v.toISOString().slice(0, 10);
+    else if (typeof v === "string" && v.trim()) kept[k] = v;
+  }
+  return Object.keys(kept).length ? { ...payload, ...kept } : payload;
+}
+
 async function flagsFor(clientId: string, item: ProposalItemInput & { payload: Record<string, unknown> }, sourceWeight: string, codes: string[], sourceTitle?: string | null): Promise<ProposalFlag[]> {
   // What would stop it from entering the file first: the reviewer reads
   // these before anything else.
-  const flags: ProposalFlag[] = proposalProblems(item.target, item.payload, codes, { sourceTitle });
+  const flags: ProposalFlag[] = proposalProblems(item.target, await withKeptFactFields({ target: item.target, action: item.action ?? "CREATE", targetId: item.targetId ?? null }, item.payload), codes, { sourceTitle });
   if (typeof item.payload.ownerName === "string" && item.payload.ownerName.trim() && !(await ownerByName(item.payload.ownerName))) {
     flags.push({ code: "OWNER", message: `אין איש צוות אחד בשם "${item.payload.ownerName.trim()}". הפריט ייכנס בלי בעלים, אלא אם מתקנים את השם.` });
   }
@@ -635,10 +657,24 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
   // is now (19.11.2026): the card shows before and after, not a struck-out
   // line with nothing in its place.
   const changesOf = new Map<string, ProposalChange[]>();
+  // A fact replaced since (20.11.2026): compared with the version in force,
+  // which approving it changes (approveProposal).
+  const liveFactOf = new Map<string, string>();
+  for (const b of batches) {
+    for (const pr of b.proposals) {
+      if (pr.state !== "PENDING" || pr.target !== "FACT" || !pr.targetId || pr.action === "CREATE") continue;
+      const live = await currentFactVersion(pr.targetId);
+      if (live && live !== pr.targetId) {
+        liveFactOf.set(pr.id, live);
+        const f = await prisma.clientFact.findUnique({ where: { id: live }, select: { id: true, body: true, sources: true } });
+        if (f) targetById.set(live, f);
+      }
+    }
+  }
   for (const b of batches) {
     for (const pr of b.proposals) {
       if (pr.state !== "PENDING" || pr.action !== "SUPERSEDE" || !pr.targetId) continue;
-      const now = await currentFields(b.clientId, pr.target, pr.targetId);
+      const now = await currentFields(b.clientId, pr.target, liveFactOf.get(pr.id) ?? pr.targetId);
       if (now) changesOf.set(pr.id, proposalChanges((pr.payload ?? {}) as Record<string, unknown>, now));
     }
   }
@@ -660,12 +696,20 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
   // What blocks a pending proposal is said again in today's words, with
   // its suggested wording (3.11.2026): a card stored before then has the
   // old sentence and no wording to approve.
+  // What a fact's new version keeps from the version in force, so a card
+  // does not ask for what the file already has (withKeptFactFields).
+  const keptPayload = new Map<string, Record<string, unknown>>();
+  for (const b of batches) {
+    for (const pr of b.proposals) {
+      if (pr.state === "PENDING" && pr.target === "FACT" && pr.action === "SUPERSEDE") keptPayload.set(pr.id, await withKeptFactFields(pr, (pr.payload ?? {}) as Record<string, unknown>));
+    }
+  }
   const codesOf = new Map<string, string[]>();
   for (const clientId of new Set(batches.map((b) => b.clientId))) codesOf.set(clientId, await registerCodes(clientId));
   const titleOf = new Map(batches.map((b) => [b.id, b.sourceId ? sourceById.get(b.sourceId)?.title ?? null : null]));
-  const restated = (pr: { clientId: string; batchId: string; target: string; payload: Prisma.JsonValue; state: string }, flags: Prisma.JsonValue): Prisma.JsonValue => {
+  const restated = (pr: { id: string; clientId: string; batchId: string; target: string; payload: Prisma.JsonValue; state: string }, flags: Prisma.JsonValue): Prisma.JsonValue => {
     if (pr.state !== "PENDING" || !Array.isArray(flags)) return flags;
-    const fresh = proposalProblems(pr.target as ProposalTargetLike, (pr.payload ?? {}) as Record<string, unknown>, codesOf.get(pr.clientId) ?? [], { sourceTitle: titleOf.get(pr.batchId) });
+    const fresh = proposalProblems(pr.target as ProposalTargetLike, keptPayload.get(pr.id) ?? ((pr.payload ?? {}) as Record<string, unknown>), codesOf.get(pr.clientId) ?? [], { sourceTitle: titleOf.get(pr.batchId) });
     return [...fresh, ...(flags as ProposalFlag[]).filter((f) => !PROBLEM_CODES.includes(f.code))] as Prisma.JsonValue;
   };
   // 3.11.2026: what approving a process proposal does to its procedure,
@@ -705,7 +749,7 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
         : {
             ...p,
             flags: liveFlags(p),
-            existing: p.targetId ? targetById.get(p.targetId) ?? null : null,
+            existing: p.targetId ? targetById.get(liveFactOf.get(p.id) ?? p.targetId) ?? null : null,
             changes: changesOf.get(p.id) ?? null,
             alreadyIn: alreadyIn.get(p.id) ? { ...alreadyIn.get(p.id)!, addsSources: keepsSources(p.target) && readSourceRefs((p.payload as Record<string, unknown>).sources).length > 0 } : null,
             hiddenFor: null as string | null,
@@ -739,6 +783,62 @@ async function findPending(actor: User, id: string) {
 async function closeIfDone(batchId: string) {
   const pending = await prisma.knowledgeProposal.count({ where: { batchId, state: "PENDING" } });
   if (pending === 0) await prisma.knowledgeBatch.update({ where: { id: batchId }, data: { closedAt: new Date() } });
+}
+
+/// The version of a fact in force now (20.11.2026): a fact replaced since
+/// follows its replacements. The id itself when it is current; null when
+/// no version of it is in the file.
+export async function currentFactVersion(id: string): Promise<string | null> {
+  let at: string | null = id;
+  for (let hops = 0; at && hops < 50; hops++) {
+    const f: { id: string; deletedAt: Date | null; knowledgeStatus: string; supersededById: string | null } | null = await prisma.clientFact.findUnique({
+      where: { id: at },
+      select: { id: true, deletedAt: true, knowledgeStatus: true, supersededById: true },
+    });
+    if (!f || f.deletedAt) return null;
+    if (f.knowledgeStatus !== "SUPERSEDED") return f.id;
+    at = f.supersededById;
+  }
+  return null;
+}
+
+/// Proposals still waiting on a fact that a newer version replaced
+/// (20.11.2026, Ariel: two meetings proposed the same change, one was
+/// approved, and the other could be neither approved nor left). Each moves
+/// to the version in force, so the card compares with what the file says
+/// now. One that the version in force already says closes as "כבר בתיק",
+/// with its sources added there, as that button does. A sensitive one only
+/// moves: closing it is for whoever approves sensitive information.
+export async function settleProposalsOnReplacedFact(actor: User, factId: string): Promise<{ moved: number; closed: number }> {
+  const current = await currentFactVersion(factId);
+  if (!current || current === factId) return { moved: 0, closed: 0 };
+  const waiting = await prisma.knowledgeProposal.findMany({ where: { target: "FACT", targetId: factId, state: "PENDING", action: { in: ["SUPERSEDE", "CONTRADICT"] } } });
+  let moved = 0;
+  let closed = 0;
+  for (const p of waiting) {
+    const payload = (p.payload ?? {}) as Record<string, unknown>;
+    const now = p.action === "SUPERSEDE" && !isSensitive(p.payload) ? await currentFields(p.clientId, "FACT", current) : null;
+    if (now && proposalChanges(payload, now).length === 0) {
+      const sources = readSourceRefs(payload.sources);
+      if (sources.length) await addClientFactSources(actor, current, sources);
+      await prisma.knowledgeProposal.update({ where: { id: p.id }, data: { targetId: current, state: "APPROVED", decidedById: actor.id, decidedAt: new Date(), edited: false, attached: true, resultId: current } });
+      await closeIfDone(p.batchId);
+      await recordAudit({
+        actorId: actor.id,
+        action: "knowledge_proposal.attach",
+        entityType: "KnowledgeProposal",
+        entityId: p.id,
+        clientId: p.clientId,
+        after: { resultId: current, replaced: factId, sources: sources.map((r) => r.code), headline: proposalHeadline(p.target, payload) },
+      });
+      closed++;
+    } else {
+      await prisma.knowledgeProposal.update({ where: { id: p.id }, data: { targetId: current } });
+      await recordAudit({ actorId: actor.id, action: "knowledge_proposal.retarget", entityType: "KnowledgeProposal", entityId: p.id, clientId: p.clientId, before: { targetId: factId }, after: { targetId: current } });
+      moved++;
+    }
+  }
+  return { moved, closed };
 }
 
 /// Writes the proposal into the file, as the person approving it, through
@@ -949,7 +1049,7 @@ export async function approveWithSuggestion(actor: User, id: string) {
   const proposal = await findPending(actor, id);
   const batch = await prisma.knowledgeBatch.findUnique({ where: { id: proposal.batchId }, select: { sourceId: true } });
   const source = batch?.sourceId ? await prisma.clientSource.findUnique({ where: { id: batch.sourceId }, select: { title: true } }) : null;
-  const flags = proposalProblems(proposal.target, proposal.payload as Record<string, unknown>, await registerCodes(proposal.clientId), { sourceTitle: source?.title });
+  const flags = proposalProblems(proposal.target, await withKeptFactFields(proposal, proposal.payload as Record<string, unknown>), await registerCodes(proposal.clientId), { sourceTitle: source?.title });
   const edits = suggestedFix(flags);
   if (!edits) throw new DomainError("knowledgeProposals.noSuggestion", "אין להצעה הזו נוסח מוצע. משלימים בעריכה, או דוחים.");
   return approveProposal(actor, id, edits);
@@ -959,9 +1059,17 @@ export async function approveWithSuggestion(actor: User, id: string) {
 /// person on the screen. Marked autoApplied, with its own audit action.
 export async function approveProposal(actor: User, id: string, edits: Record<string, unknown> = {}, options: { bulk?: boolean; auto?: boolean } = {}) {
   assertCan(actor.role, "time_entry.create_self");
-  const proposal = await findPending(actor, id);
+  let proposal = await findPending(actor, id);
+  // A fact replaced since the proposal arrived (20.11.2026): the proposal
+  // moves to the version in force, or closes when that version says it.
+  if (proposal.target === "FACT" && proposal.targetId && proposal.action !== "CREATE" && (await currentFactVersion(proposal.targetId)) !== proposal.targetId) {
+    await settleProposalsOnReplacedFact(actor, proposal.targetId);
+    const after = await prisma.knowledgeProposal.findUniqueOrThrow({ where: { id } });
+    if (after.state !== "PENDING") return { ...after, procedure: null as ProcedureAlongside | null };
+    proposal = after;
+  }
   if (isSensitive(proposal.payload)) await assertCanApproveForClient(actor, proposal.clientId);
-  const original = proposal.payload as Record<string, unknown>;
+  const original = await withKeptFactFields(proposal, proposal.payload as Record<string, unknown>);
   // "Not visible to the client" is what an item without the field means:
   // leaving it as it was is no edit.
   const was = (k: string) => original[k] ?? (k === "clientVisible" ? false : null);
@@ -1024,6 +1132,10 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
       ...(options.bulk ? { bulk: true } : {}),
     },
   });
+  // The other proposals on the fact this one replaced move to the new
+  // version, or close when it already says them (20.11.2026). After this
+  // one is closed, so it is not one of them.
+  if (proposal.target === "FACT" && proposal.action === "SUPERSEDE" && proposal.targetId) await settleProposalsOnReplacedFact(actor, proposal.targetId);
   // Not on arrival (auto): a procedure is approved by a person.
   const procedure: ProcedureAlongside | null =
     proposal.target === "PROCESS" && !options.auto && resultId && proposal.action !== "CONTRADICT" ? await approveProcedureAlongside(actor, resultId, versionBefore) : null;
