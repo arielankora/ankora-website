@@ -83,7 +83,7 @@ type Observed = {
   /// Aborts seen while the test body was still running, writes and all.
   /// Separate from `done` because `done` also holds the teardown aborts,
   /// and those are Playwright closing the page rather than the fault.
-  abortsWhileRunning: { method: string; path: string }[];
+  abortsWhileRunning: { method: string; path: string; action?: string }[];
 };
 
 const observed = new WeakMap<Page, Observed>();
@@ -266,7 +266,7 @@ export function observe(page: Page): void {
     // that noise is in the report it is worse than no report, because it
     // is indistinguishable from the real thing.
     if (state.sealed) return;
-    state.abortsWhileRunning.push({ method: started.method, path: started.path });
+    state.abortsWhileRunning.push({ method: started.method, path: started.path, action: started.action });
     console.warn(
       `[abort] ${started.method} ${started.path} ${ms}ms ${failed ?? "(no reason given)"}` +
         ` (${navigating ? "WHILE NAVIGATING" : "page still"},` +
@@ -340,7 +340,9 @@ export function observe(page: Page): void {
 export function abortedWrites(page: Page): { method: string; path: string }[] {
   const state = observed.get(page);
   if (!state) return [];
-  return state.abortsWhileRunning.filter((a) => a.method !== "GET");
+  // A Server Action named get... reads (getActiveTimerSummaryAction):
+  // a POST, and not a write (20.11.2026).
+  return state.abortsWhileRunning.filter((a) => a.method !== "GET" && !/^get[A-Z]/.test(a.action ?? ""));
 }
 
 export function seal(page: Page): void {

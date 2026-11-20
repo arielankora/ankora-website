@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { abortVerdict } from "../../qa/checks/e2e.mjs";
+import { abortFinding, abortVerdict } from "../../qa/checks/e2e.mjs";
 
 // "34 writes dropped while the browser was navigating away" is not a finding.
 //
@@ -70,5 +70,37 @@ describe("the aborted-write verdict", () => {
   it("counts writes, not lines", () => {
     const out = v(abortVerdict([line({ writes: 10 }), line({ writes: 5 }), line({ writes: 1 })].join("\n")));
     expect(out?.title).toContain("16 aborted write(s)");
+  });
+});
+
+// 20.11.2026: "1 write(s) dropped with the page standing still" on every
+// run, on POST /app/timer. With the action named ([abort-context], from
+// qa/e2e/observe.ts), it was the header reading its summary, cut off while
+// the stop beside it landed. A get... action reads: not a write.
+describe("the abandoned-requests finding", () => {
+  const timerRead =
+    "[abort] POST /app/timer 36ms net::ERR_ABORTED (page still, at 7 navigation(s), last /app/timer)\n" +
+    "[abort-context] getActiveTimerSummaryAction (components/app/active-timer-actions.ts) | in flight: POST /app/timer [stopTimerAction (timer/actions.ts)] 58ms | just before: nothing";
+  const standingWrite =
+    "[abort] POST /app/timer 40ms net::ERR_ABORTED (page still, at 3 navigation(s), last /app/timer)\n" +
+    "[abort-context] stopTimerAction (timer/actions.ts) | in flight: nothing | just before: nothing";
+
+  it("does not call a read cut off with the page standing still a lost write", () => {
+    const out = v(abortFinding(timerRead));
+    expect(out?.severity).toBe("info");
+    expect(out?.title).toContain("none of them a write");
+  });
+
+  it("still raises a write cut off with the page standing still, with what it was", () => {
+    const out = v(abortFinding(standingWrite));
+    expect(out?.severity).toBe("major");
+    expect(out?.title).toBe("1 write(s) dropped with the page standing still");
+    expect(out?.detail).toContain("[abort-context] stopTimerAction");
+  });
+
+  it("treats a POST with no context line as a write, as before", () => {
+    const out = v(abortFinding("[abort] POST /app/clients 115ms net::ERR_ABORTED (page still, at 2 navigation(s), last /app/clients)"));
+    expect(out?.severity).toBe("major");
+    expect(abortFinding("")).toBeNull();
   });
 });
