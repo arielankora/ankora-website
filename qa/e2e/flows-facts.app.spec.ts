@@ -38,7 +38,7 @@ async function submit(page: import("@playwright/test").Page, button: string) {
 }
 
 test.describe("clients/fact-actions", () => {
-  test("a preference replaced by a new version keeps the old one in the history", async ({ page }) => {
+  test("a preference replaced by a new version keeps the old one under it", async ({ page }) => {
     const first = tag("[E2E] העדפה");
     const second = tag("[E2E] העדפה חדשה");
 
@@ -61,10 +61,13 @@ test.describe("clients/fact-actions", () => {
     await dialog.locator('textarea[name="body"]').fill(second);
     await submit(page, "שמירת הגרסה החדשה");
 
-    await expect(page.locator("li", { hasText: second }).first(), "the new version is not shown").toBeVisible({ timeout: 15_000 });
-    // The old words are still in the file, under the history.
-    await page.getByText(/היסטוריה: גרסאות שהוחלפו/).click();
-    await expect(page.locator("li", { hasText: first }).first()).toBeVisible();
+    const current = page.locator("li", { hasText: second }).first();
+    await expect(current, "the new version is not shown").toBeVisible({ timeout: 15_000 });
+    // The old words are still in the file, under the new version
+    // (20.11.2026: "גרסה קודמת" under the fact, not the history below).
+    const previous = current.getByTestId("fact-previous");
+    await previous.getByText("גרסה קודמת", { exact: true }).click();
+    await expect(previous.locator("li", { hasText: first })).toBeVisible();
   });
 
   test("an open question answered with a source shows its answer", async ({ page }) => {

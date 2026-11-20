@@ -151,6 +151,9 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   ]);
   const now = new Date();
 
+  // 20.11.2026 (Ariel): the version a fact replaced, as the screen shows it
+  // under the fact. Only one Claude may read (shown).
+  const previousOf = new Map(facts.superseded.filter((p) => p.supersededById && shown(p)).map((p) => [p.supersededById!, p]));
   const factItem = (f: ClientFact): DocItem & { group?: string } => ({
     ref: f.id,
     text: f.body,
@@ -167,6 +170,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
         .filter((a) => typeof a?.value === "string")
         .map((a) => `גרסה אחרת: ${a.value as string}${readSourceRefs(a.sources).length ? ` [${readSourceRefs(a.sources).map(formatSourceRef).join(", ")}]` : ""}`),
       f.importance === "LOW" ? "לא קריטי" : null,
+      previousOf.get(f.id) ? `גרסה קודמת${previousOf.get(f.id)!.supersededAt ? ` (הוחלפה ${day(previousOf.get(f.id)!.supersededAt)})` : ""}: ${previousOf.get(f.id)!.body}` : null,
     ],
     ...knowledge(f),
     // A question's status is the question itself; it is not repeated.
