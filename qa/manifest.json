@@ -2400,8 +2400,16 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-19",
       "riskReason": "Changes a person's billed hours through the connector. Same domain function as the my-time edit form (48-hour window, overlap, closed bank, revisions); only the caller's own finished entries."
+    },
+    "domain:proposal-revert": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-19",
+      "riskReason": "Undoes an approved proposal in a client file: removes the item it added or puts back the fields it changed (a replaced fact is current again). Refused when the item changed after; a wrong undo erases what the team approved"
     }
   },
   "waivers": {},
-  "lastScan": "2026-11-19"
+  "lastScan": "2026-11-20"
 }
