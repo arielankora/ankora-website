@@ -241,7 +241,15 @@ export async function e2e() {
       : abortedWrites.length
         ? `${abortedWrites.length} write(s) dropped while the browser was navigating away`
         : `${allAborts.length} request(s) the browser abandoned, none of them a write`;
-    out.push(finding(severity, summary, aborted.join("\n")));
+    // 20.11.2026: which action each aborted write was, and what ran beside
+    // it (qa/e2e/observe.ts, [abort-context]). Without it the report said
+    // "POST /app/timer" for a screen that posts five actions to one path.
+    const contexts = String(r.all ?? "")
+      .split("\n")
+      .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
+      .filter((l) => l.includes("[abort-context]"))
+      .slice(0, 8);
+    out.push(finding(severity, summary, [...aborted, ...(contexts.length ? ["", ...contexts] : [])].join("\n")));
   }
 
   const verdict = abortVerdict(r.all);
