@@ -554,7 +554,8 @@ export function registerClientFileTools(server: McpServer): void {
             actor,
             { clientId: g.id, source: args.sourceCode && groups.size === 1 ? { code: args.sourceCode } : newSource!, note: args.note, via: "MCP", items: g.items },
             // 3.11.2026: the AUTO tier enters on arrival (approval tiers).
-            { indexes: g.indexes, autoApply: true }
+            // 20.11.2026: what a card would hold back comes back to Claude.
+            { indexes: g.indexes, autoApply: true, returnIncomplete: true }
           );
           const base = appBaseUrl();
           const { autoApplied, ...rest } = result;
@@ -577,6 +578,8 @@ export function registerClientFileTools(server: McpServer): void {
         const proposed = batches.reduce((n, b) => n + b.proposed, 0) - entered;
         const matched = batches.reduce((n, b) => n + b.possibleMatches.length, 0);
         const incomplete = batches.reduce((n, b) => n + (b.incomplete?.length ?? 0), 0);
+        const returned = new Set(batches.flatMap((b) => (b.returned ?? []).map((r) => r.index))).size;
+        const filled = new Set(batches.flatMap((b) => (b.filled ?? []).map((r) => r.index))).size;
         const unmapped = batches.reduce((n, b) => n + (b.missingSystems?.length ?? 0), 0);
         const next =
           (proposed > 0
@@ -584,6 +587,12 @@ export function registerClientFileTools(server: McpServer): void {
             : entered > 0
               ? "Nothing else waits for approval."
               : "Nothing was proposed.") +
+          (returned > 0
+            ? ` ${returned} item(s) were NOT kept (\`returned\`): each is missing something a person would otherwise have to fill in on the approvals screen. Complete each one yourself from what you know (the meeting, the client file) and call propose_knowledge again with only those items and the same source (\`sourceCode\` when it is set; otherwise \`newSource\` as before). Do this before telling the user you are done. Only when the information is truly not known: send it as UNCERTAIN with toResolve, or tell the user what is missing.`
+            : "") +
+          (filled > 0
+            ? ` ${filled} item(s) were completed on arrival with the card's suggested wording (\`filled\`: what was missing, and what was written). Where you know better (what would confirm an uncertain item, the interim rule), send a SUPERSEDE of the item once it is approved, or tell the user.`
+            : "") +
           (unmapped > 0
             ? ` ${unmapped} system name(s) a process uses are not in the client's system map (missingSystems), so the process would enter without linking them. Before telling the user you are done, call propose_knowledge again with the same source and a SYSTEM item for each (systemName exactly as the process wrote it, purpose, accessStatus, confidence). Where \`similar\` lists a system already in the map that is the same one, do not add it: tell the user, so the name is corrected on the process's card before it is approved. The process links when its systems are approved before it.`
             : "") +

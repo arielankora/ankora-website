@@ -140,4 +140,35 @@ describe("propose_knowledge, the RIMED reproduction", () => {
     expect(r.missingSystems).toEqual([]);
     expect(r.next).not.toContain("system map");
   });
+
+  // 20.11.2026 (Ariel): knowledge should flow. What a card would hold for a
+  // person to complete is completed here, or goes back to Claude.
+  it("an item a card would hold goes back to Claude, unkept; one with a suggested wording is completed on arrival", async () => {
+    const { client, user, source } = await setup();
+    const temporary = { target: "FACT", payload: { kind: "TEMPORARY", body: "חסימת וואטסאפ במספר הישראלי" }, reason: "נאמר בשיחה", confidence: "HIGH" };
+    const unsure = { target: "FACT", payload: { kind: "NOTE", body: "החשבוניות יוצאות דרך MAK" }, reason: "נאמר בשיחה", confidence: "MEDIUM" };
+    const r = await propose(user, { client: "RIMED", sourceCode: source.code, items: [temporary, unsure] });
+
+    expect(r.returned).toEqual([expect.objectContaining({ index: 0, missing: expect.stringContaining("מידע זמני צריך תוקף") })]);
+    expect(r.next).toContain("NOT kept");
+    expect(r.filled).toEqual([expect.objectContaining({ index: 1 })]);
+    expect(r.proposed).toBe(1);
+    const kept = await prisma.knowledgeProposal.findMany({ where: { clientId: client.id } });
+    expect(kept).toHaveLength(1);
+    expect((kept[0].payload as Record<string, unknown>).toResolve).toBe(r.filled[0].filledWith);
+    expect(((kept[0].flags ?? []) as { code: string; block?: boolean }[]).filter((f) => f.block)).toEqual([]);
+
+    // Sent again complete, it is kept.
+    const again = await propose(user, { client: "RIMED", sourceCode: source.code, items: [{ ...temporary, payload: { ...temporary.payload, validUntilEvent: "עד שהאימות עובר" } }] });
+    expect(again).toMatchObject({ proposed: 1, returned: [] });
+  });
+
+  it("a new source whose items all go back is not registered", async () => {
+    const { client, user } = await setup();
+    const r = await propose(user, { client: "RIMED", newSource: { kind: "PERSON", title: "שיחה" }, items: [{ target: "FACT", payload: { kind: "TEMPORARY", body: "משהו זמני" }, reason: "נאמר", confidence: "HIGH" }] });
+    expect(r).toMatchObject({ proposed: 0, sourceCode: null, batchId: null });
+    expect(r.returned).toHaveLength(1);
+    expect(await prisma.clientSource.count({ where: { clientId: client.id } })).toBe(1);
+  });
 });
+

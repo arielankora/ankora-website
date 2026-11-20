@@ -126,13 +126,13 @@ describe("propose_knowledge", () => {
         via: "MCP",
         source: expect.objectContaining({ kind: "TRANSCRIPT", externalIds: ["ff-1"], restriction: "NONE", occurredAt: new Date("2026-10-12T00:00:00Z") }),
       }),
-      { indexes: [0], autoApply: true }
+      { indexes: [0], autoApply: true, returnIncomplete: true }
     );
   });
 
   it("passes an item's status on to the domain, where it is read (31.10.2026)", async () => {
     await call({ client: "nux", sourceCode: "S4", items: [{ ...ITEM, reason: "r", status: "CONFIRMED" }] });
-    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ items: [expect.objectContaining({ status: "CONFIRMED" })] }), { indexes: [0], autoApply: true });
+    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ items: [expect.objectContaining({ status: "CONFIRMED" })] }), { indexes: [0], autoApply: true, returnIncomplete: true });
   });
 
   it("takes a task as the source, so a mapping task can be cited (19.10.2026)", async () => {
@@ -140,7 +140,7 @@ describe("propose_knowledge", () => {
     expect(proposals.proposeKnowledge).toHaveBeenCalledWith(
       ACTOR,
       expect.objectContaining({ source: expect.objectContaining({ kind: "TASK", externalIds: ["t-map"] }) }),
-      { indexes: [0], autoApply: true }
+      { indexes: [0], autoApply: true, returnIncomplete: true }
     );
   });
 
@@ -174,8 +174,8 @@ describe("propose_knowledge", () => {
     const r = await call({ client: "nux", newSource: { kind: "TRANSCRIPT", title: "Nextage", firefliesId: "ff-2" }, items: [ITEM, { ...ITEM, client: "zest" }, ITEM] });
     const body = JSON.parse(r.content[0].text!);
     expect(body.batches.map((b: { client: string }) => b.client)).toEqual(["NUX", "Zest"]);
-    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ clientId: "c-nux", items: [ITEM, ITEM] }), { indexes: [0, 2], autoApply: true });
-    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ clientId: "c-zest", items: [ITEM] }), { indexes: [1], autoApply: true });
+    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ clientId: "c-nux", items: [ITEM, ITEM] }), { indexes: [0, 2], autoApply: true, returnIncomplete: true });
+    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ clientId: "c-zest", items: [ITEM] }), { indexes: [1], autoApply: true, returnIncomplete: true });
     // A source code belongs to one register.
     proposals.proposeKnowledge.mockClear();
     expect((await call({ client: "nux", sourceCode: "S1", items: [ITEM, { ...ITEM, client: "zest" }] })).content[0].text).toContain("newSource");
