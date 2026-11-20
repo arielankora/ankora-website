@@ -13,6 +13,7 @@ import {
   type ClientFactInput,
 } from "@/lib/app-domain/client-facts";
 import type { FactKind, FactTopic, KnowledgeAudience, KnowledgeStatus } from "@prisma/client";
+import { settleProposalsOnReplacedFact } from "@/lib/app-domain/knowledge-proposals";
 import { itemExtrasFrom } from "./item-extras";
 import { knowledgeErrorT, knowledgeErrorText, type KnowledgeErrorT } from "./knowledge-errors";
 
@@ -107,7 +108,13 @@ export async function supersedeClientFactAction(_prev: FormState | undefined, fo
   const clientId = String(formData.get("clientId") ?? "");
   const parsed = parseFact(formData, await knowledgeErrorT(), user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
-  return run(clientId, () => supersedeClientFact(user, String(formData.get("id") ?? ""), parsed.value!));
+  const id = String(formData.get("id") ?? "");
+  return run(clientId, async () => {
+    const replacement = await supersedeClientFact(user, id, parsed.value!);
+    // Proposals still waiting on the old version follow it (20.11.2026).
+    await settleProposalsOnReplacedFact(user, id);
+    return replacement;
+  });
 }
 
 export async function confirmClientFactAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {

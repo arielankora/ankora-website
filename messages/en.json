@@ -1990,6 +1990,7 @@
       "knowledgeProposalMerge": "Proposal added to an existing file item",
       "knowledgeProposalReject": "Client file proposal rejected",
       "knowledgeProposalAttach": "Proposal already in the file: source added to the existing item",
+      "knowledgeProposalRetarget": "A proposal moved to the item's new version",
       "knowledgeProposalToTask": "Client file proposal turned into a task",
       "knowledgeProposalRevert": "Approved proposal undone: item removed from the client file or put back as it was",
       "knowledgeProposalAutoApply": "Client file proposal added to the file automatically",

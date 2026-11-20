@@ -385,6 +385,9 @@ export async function undoFactSupersede(actor: User, oldId: string, status: Clie
   const [removed, restored] = await prisma.$transaction([
     prisma.clientFact.update({ where: { id: replacement.id }, data: { deletedAt: now } }),
     prisma.clientFact.update({ where: { id: old.id }, data: { knowledgeStatus: status, supersededById: null, supersededAt: null } }),
+    // Proposals that moved to the version taken out wait on the one back
+    // in force (settleProposalsOnReplacedFact, 20.11.2026).
+    prisma.knowledgeProposal.updateMany({ where: { target: "FACT", targetId: replacement.id, state: "PENDING" }, data: { targetId: old.id } }),
   ]);
   await recordAudit({ actorId: actor.id, action: "client_fact.remove", entityType: "ClientFact", entityId: replacement.id, clientId: old.clientId, before: replacement });
   await recordAudit({ actorId: actor.id, action: "client_fact.restore", entityType: "ClientFact", entityId: old.id, clientId: old.clientId, before: old, after: restored });
