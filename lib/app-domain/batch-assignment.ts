@@ -229,7 +229,7 @@ export async function assignBatch(actor: User, batchId: string, clientId: string
           },
           { createdById: batch.createdById, dropped, indexes: prepared.indexes }
         )
-      : { batchId: null, sourceCode: "", proposed: 0, dropped, secretTaskId: null, possibleMatches: [], autoApplied: [], incomplete: [], missingSystems: [] };
+      : { batchId: null, sourceCode: "", proposed: 0, dropped, secretTaskId: null, possibleMatches: [], autoApplied: [], incomplete: [], returned: [], filled: [], missingSystems: [] };
   } catch (err) {
     await prisma.knowledgeBatch.update({ where: { id: batchId }, data: { awaitingAssignment: true } });
     throw err;

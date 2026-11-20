@@ -163,6 +163,16 @@ export type ProposeResult = {
   /// Every note the card shows as blocking, or as holding the procedure
   /// back (proposalProblems), in the card's own words, with why it matters.
   incomplete: { index: number; missing: string; why: string | null; suggested: string | null }[];
+  /// 20.11.2026 (Ariel: knowledge should flow, and a person should not
+  /// complete what Claude can): with `returnIncomplete`, an item the review
+  /// screen would hold back (a blocking note of proposalProblems) with no
+  /// suggested wording is not kept. It comes back here, in the card's
+  /// words, to be sent again complete. Nothing of it is stored.
+  returned: { index: number; missing: string; why: string | null; suggested: string | null }[];
+  /// With `returnIncomplete`, a hold the card has a suggested wording for
+  /// is completed with it on arrival, as "להשלים בנוסח המוצע" would: what
+  /// was missing and what was written.
+  filled: { index: number; missing: string; filledWith: string }[];
   /// 5.11.2026: systems a process in the batch names that are not in the
   /// client's system map and not proposed in the batch, with look-alikes
   /// from the map. Send them as SYSTEM, or use the name in the map.
@@ -362,7 +372,7 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
 export async function proposeKnowledge(
   actor: User,
   input: ProposeInput,
-  options: { createdById?: string | null; dropped?: ProposeResult["dropped"]; indexes?: number[]; autoApply?: boolean } = {}
+  options: { createdById?: string | null; dropped?: ProposeResult["dropped"]; indexes?: number[]; autoApply?: boolean; returnIncomplete?: boolean } = {}
 ): Promise<ProposeResult> {
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
@@ -378,6 +388,8 @@ export async function proposeKnowledge(
   const accepted: { index: number; item: ProposalItemInput & { action: ProposalActionLike }; payload: Record<string, unknown>; flags: ProposalFlag[] }[] = [];
   const possibleMatches: ProposeResult["possibleMatches"] = [];
   const incomplete: ProposeResult["incomplete"] = [];
+  const returned: ProposeResult["returned"] = [];
+  const filled: ProposeResult["filled"] = [];
 
   for (const [i, raw] of input.items.entries()) {
     const index = options.indexes?.[i] ?? i;
@@ -464,7 +476,20 @@ export async function proposeKnowledge(
       const latest = await prisma.clientNarrative.findFirst({ where: { clientId: input.clientId, kind: payload.kind as never }, orderBy: { version: "desc" }, select: { version: true } });
       payload.baseVersion = latest?.version ?? 0;
     }
-    const flags = await flagsFor(input.clientId, { ...item, payload }, weight, codes, source.title);
+    let flags = await flagsFor(input.clientId, { ...item, payload }, weight, codes, source.title);
+    // Not on to a person: what would stop the card is completed with its
+    // suggested wording, or goes back to whoever sent it
+    // (ProposeResult.returned, .filled).
+    const blocking = options.returnIncomplete ? flags.filter((f) => f.block && PROBLEM_CODES.includes(f.code)) : [];
+    if (blocking.some((f) => !f.fix)) {
+      for (const f of blocking) returned.push({ index, missing: f.message, why: f.why ?? null, suggested: f.fix?.label ?? null });
+      continue;
+    }
+    if (blocking.length) {
+      Object.assign(payload, ...blocking.map((f) => f.fix!.edits));
+      for (const f of blocking) filled.push({ index, missing: f.message, filledWith: f.fix!.label });
+      flags = await flagsFor(input.clientId, { ...item, payload }, weight, codes, source.title);
+    }
     const existing = flags.flatMap((f) => (f.match ? [f.match] : []));
     if (existing.length && isNamedTarget(item.target)) possibleMatches.push({ index, target: item.target, name: String(payload[nameFieldOf(item.target)] ?? ""), existing });
     else if (existing.length && item.target === "DATE") possibleMatches.push({ index, target: item.target, name: String(payload.title ?? ""), existing });
@@ -495,7 +520,7 @@ export async function proposeKnowledge(
 
   // Nothing kept: a new source is not registered (31.10.2026).
   if (accepted.length === 0) {
-    return { batchId: null, sourceCode: source.existing ? source.code : null, proposed: 0, dropped, secretTaskId, possibleMatches, autoApplied: [], incomplete: [], missingSystems: [] };
+    return { batchId: null, sourceCode: source.existing ? source.code : null, proposed: 0, dropped, secretTaskId, possibleMatches, autoApplied: [], incomplete: [], returned, filled, missingSystems: [] };
   }
 
   // The source and the batch go in together: a new source is registered
@@ -561,7 +586,7 @@ export async function proposeKnowledge(
   // Only what Claude sent (propose_knowledge): a batch typed on a screen,
   // or one a person assigned to its client, waits as it always did.
   const autoApplied = options.autoApply ? await autoApplyBatch(actor, batch.id, input.clientId) : [];
-  return { batchId: batch.id, sourceCode: registered.code, proposed: accepted.length, dropped, secretTaskId, possibleMatches, autoApplied, incomplete, missingSystems: unmapped };
+  return { batchId: batch.id, sourceCode: registered.code, proposed: accepted.length, dropped, secretTaskId, possibleMatches, autoApplied, incomplete, returned, filled, missingSystems: unmapped };
 }
 
 /// The AUTO tier on arrival (3.11.2026, approval tiers part 2): each
