@@ -5652,6 +5652,7 @@
         "answer": "Answer ({date}):",
         "closedOn": "Closed on {date}",
         "alternative": "Another version:",
+        "previous": "{count, plural, one {Previous version} other {# previous versions}}",
         "pastValidity": "Past its end date. Still true?",
         "toTask": "To task",
         "doNotTell": "Do not tell: {text}",

@@ -63,6 +63,9 @@ export type PanelFact = {
   supersededAt: string | null;
   /// Other versions somebody said, each with its sources (spec 5.2).
   alternatives: { value: string; sources: string[] }[];
+  /// 20.11.2026 (Ariel): the versions this one replaced, newest first,
+  /// each with its sources and the day it was replaced.
+  previous?: { id: string; body: string; sources: string[]; replacedAt: string | null }[];
 };
 
 type Option = { value: string; label: string };
@@ -319,6 +322,20 @@ function FactRow({
               {a.sources.length > 0 && <span dir="ltr"> [{a.sources.join(", ")}]</span>}
             </p>
           ))}
+          {fact.previous && fact.previous.length > 0 && (
+            <details className="mt-1 text-xs text-app-text-tertiary" data-testid="fact-previous">
+              <summary className="cursor-pointer">{t("row.previous", { count: fact.previous.length })}</summary>
+              <ul className="mt-1 space-y-1 border-s-2 border-app-border ps-2.5">
+                {fact.previous.map((v) => (
+                  <li key={v.id}>
+                    <span dir="auto" className="text-app-text-secondary">{v.body}</span>
+                    {v.sources.length > 0 && <span dir="ltr"> [{v.sources.join(", ")}]</span>}
+                    {v.replacedAt && <span className="ms-1.5">{t("supersededOn", { date: dateLabel(v.replacedAt) ?? "" })}</span>}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           {pastValidity && (
             <div className="mt-1.5">
               <StatusBadge label={t("row.pastValidity")} tone="amber" />

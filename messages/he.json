@@ -5652,6 +5652,7 @@
         "answer": "תשובה ({date}):",
         "closedOn": "נסגר ב-{date}",
         "alternative": "גרסה אחרת:",
+        "previous": "{count, plural, one {גרסה קודמת} other {# גרסאות קודמות}}",
         "pastValidity": "עבר התוקף. עדיין נכון?",
         "toTask": "למשימה",
         "doNotTell": "לא לספר: {text}",

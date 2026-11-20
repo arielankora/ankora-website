@@ -43,6 +43,7 @@ import { stepCandidates } from "@/lib/app-domain/process-next-steps";
 import { FIELD_LABELS, type KeyedCheck } from "@/lib/process-rules";
 import { listClientSources, listClientDomains } from "@/lib/app-domain/client-sources";
 import { formatSourceRef, readSourceRefs } from "@/lib/knowledge-sources";
+import { previousVersions } from "@/lib/fact-versions";
 import { SystemsPanel } from "./SystemsPanel";
 import { FactsPanel, type PanelFact } from "./FactsPanel";
 import { EntitiesPanel } from "./EntitiesPanel";
@@ -357,6 +358,14 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         .map((a) => ({ value: a.value as string, sources: readSourceRefs(a.sources).map(formatSourceRef) })),
     };
   };
+  // 20.11.2026 (Ariel): each fact with the versions it replaced, newest
+  // first. What no current fact leads back to stays in the history below.
+  const versions = previousVersions(facts.current, facts.superseded);
+  const factsWithPrevious = facts.current.map((f) => ({
+    ...toPanelFact(f),
+    previous: (versions.previous.get(f.id) ?? []).map((v) => ({ id: v.id, body: v.body, sources: readSourceRefs(v.sources).map(formatSourceRef), replacedAt: iso(v.supersededAt) })),
+  }));
+  const factHistory = versions.orphans.map(toPanelFact);
   const taskCategories = allCategories
     .filter((cat) => cat.active && (cat.visibility === "GLOBAL" || cat.clientId === client.id))
     .map((cat) => ({ id: cat.id, name: cat.name, clientId: cat.clientId }));
@@ -861,8 +870,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               sourceOptions={sourceOptions}
               staff={staff.map((s) => ({ value: s.id, label: s.name }))}
               subjects={subjects}
-              facts={facts.current.map(toPanelFact)}
-              history={facts.superseded.map(toPanelFact)}
+              facts={factsWithPrevious}
+              history={factHistory}
             />
               </>
             )}
