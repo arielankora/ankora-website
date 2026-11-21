@@ -193,56 +193,8 @@ export async function e2e() {
     );
   }
 
-  // Requests the browser abandoned, on every run.
-  //
-  // Reported outside the failure branch on purpose. Playwright retries a
-  // failed test once, so a Server Action whose POST was aborted and which
-  // then succeeded leaves a green run and no evidence - and three rounds
-  // of this investigation were spent waiting to catch the fault in the
-  // act. An abandoned request is worth knowing about whether or not it
-  // happened to fail a test this time.
-  const allAborts = String(r.all ?? "")
-    .split("\n")
-    .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
-    .filter((l) => l.includes("[abort]"));
-
-  // Writes first, and only then whatever room is left for the rest.
-  //
-  // Taking the first twelve lines in order dropped the one abandoned
-  // write that a test actually failed on, because eleven cancelled
-  // prefetches happened to come earlier in the run. The prefetches are
-  // the background; a write nobody got is the finding.
-  const abortedWrites = allAborts.filter((l) => /\[abort\] POST/.test(l));
-  // A write dropped while the browser was navigating is the test moving on
-  // before the answer landed: the server still did the work, and the run
-  // still passes. A write dropped with the page standing still is the
-  // fault this whole investigation was about.
-  const droppedStanding = abortedWrites.filter((l) => l.includes("page still"));
-  const aborted = [
-    ...droppedStanding.slice(0, 8),
-    ...abortedWrites.filter((l) => !l.includes("page still")).slice(0, 6),
-    ...allAborts.filter((l) => !/\[abort\] POST/.test(l)),
-  ].slice(0, 14);
-
-  if (aborted.length) {
-    // A POST is a write the user asked for and did not get. A GET is
-    // usually a prefetch the router cancelled on purpose, which is
-    // ordinary Next behaviour and not worth waking anyone for.
-    // Severity by what was actually lost, not by how many lines there are.
-    //
-    // This started at major for any abandoned write, which was right while
-    // writes were being dropped with nothing moving. It is wrong now: the
-    // GETs are Next cancelling its own prefetches on pagehide, ordinary
-    // router housekeeping, and a hundred of them every run under a major
-    // heading is a report that cries wolf until nobody reads it.
-    const severity = droppedStanding.length ? "major" : abortedWrites.length ? "minor" : "info";
-    const summary = droppedStanding.length
-      ? `${droppedStanding.length} write(s) dropped with the page standing still`
-      : abortedWrites.length
-        ? `${abortedWrites.length} write(s) dropped while the browser was navigating away`
-        : `${allAborts.length} request(s) the browser abandoned, none of them a write`;
-    out.push(finding(severity, summary, aborted.join("\n")));
-  }
+  const abandoned = abortFinding(r.all);
+  if (abandoned) out.push(abandoned);
 
   const verdict = abortVerdict(r.all);
   if (verdict) out.push(verdict);
@@ -314,6 +266,81 @@ export async function e2e() {
 
   out.push(finding("info", `browser: ${passed}/${specs.length} specs passing`));
   return out;
+}
+
+/// The requests the browser abandoned during the browser suite, as one
+/// finding: a write cut off with the page standing still is major, one cut
+/// off by a navigation minor, the rest (prefetches, reads) info. Null when
+/// nothing was abandoned. Exported for tests/unit/qa-abort-verdict.test.ts.
+export function abortFinding(output) {
+  // Requests the browser abandoned, on every run.
+  //
+  // Reported outside the failure branch on purpose. Playwright retries a
+  // failed test once, so a Server Action whose POST was aborted and which
+  // then succeeded leaves a green run and no evidence - and three rounds
+  // of this investigation were spent waiting to catch the fault in the
+  // act. An abandoned request is worth knowing about whether or not it
+  // happened to fail a test this time.
+  const outputLines = String(output ?? "")
+    .split("\n")
+    .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd());
+  const allAborts = outputLines.filter((l) => l.includes("[abort]"));
+
+  // 20.11.2026: each aborted POST with the [abort-context] line the
+  // observer prints right after it (qa/e2e/observe.ts): which Server
+  // Action it was, and what ran beside it. A POST is not always a write.
+  // The timer's "write dropped with the page standing still", reported on
+  // every run for weeks, turned out to be getActiveTimerSummaryAction, the
+  // header reading its summary, cut off while the stop beside it landed.
+  // An action named get... reads; losing one loses nothing.
+  const contextOf = new Map();
+  outputLines.forEach((l, i) => {
+    if (!/\[abort\] POST/.test(l)) return;
+    const next = outputLines.slice(i + 1, i + 4).find((n) => n.includes("[abort-context]"));
+    if (next) contextOf.set(l, next.slice(next.indexOf("[abort-context]")));
+  });
+  const isRead = (l) => /^\[abort-context\] get[A-Z]/.test(contextOf.get(l) ?? "");
+
+  // Writes first, and only then whatever room is left for the rest.
+  //
+  // Taking the first twelve lines in order dropped the one abandoned
+  // write that a test actually failed on, because eleven cancelled
+  // prefetches happened to come earlier in the run. The prefetches are
+  // the background; a write nobody got is the finding.
+  const abortedWrites = allAborts.filter((l) => /\[abort\] POST/.test(l) && !isRead(l));
+  // A write dropped while the browser was navigating is the test moving on
+  // before the answer landed: the server still did the work, and the run
+  // still passes. A write dropped with the page standing still is the
+  // fault this whole investigation was about.
+  const droppedStanding = abortedWrites.filter((l) => l.includes("page still"));
+  // A standing drop is followed by what it was: the line that decides
+  // whether anyone has to look.
+  const withContext = (l) => (contextOf.has(l) ? [l, `    ${contextOf.get(l).slice(0, 600)}`] : [l]);
+  const aborted = [
+    ...droppedStanding.slice(0, 8).flatMap(withContext),
+    ...abortedWrites.filter((l) => !l.includes("page still")).slice(0, 6),
+    ...allAborts.filter((l) => !abortedWrites.includes(l)),
+  ].slice(0, 14);
+
+  if (!aborted.length) return null;
+
+  // A POST is a write the user asked for and did not get. A GET is
+  // usually a prefetch the router cancelled on purpose, which is
+  // ordinary Next behaviour and not worth waking anyone for.
+  // Severity by what was actually lost, not by how many lines there are.
+  //
+  // This started at major for any abandoned write, which was right while
+  // writes were being dropped with nothing moving. It is wrong now: the
+  // GETs are Next cancelling its own prefetches on pagehide, ordinary
+  // router housekeeping, and a hundred of them every run under a major
+  // heading is a report that cries wolf until nobody reads it.
+  const severity = droppedStanding.length ? "major" : abortedWrites.length ? "minor" : "info";
+  const summary = droppedStanding.length
+    ? `${droppedStanding.length} write(s) dropped with the page standing still`
+    : abortedWrites.length
+      ? `${abortedWrites.length} write(s) dropped while the browser was navigating away`
+      : `${allAborts.length} request(s) the browser abandoned, none of them a write`;
+  return finding(severity, summary, aborted.join("\n"));
 }
 
 /**

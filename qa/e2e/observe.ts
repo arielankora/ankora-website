@@ -1,5 +1,7 @@
 import os from "node:os";
 import type { Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 // What the browser saw, for a failure the server log cannot explain.
 //
@@ -36,11 +38,37 @@ import type { Page } from "@playwright/test";
 // average of the machine both of them share. Neither belongs in a
 // product fix. Both decide whether a product fix is what is needed.
 
-type Call = { method: string; path: string; ms: number; status?: number; failed?: string };
+type Call = { method: string; path: string; ms: number; status?: number; failed?: string; action?: string };
+
+/// Which Server Action a POST is, by the id in its `next-action` header
+/// (20.11.2026). An aborted write was reported only as "POST /app/timer",
+/// and a screen like the timer posts five different actions to that one
+/// path: the report could not say whether the stop, the note autosave or
+/// the header's summary was the one cut off. The build's own manifest
+/// names each id (`exportedName`, `filename`). Read once; a run without a
+/// build (or a manifest of another shape) just leaves the name out.
+let actionNames: Map<string, string> | null = null;
+function actionName(id: string | undefined): string | undefined {
+  if (!id) return undefined;
+  if (!actionNames) {
+    actionNames = new Map();
+    try {
+      const manifest = JSON.parse(readFileSync(join(process.cwd(), ".next/server/server-reference-manifest.json"), "utf8")) as {
+        node?: Record<string, { exportedName?: string; filename?: string }>;
+      };
+      for (const [k, v] of Object.entries(manifest.node ?? {})) {
+        if (v.exportedName) actionNames.set(k, v.filename ? `${v.exportedName} (${v.filename.replace(/^app\/\(product\)\/app\/\(authenticated\)\//, "")})` : v.exportedName);
+      }
+    } catch {
+      // No build here: the id alone is still printed.
+    }
+  }
+  return actionNames.get(id) ?? `action ${id.slice(0, 10)}`;
+}
 
 type Observed = {
   done: Call[];
-  open: Map<string, { method: string; path: string; startedAt: number }>;
+  open: Map<string, { method: string; path: string; startedAt: number; action?: string }>;
   logs: string[];
   navigations: string[];
   /// Navigation requests started and not yet finished. A navigation
@@ -55,7 +83,7 @@ type Observed = {
   /// Aborts seen while the test body was still running, writes and all.
   /// Separate from `done` because `done` also holds the teardown aborts,
   /// and those are Playwright closing the page rather than the fault.
-  abortsWhileRunning: { method: string; path: string }[];
+  abortsWhileRunning: { method: string; path: string; action?: string }[];
 };
 
 const observed = new WeakMap<Page, Observed>();
@@ -197,7 +225,7 @@ export function observe(page: Page): void {
   page.on("request", (r) => {
     if (r.isNavigationRequest() && r.frame() === page.mainFrame()) state.navsInFlight++;
     if (!WATCHED.has(r.resourceType())) return;
-    state.open.set(keyOf(r), { method: r.method(), path: shortPath(r.url()), startedAt: Date.now() });
+    state.open.set(keyOf(r), { method: r.method(), path: shortPath(r.url()), startedAt: Date.now(), action: r.method() === "POST" ? actionName(r.headers()["next-action"]) : undefined });
   });
   page.on("requestfinished", async (r) => {
     if (r.isNavigationRequest() && r.frame() === page.mainFrame()) state.navsInFlight--;
@@ -211,7 +239,7 @@ export function observe(page: Page): void {
       // A response that cannot be read is still a finished request; the
       // duration is the part that matters here.
     }
-    state.done.push({ method: started.method, path: started.path, ms: Date.now() - started.startedAt, status });
+    state.done.push({ method: started.method, path: started.path, ms: Date.now() - started.startedAt, status, action: started.action });
   });
   page.on("requestfailed", (r) => {
     const navigating = state.navsInFlight > 0;
@@ -221,7 +249,7 @@ export function observe(page: Page): void {
     state.open.delete(keyOf(r));
     const ms = Date.now() - started.startedAt;
     const failed = r.failure()?.errorText;
-    state.done.push({ method: started.method, path: started.path, ms, failed });
+    state.done.push({ method: started.method, path: started.path, ms, failed, action: started.action });
 
     // Printed, not only stored, because this fault does not always fail a
     // test. Playwright retries once, and a Server Action that was aborted
@@ -238,12 +266,31 @@ export function observe(page: Page): void {
     // that noise is in the report it is worse than no report, because it
     // is indistinguishable from the real thing.
     if (state.sealed) return;
-    state.abortsWhileRunning.push({ method: started.method, path: started.path });
+    state.abortsWhileRunning.push({ method: started.method, path: started.path, action: started.action });
     console.warn(
       `[abort] ${started.method} ${started.path} ${ms}ms ${failed ?? "(no reason given)"}` +
         ` (${navigating ? "WHILE NAVIGATING" : "page still"},` +
         ` at ${state.navigations.length} navigation(s), last ${state.navigations.at(-1) ?? "none"})`
     );
+    // 20.11.2026: for a write, what it was and what ran beside it. The
+    // timer's stop was cut off with the page standing still, the test went
+    // green, and the line could not say which action it was or what else
+    // was in flight at that moment (the header's summary, a refresh).
+    if (started.method !== "GET") {
+      const now = Date.now();
+      // Writes first: the prefetches beside them are the background.
+      const open = [...state.open.values()].sort((a, b) => Number(a.method === "GET") - Number(b.method === "GET"));
+      const beside = open.slice(0, 5).map((o) => `${o.method} ${o.path}${o.action ? ` [${o.action}]` : ""} ${now - o.startedAt}ms`);
+      if (open.length > 5) beside.push(`+${open.length - 5} more`);
+      const before = state.done
+        .slice(-5, -1)
+        .map((d) => `${d.method} ${d.path}${d.action ? ` [${d.action}]` : ""} ${d.ms}ms ${d.failed ?? d.status ?? ""}`.trimEnd());
+      console.warn(
+        `[abort-context] ${started.action ?? "not a server action"}` +
+          ` | in flight: ${beside.length ? beside.join("; ") : "nothing"}` +
+          ` | just before: ${before.length ? before.join("; ") : "nothing"}`
+      );
+    }
   });
 
   // A navigation is the ordinary reason a browser aborts everything it
@@ -293,7 +340,9 @@ export function observe(page: Page): void {
 export function abortedWrites(page: Page): { method: string; path: string }[] {
   const state = observed.get(page);
   if (!state) return [];
-  return state.abortsWhileRunning.filter((a) => a.method !== "GET");
+  // A Server Action named get... reads (getActiveTimerSummaryAction):
+  // a POST, and not a write (20.11.2026).
+  return state.abortsWhileRunning.filter((a) => a.method !== "GET" && !/^get[A-Z]/.test(a.action ?? ""));
 }
 
 export function seal(page: Page): void {
