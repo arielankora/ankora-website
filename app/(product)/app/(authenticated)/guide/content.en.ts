@@ -764,6 +764,28 @@ export const GUIDE_GROUPS: GuideGroup[] = [
         ],
         images: [{ src: "/guide/en/integrations.png", alt: "The integrations screen", caption: "The \"Integrations\" screen" }],
       },
+      {
+        id: "claude-usage",
+        title: "Claude usage",
+        roles: ["SUPER_ADMIN"],
+        summary: "Who in the team is close to getting stuck in Claude's limits, and what in Ankora sends Claude the most.",
+        description: [
+          "The screen opens with \"Where things stand now\": a status line (\"All good\", \"Data missing\" or \"Needs attention\"), who is stuck now, who may get stuck before the reset, and how many times people got stuck in the last 7 days.",
+          "\"Who is close to getting stuck\" shows two bars for each person: a 5-hour window and a weekly limit. The color is how much was used, and the dark line is how much of the time has passed. Color past the line means the person is using it faster than time is passing. The reading comes from a Chrome extension installed for that person, and when no reading arrives from it the bar is marked \"Not measured\".",
+          "\"What to do\" lists up to three things, the most urgent first: for example, check what made someone get stuck, shorten an Ankora tool that sends Claude a lot, or check the extension for a person who sends no reading. \"Where to save\" shows three measures against the target of each, and the tool that sent Claude the most.",
+          "\"Detail\" is folded, and in it you choose a period of 7 or 30 days: \"By person\" (requests, work weight, times stuck, connector calls and prompts copied), \"This week's windows\", \"Ankora's tools\", \"Prompts Ankora builds\" and \"Heaviest requests\". Work weight is what the same work would cost at API prices, by Cowork's estimate. It is not money spent: the seat has a fixed price.",
+          "In \"Settings\" you mark, for each person, whether they do not work in Cowork or Claude Code, so their missing data is not flagged, and add other addresses they sign in to Claude with. Data that already arrived from those addresses is assigned to them.",
+        ],
+        steps: [
+          "Open \"Claude usage\" in the side menu.",
+          "For the detail of another period: choose \"7 days\" or \"30 days\" at the top of \"Detail\".",
+          "To change a person's settings: open \"Settings\" at the bottom of the screen, check the box or add addresses, and click \"Save\".",
+        ],
+        notes: [
+          "The screen keeps no prompt or conversation content: only who, when, how much, and which Ankora tools ran.",
+          "Claude can read the same data through the connector, with the get_claude_usage tool, for a Super admin only.",
+        ],
+      },
     ],
   },
   {
