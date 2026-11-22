@@ -785,6 +785,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "The screen keeps no prompt or conversation content: only who, when, how much, and which Ankora tools ran.",
           "Claude can read the same data through the connector, with the get_claude_usage tool, for a Super admin only.",
         ],
+        images: [{ src: "/guide/en/claude-usage.png", alt: "The Claude usage screen", caption: "The \"Claude usage\" screen" }],
       },
     ],
   },
@@ -1077,6 +1078,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
         steps: [
           "Use the \"Previous month\" / \"Next month\" buttons to see the tasks closed in another month. The open tasks are always shown as of today.",
         ],
+        images: [{ src: "/guide/en/portal-tasks.png", alt: "The tasks tab in the portal", caption: "The \"Tasks\" tab on the \"Hours and reports\" screen" }],
       },
       {
         id: "portal-history",

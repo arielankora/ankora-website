@@ -56,7 +56,7 @@ export const SHOTS = [
   // Built in Hebrew whatever the reader's language (client-file-view.ts),
   // so only the Hebrew set has it.
   { name: "client-file-read", path: "/app/clients/demo-client-a/client-file", user: SUPER, full: true, langs: ["he"] },
-  { name: "client-processes", path: "/app/clients/demo-client-a?tab=file", user: SUPER, card: { he: "^תהליכים \\(", en: "^Processes \\(" } },
+  { name: "client-processes", path: "/app/clients/demo-client-a?tab=file&section=processes", user: SUPER, selector: "#processes" },
   { name: "client-connections", path: "/app/clients/demo-client-a/connections", user: SUPER },
   { name: "client-rules", path: "/app/clients/demo-client-a?tab=file", user: SUPER, card: { he: "כללים של הלקוח", en: "Client rules" } },
   { name: "approvals", path: "/app/approvals", user: SUPER },
@@ -76,7 +76,7 @@ export const SHOTS = [
   { name: "portal-activity", path: "/app/portal/activity", user: CLIENT },
   { name: "portal-dashboard", path: "/app/portal/hours", user: CLIENT },
   { name: "portal-weekly", path: "/app/portal/weekly", user: CLIENT },
-  { name: "portal-tasks", path: "/app/portal/tasks", user: CLIENT },
+  { name: "portal-tasks", path: "/app/portal/hours?view=tasks", user: CLIENT },
   { name: "portal-history", path: "/app/portal/history", user: CLIENT },
   { name: "portal-file", path: "/app/portal/file", user: CLIENT, full: true },
   { name: "notifications", path: "/app/notifications", user: SUPER },
@@ -150,7 +150,13 @@ async function main() {
         const text = await page.evaluate(() => document.body.innerText);
         if (/אין לך הרשאה|This page could not be found|You do not have permission/.test(text)) throw new Error("the page refused this user");
         if (shot.user && new URL(page.url()).pathname.startsWith("/app/login")) throw new Error("landed on the sign-in page");
-        if (shot.card) {
+        if (shot.selector) {
+          // An element by id, clipped from the full page (see `card` below for why).
+          await page.evaluate(() => window.scrollTo(0, 0));
+          const box = await page.locator(shot.selector).first().boundingBox();
+          if (!box) throw new Error(`no box for ${shot.selector}`);
+          await page.screenshot({ path: file, fullPage: true, clip: box });
+        } else if (shot.card) {
           // The heading as a pattern, so "Processes (3)" is not "Processes and procedures".
           const heading = page.getByText(new RegExp(shot.card[LANG])).first();
           const card = heading.locator("xpath=ancestor::*[contains(@class,'rounded')][1]");

@@ -319,8 +319,8 @@ async function main() {
   // Systems (no secrets: the vault holds those).
   const system = async (c: typeof orbit, input: Record<string, unknown>, sourceKey: string) =>
     addSystemAccess(superAdmin, { clientId: c.id, knowledgeStatus: "CONFIRMED", sources: src(c, sourceKey), ownerId: owner(c), ...input } as never);
-  const sysBank = await system(orbit, { systemName: "Business bank account (demo)", purpose: "Supplier payments and statements", url: "https://bank.example", accountUsed: "ops@ankora.co.il", ourPermission: "USER", accessStatus: "HAS_ACCESS", clientAdmin: "Jonathan Hale" }, "finance");
-  const sysBooks = await system(orbit, { systemName: "Bookkeeping software (demo)", purpose: "Invoices, expenses and the monthly close", url: "https://books.example", accountUsed: "ops@ankora.co.il", ourPermission: "ADMIN", accessStatus: "HAS_ACCESS", billingCycle: "MONTHLY", billingCostMinor: 29000, billingCurrency: "ILS" }, "kickoff");
+  const sysBank = await system(orbit, { systemName: "Business bank account (demo)", purpose: "Supplier payments and statements", url: "https://bank.example", accountUsed: "demo.operations@ankora.co.il", ourPermission: "USER", accessStatus: "HAS_ACCESS", clientAdmin: "Jonathan Hale" }, "finance");
+  const sysBooks = await system(orbit, { systemName: "Bookkeeping software (demo)", purpose: "Invoices, expenses and the monthly close", url: "https://books.example", accountUsed: "demo.operations@ankora.co.il", ourPermission: "ADMIN", accessStatus: "HAS_ACCESS", billingCycle: "MONTHLY", billingCostMinor: 29000, billingCurrency: "ILS" }, "kickoff");
   const sysDrive = await system(orbit, { systemName: "Shared drive (demo)", purpose: "Contracts, invoices and the client file", url: "https://drive.example", ourPermission: "USER", accessStatus: "HAS_ACCESS" }, "kickoff");
   await system(orbit, { systemName: "Payroll portal (demo)", purpose: "Monthly payroll inputs", ourPermission: "VIEWER", accessStatus: "PENDING", blocker: "Waiting for Shira to add our user" }, "weekly");
   await system(orbit, { systemName: "Office access control (demo)", purpose: "Door cards for new employees", ourPermission: "NONE", accessStatus: "NOT_NEEDED" }, "notes");
@@ -1063,7 +1063,7 @@ async function main() {
   // and stores that sentence in Hebrew. The English file says it in English.
   const why = "Confirmation from the client or their vendor: every source is an Ankora document.";
   for (const table of ["client_facts", "client_contacts", "client_organizations", "system_access", "client_policies", "processes", "request_types"]) {
-    await prisma.$executeRawUnsafe(`UPDATE "${table}" SET "toResolve" = $1 WHERE "toResolve" ~ E'\\xD7[\\x90-\\xAA]'`, why);
+    await prisma.$executeRawUnsafe(`UPDATE "${table}" SET "toResolve" = $1 WHERE "toResolve" ~ ('[' || chr(1488) || '-' || chr(1514) || ']')`, why);
   }
 
   // Everything above was written a moment ago. Spread it back over the
