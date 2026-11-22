@@ -1635,6 +1635,94 @@ erDiagram
     }
 ```
 
+### Claude usage measurement (November 2026)
+
+The data behind the "שימוש בקלוד" screen (`/app/claude-usage`, permission
+`claude_usage.view`, SUPER_ADMIN only) and the `get_claude_usage` MCP tool.
+Each table belongs to one source: calls to the Ankora MCP connector, prompts
+copied from the app, telemetry events sent by Cowork and Claude Code, and the
+quota readings reported by the Chrome extension. None of them stores prompt
+text. `userId` is nullable in all four and set to null when the user is
+deleted; incoming events and readings are matched to a user by email.
+
+```mermaid
+erDiagram
+    User ||--o{ McpToolCall : "made"
+    User ||--o{ ClaudePromptCopy : "copied"
+    User ||--o{ CoworkEvent : "sent"
+    User ||--o{ ClaudeLimitSample : "reported"
+
+    McpToolCall {
+        string id PK
+        string userId FK "nullable, null for a refused token"
+        string tool
+        boolean ok "false when the tool answered with isError"
+        int resultBytes
+        int resultChars
+        int imageCount
+        boolean truncated
+        string argsHash "first 16 hex of SHA-256 over the arguments"
+        int durationMs
+        datetime createdAt
+    }
+
+    ClaudePromptCopy {
+        string id PK
+        string userId FK "nullable"
+        string kind "see PROMPT_KINDS in lib/claude-usage/prompt-kinds.ts"
+        int chars "length only, never the prompt"
+        datetime createdAt
+    }
+
+    CoworkEvent {
+        string id PK
+        string dedupeKey UK
+        string eventName "user_prompt, api_request, api_error or tool_result"
+        string userId FK "nullable"
+        string userEmail "nullable"
+        string accountUuid "nullable"
+        string sessionId "nullable"
+        string promptId "nullable"
+        datetime occurredAt
+        string source "nullable, service.name"
+        string appVersion "nullable"
+        string model "nullable"
+        decimal costUsd "nullable, Cowork's estimate, not a bill"
+        int inputTokens "nullable"
+        int outputTokens "nullable"
+        int cacheReadTokens "nullable"
+        int cacheCreationTokens "nullable"
+        int durationMs "nullable"
+        string speed "nullable"
+        string statusCode "nullable"
+        int attempt "nullable"
+        string errorText "nullable, api_error only, at most 300 chars"
+        string toolName "nullable"
+        boolean toolSuccess "nullable"
+        int toolResultBytes "nullable"
+        string mcpServer "nullable"
+        string mcpTool "nullable"
+        int promptLength "nullable"
+        datetime receivedAt
+    }
+
+    ClaudeLimitSample {
+        string id PK
+        string userId FK "nullable"
+        string email "lower case"
+        float fiveHourPct "nullable, 0 to 100"
+        datetime fiveHourResetsAt "nullable"
+        float sevenDayPct "nullable, 0 to 100"
+        datetime sevenDayResetsAt "nullable"
+        datetime observedAt
+        string extensionVersion "nullable"
+        datetime receivedAt
+    }
+```
+
+Tables: `mcp_tool_calls`, `claude_prompt_copies`, `cowork_events`,
+`claude_limit_samples`.
+
 ## Notes on relationships not enforced by a Prisma `@relation`
 
 - `AlertEvent.hourBankId` is a plain string column, not a formal foreign key.
