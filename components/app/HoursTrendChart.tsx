@@ -354,7 +354,11 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                           ))}
                       </div>
                     </div>
+                    {/* The row is ltr on purpose (oldest on the left); the labels under the bars
+                        are words in the page's language and get its direction back, so "ראשון
+                        (היום)" is Hebrew text, not ltr text (iPhone check, 22.11.2026). */}
                     <span
+                      dir={textDir}
                       className={`mt-2 flex w-full flex-col text-center text-[11px] ${
                         i === focusIdx ? "font-medium text-app-text-primary" : "text-app-text-tertiary"
                       }`}
@@ -374,7 +378,7 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                   <div className="flex h-48 w-full items-end justify-center">
                     <div className="w-full max-w-[30px] border-t border-dashed border-app-border" />
                   </div>
-                  <span className="mt-2 flex w-full flex-col text-center text-[11px] text-app-text-tertiary">
+                  <span dir={textDir} className="mt-2 flex w-full flex-col text-center text-[11px] text-app-text-tertiary">
                     <span className="truncate">{t(`weekdays.${WEEKDAY_KEYS[dateOfKey(dateKey).getUTCDay()]}`)}</span>
                     <span className="truncate text-[10px]">{shortDay(dateKey)}</span>
                   </span>
