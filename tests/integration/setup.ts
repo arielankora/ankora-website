@@ -63,6 +63,7 @@ const TABLES = [
   "client_contacts",
   "client_organizations",
   "extraction_guides",
+  "agent_runs",
   "agent_client_values",
   "agent_installations",
   "agent_versions",

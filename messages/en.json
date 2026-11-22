@@ -1958,7 +1958,11 @@
       "installationNotYours": "This installation belongs to someone else.",
       "versionNotApproved": "Version {version} is not approved.",
       "notLatest": "The latest version is {version}.",
-      "clientNotInScope": "The client is not in this installation, or is marked \"no AI\"."
+      "clientNotInScope": "The client is not in this installation, or is marked \"no AI\".",
+      "runSummaryRequired": "Write one line on what the run did.",
+      "alreadyFaulty": "The version is already marked faulty.",
+      "noFallback": "There is no other approved version to fall back to. Approve a fixed version first.",
+      "notInstallationParam": "\"{key}\" is not an installation-level parameter of this agent."
     }
   },
   "auditLog": {
@@ -2238,7 +2242,9 @@
       "agentClientValue": "Agent client value set",
       "agentInstall": "Agent installed",
       "agentUninstall": "Agent installation removed",
-      "agentUpdateAccept": "Agent installation updated to a new version"
+      "agentUpdateAccept": "Agent installation updated to a new version",
+      "agentMarkFaulty": "Agent version marked faulty",
+      "agentInstallationValue": "Agent installation value saved"
     },
     "kinds": {
       "failure": "Failure",

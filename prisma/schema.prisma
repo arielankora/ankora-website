@@ -5082,6 +5082,11 @@ model AgentVersion {
   decidedById  String?
   decidedAt    DateTime?
   rejectReason String?
+  /// Phase 2: a manager marked this approved version faulty. Installations
+  /// pinned to it fall back to the newest approved version that is not.
+  faultyAt     DateTime?
+  faultyById   String?
+  faultyReason String?
 
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
@@ -5132,9 +5137,39 @@ model AgentInstallation {
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
 
-  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agent Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  runs  AgentRun[]
 
   @@index([userId, status])
   @@index([agentId, status])
   @@map("agent_installations")
+}
+
+enum AgentRunOutcome {
+  OK
+  PARTIAL
+  FAILED
+}
+
+/// Phase 2: one run of an installation, as the agent reports it through
+/// record_agent_run. Kept 180 days, like CoworkEvent.
+model AgentRun {
+  id             String          @id @default(cuid())
+  installationId String
+  version        Int
+  outcome        AgentRunOutcome
+  /// One line: what the run did.
+  summary        String
+  /// What went wrong or is missing, one item per line.
+  problems       String[]        @default([])
+  /// Requirements the agent found missing (a connector, a skill).
+  missing        String[]        @default([])
+  startedAt      DateTime?
+  createdAt      DateTime        @default(now())
+
+  installation AgentInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+
+  @@index([installationId, createdAt])
+  @@index([createdAt])
+  @@map("agent_runs")
 }

@@ -32,8 +32,9 @@ export function contentOf(v: Pick<AgentVersion, "blocks" | "params" | "requireme
   return { blocks: parseBlocks(v.blocks), params: parseParams(v.params), requirements: parseRequirements(v.requirements), actionLevel: v.actionLevel };
 }
 
+/// The version in use: the newest approved one that no manager marked faulty.
 async function currentApproved(agentId: string) {
-  return prisma.agentVersion.findFirst({ where: { agentId, state: "APPROVED" }, orderBy: { version: "desc" } });
+  return prisma.agentVersion.findFirst({ where: { agentId, state: "APPROVED", faultyAt: null }, orderBy: { version: "desc" } });
 }
 
 async function namesOf(ids: (string | null | undefined)[]) {
@@ -50,13 +51,13 @@ export async function listAgents(actor: User) {
     where: { archivedAt: null },
     orderBy: { name: "asc" },
     include: {
-      versions: { select: { id: true, version: true, state: true }, orderBy: { version: "desc" } },
-      installations: { where: { status: "ACTIVE" }, select: { id: true, userId: true, surface: true, pinnedVersionId: true } },
+      versions: { select: { id: true, version: true, state: true, faultyAt: true }, orderBy: { version: "desc" } },
+      installations: { where: { status: "ACTIVE" }, select: { id: true, userId: true, surface: true, pinnedVersionId: true, runs: { orderBy: { createdAt: "desc" }, take: 1, select: { outcome: true } } } },
     },
   });
   const names = await namesOf([...agents.map((a) => a.ownerId), ...agents.flatMap((a) => a.installations.map((i) => i.userId))]);
   return agents.map((a) => {
-    const approved = a.versions.find((v) => v.state === "APPROVED") ?? null;
+    const approved = a.versions.find((v) => v.state === "APPROVED" && !v.faultyAt) ?? null;
     return {
       id: a.id,
       slug: a.slug,
@@ -71,6 +72,7 @@ export async function listAgents(actor: User) {
       // Behind the version in use: the same rule the installations tab shows.
       updatesWaiting: approved ? a.installations.filter((i) => (a.versions.find((v) => v.id === i.pinnedVersionId)?.version ?? 0) < approved.version).length : 0,
       surfaces: [...new Set(a.installations.map((i) => i.surface))],
+      lastRunFailed: a.installations.some((i) => i.runs[0]?.outcome === "FAILED"),
     };
   });
 }
@@ -81,13 +83,13 @@ export async function getAgent(actor: User, slug: string) {
     where: { slug },
     include: {
       versions: { orderBy: { version: "desc" } },
-      installations: { where: { status: "ACTIVE" }, orderBy: { createdAt: "asc" } },
+      installations: { where: { status: "ACTIVE" }, orderBy: { createdAt: "asc" }, include: { runs: { orderBy: { createdAt: "desc" }, take: 5 } } },
       clientValues: true,
     },
   });
   if (!agent || agent.archivedAt) throw new DomainError("agents.notFound", "הסוכן לא נמצא.");
   const names = await namesOf([agent.ownerId, ...agent.versions.flatMap((v) => [v.createdById, v.decidedById]), ...agent.installations.map((i) => i.userId)]);
-  const approved = agent.versions.find((v) => v.state === "APPROVED") ?? null;
+  const approved = agent.versions.find((v) => v.state === "APPROVED" && !v.faultyAt) ?? null;
   const draft = agent.versions.find((v) => v.state === "DRAFT" || v.state === "PENDING") ?? null;
   const versionNo = new Map(agent.versions.map((v) => [v.id, v.version]));
   return {
@@ -352,10 +354,16 @@ export async function fetchAgent(actor: User, installationId: string, now = new 
   if (inst.userId !== actor.id) throw new DomainError("agents.installationNotYours", "ההתקנה הזו שייכת למישהו אחר.");
   let pinned = await prisma.agentVersion.findUniqueOrThrow({ where: { id: inst.pinnedVersionId } });
   const latest = await currentApproved(inst.agentId);
+  // Phase 2: a version marked faulty is left at once, without asking.
+  let fellBackFrom: { version: number; reason: string | null } | null = null;
+  if (pinned.faultyAt && latest) {
+    fellBackFrom = { version: pinned.version, reason: pinned.faultyReason };
+    pinned = latest;
+  }
   const due = isCheckDue(inst.checkEvery, inst.lastCheckedAt, now);
   let compiled = await compileVersion(actor, inst, inst.agent, pinned);
   let update: null | { version: number; notes: { version: number; note: string }[]; ask: boolean } = null;
-  let pendingVersion = inst.pendingVersion;
+  let pendingVersion = fellBackFrom ? null : inst.pendingVersion;
 
   if (latest && latest.version > pinned.version && due) {
     const next = await compileVersion(actor, inst, inst.agent, latest);
@@ -365,17 +373,112 @@ export async function fetchAgent(actor: User, installationId: string, now = new 
       compiled = next;
       pendingVersion = null;
     } else {
-      const between = await prisma.agentVersion.findMany({ where: { agentId: inst.agentId, state: "APPROVED", version: { gt: pinned.version, lte: latest.version } }, orderBy: { version: "asc" }, select: { version: true, changeNote: true } });
+      const between = await prisma.agentVersion.findMany({ where: { agentId: inst.agentId, state: "APPROVED", faultyAt: null, version: { gt: pinned.version, lte: latest.version } }, orderBy: { version: "asc" }, select: { version: true, changeNote: true } });
       const ask = inst.surface === "PROJECT" || inst.surface === "SKILL";
       update = { version: latest.version, notes: between.map((b) => ({ version: b.version, note: b.changeNote ?? "" })), ask };
       pendingVersion = latest.version;
+      if (!ask && inst.pendingVersion !== latest.version) await notifyOwner(inst.userId, inst.agent.slug, "agent.update_waiting", `${inst.agent.name}: גרסה ${latest.version} ממתינה לאישור שלך`, "ההתקנה המתוזמנת ממשיכה בגרסה הקודמת עד שתאשר את העדכון במסך ההתקנות.");
     }
   }
   await prisma.agentInstallation.update({
     where: { id: inst.id },
     data: { lastFetchedAt: now, ...(due ? { lastCheckedAt: now } : {}), pinnedVersionId: pinned.id, pendingVersion },
   });
-  return { installation: inst, agent: inst.agent, version: pinned.version, compiled, update };
+  return { installation: inst, agent: inst.agent, version: pinned.version, compiled, update, fellBackFrom };
+}
+
+async function notifyOwner(userId: string, slug: string, type: string, title: string, body: string) {
+  await prisma.notification.create({ data: { userId, type, title: title.slice(0, 200), body, entityType: "Agent", entityId: slug } });
+}
+
+// --- Phase 2: runs, faulty versions, the agent's own values --------------------
+
+const RUN_TEXT = 500;
+
+/// One run, as the agent reports it. A failed run tells the installation's
+/// owner, at most once in 12 hours for the same installation.
+export async function recordRun(
+  actor: User,
+  installationId: string,
+  input: { outcome: "OK" | "PARTIAL" | "FAILED"; summary: string; problems?: string[]; missing?: string[]; startedAt?: Date | null }
+) {
+  const inst = await ownInstallation(actor, installationId);
+  if (inst.userId !== actor.id) throw new DomainError("agents.installationNotYours", "ההתקנה הזו שייכת למישהו אחר.");
+  const summary = input.summary.trim().slice(0, RUN_TEXT);
+  if (!summary) throw new DomainError("agents.runSummaryRequired", "צריך שורה אחת על מה שהריצה עשתה.");
+  const clean = (xs?: string[]) => (xs ?? []).map((x) => x.trim().slice(0, RUN_TEXT)).filter(Boolean).slice(0, 20);
+  const texts = [summary, ...clean(input.problems), ...clean(input.missing)];
+  if (texts.some((t) => findSecrets(t).length > 0)) throw new DomainError("agents.hasSecret", "בדיווח יש סיסמה, מפתח או טוקן. סודות לא נכתבים בסוכן.");
+  const pinned = await prisma.agentVersion.findUniqueOrThrow({ where: { id: inst.pinnedVersionId }, select: { version: true } });
+  const run = await prisma.agentRun.create({
+    data: { installationId: inst.id, version: pinned.version, outcome: input.outcome, summary, problems: clean(input.problems), missing: clean(input.missing), startedAt: input.startedAt ?? null },
+  });
+  if (input.outcome === "FAILED" || clean(input.missing).length > 0) {
+    const since = new Date(Date.now() - 12 * 60 * 60 * 1000);
+    const recent = await prisma.notification.count({ where: { userId: inst.userId, type: "agent.run_failed", entityId: inst.agent.slug, createdAt: { gte: since } } });
+    if (recent === 0) {
+      const why = [...clean(input.missing).map((m) => `חסר: ${m}`), ...clean(input.problems)].slice(0, 3).join(" · ");
+      await notifyOwner(inst.userId, inst.agent.slug, "agent.run_failed", `${inst.agent.name}: ${input.outcome === "FAILED" ? "הריצה נכשלה" : "חסרה דרישה בריצה"}`, why || summary);
+    }
+  }
+  return run;
+}
+
+export async function markFaulty(actor: User, versionId: string, reason: string) {
+  assertApprover(actor);
+  const v = await prisma.agentVersion.findUnique({ where: { id: versionId } });
+  if (!v || v.state !== "APPROVED") throw new DomainError("agents.versionNotApproved", `גרסה ${v?.version ?? ""} לא מאושרת.`, { version: v?.version ?? "" });
+  if (v.faultyAt) throw new DomainError("agents.alreadyFaulty", "הגרסה כבר סומנה כתקולה.");
+  const why = reason.trim();
+  if (!why) throw new DomainError("agents.reasonRequired", "צריך לכתוב בשורה אחת למה.");
+  const fallback = await prisma.agentVersion.findFirst({ where: { agentId: v.agentId, state: "APPROVED", faultyAt: null, id: { not: v.id } }, orderBy: { version: "desc" } });
+  if (!fallback) throw new DomainError("agents.noFallback", "אין גרסה מאושרת אחרת לחזור אליה. צריך לאשר גרסה מתוקנת קודם.");
+  await prisma.agentVersion.update({ where: { id: v.id }, data: { faultyAt: new Date(), faultyById: actor.id, faultyReason: why } });
+  // Every installation on it moves now, so even one that is not checking
+  // for updates today runs the version before it on its next run.
+  await prisma.agentInstallation.updateMany({ where: { pinnedVersionId: v.id }, data: { pinnedVersionId: fallback.id, pendingVersion: null } });
+  await recordAudit({ actorId: actor.id, action: "agent.mark_faulty", entityType: "AgentVersion", entityId: v.id, after: { version: v.version, fallback: fallback.version, reason: why } });
+  return fallback;
+}
+
+/// The agent fills an installation-level value it found itself (a label id).
+export async function setInstallationValue(actor: User, installationId: string, key: string, value: string) {
+  const inst = await ownInstallation(actor, installationId);
+  if (inst.userId !== actor.id) throw new DomainError("agents.installationNotYours", "ההתקנה הזו שייכת למישהו אחר.");
+  const pinned = await prisma.agentVersion.findUniqueOrThrow({ where: { id: inst.pinnedVersionId } });
+  const param = contentOf(pinned).params.find((p) => p.key === key);
+  if (!param || param.level !== "INSTALLATION") throw new DomainError("agents.notInstallationParam", `"${key}" הוא לא פרמטר ברמת התקנה בסוכן הזה.`, { key });
+  const v = value.trim();
+  if (v.length > 2000) throw new DomainError("agents.valueTooLong", "הערך ארוך מדי.");
+  if (findSecrets(v).length > 0) throw new DomainError("agents.hasSecret", "בערך יש סיסמה, מפתח או טוקן. סודות לא נכתבים בסוכן.");
+  const values = { ...((inst.values ?? {}) as Record<string, string>) };
+  if (v) values[key] = v;
+  else delete values[key];
+  await prisma.agentInstallation.update({ where: { id: inst.id }, data: { values } });
+  await recordAudit({ actorId: actor.id, action: "agent.installation_value", entityType: "AgentInstallation", entityId: inst.id, after: { key } });
+}
+
+/// The installations of this person, for list_my_agents.
+export async function listMyInstallations(actor: User) {
+  const rows = await prisma.agentInstallation.findMany({
+    where: { userId: actor.id, status: "ACTIVE", agent: { archivedAt: null } },
+    include: { agent: { select: { slug: true, name: true, purpose: true } }, runs: { orderBy: { createdAt: "desc" }, take: 1 } },
+    orderBy: { createdAt: "asc" },
+  });
+  const versionNo = new Map((await prisma.agentVersion.findMany({ where: { id: { in: rows.map((r) => r.pinnedVersionId) } }, select: { id: true, version: true } })).map((v) => [v.id, v.version]));
+  const latest = new Map<string, number>();
+  for (const r of rows) {
+    if (!latest.has(r.agentId)) latest.set(r.agentId, (await currentApproved(r.agentId))?.version ?? 0);
+  }
+  return rows.map((r) => ({
+    installation: r.id,
+    agent: r.agent,
+    surface: r.surface,
+    version: versionNo.get(r.pinnedVersionId) ?? null,
+    latestVersion: latest.get(r.agentId) ?? null,
+    lastFetchedAt: r.lastFetchedAt,
+    lastRun: r.runs[0] ? { outcome: r.runs[0].outcome, summary: r.runs[0].summary, at: r.runs[0].createdAt } : null,
+  }));
 }
 
 export async function acceptUpdate(actor: User, installationId: string, version: number) {

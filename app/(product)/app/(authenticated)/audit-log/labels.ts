@@ -234,6 +234,8 @@ export const ACTION_LABEL: Record<string, string> = {
   "agent.install": "התקנת סוכן",
   "agent.uninstall": "הסרת התקנה של סוכן",
   "agent.update_accept": "עדכון התקנה של סוכן לגרסה חדשה",
+  "agent.mark_faulty": "סימון גרסה של סוכן כתקולה",
+  "agent.installation_value": "שמירת ערך של התקנת סוכן",
   "client_document.add": "צירוף מסמך לתיק הלקוח",
   "client_document.visibility": "שינוי חשיפת מסמך ללקוח",
   "client_document.kind": "שינוי סוג מסמך",

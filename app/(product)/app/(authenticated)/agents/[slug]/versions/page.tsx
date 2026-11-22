@@ -3,7 +3,7 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { contentOf, draftProblems } from "@/lib/app-domain/agents";
 import { diffBlocks, diffParams } from "@/lib/agents/diff";
 import { AgentHeader, loadAgent } from "../shared";
-import { DecideVersion } from "../../AgentForms";
+import { DecideVersion, MarkFaulty } from "../../AgentForms";
 import { ACTION_LEVEL_LABEL, BLOCK_KIND_LABEL, STATE_LABEL } from "../../labels";
 
 // Agents, phase 1: "גרסאות". Every version, and one compared with the
@@ -43,13 +43,14 @@ export default async function VersionsPage({ params, searchParams }: { params: P
               className={`rounded-xl border px-3.5 py-2.5 text-sm ${selected?.id === x.id ? "border-app-accent bg-white" : "border-app-border bg-white/60 hover:bg-white"}`}
             >
               <div className="font-medium">
-                גרסה {x.version} <span className="text-xs font-normal text-app-text-secondary">{STATE_LABEL[x.state]}{x.id === approved?.id ? ", בשימוש" : ""}</span>
+                גרסה {x.version} <span className="text-xs font-normal text-app-text-secondary">{x.faultyAt ? "תקולה" : STATE_LABEL[x.state]}{x.id === approved?.id ? ", בשימוש" : ""}</span>
               </div>
               {x.changeNote && <div className="mt-0.5 line-clamp-2 text-xs text-app-text-secondary" dir="auto">{x.changeNote}</div>}
               <div className="mt-0.5 text-[11px] text-app-text-tertiary">
                 {[x.createdByName, when(x.createdAt)].filter(Boolean).join(", ")}
                 {x.state === "APPROVED" && x.decidedByName ? ` · אישר ${x.decidedByName}` : ""}
                 {x.state === "REJECTED" && x.rejectReason ? ` · נדחתה: ${x.rejectReason}` : ""}
+                {x.faultyAt && x.faultyReason ? ` · ${x.faultyReason}` : ""}
               </div>
             </a>
           ))}
@@ -92,6 +93,13 @@ export default async function VersionsPage({ params, searchParams }: { params: P
                 </div>
               </section>
             ))}
+
+            {selected.state === "APPROVED" && !selected.faultyAt && canDecide && (
+              <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-app-border bg-white px-5 py-3 text-[13px] text-app-text-secondary">
+                <span>גרסה שגורמת נזק? סימון כתקולה מחזיר מיד את כל ההתקנות שעליה לגרסה הקודמת.</span>
+                <MarkFaulty id={selected.id} version={selected.version} />
+              </section>
+            )}
 
             {(selected.state === "DRAFT" || selected.state === "PENDING") && (
               <section className="rounded-xl border border-app-border bg-white px-5 py-4">

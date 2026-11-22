@@ -8,7 +8,7 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { appUrl } from "@/lib/approval-links";
 import { prisma } from "@/lib/prisma";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { acceptUpdate, clientContext, createAgent, draftProblems, fetchAgent, saveDraft, submitDraft } from "@/lib/app-domain/agents";
+import { acceptUpdate, clientContext, createAgent, draftProblems, fetchAgent, listMyInstallations, recordRun, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
 import { BLOCK_KINDS, CLIENT_FIELDS, LIMITS, PARAM_LEVELS, PARAM_TYPES } from "@/lib/agents/model";
 
 // Agents, phase 1 (22.11.2026): the connector side of "סוכנים".
@@ -66,7 +66,9 @@ export function registerAgentTools(server: McpServer): void {
         const actor = actorOf(ctx);
         const got = await fetchAgent(actor, args.installation.trim());
         const parts = [got.compiled.text.trim()];
+        if (got.fellBackFrom) parts.push(`## הערה\n\nגרסה ${got.fellBackFrom.version} סומנה כתקולה${got.fellBackFrom.reason ? ` (${got.fellBackFrom.reason})` : ""}, וההתקנה חזרה לגרסה ${got.version}. ההוראות למעלה הן של גרסה ${got.version}.`);
         if (got.update) parts.push(updateSection(got.update, got.version));
+        parts.push("## בסוף הריצה\n\nקרא ל-record_agent_run עם installation הזה: OK, PARTIAL או FAILED, שורה על מה שנעשה, מה השתבש ומה חסר (חיבור, סקיל, ערך). ריצה שלא דווחה נראית באנקורה כאילו לא קרתה.");
         parts.push(`---\nמקור: אנקורה, ${agentUrl(got.agent.slug)}`);
         return toolText(parts.join("\n\n"));
       } catch (err) {
@@ -254,6 +256,84 @@ export function registerAgentTools(server: McpServer): void {
         return toolJson({ saved: true, state, version: v.version, problems: args.submit ? [] : problems, url: agentUrl(slug, "instructions") });
       } catch (err) {
         console.error("[mcp] save_agent_draft failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "record_agent_run",
+    {
+      title: "Report an agent run to Ankora",
+      description: [
+        "Records how this run of an Ankora agent installation ended, as get_agent's last section asks: `outcome` OK, PARTIAL or FAILED, a one-line `summary`, what went wrong in `problems` and requirements that were missing in `missing` (a connector, a skill, a value).",
+        "Call it once, at the end of every run, scheduled or not. A failed run, or one with something missing, tells the installation's owner in Ankora.",
+      ].join(" "),
+      inputSchema: z.object({
+        installation: z.string().min(1).max(60).describe("The installation id from the bootstrap text."),
+        outcome: z.enum(["OK", "PARTIAL", "FAILED"]),
+        summary: z.string().min(1).max(500).describe("What the run did, in one line, in Hebrew."),
+        problems: z.array(z.string().max(500)).max(20).optional(),
+        missing: z.array(z.string().max(500)).max(20).optional().describe("Requirements not available in this run."),
+      }),
+      annotations: TOOL_ANNOTATIONS.record_agent_run,
+    },
+    async (args: { installation: string; outcome: "OK" | "PARTIAL" | "FAILED"; summary: string; problems?: string[]; missing?: string[] }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const run = await recordRun(actor, args.installation.trim(), args);
+        return toolJson({ recorded: true, runId: run.id, version: run.version });
+      } catch (err) {
+        console.error("[mcp] record_agent_run failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "set_agent_installation_value",
+    {
+      title: "Set a value of this agent installation",
+      description: [
+        "Saves an installation-level parameter value the agent found by itself (for example the id of a Gmail label it created), so the next run gets it in its instructions.",
+        "Only for parameters get_agent lists at installation level, and only values found in this run; never a password, token or key.",
+      ].join(" "),
+      inputSchema: z.object({
+        installation: z.string().min(1).max(60).describe("The installation id from the bootstrap text."),
+        key: z.string().min(1).max(40).describe("The parameter's key, as it appears between braces."),
+        value: z.string().max(2000).describe("The value. Empty clears it."),
+      }),
+      annotations: TOOL_ANNOTATIONS.set_agent_installation_value,
+    },
+    async (args: { installation: string; key: string; value: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        await setInstallationValue(actor, args.installation.trim(), args.key.trim(), args.value);
+        return toolJson({ saved: true, key: args.key.trim(), next: "The value is in the instructions from the next get_agent." });
+      } catch (err) {
+        console.error("[mcp] set_agent_installation_value failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "list_my_agents",
+    {
+      title: "List my Ankora agent installations",
+      description: "The Ankora agents this person runs: for each installation its id, the agent, where it runs, the version it is on and the newest version, when it last fetched its instructions and how its last run ended. Use it when the user asks what agents they run or which need an update.",
+      inputSchema: z.object({}),
+      annotations: TOOL_ANNOTATIONS.list_my_agents,
+    },
+    async (_args: Record<string, never>, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const rows = await listMyInstallations(actor);
+        return toolJson({
+          installations: rows.map((r) => ({ ...r, updateWaiting: r.version !== null && r.latestVersion !== null && r.version < r.latestVersion, url: agentUrl(r.agent.slug, "installations") })),
+        });
+      } catch (err) {
+        console.error("[mcp] list_my_agents failed", err);
         return toolFailure(err);
       }
     }

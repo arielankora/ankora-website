@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { User } from "@prisma/client";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
-import { approveVersion, createInstallation, saveDraft, setClientValue, submitDraft } from "@/lib/app-domain/agents";
+import { approveVersion, createInstallation, markFaulty, saveDraft, setClientValue, submitDraft } from "@/lib/app-domain/agents";
 import { collectApprovals } from "@/lib/app-domain/approvals";
 import type { AgentBlock } from "@/lib/agents/model";
 
@@ -125,5 +125,65 @@ describe("agents through the connector", () => {
     const r = await call(hadas, "save_agent_draft", { create: { name: "Leaky", purpose: "בדיקה", kind: "SKILL" }, blocks: [{ key: "a", kind: "rules", title: "גישה", body: "הטוקן הוא ghp_1234567890abcdefghijklmnopqrstuvwxyzAB" }] });
     expect(r.isError).toBe(true);
     expect(r.text).toContain("סודות לא נכתבים");
+  });
+});
+
+describe("agents, phase 2", () => {
+  it("records runs, tells the owner about a failed one once, and lists the user's installations", async () => {
+    const { hadas, nux } = await setup();
+    const agent = await prisma.agent.create({ data: { slug: "runner", name: "Runner", purpose: "בדיקה", kind: "SCHEDULED", versions: { create: { version: 1, state: "APPROVED", blocks: BLOCKS, params: [...PARAMS, { key: "תווית", label: "מזהה תווית", level: "INSTALLATION" }] } } } });
+    const inst = await createInstallation(hadas, { agentId: agent.id, surface: "SCHEDULED", clientScope: "ONE", clientIds: [nux.id], checkEvery: "DAILY" });
+
+    const fetched = await call(hadas, "get_agent", { installation: inst.id });
+    expect(fetched.text).toContain("record_agent_run");
+
+    const ok = await call(hadas, "record_agent_run", { installation: inst.id, outcome: "OK", summary: "מוינו 12 שרשורים" });
+    expect(ok.json).toMatchObject({ recorded: true, version: 1 });
+    await call(hadas, "record_agent_run", { installation: inst.id, outcome: "FAILED", summary: "לא נקרא", missing: ["Gmail"] });
+    await call(hadas, "record_agent_run", { installation: inst.id, outcome: "FAILED", summary: "שוב לא נקרא" });
+    const notes = await prisma.notification.findMany({ where: { userId: hadas.id, type: "agent.run_failed" } });
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toMatchObject({ entityType: "Agent", entityId: "runner" });
+    expect(notes[0].body).toContain("חסר: Gmail");
+
+    const saved = await call(hadas, "set_agent_installation_value", { installation: inst.id, key: "תווית", value: "Label_7" });
+    expect(saved.json).toMatchObject({ saved: true });
+    const notParam = await call(hadas, "set_agent_installation_value", { installation: inst.id, key: "חתימה", value: "x" });
+    expect(notParam.isError).toBe(true);
+
+    const mine = await call(hadas, "list_my_agents", {});
+    expect(mine.json.installations).toHaveLength(1);
+    expect(mine.json.installations[0]).toMatchObject({ installation: inst.id, version: 1, latestVersion: 1, updateWaiting: false, lastRun: { outcome: "FAILED" } });
+  });
+
+  it("moves every installation off a version marked faulty, and tells a scheduled owner about a waiting update", async () => {
+    const { hadas, ariel, nux } = await setup();
+    const agent = await prisma.agent.create({ data: { slug: "faulty", name: "Faulty", purpose: "בדיקה", kind: "SCHEDULED", versions: { create: { version: 1, state: "APPROVED", blocks: BLOCKS, params: PARAMS } } } });
+    await setClientValue(hadas, { agentId: agent.id, clientId: nux.id, key: "חתימה", value: "הדס" });
+    const inst = await createInstallation(hadas, { agentId: agent.id, surface: "SCHEDULED", clientScope: "ONE", clientIds: [nux.id], checkEvery: "RUN" });
+
+    await saveDraft(hadas, agent.id, { blocks: [{ ...BLOCKS[0], body: "גרסה שבורה." }, BLOCKS[1]], changeNote: "שינוי" });
+    const v2 = await prisma.agentVersion.findFirstOrThrow({ where: { agentId: agent.id, version: 2 } });
+    await submitDraft(hadas, v2.id);
+    await approveVersion(ariel, v2.id);
+
+    // Scheduled: not asked, the owner is told once.
+    const waiting = await call(hadas, "get_agent", { installation: inst.id });
+    expect(waiting.text).toContain("עדכון ממתין");
+    await call(hadas, "get_agent", { installation: inst.id });
+    expect(await prisma.notification.count({ where: { userId: hadas.id, type: "agent.update_waiting" } })).toBe(1);
+
+    // The owner takes it, then a manager marks it faulty: back to 1 at once.
+    await call(hadas, "accept_agent_update", { installation: inst.id, version: 2 });
+    await expect(markFaulty(hadas, v2.id, "שובר")).rejects.toThrow();
+    await markFaulty(ariel, v2.id, "שובר את המיון");
+    expect((await prisma.agentInstallation.findUniqueOrThrow({ where: { id: inst.id } })).pinnedVersionId).not.toBe(v2.id);
+    const back = await call(hadas, "get_agent", { installation: inst.id });
+    expect(back.text).toContain("גרסה 1");
+    expect(back.text).not.toContain("גרסה שבורה");
+
+    // The only approved version left cannot be marked faulty.
+    const v1 = await prisma.agentVersion.findFirstOrThrow({ where: { agentId: agent.id, version: 1 } });
+    await expect(markFaulty(ariel, v1.id, "גם")).rejects.toThrow(/אין גרסה מאושרת אחרת/);
   });
 });

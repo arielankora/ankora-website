@@ -46,7 +46,7 @@ describe("Cowork events", () => {
         { dedupeKey: "recent", eventName: "api_request", occurredAt: recent },
       ],
     });
-    expect(await pruneClaudeUsage(now)).toEqual({ toolCalls: 0, promptCopies: 0, coworkEvents: 1, limitSamples: 0 });
+    expect(await pruneClaudeUsage(now)).toEqual({ toolCalls: 0, promptCopies: 0, coworkEvents: 1, limitSamples: 0, agentRuns: 0 });
     expect((await prisma.coworkEvent.findMany()).map((r) => r.dedupeKey)).toEqual(["recent"]);
   });
 });
