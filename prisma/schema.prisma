@@ -5055,6 +5055,7 @@ model Agent {
   versions      AgentVersion[]
   clientValues  AgentClientValue[]
   installations AgentInstallation[]
+  lessons       AgentLesson[]
 
   @@map("agents")
 }
@@ -5172,4 +5173,70 @@ model AgentRun {
   @@index([installationId, createdAt])
   @@index([createdAt])
   @@map("agent_runs")
+}
+
+/// Phase 3: a block many agents share ("כתיבה בעברית בלי מקפים"). Edited in
+/// one place; approving a version writes it into every agent that uses it,
+/// as a new approved version of that agent.
+model SharedBlock {
+  id    String @id @default(cuid())
+  /// Stable, referenced by an agent block's sharedKey.
+  key   String @unique
+  title String
+  kind  String
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  versions SharedBlockVersion[]
+
+  @@map("shared_blocks")
+}
+
+model SharedBlockVersion {
+  id            String            @id @default(cuid())
+  sharedBlockId String
+  version       Int
+  state         AgentVersionState @default(PENDING)
+  body          String
+  changeNote    String?
+
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  decidedById  String?
+  decidedAt    DateTime?
+  rejectReason String?
+
+  sharedBlock SharedBlock @relation(fields: [sharedBlockId], references: [id], onDelete: Cascade)
+
+  @@unique([sharedBlockId, version])
+  @@index([state])
+  @@map("shared_block_versions")
+}
+
+enum AgentLessonStatus {
+  OPEN
+  USED
+  DISMISSED
+}
+
+/// Phase 3: something an agent learned in a run and proposes to change in
+/// its instructions. A person turns it into a draft, or dismisses it.
+model AgentLesson {
+  id             String            @id @default(cuid())
+  agentId        String
+  installationId String?
+  /// The block it is about, when the agent named one.
+  blockKey       String?
+  text           String
+  status         AgentLessonStatus @default(OPEN)
+  createdById    String?
+  createdAt      DateTime          @default(now())
+  decidedById    String?
+  decidedAt      DateTime?
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, status])
+  @@map("agent_lessons")
 }

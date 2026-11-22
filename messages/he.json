@@ -1962,7 +1962,15 @@
       "runSummaryRequired": "צריך שורה אחת על מה שהריצה עשתה.",
       "alreadyFaulty": "הגרסה כבר סומנה כתקולה.",
       "noFallback": "אין גרסה מאושרת אחרת לחזור אליה. צריך לאשר גרסה מתוקנת קודם.",
-      "notInstallationParam": "\"{key}\" הוא לא פרמטר ברמת התקנה בסוכן הזה."
+      "notInstallationParam": "\"{key}\" הוא לא פרמטר ברמת התקנה בסוכן הזה.",
+      "libraryEmpty": "לקטע בספרייה צריך כותרת וטקסט.",
+      "libraryKind": "סוג הקטע לא מוכר.",
+      "libraryDash": "יש בטקסט מקף ארוך או בינוני.",
+      "libraryNotFound": "הקטע לא נמצא בספרייה.",
+      "libraryPending": "יש לקטע הזה גרסה שממתינה לאישור. צריך לאשר או לדחות אותה קודם.",
+      "libraryNotApproved": "לקטע הזה עוד אין גרסה מאושרת בספרייה.",
+      "lessonEmpty": "צריך לכתוב מה כדאי לשנות.",
+      "lessonNotOpen": "ההצעה כבר טופלה."
     }
   },
   "auditLog": {
@@ -2244,7 +2252,12 @@
       "agentUninstall": "הסרת התקנה של סוכן",
       "agentUpdateAccept": "עדכון התקנה של סוכן לגרסה חדשה",
       "agentMarkFaulty": "סימון גרסה של סוכן כתקולה",
-      "agentInstallationValue": "שמירת ערך של התקנת סוכן"
+      "agentInstallationValue": "שמירת ערך של התקנת סוכן",
+      "agentLibraryPropose": "הצעת גרסה לקטע בספריית הסוכנים",
+      "agentLibraryApprove": "אישור גרסה של קטע בספריית הסוכנים",
+      "agentLibraryReject": "דחיית גרסה של קטע בספריית הסוכנים",
+      "agentLessonPropose": "הצעת שינוי לסוכן מתוך ריצה",
+      "agentLessonDecide": "טיפול בהצעת שינוי לסוכן"
     },
     "kinds": {
       "failure": "כשלון",

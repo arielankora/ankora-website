@@ -138,6 +138,8 @@ export const TOOL_ANNOTATIONS = {
   record_agent_run: WRITES,
   set_agent_installation_value: WRITES,
   list_my_agents: READ_ONLY,
+  propose_agent_change: WRITES,
+  install_agent: WRITES,
   // A client's processes, one in full, and the rules that bind them (spec
   // 8). Assembled on each call; nothing is written.
   list_processes: READ_ONLY,
@@ -246,6 +248,8 @@ export const WRITE_TOOLS = [
   "save_agent_draft",
   "record_agent_run",
   "set_agent_installation_value",
+  "propose_agent_change",
+  "install_agent",
   "set_client_subprocessor_notice",
   "start_process",
   "record_process_check",

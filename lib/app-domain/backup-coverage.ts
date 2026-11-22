@@ -165,6 +165,9 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   Agent: { decision: "DUMP", table: "agents", reason: "Every agent the team runs on Claude: what it is for and who owns it." },
   AgentVersion: { decision: "DUMP", table: "agent_versions", reason: "Every version of every agent's instructions, and who wrote and approved it." },
   AgentClientValue: { decision: "DUMP", table: "agent_client_values", reason: "Per-client values agents run with (signatures, recipients): typed once, nowhere else." },
+  SharedBlock: { decision: "DUMP", table: "shared_blocks", reason: "The library of blocks many agents share, by key." },
+  SharedBlockVersion: { decision: "DUMP", table: "shared_block_versions", reason: "Every version of every library block, and who wrote and approved it." },
+  AgentLesson: { decision: "DUMP", table: "agent_lessons", reason: "What agents learned in runs and proposed to change, and what a person decided." },
   AgentRun: { decision: "DUMP", table: "agent_runs", reason: "How each agent run ended, as the agent reported it: the only record that a scheduled agent ran at all." },
   AgentInstallation: { decision: "DUMP", table: "agent_installations", reason: "Who runs which agent, where and on which version; the bootstrap texts point at these ids." },
   KnowledgeBatch: { decision: "DUMP", table: "knowledge_batches", reason: "Which meeting or document each batch of proposals came from, and what was dropped (reasons only, never the text)." },
@@ -323,6 +326,8 @@ export const ACKNOWLEDGED_SENSITIVE_COLUMNS: Readonly<Record<string, string>> = 
   "client_connections.credentialId": "The id of a vault row, a pointer. The connection's secret stays encrypted in client_credentials.",
   "auto_apply_pauses.key": "Which kind of proposal (FACT.NOTE) or which client id was paused from auto-apply. A label, not a key of any kind.",
   "app_settings.key": "A setting's name ('knowledge.auto_apply'). A label, not a key of any kind.",
+  "shared_blocks.key": "A library block's name ('כתיבה-בעברית'). A label, not a key of any kind.",
+  "agent_lessons.blockKey": "Which block of an agent a lesson is about. A label, not a key of any kind.",
   "agent_client_values.key": "An agent parameter's name ('חתימה'). A label, not a key of any kind; the domain refuses a secret as a value.",
   // Credentials vault. Every one of these is either ciphertext that
   // needs the production key to open, or a flag that says a value exists.

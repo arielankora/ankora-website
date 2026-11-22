@@ -7,6 +7,11 @@ import { useToast } from "@/components/app/toast/ToastProvider";
 import { CopyValue } from "@/components/app/CopyValue";
 import {
   acceptUpdateAction,
+  addFromLibraryAction,
+  approveSharedAction,
+  decideLessonAction,
+  proposeSharedAction,
+  rejectSharedAction,
   approveVersionAction,
   createAgentAction,
   deleteBlockAction,
@@ -474,4 +479,111 @@ export function RemoveInstallation({ id }: { id: string }) {
 
 export function AcceptUpdate({ id, version }: { id: string; version: number }) {
   return <ActionButton run={() => acceptUpdateAction(id, version)} label="לעדכן" done={`ההתקנה עודכנה לגרסה ${version}`} tone="primary" />;
+}
+
+// --- Phase 3: library and lessons -------------------------------------------
+
+function SharedForm({ block }: { block?: { key: string; title: string; kind: string; body: string } }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(proposeSharedAction, close);
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="key" value={block?.key ?? ""} />
+      <Field label="כותרת">
+        <input name="title" required maxLength={120} dir="auto" defaultValue={block?.title ?? ""} className={INPUT} />
+      </Field>
+      <Field label="סוג הקטע">
+        <select name="kind" defaultValue={block?.kind ?? "language"} className={INPUT}>
+          {Object.entries(BLOCK_KIND_LABEL).map(([k, l]) => (
+            <option key={k} value={k}>{l}</option>
+          ))}
+        </select>
+      </Field>
+      <Field label="הטקסט">
+        <textarea name="body" rows={10} required dir="auto" defaultValue={block?.body ?? ""} className={INPUT} />
+      </Field>
+      <Field label="מה השתנה ולמה" hint="מופיע בגרסה החדשה של כל סוכן שמשתמש בקטע.">
+        <input name="changeNote" dir="auto" className={INPUT} />
+      </Field>
+      <Err error={error} />
+      <button type="submit" disabled={pending} className={PRIMARY}>
+        {pending ? "שומר..." : "לשלוח לאישור מנהל"}
+      </button>
+    </form>
+  );
+}
+
+export function EditShared({ block }: { block?: { key: string; title: string; kind: string; body: string } }) {
+  return (
+    <Drawer triggerLabel={block ? "לערוך" : "קטע חדש"} title={block ? `ספרייה: ${block.title}` : "קטע חדש בספרייה"} variant={block ? "link" : "primary"}>
+      <SharedForm block={block} />
+    </Drawer>
+  );
+}
+
+function RejectSharedForm({ id }: { id: string }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(rejectSharedAction, close);
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="id" value={id} />
+      <Field label="הערה למי שכתב (חובה)">
+        <input name="reason" required dir="auto" className={INPUT} />
+      </Field>
+      <Err error={error} />
+      <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+        {pending ? "שומר..." : "לדחות"}
+      </button>
+    </form>
+  );
+}
+
+export function DecideShared({ id, version, reach }: { id: string; version: number; reach: number }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <ActionButton run={() => approveSharedAction(id)} label={`לאשר גרסה ${version}${reach ? `, ותעדכן ${reach} סוכנים` : ""}`} done="אושר, והסוכנים עודכנו" tone="primary" />
+      <Drawer triggerLabel="לדחות" title={`דחיית גרסה ${version}`} variant="link">
+        <RejectSharedForm id={id} />
+      </Drawer>
+    </div>
+  );
+}
+
+function FromLibraryForm({ agentId, options }: { agentId: string; options: { key: string; title: string }[] }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(addFromLibraryAction, close);
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="agentId" value={agentId} />
+      <Field label="קטע מהספרייה" hint="הקטע נכנס לטיוטה כמו שהוא, ומתעדכן לבד כשגרסה חדשה שלו מאושרת בספרייה.">
+        <select name="key" required className={INPUT}>
+          {options.map((o) => (
+            <option key={o.key} value={o.key}>{o.title}</option>
+          ))}
+        </select>
+      </Field>
+      <Err error={error} />
+      <button type="submit" disabled={pending} className={PRIMARY}>
+        {pending ? "שומר..." : "להוסיף לטיוטה"}
+      </button>
+    </form>
+  );
+}
+
+export function AddFromLibrary({ agentId, options }: { agentId: string; options: { key: string; title: string }[] }) {
+  if (options.length === 0) return null;
+  return (
+    <Drawer triggerLabel="להוסיף מהספרייה" title="קטע מהספרייה" variant="link">
+      <FromLibraryForm agentId={agentId} options={options} />
+    </Drawer>
+  );
+}
+
+export function LessonButtons({ id }: { id: string }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <ActionButton run={() => decideLessonAction(id, "USED")} label="נכנס לטיוטה" done="סומן כטופל" />
+      <ActionButton run={() => decideLessonAction(id, "DISMISSED")} label="לא רלוונטי" done="ההצעה נסגרה" />
+    </div>
+  );
 }

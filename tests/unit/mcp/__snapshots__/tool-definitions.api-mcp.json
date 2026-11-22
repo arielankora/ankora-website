@@ -1356,6 +1356,98 @@
     "name": "get_task_plan",
     "title": "Read a task's work plan"
   },
+  "install_agent": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Creates an installation of an Ankora agent for the signed-in person and returns its bootstrap text: the only lines to put in the Claude project's instructions, the scheduled task's prompt or the first message of a persistent conversation. Pass the agent's slug, where it will run, and its clients by name (or allClients). Installation-level values go in `values`, by parameter key. Before calling, confirm with the user where it runs and on which clients.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "agent": {
+          "description": "The agent's slug, from its url.",
+          "maxLength": 60,
+          "minLength": 1,
+          "type": "string"
+        },
+        "allClients": {
+          "description": "Every client this person has access to.",
+          "type": "boolean"
+        },
+        "checkEvery": {
+          "description": "How often to look for a newer version. Default DAILY.",
+          "enum": [
+            "RUN",
+            "DAILY",
+            "WEEKLY"
+          ],
+          "type": "string"
+        },
+        "claudeAccount": {
+          "description": "The Claude account it runs in, when not the person's own.",
+          "maxLength": 120,
+          "type": "string"
+        },
+        "clients": {
+          "description": "Client names, as the user has them in Ankora.",
+          "items": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "schedule": {
+          "description": "For a scheduled run: its cron and time zone.",
+          "properties": {
+            "cron": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "tz": {
+              "maxLength": 60,
+              "type": "string"
+            }
+          },
+          "required": [
+            "cron",
+            "tz"
+          ],
+          "type": "object"
+        },
+        "surface": {
+          "enum": [
+            "PROJECT",
+            "SCHEDULED",
+            "PERSISTENT_SESSION",
+            "SKILL"
+          ],
+          "type": "string"
+        },
+        "values": {
+          "additionalProperties": {
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "propertyNames": {
+            "maxLength": 40,
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "agent",
+        "surface"
+      ],
+      "type": "object"
+    },
+    "name": "install_agent",
+    "title": "Install an Ankora agent for this person"
+  },
   "issue_agreement_upload_code": {
     "annotations": {
       "destructiveHint": false,
@@ -1917,6 +2009,44 @@
     },
     "name": "move_time_entry_to_open_bank",
     "title": "Move a stopped timer into the open hour bank"
+  },
+  "propose_agent_change": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Records something this run taught you that the agent's instructions should say (a missing rule, wording that misled you), for a person to turn into a draft or dismiss on the agent's screen. Name the block it is about when you know it. It changes nothing by itself: the instructions stay as they are until a draft is written and a manager approves it.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "block": {
+          "description": "The key of the block it is about, if known.",
+          "maxLength": 40,
+          "type": "string"
+        },
+        "installation": {
+          "description": "The installation id from the bootstrap text.",
+          "maxLength": 60,
+          "minLength": 1,
+          "type": "string"
+        },
+        "lesson": {
+          "description": "What to change and why, in plain Hebrew.",
+          "maxLength": 2000,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "installation",
+        "lesson"
+      ],
+      "type": "object"
+    },
+    "name": "propose_agent_change",
+    "title": "Propose a change to this agent's instructions"
   },
   "propose_extraction_guide_version": {
     "annotations": {

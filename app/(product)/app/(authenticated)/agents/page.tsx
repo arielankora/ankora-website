@@ -31,7 +31,10 @@ export default async function AgentsPage() {
           <h1 className="text-xl font-medium text-app-text-primary">סוכנים</h1>
           <p className="mt-1 max-w-2xl text-sm text-app-text-secondary">כל סוכן נכתב כאן פעם אחת. כל מנהל תפעול מתקין אותו אצלו, והעדכונים מגיעים אליו מכאן.</p>
         </div>
-        <NewAgent />
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/app/agents/library" className="tap-area rounded-full border border-app-border bg-white px-4 py-2 text-[13px] text-app-text-primary">ספריית קטעים</Link>
+          <NewAgent />
+        </div>
       </header>
 
       <section aria-label="מה דורש תשומת לב" className="grid grid-cols-2 gap-3 md:grid-cols-4">

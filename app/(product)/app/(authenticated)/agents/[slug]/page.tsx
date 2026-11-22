@@ -1,5 +1,7 @@
 import { Forbidden } from "@/components/app/Forbidden";
 import { AgentHeader, loadAgent } from "./shared";
+import { listLessons } from "@/lib/app-domain/agent-library";
+import { LessonButtons } from "../AgentForms";
 import { ACTION_LEVEL_LABEL, SURFACE_LABEL } from "../labels";
 import type { AgentBlock } from "@/lib/agents/model";
 
@@ -40,6 +42,7 @@ export default async function AgentOverviewPage({ params }: { params: Promise<{ 
   const never = shown.blocks.filter((b) => !b.clientId && (b.safety || b.kind === "rules"));
   const needsPerson = of("approvals");
   const req = shown.requirements;
+  const lessons = await listLessons(data.user, data.agent.id);
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
@@ -89,6 +92,21 @@ export default async function AgentOverviewPage({ params }: { params: Promise<{ 
               </ul>
             )}
           </section>
+          {lessons.length > 0 && (
+            <section className="rounded-xl border border-app-accent bg-app-accent-soft p-4">
+              <h2 className="text-sm font-medium">הצעות מהריצות ({lessons.length})</h2>
+              <ul className="mt-2 space-y-3 text-[13px]">
+                {lessons.map((l) => (
+                  <li key={l.id}>
+                    <p dir="auto">{l.text}</p>
+                    {l.blockKey && <p className="text-[11px] text-app-text-tertiary">על הקטע: {shown.blocks.find((b) => b.key === l.blockKey)?.title ?? l.blockKey}</p>}
+                    <div className="mt-1.5"><LessonButtons id={l.id} /></div>
+                  </li>
+                ))}
+              </ul>
+              <a href={`/app/agents/${data.agent.slug}/instructions`} className="mt-2 inline-block text-xs text-app-text-accent">לערוך בטיוטה</a>
+            </section>
+          )}
           <section className="rounded-xl border border-app-border bg-white p-4">
             <h2 className="text-sm font-medium">רץ אצל</h2>
             {installations.length === 0 ? <p className="mt-1 text-[13px] text-app-text-tertiary">אין התקנות.</p> : (

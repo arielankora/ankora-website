@@ -440,8 +440,29 @@ async function guides(s: Scope): Promise<ApprovalItem[]> {
 async function agentVersions(s: Scope): Promise<ApprovalItem[]> {
   if (!s.manager) return [];
   const rows = await prisma.agentVersion.findMany({ where: { state: "PENDING" }, orderBy: { submittedAt: "asc" }, include: { agent: { select: { slug: true, name: true } } } });
-  const names = await namesOf(rows.map((r) => r.createdById));
-  return rows.map((v) => ({
+  const shared = await prisma.sharedBlockVersion.findMany({ where: { state: "PENDING" }, orderBy: { createdAt: "asc" }, include: { sharedBlock: { select: { title: true } } } });
+  const names = await namesOf([...rows.map((r) => r.createdById), ...shared.map((r) => r.createdById)]);
+  // Phase 3: a library block's version is decided with the agents it reaches.
+  const library: ApprovalItem[] = shared.map((v) => ({
+    kind: "agent",
+    id: v.id,
+    clientId: null,
+    clientName: null,
+    title: `ספריית קטעים: ${v.sharedBlock.title}, גרסה ${v.version}`,
+    detail: v.changeNote ? clip(v.changeNote) : null,
+    since: v.createdAt,
+    by: names.get(v.createdById ?? "") ?? null,
+    href: "/app/agents/library",
+    actions: { approve: "אישור הגרסה", reject: { label: "דחייה", note: true } },
+    recommend: { text: "לקרוא את השינוי ולאשר", why: "האישור כותב את הנוסח החדש בכל סוכן שמשתמש בקטע, כגרסה מאושרת חדשה שלו." },
+    screen: {
+      title: k("agent.title", { name: `ספריית קטעים: ${v.sharedBlock.title}`, version: String(v.version) }),
+      approve: k("agent.approve"),
+      reject: k("agent.reject"),
+      recommend: { text: k("agent.recommend"), why: k("agent.why") },
+    },
+  }));
+  return [...library, ...rows.map((v): ApprovalItem => ({
     kind: "agent",
     id: v.id,
     clientId: null,
@@ -459,7 +480,7 @@ async function agentVersions(s: Scope): Promise<ApprovalItem[]> {
       reject: k("agent.reject"),
       recommend: { text: k("agent.recommend"), why: k("agent.why") },
     },
-  }));
+  }))];
 }
 
 /// The steps of a process that are decisions, on the approvals screen. The

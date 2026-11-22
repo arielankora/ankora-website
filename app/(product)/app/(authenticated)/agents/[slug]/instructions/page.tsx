@@ -3,7 +3,9 @@ import { CopyValue } from "@/components/app/CopyValue";
 import { BLOCK_KINDS } from "@/lib/agents/model";
 import { compileAgent } from "@/lib/agents/compile";
 import { AgentHeader, loadAgent } from "../shared";
-import { DeleteBlock, EditBlock, EditMeta } from "../../AgentForms";
+import Link from "next/link";
+import { listSharedBlocks } from "@/lib/app-domain/agent-library";
+import { AddFromLibrary, DeleteBlock, EditBlock, EditMeta } from "../../AgentForms";
 import { ACTION_LEVEL_LABEL, BLOCK_KIND_LABEL } from "../../labels";
 
 // Agents, phase 1: "הוראות". The blocks in the order Claude reads them, and
@@ -33,6 +35,7 @@ export default async function InstructionsPage({ params, searchParams }: { param
   const previewClients = client ? await data.resolve([client]) : [];
   const preview = editing ? compileAgent({ agent, version: { version: editing.version, ...content }, installation: null, clients: previewClients }) : null;
   const canEdit = !data.draft || data.draft.state === "DRAFT";
+  const library = (await listSharedBlocks(data.user)).filter((b) => b.approved).map((b) => ({ key: b.key, title: b.title }));
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
@@ -51,10 +54,13 @@ export default async function InstructionsPage({ params, searchParams }: { param
           {general.map((b) => (
             <section key={b.key} className={`rounded-xl border bg-white px-4 py-3 ${b.safety ? "border-app-error/40" : "border-app-border"}`}>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-app-text-secondary">{BLOCK_KIND_LABEL[b.kind]}{b.safety ? " · גבול בטיחות" : ""}</span>
+                <span className="flex items-center gap-2 text-xs text-app-text-secondary">
+                  {BLOCK_KIND_LABEL[b.kind]}{b.safety ? " · גבול בטיחות" : ""}
+                  {b.sharedKey && <Link href="/app/agents/library" className="rounded-full bg-app-info-soft px-2 py-0.5 text-app-info">מספרייה, גרסה {b.sharedVersion}</Link>}
+                </span>
                 {canEdit && (
                   <span className="flex items-center gap-2">
-                    <EditBlock agentId={agent.id} block={b} clients={clients} params={content.params} />
+                    {!b.sharedKey && <EditBlock agentId={agent.id} block={b} clients={clients} params={content.params} />}
                     <DeleteBlock agentId={agent.id} blockKey={b.key} />
                   </span>
                 )}
@@ -86,8 +92,9 @@ export default async function InstructionsPage({ params, searchParams }: { param
           </section>
 
           {canEdit && (
-            <div>
+            <div className="flex flex-wrap items-center gap-3">
               <EditBlock agentId={agent.id} clients={clients} params={content.params} />
+              <AddFromLibrary agentId={agent.id} options={library.filter((l) => !content.blocks.some((b) => b.sharedKey === l.key))} />
             </div>
           )}
         </div>
