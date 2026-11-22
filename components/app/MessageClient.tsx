@@ -147,10 +147,13 @@ export function MessageClient({
       {open && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={t("dialog", { client: clientName })}>
           <button type="button" aria-label={t("close")} onClick={dismiss} className="absolute inset-0 bg-app-surface-nav/30" />
-          <div className="absolute inset-y-0 end-0 flex w-full max-w-md flex-col border-s border-app-border bg-white shadow-lg">
+          {/* Safe-area padding and a 44px close, as in Drawer (#557): the panel runs the full height
+              of the screen, so in the installed app its header sat under the status bar and its
+              last button under the home indicator (iPhone level 3, 22.11.2026). */}
+          <div className="absolute inset-y-0 end-0 flex w-full max-w-md flex-col border-s border-app-border bg-white pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-lg">
             <div className="flex items-center justify-between border-b border-app-border px-5 py-4">
               <h2 className="text-base font-medium text-app-text-primary">{t("dialog", { client: clientName })}</h2>
-              <button type="button" aria-label={t("close")} onClick={dismiss} className="text-app-text-tertiary hover:text-app-text-primary">
+              <button type="button" aria-label={t("close")} onClick={dismiss} className="-m-3 flex h-11 w-11 shrink-0 items-center justify-center text-app-text-tertiary hover:text-app-text-primary">
                 <X size={18} />
               </button>
             </div>
@@ -180,7 +183,7 @@ export function MessageClient({
                         <button
                           type="button"
                           onClick={() => start(d)}
-                          className="w-full rounded-lg px-2 py-2 text-start text-[13.5px] text-app-text-primary transition-colors hover:bg-cream/60"
+                          className="min-h-11 w-full rounded-lg px-2 py-2 text-start text-[13.5px] text-app-text-primary transition-colors hover:bg-cream/60"
                         >
                           {isDraftKind(d.kind) ? t(`kinds.${d.kind}`) : d.label}
                         </button>
@@ -214,7 +217,7 @@ export function MessageClient({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={() => record("whatsapp")}
-                          className="rounded-full bg-app-accent px-4 py-2 text-[12.5px] font-medium text-app-text-primary"
+                          className="tap-area rounded-full bg-app-accent px-4 py-2 text-[12.5px] font-medium text-app-text-primary"
                         >
                           {t("whatsapp")}
                         </a>
@@ -232,7 +235,7 @@ export function MessageClient({
                           }
                           await record("copied");
                         }}
-                        className="rounded-full border border-app-border px-4 py-2 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold disabled:opacity-40"
+                        className="tap-area rounded-full border border-app-border px-4 py-2 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold disabled:opacity-40"
                       >
                         {t("copy")}
                       </button>
@@ -241,7 +244,7 @@ export function MessageClient({
                           type="button"
                           disabled={busy}
                           onClick={() => record("email")}
-                          className="rounded-full border border-app-border px-4 py-2 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold disabled:opacity-40"
+                          className="tap-area rounded-full border border-app-border px-4 py-2 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold disabled:opacity-40"
                         >
                           {t("email")}
                         </button>
@@ -249,7 +252,7 @@ export function MessageClient({
                       <button
                         type="button"
                         onClick={() => setChosen(null)}
-                        className="rounded-full px-3 py-2 text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
+                        className="tap-area rounded-full px-3 py-2 text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
                       >
                         {/* Back to the six situations, even when the
                             screen opened on one of them: somebody who

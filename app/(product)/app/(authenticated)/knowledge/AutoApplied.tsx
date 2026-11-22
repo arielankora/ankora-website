@@ -158,7 +158,7 @@ function Switch({ enabled, firstEnabled }: { enabled: boolean; firstEnabled: Dat
         type="button"
         disabled={pending}
         onClick={flip}
-        className="rounded-lg border border-app-border px-3 py-1 text-xs font-medium text-app-text-primary hover:border-app-accent disabled:opacity-50"
+        className="tap-area rounded-lg border border-app-border px-3 py-1 text-xs font-medium text-app-text-primary hover:border-app-accent disabled:opacity-50"
         data-testid="auto-apply-switch"
       >
         {pending ? t("saving") : enabled ? t("turnOff") : t("turnOn")}
@@ -207,7 +207,7 @@ function PauseRow({ p }: { p: AutoApplyPauseRow }) {
         type="button"
         disabled={pending}
         onClick={lift}
-        className="rounded-lg border border-app-border px-3 py-1 text-xs font-medium text-app-text-primary hover:border-app-accent disabled:opacity-50"
+        className="tap-area rounded-lg border border-app-border px-3 py-1 text-xs font-medium text-app-text-primary hover:border-app-accent disabled:opacity-50"
         data-testid="auto-apply-lift"
       >
         {pending ? t("lifting") : t("lift")}

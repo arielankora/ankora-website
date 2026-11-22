@@ -654,7 +654,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               {/* The file to read, top to bottom, and to download. */}
               {/* Every approval on this client, in one place (20.10.2026). */}
               {approvalsHere > 0 && (
-                <Link href={`/app/approvals?clientId=${client.id}`} className="text-sm text-app-warning hover:underline" data-testid="client-approvals-link">
+                <Link href={`/app/approvals?clientId=${client.id}`} className="tap-area text-sm text-app-warning hover:underline" data-testid="client-approvals-link">
                   {t("header.approvals", { count: approvalsHere })}
                 </Link>
               )}
