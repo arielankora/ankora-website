@@ -373,9 +373,12 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                   today can sit in the middle of the strip instead of at its
                   edge. Only in the day view: a coming week or month has
                   no use there. */}
+              {/* The faded look is on the empty bar only: a label at half
+                  opacity fails the contrast check (2.08:1), which shows once
+                  the strip fits its card and these days are on screen. */}
               {upcomingDays.map((dateKey) => (
-                <div key={dateKey} aria-hidden className="flex min-w-[56px] flex-1 flex-col items-center opacity-50">
-                  <div className="flex h-48 w-full items-end justify-center">
+                <div key={dateKey} aria-hidden className="flex min-w-[56px] flex-1 flex-col items-center">
+                  <div className="flex h-48 w-full items-end justify-center opacity-50">
                     <div className="w-full max-w-[30px] border-t border-dashed border-app-border" />
                   </div>
                   <span dir={textDir} className="mt-2 flex w-full flex-col text-center text-[11px] text-app-text-tertiary">
