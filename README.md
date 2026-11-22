@@ -112,8 +112,8 @@ one phase.
 ### Roles & permissions
 
 Four roles (`prisma/schema.prisma`'s `UserRole`): `SUPER_ADMIN` (every
-permission, including the three Super-Admin-only screens - Hour Banks,
-Alerts, and Integrations), `ANKORA_ADMIN` (clients + categories + time entries + internal
+permission, including the Super-Admin-only screens: Hour Banks, Alerts,
+Integrations and Claude usage), `ANKORA_ADMIN` (clients + categories + time entries + internal
 reports, not users, the audit log, hour banks, or alerts), `ANKORA_EMPLOYEE`
 (own timer/entries: `time_entry.create_self` + `time_entry.edit_self`,
 never `edit_others`), and `CLIENT_USER` (no admin permissions and no
@@ -264,11 +264,11 @@ existed.
 ### Claude Desktop (MCP)
 
 `/api/mcp` exposes the Time Tracking app to a staff member's Claude over
-the Model Context Protocol. 75 tools, by family:
+the Model Context Protocol. 78 tools, by family:
 
 | | |
 | --- | --- |
-| Time (`lib/mcp/tools.ts`, 15) | `list_my_clients`, `list_categories`, `get_active_timer`, `list_my_time_entries`, `start_timer`, `stop_timer`, `move_time_entry_to_open_bank`, `update_timer_note`, `create_time_entry`, `list_tasks`, `create_task`, `update_task`, `list_assignable_people`, and the two team reads below |
+| Time (`lib/mcp/tools.ts`, 17) | `list_my_clients`, `list_categories`, `get_active_timer`, `list_my_time_entries`, `start_timer`, `stop_timer`, `move_time_entry_to_open_bank`, `update_timer_note`, `create_time_entry`, `update_time_entry` and `delete_time_entry` (the person's own finished entries, under the same rules as the "הזמן שלי" screen), `list_tasks`, `create_task`, `update_task`, `list_assignable_people`, and the two team reads below |
 | Read (team) | `list_team_members`, `list_team_time_entries` — needs `time_entry.edit_others`, the same permission the admin screen and the CSV export already use |
 | Tasks (`task-extra-tools.ts`, 12) | `get_task`, task steps (`add_task_steps`, `replace_task_steps`, `set_task_step`), the work plan (`get_task_plan`, `save_task_plan`, `apply_task_plan_steps`), `set_task_process` (mark a task as a run of a process), `add_task_comment`, `decide_vendor_check` (a detected new vendor: open the sub-processor run or dismiss it), `create_decision`, `list_decisions` |
 | Client file (`client-file-tools.ts`, 22) | `get_client_file`, `get_client_brief`, `list_subprocessor_notice_recipients`, `set_client_subprocessor_notice`, `get_client_changes`, `propose_knowledge`, `lookup_contact`, `list_processes`, `get_process`, `get_procedure_for_translation`, `save_procedure_translation`, `save_procedure_draft`, `save_procedure_audit_draft` (drafts of a procedure's steps and of its audit preparation; a person approves them on the screen), `list_policies`, `start_process`, `record_run_lesson`, `record_stranger_test`, `answer_stranger_question`, `list_my_routines`, `record_process_check`, `get_extraction_brief`, `propose_extraction_guide_version` (a draft of the extraction guide; an admin approves it on the screen) |
@@ -279,6 +279,7 @@ the Model Context Protocol. 75 tools, by family:
 | Communications (`comms-tools.ts`, 2) | `list_client_communications`, `get_client_communication`: a client's stored WhatsApp conversations and recorded calls with their transcripts, read-only, with the communications screen's visibility and block rules, and nothing of a number that also belongs to a client marked "בלי AI" |
 | Approvals (`approval-tools.ts`, 4) | `list_approvals`, `decide_approval`, `decide_knowledge_proposals`: the decisions waiting on the person, and approving or rejecting them from Claude. `get_proposal_stats` (managers only): how proposals to client files ended, by kind, metadata only |
 | Internal suppliers (`employee-tools.ts`, 5) | `get_employee_status`, `get_blank_agreement_pdf`, `issue_agreement_upload_code`, `record_pdf_signature`, `dismiss_pdf_upload` |
+| Claude usage (`usage-tools.ts`, 1) | `get_claude_usage`: the data of the "שימוש בקלוד" screen (`/app/claude-usage`), SUPER_ADMIN only |
 
 A second, separate server at `/api/mcp/portal` (`portal-tools.ts`) serves
 client-portal users with 7 read-mostly tools: `get_status`, `list_tasks`,
@@ -287,8 +288,9 @@ client-portal users with 7 read-mostly tools: `get_status`, `list_tasks`,
 admin can answer a decision through it.
 
 Entries created through MCP carry `createdVia = MCP`, so they are always
-distinguishable from ones typed into the app. Nothing here deletes, and
-nothing writes on behalf of another employee — both stay in the UI. The
+distinguishable from ones typed into the app. The only deletion is
+`delete_time_entry`, of the person's own finished entry, and nothing
+writes on behalf of another employee. The
 full reasoning is in `docs/adr/0005-mcp-server.md`.
 
 **Connecting (OAuth).** Add `https://www.ankora.co.il/api/mcp` as a custom
