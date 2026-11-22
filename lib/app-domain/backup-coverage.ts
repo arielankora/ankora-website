@@ -165,6 +165,7 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   Agent: { decision: "DUMP", table: "agents", reason: "Every agent the team runs on Claude: what it is for and who owns it." },
   AgentVersion: { decision: "DUMP", table: "agent_versions", reason: "Every version of every agent's instructions, and who wrote and approved it." },
   AgentClientValue: { decision: "DUMP", table: "agent_client_values", reason: "Per-client values agents run with (signatures, recipients): typed once, nowhere else." },
+  AgentRun: { decision: "DUMP", table: "agent_runs", reason: "How each agent run ended, as the agent reported it: the only record that a scheduled agent ran at all." },
   AgentInstallation: { decision: "DUMP", table: "agent_installations", reason: "Who runs which agent, where and on which version; the bootstrap texts point at these ids." },
   KnowledgeBatch: { decision: "DUMP", table: "knowledge_batches", reason: "Which meeting or document each batch of proposals came from, and what was dropped (reasons only, never the text)." },
   KnowledgeProposal: { decision: "DUMP", table: "knowledge_proposals", reason: "Proposals to client files and who decided them: the review history decision 1 is measured on." },

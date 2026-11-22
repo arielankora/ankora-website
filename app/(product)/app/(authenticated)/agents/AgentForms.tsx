@@ -13,6 +13,7 @@ import {
   deleteParamAction,
   discardDraftAction,
   installAction,
+  markFaultyAction,
   rejectVersionAction,
   removeInstallationAction,
   saveBlockAction,
@@ -355,6 +356,32 @@ export function DecideVersion({ id, version }: { id: string; version: number }) 
         <RejectForm id={id} />
       </Drawer>
     </div>
+  );
+}
+
+function FaultyForm({ id }: { id: string }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(markFaultyAction, close);
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="id" value={id} />
+      <p className="text-sm text-app-text-primary">כל ההתקנות שרצות על הגרסה הזו יחזרו מיד לגרסה המאושרת הקודמת, בלי לשאול. אחר כך מתקנים בטיוטה חדשה.</p>
+      <Field label="מה התקלה (חובה)">
+        <input name="reason" required dir="auto" className={INPUT} />
+      </Field>
+      <Err error={error} />
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-error px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50">
+        {pending ? "שומר..." : "לסמן כתקולה ולחזור לגרסה הקודמת"}
+      </button>
+    </form>
+  );
+}
+
+export function MarkFaulty({ id, version }: { id: string; version: number }) {
+  return (
+    <Drawer triggerLabel="לסמן כתקולה" title={`גרסה ${version} תקולה`} variant="link">
+      <FaultyForm id={id} />
+    </Drawer>
   );
 }
 

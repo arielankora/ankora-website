@@ -87,7 +87,8 @@ export default async function AgentsPage() {
                       {a.updatesWaiting > 0 && <Pill tone="warn">{a.updatesWaiting === 1 ? "עדכון ממתין" : `${a.updatesWaiting} עדכונים ממתינים`}</Pill>}
                       {a.draft?.state === "PENDING" && <Pill tone="accent">גרסה {a.draft.version} לאישור</Pill>}
                       {a.draft?.state === "DRAFT" && <Pill tone="accent">טיוטה לגרסה {a.draft.version}</Pill>}
-                      {!a.draft && a.updatesWaiting === 0 && a.version && <Pill tone="ok">תקין</Pill>}
+                      {a.lastRunFailed && <Pill tone="warn">הריצה האחרונה נכשלה</Pill>}
+                      {!a.draft && a.updatesWaiting === 0 && !a.lastRunFailed && a.version && <Pill tone="ok">תקין</Pill>}
                     </div>
                   </td>
                 </tr>

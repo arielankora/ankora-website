@@ -74,6 +74,11 @@ export default async function NotificationsPage() {
                     <Link dir="auto" href={`/app/clients/${n.entityId}?tab=file#processes`} className="font-medium text-app-text-primary hover:text-app-text-accent">
                       {n.title}
                     </Link>
+                  ) : n.entityType === "Agent" && n.entityId ? (
+                    // An agent's failed run or waiting update: to its installations.
+                    <Link dir="auto" href={`/app/agents/${n.entityId}/installations`} className="font-medium text-app-text-primary hover:text-app-text-accent">
+                      {n.title}
+                    </Link>
                   ) : n.entityType === "Knowledge" && n.entityId ? (
                     <Link dir="auto" href={`/app/approvals?tab=knowledge&clientId=${n.entityId}`} className="font-medium text-app-text-primary hover:text-app-text-accent">
                       {n.title}

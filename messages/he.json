@@ -1958,7 +1958,11 @@
       "installationNotYours": "ההתקנה הזו שייכת למישהו אחר.",
       "versionNotApproved": "גרסה {version} לא מאושרת.",
       "notLatest": "הגרסה העדכנית היא {version}.",
-      "clientNotInScope": "הלקוח לא בהתקנה הזו, או שהוא מסומן \"בלי AI\"."
+      "clientNotInScope": "הלקוח לא בהתקנה הזו, או שהוא מסומן \"בלי AI\".",
+      "runSummaryRequired": "צריך שורה אחת על מה שהריצה עשתה.",
+      "alreadyFaulty": "הגרסה כבר סומנה כתקולה.",
+      "noFallback": "אין גרסה מאושרת אחרת לחזור אליה. צריך לאשר גרסה מתוקנת קודם.",
+      "notInstallationParam": "\"{key}\" הוא לא פרמטר ברמת התקנה בסוכן הזה."
     }
   },
   "auditLog": {
@@ -2238,7 +2242,9 @@
       "agentClientValue": "קביעת ערך ללקוח בסוכן",
       "agentInstall": "התקנת סוכן",
       "agentUninstall": "הסרת התקנה של סוכן",
-      "agentUpdateAccept": "עדכון התקנה של סוכן לגרסה חדשה"
+      "agentUpdateAccept": "עדכון התקנה של סוכן לגרסה חדשה",
+      "agentMarkFaulty": "סימון גרסה של סוכן כתקולה",
+      "agentInstallationValue": "שמירת ערך של התקנת סוכן"
     },
     "kinds": {
       "failure": "כשלון",

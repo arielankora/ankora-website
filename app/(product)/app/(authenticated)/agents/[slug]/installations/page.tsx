@@ -5,7 +5,7 @@ import { bootstrapText } from "@/lib/agents/compile";
 import { CopyValue } from "@/components/app/CopyValue";
 import { AgentHeader, loadAgent } from "../shared";
 import { AcceptUpdate, NewInstallation, RemoveInstallation } from "../../AgentForms";
-import { CHECK_LABEL, SURFACE_LABEL } from "../../labels";
+import { CHECK_LABEL, RUN_LABEL, SURFACE_LABEL } from "../../labels";
 
 // Agents, phase 1: "התקנות". Who runs this agent, where, on which clients
 // and version; a new installation ends with the bootstrap text.
@@ -49,6 +49,7 @@ export default async function InstallationsPage({ params }: { params: Promise<{ 
                 <th className="px-4 py-2.5 text-start font-normal">גרסה</th>
                 <th className="px-4 py-2.5 text-start font-normal">בדיקת עדכון</th>
                 <th className="px-4 py-2.5 text-start font-normal">פנה לאנקורה</th>
+                <th className="px-4 py-2.5 text-start font-normal">ריצה אחרונה</th>
                 <th className="px-4 py-2.5 text-start font-normal">מצב</th>
               </tr>
             </thead>
@@ -67,6 +68,19 @@ export default async function InstallationsPage({ params }: { params: Promise<{ 
                     <td className="px-4 py-3">{i.pinnedVersion ?? ""}</td>
                     <td className="px-4 py-3">{CHECK_LABEL[i.checkEvery]}</td>
                     <td className="px-4 py-3">{when(i.lastFetchedAt)}</td>
+                    <td className="max-w-[260px] px-4 py-3">
+                      {i.runs[0] ? (
+                        <>
+                          <span className={`rounded-full px-2 py-0.5 text-xs ${i.runs[0].outcome === "OK" ? "bg-app-success-soft text-app-success" : i.runs[0].outcome === "FAILED" ? "bg-app-error-soft text-app-error" : "bg-app-warning-soft text-app-warning"}`}>{RUN_LABEL[i.runs[0].outcome]}, {when(i.runs[0].createdAt)}</span>
+                          <div className="mt-1 text-xs text-app-text-secondary" dir="auto">{i.runs[0].summary}</div>
+                          {[...i.runs[0].missing.map((m) => `חסר: ${m}`), ...i.runs[0].problems].slice(0, 3).map((p, k) => (
+                            <div key={k} className="text-xs text-app-error" dir="auto">{p}</div>
+                          ))}
+                        </>
+                      ) : (
+                        <span className="text-xs text-app-text-tertiary">לא דווחה</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col items-start gap-2">
                         {behind ? <span className="rounded-full bg-app-warning-soft px-2 py-0.5 text-xs text-app-warning">עדכון לגרסה {approved!.version} ממתין</span> : i.lastFetchedAt ? <span className="rounded-full bg-app-success-soft px-2 py-0.5 text-xs text-app-success">תקין, גרסה אחרונה</span> : <span className="rounded-full bg-app-neutral-soft px-2 py-0.5 text-xs text-app-text-secondary">מחכה להפעלה ראשונה</span>}

@@ -11,6 +11,7 @@ import {
   createAgent,
   createInstallation,
   discardDraft,
+  markFaulty,
   rejectVersion,
   removeInstallation,
   saveDraft,
@@ -153,6 +154,11 @@ export async function approveVersionAction(versionId: string): Promise<FormState
 export async function rejectVersionAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
   const user = await requireUser();
   return run(() => rejectVersion(user, str(f, "id"), str(f, "reason")).then(() => undefined));
+}
+
+export async function markFaultyAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => markFaulty(user, str(f, "id"), str(f, "reason")).then(() => undefined));
 }
 
 export async function setClientValueAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {

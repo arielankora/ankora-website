@@ -25,4 +25,6 @@ export const ACTION_LEVEL_LABEL = { READ: "קורא בלבד", DRAFT: "כותב 
 
 export const STATE_LABEL = { DRAFT: "טיוטה", PENDING: "ממתינה לאישור", APPROVED: "מאושרת", REJECTED: "נדחתה" } as const;
 
+export const RUN_LABEL = { OK: "תקינה", PARTIAL: "חלקית", FAILED: "נכשלה" } as const;
+
 export const CHECK_LABEL = { RUN: "בכל ריצה", DAILY: "יומית", WEEKLY: "שבועית" } as const;
