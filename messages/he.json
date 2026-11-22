@@ -1221,9 +1221,10 @@
       "category": "קטגוריה",
       "pickCategory": "בחירת קטגוריה",
       "pickClientFirst": "קודם בוחרים לקוח",
-      "promise": "הבטחה ללקוח",
+      "task": "משימה",
+      "clientSeesOption": "{label} (הלקוח רואה)",
       "unlinked": "לא משויך",
-      "note": "משימה / הערה",
+      "note": "הערה",
       "notePlaceholder": "למשל: עדכון דוח שבועי",
       "starting": "מתחיל..."
     },

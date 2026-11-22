@@ -4,7 +4,7 @@ import { can } from "@/lib/app-auth/permissions";
 import { getActiveTimers, listRecentCombinations, listMyTimeEntries } from "@/lib/app-domain/time-entries";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
-import { listOpenPromises } from "@/lib/app-domain/tasks";
+import { listOpenTasksForTimeEntry } from "@/lib/app-domain/tasks";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 import { Forbidden } from "@/components/app/Forbidden";
 import { TimerWidget, type TodayEntry } from "./TimerWidget";
@@ -69,17 +69,20 @@ export default async function TimerPage(props: { searchParams: Promise<{ tab?: s
     );
   }
 
-  const [activeTimers, clients, allCategories, recent, todayEntries, openPromises] = await Promise.all([
+  const [activeTimers, clients, allCategories, recent, todayEntries, openTasks] = await Promise.all([
     getActiveTimers(user.id),
     listAccessibleClients(user),
     listCategories(),
     // Spec 6.2 quick-start bullet: exactly three one-click combos.
     listRecentCombinations(user.id, 3),
     loadTodayEntries(user.id),
-    // Team adoption: what the stop can ask about. Loaded here rather
-    // than fetched when the toast appears, because a question that
+    // The task picker and what the stop can ask about. Loaded here
+    // rather than fetched when the toast appears, because a question that
     // arrives a moment after the toast does is a question nobody sees.
-    listOpenPromises(user),
+    // 22.11.2026: every open task, not only those the client sees - the
+    // same list "הזמן שלי" offers, so the two screens never disagree on
+    // what work can be logged against.
+    listOpenTasksForTimeEntry(user),
   ]);
 
   const clientIds = new Set(clients.map((c) => c.id));
@@ -121,14 +124,16 @@ export default async function TimerPage(props: { searchParams: Promise<{ tab?: s
             lastUsedAt: r.startAt.toISOString(),
           }))}
           todayEntries={todayEntries}
-          openPromises={openPromises.map((t) => ({
+          openTasks={openTasks.map((t) => ({
             id: t.id,
             clientId: t.clientId,
-            // What the client calls it, when Ankora wrote them a title.
-            // The person stopping the timer is about to tell that client
-            // something, so the words in front of them should be the
-            // ones the client already sees.
-            label: t.clientTitle?.trim() || t.title,
+            // For a task the client sees: what the client calls it, when
+            // Ankora wrote them a title. The person stopping the timer is
+            // about to tell that client something, so the words in front
+            // of them should be the ones the client already sees.
+            label: (t.clientVisible && t.clientTitle?.trim()) || t.title,
+            categoryId: t.categoryId,
+            clientVisible: t.clientVisible,
           }))}
         />
       </div>

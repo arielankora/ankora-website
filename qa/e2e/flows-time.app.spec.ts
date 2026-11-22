@@ -113,7 +113,7 @@ test.describe("timer/actions - start and stop", () => {
     const clientSelect = page.getByLabel("לקוח");
     await clientSelect.selectOption({ index: 1 });
     await page.getByLabel("קטגוריה").selectOption({ index: 1 });
-    await page.getByLabel("משימה / הערה").fill(note);
+    await page.getByLabel("הערה", { exact: true }).fill(note);
 
     await page.getByRole("button", { name: "התחלת טיימר" }).click();
 
