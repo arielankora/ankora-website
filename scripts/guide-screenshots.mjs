@@ -9,6 +9,11 @@
 //
 //   node scripts/guide-screenshots.mjs --lang=en [--base=http://localhost:3100] [--only=tasks,timer]
 //
+// Demo data: scripts/seed-guide-he.ts for the Hebrew set and
+// scripts/seed-guide-en.ts for the English one, each into its own fresh
+// local database (the steps are at the top of each seed). prisma/seed.ts
+// alone is too thin: most screens come out empty.
+//
 // Every picture is 1400 pixels wide at device scale 2 (2800 in the file),
 // like the existing set. `full` pictures take the whole page; `card`
 // pictures crop to the card whose heading is given.
@@ -52,6 +57,7 @@ export const SHOTS = [
   // so only the Hebrew set has it.
   { name: "client-file-read", path: "/app/clients/demo-client-a/client-file", user: SUPER, full: true, langs: ["he"] },
   { name: "client-processes", path: "/app/clients/demo-client-a?tab=file", user: SUPER, card: { he: "^תהליכים \\(", en: "^Processes \\(" } },
+  { name: "client-connections", path: "/app/clients/demo-client-a/connections", user: SUPER },
   { name: "client-rules", path: "/app/clients/demo-client-a?tab=file", user: SUPER, card: { he: "כללים של הלקוח", en: "Client rules" } },
   { name: "approvals", path: "/app/approvals", user: SUPER },
   { name: "knowledge-review", path: "/app/knowledge", user: SUPER, full: true },
@@ -60,6 +66,7 @@ export const SHOTS = [
   { name: "users", path: "/app/users", user: SUPER },
   { name: "audit-log", path: "/app/audit-log", user: SUPER },
   { name: "integrations", path: "/app/integrations", user: SUPER },
+  { name: "claude-usage", path: "/app/claude-usage", user: SUPER, full: true },
   { name: "hour-banks", path: "/app/hour-banks?clientId=demo-client-a", user: SUPER, full: true },
   { name: "alerts", path: "/app/alerts?clientId=demo-client-a", user: SUPER, full: true },
   { name: "reports", path: "/app/reports", user: SUPER },
@@ -69,6 +76,7 @@ export const SHOTS = [
   { name: "portal-activity", path: "/app/portal/activity", user: CLIENT },
   { name: "portal-dashboard", path: "/app/portal/hours", user: CLIENT },
   { name: "portal-weekly", path: "/app/portal/weekly", user: CLIENT },
+  { name: "portal-tasks", path: "/app/portal/tasks", user: CLIENT },
   { name: "portal-history", path: "/app/portal/history", user: CLIENT },
   { name: "portal-file", path: "/app/portal/file", user: CLIENT, full: true },
   { name: "notifications", path: "/app/notifications", user: SUPER },
@@ -136,6 +144,12 @@ async function main() {
         await page.goto(`${BASE}${shot.path}`).catch(() => page.goto(`${BASE}${shot.path}`));
         await page.waitForLoadState("networkidle");
         await page.evaluate(() => document.fonts?.ready);
+        // Next's development badge, if the server is `next dev`: a tool, never part of the guide.
+        await page.addStyleTag({ content: "nextjs-portal,[data-nextjs-toast],#__next-build-watcher,[data-next-badge-root]{display:none!important}" });
+        // A screen the user may not open looks like a normal page in the picture.
+        const text = await page.evaluate(() => document.body.innerText);
+        if (/אין לך הרשאה|This page could not be found|You do not have permission/.test(text)) throw new Error("the page refused this user");
+        if (shot.user && new URL(page.url()).pathname.startsWith("/app/login")) throw new Error("landed on the sign-in page");
         if (shot.card) {
           // The heading as a pattern, so "Processes (3)" is not "Processes and procedures".
           const heading = page.getByText(new RegExp(shot.card[LANG])).first();
@@ -159,6 +173,16 @@ async function main() {
   } finally {
     await browser.close();
   }
+  // Two pictures with the same size in bytes are almost always the same
+  // picture (the sign-in page, or a refusal), not two screens.
+  const sizes = new Map();
+  for (const shot of SHOTS) {
+    const file = path.join(OUT, `${shot.name}.png`);
+    if ((ONLY && !ONLY.has(shot.name)) || !fs.existsSync(file)) continue;
+    const size = fs.statSync(file).size;
+    sizes.set(size, [...(sizes.get(size) ?? []), shot.name]);
+  }
+  for (const names of sizes.values()) if (names.length > 1) console.log("SAME SIZE, look at them:", names.join(", "));
   if (failed.length) {
     console.log(`\n${failed.length} failed: ${failed.join(", ")}`);
     process.exitCode = 1;

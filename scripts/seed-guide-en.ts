@@ -1088,6 +1088,10 @@ async function main() {
   await prisma.$executeRawUnsafe(`UPDATE "process_versions" SET "createdAt" = "createdAt" - interval '24 days', "approvedAt" = "approvedAt" - interval '23 days' WHERE "status" = 'APPROVED'`);
   await prisma.$executeRawUnsafe(`UPDATE "employee_agreements" SET "signedAt" = "signedAt" - interval '60 days', "createdAt" = "createdAt" - interval '60 days'`);
 
+  // The "Claude usage" screen: stuck, at risk, calm, calm.
+  const { seedClaudeUsage } = await import("./seed-guide-claude-usage");
+  await seedClaudeUsage(prisma, [maya, itai, noa, admin], NOW);
+
   console.log("Done. Demo accounts (all share the password below):");
   console.log(`  password: ${DEMO_PASSWORD}`);
   for (const u of [superAdmin, admin, maya, itai, noa, clientAdmin]) console.log(`  ${u.email} (${u.role})`);
