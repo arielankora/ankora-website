@@ -761,6 +761,14 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
         ? {
             ...p,
             payload: { sensitivity: "SENSITIVE", kind: (p.payload as Record<string, unknown>).kind ?? null } as Prisma.JsonValue,
+            // The flags were worded from the full payload when it arrived
+            // (a linked name, a similar item), and the reason for a
+            // rejection is the approver's. Both reach the screen's client
+            // component, and so the page's HTML (level-3 hunt, 22.11.2026).
+            // R6 alone stays: its wording is fixed, and it is what marks
+            // the proposal sensitive for the ranking and the tiers.
+            flags: (Array.isArray(p.flags) ? (p.flags as ProposalFlag[]).filter((f) => f.code === "R6") : []) as Prisma.JsonValue,
+            rejectReason: null,
             reason: null,
             quote: null,
             existing: null,
