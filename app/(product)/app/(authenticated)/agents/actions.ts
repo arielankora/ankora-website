@@ -20,6 +20,7 @@ import {
 } from "@/lib/app-domain/agents";
 import { BLOCK_KINDS, CLIENT_FIELDS, PARAM_LEVELS, PARAM_TYPES, type AgentBlock, type AgentParam } from "@/lib/agents/model";
 import { bootstrapText } from "@/lib/agents/compile";
+import { approveSharedVersion, decideLesson, proposeSharedBlock, rejectSharedVersion, sharedBlockForAgent } from "@/lib/app-domain/agent-library";
 
 // Agents, phase 1: the screens' writes. Every one goes through
 // lib/app-domain/agents.ts, the same functions the MCP tools call.
@@ -199,4 +200,36 @@ export async function removeInstallationAction(installationId: string): Promise<
 export async function acceptUpdateAction(installationId: string, version: number): Promise<FormState> {
   const user = await requireUser();
   return run(() => acceptUpdate(user, installationId, version).then(() => undefined));
+}
+
+// --- Phase 3: library and lessons -------------------------------------------
+
+export async function proposeSharedAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => proposeSharedBlock(user, { key: str(f, "key") || null, title: str(f, "title"), kind: str(f, "kind"), body: String(f.get("body") ?? ""), changeNote: str(f, "changeNote") || null }).then(() => undefined));
+}
+
+export async function approveSharedAction(versionId: string): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => approveSharedVersion(user, versionId).then(() => undefined));
+}
+
+export async function rejectSharedAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => rejectSharedVersion(user, str(f, "id"), str(f, "reason")));
+}
+
+export async function addFromLibraryAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  return run(async () => {
+    const agentId = str(f, "agentId");
+    const block = await sharedBlockForAgent(str(f, "key"));
+    const { blocks } = await editable(agentId);
+    await saveDraft(user, agentId, { blocks: [...blocks.filter((b) => b.sharedKey !== block.sharedKey), block] });
+  });
+}
+
+export async function decideLessonAction(lessonId: string, status: "USED" | "DISMISSED"): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => decideLesson(user, lessonId, status));
 }

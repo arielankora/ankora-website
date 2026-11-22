@@ -24,6 +24,9 @@ export const blockSchema = z.object({
   clientId: z.string().nullish(),
   /// A guardrail ("never send"): shown apart and flagged when it changes.
   safety: z.boolean().optional(),
+  /// Phase 3: a copy of a library block, kept in step when the library's version is approved.
+  sharedKey: z.string().max(60).nullish(),
+  sharedVersion: z.number().int().nullish(),
 });
 export type AgentBlock = z.infer<typeof blockSchema>;
 

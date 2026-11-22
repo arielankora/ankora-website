@@ -86,6 +86,8 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   record_agent_run: "records how a run of the user's own installation ended; it stores the agent's words, no client data is read",
   set_agent_installation_value: "stores a value of the user's own installation (a label id); no client data is read",
   list_my_agents: "lists the user's own installations and their agents; no client data",
+  propose_agent_change: "stores a lesson about the agent's own instructions; no client data is read",
+  install_agent: "clients are matched among those the user can access, and \"בלי AI\" clients are dropped by resolveClients whenever the installation is compiled",
   propose_extraction_guide_version: "Ankora's own extraction guide, no client data; the guide it reads back is the same for every client",
 
   // lib/mcp/document-tools.ts

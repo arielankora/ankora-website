@@ -8,7 +8,9 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { appUrl } from "@/lib/approval-links";
 import { prisma } from "@/lib/prisma";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { acceptUpdate, clientContext, createAgent, draftProblems, fetchAgent, listMyInstallations, recordRun, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
+import { acceptUpdate, clientContext, createAgent, createInstallation, draftProblems, fetchAgent, listMyInstallations, recordRun, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
+import { proposeLesson } from "@/lib/app-domain/agent-library";
+import { bootstrapText } from "@/lib/agents/compile";
 import { BLOCK_KINDS, CLIENT_FIELDS, LIMITS, PARAM_LEVELS, PARAM_TYPES } from "@/lib/agents/model";
 
 // Agents, phase 1 (22.11.2026): the connector side of "סוכנים".
@@ -68,7 +70,7 @@ export function registerAgentTools(server: McpServer): void {
         const parts = [got.compiled.text.trim()];
         if (got.fellBackFrom) parts.push(`## הערה\n\nגרסה ${got.fellBackFrom.version} סומנה כתקולה${got.fellBackFrom.reason ? ` (${got.fellBackFrom.reason})` : ""}, וההתקנה חזרה לגרסה ${got.version}. ההוראות למעלה הן של גרסה ${got.version}.`);
         if (got.update) parts.push(updateSection(got.update, got.version));
-        parts.push("## בסוף הריצה\n\nקרא ל-record_agent_run עם installation הזה: OK, PARTIAL או FAILED, שורה על מה שנעשה, מה השתבש ומה חסר (חיבור, סקיל, ערך). ריצה שלא דווחה נראית באנקורה כאילו לא קרתה.");
+        parts.push("## בסוף הריצה\n\nאם למדת בריצה משהו שכדאי לשנות בהוראות (כלל חסר, ניסוח שהטעה), הצע אותו ב-propose_agent_change. אדם יחליט.\n\nקרא ל-record_agent_run עם installation הזה: OK, PARTIAL או FAILED, שורה על מה שנעשה, מה השתבש ומה חסר (חיבור, סקיל, ערך). ריצה שלא דווחה נראית באנקורה כאילו לא קרתה.");
         parts.push(`---\nמקור: אנקורה, ${agentUrl(got.agent.slug)}`);
         return toolText(parts.join("\n\n"));
       } catch (err) {
@@ -334,6 +336,89 @@ export function registerAgentTools(server: McpServer): void {
         });
       } catch (err) {
         console.error("[mcp] list_my_agents failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "propose_agent_change",
+    {
+      title: "Propose a change to this agent's instructions",
+      description: [
+        "Records something this run taught you that the agent's instructions should say (a missing rule, wording that misled you), for a person to turn into a draft or dismiss on the agent's screen. Name the block it is about when you know it.",
+        "It changes nothing by itself: the instructions stay as they are until a draft is written and a manager approves it.",
+      ].join(" "),
+      inputSchema: z.object({
+        installation: z.string().min(1).max(60).describe("The installation id from the bootstrap text."),
+        lesson: z.string().min(1).max(2000).describe("What to change and why, in plain Hebrew."),
+        block: z.string().max(40).optional().describe("The key of the block it is about, if known."),
+      }),
+      annotations: TOOL_ANNOTATIONS.propose_agent_change,
+    },
+    async (args: { installation: string; lesson: string; block?: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const row = await proposeLesson(actor, args.installation.trim(), { text: args.lesson, blockKey: args.block });
+        return toolJson({ proposed: true, lessonId: row.id, state: "open: waits for a person on the agent's screen" });
+      } catch (err) {
+        console.error("[mcp] propose_agent_change failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "install_agent",
+    {
+      title: "Install an Ankora agent for this person",
+      description: [
+        "Creates an installation of an Ankora agent for the signed-in person and returns its bootstrap text: the only lines to put in the Claude project's instructions, the scheduled task's prompt or the first message of a persistent conversation.",
+        "Pass the agent's slug, where it will run, and its clients by name (or allClients). Installation-level values go in `values`, by parameter key. Before calling, confirm with the user where it runs and on which clients.",
+      ].join(" "),
+      inputSchema: z.object({
+        agent: z.string().min(1).max(60).describe("The agent's slug, from its url."),
+        surface: z.enum(["PROJECT", "SCHEDULED", "PERSISTENT_SESSION", "SKILL"]),
+        clients: z.array(z.string().max(120)).max(50).optional().describe("Client names, as the user has them in Ankora."),
+        allClients: z.boolean().optional().describe("Every client this person has access to."),
+        checkEvery: z.enum(["RUN", "DAILY", "WEEKLY"]).optional().describe("How often to look for a newer version. Default DAILY."),
+        schedule: z.object({ cron: z.string().max(120), tz: z.string().max(60) }).optional().describe("For a scheduled run: its cron and time zone."),
+        claudeAccount: z.string().max(120).optional().describe("The Claude account it runs in, when not the person's own."),
+        values: z.record(z.string().max(40), z.string().max(2000)).optional(),
+      }),
+      annotations: TOOL_ANNOTATIONS.install_agent,
+    },
+    async (
+      args: { agent: string; surface: "PROJECT" | "SCHEDULED" | "PERSISTENT_SESSION" | "SKILL"; clients?: string[]; allClients?: boolean; checkEvery?: "RUN" | "DAILY" | "WEEKLY"; schedule?: { cron: string; tz: string }; claudeAccount?: string; values?: Record<string, string> },
+      ctx: ServerContext
+    ) => {
+      try {
+        const actor = actorOf(ctx);
+        const agent = await prisma.agent.findUnique({ where: { slug: args.agent.trim() }, select: { id: true, slug: true, name: true, archivedAt: true } });
+        if (!agent || agent.archivedAt) return toolText(`No agent with the slug "${args.agent}". Nothing was installed.`);
+        let clientIds: string[] = [];
+        if (!args.allClients) {
+          const mine = await listAccessibleClients(actor);
+          for (const name of args.clients ?? []) {
+            const c = mine.find((x) => x.name.toLowerCase() === name.trim().toLowerCase());
+            if (!c) return toolText(`No client you can access is named "${name}". Nothing was installed.`);
+            clientIds.push(c.id);
+          }
+          clientIds = [...new Set(clientIds)];
+        }
+        const inst = await createInstallation(actor, {
+          agentId: agent.id,
+          surface: args.surface,
+          clientScope: args.allClients ? "ALL_MINE" : clientIds.length > 1 ? "LIST" : "ONE",
+          clientIds,
+          checkEvery: args.checkEvery ?? "DAILY",
+          claudeAccount: args.claudeAccount ?? null,
+          values: args.values,
+          schedules: args.schedule ? [args.schedule] : [],
+        });
+        return toolJson({ installed: true, installation: inst.id, bootstrap: bootstrapText(agent, inst.id), url: agentUrl(agent.slug, "installations") });
+      } catch (err) {
+        console.error("[mcp] install_agent failed", err);
         return toolFailure(err);
       }
     }

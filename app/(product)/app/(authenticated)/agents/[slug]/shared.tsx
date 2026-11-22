@@ -53,6 +53,7 @@ export function AgentHeader({ data, active }: { data: LoadedAgent; active: (type
           <span className="rounded-full border border-app-border bg-white px-2.5 py-0.5">{KIND_LABEL[agent.kind]}</span>
           {agent.ownerName && <span className="rounded-full border border-app-border bg-white px-2.5 py-0.5">אחראי: {agent.ownerName}</span>}
           <span className="rounded-full border border-app-border bg-white px-2.5 py-0.5">{approved ? `גרסה ${approved.version} מאושרת` : "אין גרסה מאושרת"}</span>
+          {approved && <a href={`/api/agents/${agent.slug}/export`} className="rounded-full border border-app-border bg-white px-2.5 py-0.5 text-app-text-accent">להוריד כסקיל (SKILL.md)</a>}
         </div>
       </div>
       <ViewTabs label="לשוניות הסוכן" active={active} tabs={TABS.map((t) => ({ key: t.key, label: t.label, href: `/app/agents/${agent.slug}${t.path}` }))} />

@@ -115,6 +115,8 @@ export async function createAgent(actor: User, input: { name: string; purpose: s
   if (!name || name.length > 80) throw new DomainError("agents.nameRequired", "צריך שם לסוכן, עד 80 תווים.");
   if (!purpose || purpose.length > 300) throw new DomainError("agents.purposeRequired", "צריך לכתוב בשורה מה הסוכן עושה.");
   let slug = slugOf(input.slug?.trim() || name) || `agent-${Date.now().toString(36)}`;
+  // "library" is the library screen's address under /app/agents.
+  if (slug === "library") slug = "library-agent";
   if (await prisma.agent.findUnique({ where: { slug }, select: { id: true } })) slug = `${slug}-${Date.now().toString(36)}`.slice(0, 50);
   const agent = await prisma.agent.create({
     data: { slug, name, purpose, kind: input.kind, ownerId: actor.id, createdById: actor.id, versions: { create: { version: 1, createdById: actor.id } } },

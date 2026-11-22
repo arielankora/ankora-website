@@ -5,6 +5,8 @@ import { createTestClient, createTestUser } from "./factories";
 import { approveVersion, createInstallation, markFaulty, saveDraft, setClientValue, submitDraft } from "@/lib/app-domain/agents";
 import { collectApprovals } from "@/lib/app-domain/approvals";
 import type { AgentBlock } from "@/lib/agents/model";
+import { approveSharedVersion, listLessons, proposeSharedBlock, sharedBlockForAgent } from "@/lib/app-domain/agent-library";
+import { parseBlocks } from "@/lib/agents/model";
 
 // Agents, phase 1 (22.11.2026). What is worth holding: a draft saved from
 // Claude waits for a manager; an installation gets the pinned version with
@@ -185,5 +187,43 @@ describe("agents, phase 2", () => {
     // The only approved version left cannot be marked faulty.
     const v1 = await prisma.agentVersion.findFirstOrThrow({ where: { agentId: agent.id, version: 1 } });
     await expect(markFaulty(ariel, v1.id, "גם")).rejects.toThrow(/אין גרסה מאושרת אחרת/);
+  });
+});
+
+describe("agents, phase 3", () => {
+  it("writes an approved library version into every agent that copies it, past an open draft", async () => {
+    const { hadas, ariel } = await setup();
+    const first = await proposeSharedBlock(hadas, { title: "כתיבה בעברית", kind: "language", body: "עברית, משפטים קצרים." });
+    await approveSharedVersion(ariel, first.version.id);
+    const lib = await sharedBlockForAgent(first.block.key);
+    const agent = await prisma.agent.create({ data: { slug: "uses-lib", name: "Uses lib", purpose: "בדיקה", kind: "SKILL", versions: { create: { version: 1, state: "APPROVED", blocks: [BLOCKS[0], lib] } } } });
+    await saveDraft(hadas, agent.id, { blocks: [BLOCKS[0], lib, { key: "extra", kind: "rules", title: "עוד", body: "כלל בטיוטה." }] });
+
+    const second = await proposeSharedBlock(hadas, { key: first.block.key, title: "כתיבה בעברית", kind: "language", body: "עברית, משפטים קצרים, בלי מקפים.", changeNote: "גם בלי מקפים" });
+    await expect(approveSharedVersion(hadas, second.version.id)).rejects.toThrow();
+    const { touched } = await approveSharedVersion(ariel, second.version.id);
+    expect(touched).toEqual(["uses-lib"]);
+
+    const versions = await prisma.agentVersion.findMany({ where: { agentId: agent.id }, orderBy: { version: "asc" } });
+    expect(versions.map((v) => [v.version, v.state])).toEqual([[1, "APPROVED"], [2, "APPROVED"], [3, "DRAFT"]]);
+    expect(versions[1].changeNote).toContain("גם בלי מקפים");
+    for (const v of versions.slice(1)) expect(parseBlocks(v.blocks).find((b) => b.sharedKey === first.block.key)?.body).toBe("עברית, משפטים קצרים, בלי מקפים.");
+    expect(parseBlocks(versions[2].blocks).some((b) => b.key === "extra")).toBe(true);
+  });
+
+  it("installs from Claude, takes a lesson from a run, and exports nothing secret", async () => {
+    const { hadas, nux } = await setup();
+    await prisma.agent.create({ data: { slug: "installable", name: "Installable", purpose: "בדיקה", kind: "CLIENT_PROJECT", versions: { create: { version: 1, state: "APPROVED", blocks: BLOCKS, params: PARAMS } } } });
+    const r = await call(hadas, "install_agent", { agent: "installable", surface: "PROJECT", clients: [nux.name] });
+    expect(r.json).toMatchObject({ installed: true });
+    expect(r.json.bootstrap).toContain(r.json.installation);
+    const wrong = await call(hadas, "install_agent", { agent: "installable", surface: "PROJECT", clients: ["No such client"] });
+    expect(wrong.isError).toBeFalsy();
+    expect(wrong.text).toContain("Nothing was installed");
+
+    const lesson = await call(hadas, "propose_agent_change", { installation: r.json.installation, lesson: "להוסיף כלל: לא לענות בשבת", block: "role" });
+    expect(lesson.json).toMatchObject({ proposed: true });
+    const agent = await prisma.agent.findUniqueOrThrow({ where: { slug: "installable" } });
+    expect((await listLessons(hadas, agent.id)).map((l) => l.text)).toEqual(["להוסיף כלל: לא לענות בשבת"]);
   });
 });
