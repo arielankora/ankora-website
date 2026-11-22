@@ -266,5 +266,10 @@ input[type="datetime-local"]::-webkit-date-and-time-value {
     max-width: 100%;
     min-width: 0;
     text-overflow: ellipsis;
+    /* Safari paints a long option's text past the select's own box and counts it as overflow:
+       a client form with a long name scrolled 282px sideways on an SE, and a filter chip 341px,
+       with the select itself the right width. Paint containment clips the text to the box
+       (WebKit, 22.11.2026). The select's own focus ring is outside the containment and stays. */
+    contain: paint;
   }
 }

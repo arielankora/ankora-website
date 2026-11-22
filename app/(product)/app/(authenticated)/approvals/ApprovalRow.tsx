@@ -128,7 +128,7 @@ export function ApprovalRow({ row }: { row: RowView }) {
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
-            className="mt-1.5 text-[12.5px] font-medium text-app-text-accent hover:underline"
+            className="tap-area mt-1.5 text-[12.5px] font-medium text-app-text-accent hover:underline"
             data-testid="approval-preview-toggle"
           >
             {open ? t("row.hide") : t(`preview.toggle.${row.preview.toggleKey}`)}
@@ -186,7 +186,7 @@ export function ApprovalRow({ row }: { row: RowView }) {
               </button>
             )}
             {reject && !rejecting && (
-              <button type="button" disabled={pending} onClick={() => setRejecting(true)} className="text-app-text-secondary hover:text-app-error disabled:opacity-40">
+              <button type="button" disabled={pending} onClick={() => setRejecting(true)} className="tap-area text-app-text-secondary hover:text-app-error disabled:opacity-40">
                 {reject.label}
               </button>
             )}
