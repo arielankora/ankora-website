@@ -157,7 +157,14 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "A timer linked to a client commitment: instead of \"Undo\", the message asks \"Where does it stand now?\" and offers \"In progress\", \"Waiting on client\" or \"Done\", next to the field \"What should we tell the client happened?\". Your choice updates the task the client sees in the portal.",
           "A timer that is running when its package closes is stopped, and you are then asked \"Move it?\": \"Move\" records the time in the open package, \"Keep\" leaves it where it is.",
         ],
-        images: [{ src: "/guide/en/timer.png", alt: "The timer screen with the start and stop button", caption: "The timer screen, from a team member's point of view" }],
+        images: [
+          { src: "/guide/en/timer.png", alt: "The timer screen with the start and stop button", caption: "The timer screen, from a team member's point of view" },
+          {
+            src: "/guide/en/timer-start.png",
+            alt: "The timer start form with client, category and task",
+            caption: "The start form: once a client and a task are chosen, the category is filled in from the task",
+          },
+        ],
       },
       {
         id: "my-time",

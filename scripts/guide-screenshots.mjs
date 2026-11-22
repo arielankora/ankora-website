@@ -44,6 +44,18 @@ export const SHOTS = [
   { name: "login", path: "/app/login", user: null },
   { name: "overview", path: "/app", user: SUPER, full: true },
   { name: "timer", path: "/app/timer", user: EMPLOYEE },
+  // The start form (22.11.2026): opened under the running timer, a client
+  // with open tasks chosen and a task picked, so the task field shows and
+  // the category it filled in. The Sela family office, because the demo
+  // timer already runs on Orbit (a client with a running timer is not
+  // offered) and employee1 is not on Meridian.
+  {
+    name: "timer-start",
+    path: "/app/timer",
+    user: EMPLOYEE,
+    card: { he: "טיימר נוסף, על לקוח אחר", en: "Another timer, for a different client" },
+    prepare: openTimerStartForm,
+  },
   { name: "my-time", path: "/app/timer?tab=mine", user: EMPLOYEE },
   { name: "tasks", path: "/app/tasks", user: SUPER },
   { name: "task-detail", path: "/app/tasks/demo-task-research-competitors", user: SUPER, full: true },
@@ -85,6 +97,22 @@ export const SHOTS = [
   // mcp-claude shows the Claude card of an account that is connected to
   // Claude, which the demo data has no way to be. It is not retaken.
 ];
+
+/// Opens "start another timer", picks the Sela family office and its first open task.
+/// The selects are found by order inside the form's card (client,
+/// category, task): the client select is named by its shown option as
+/// well as its label, so a name lookup is brittle.
+async function openTimerStartForm(page) {
+  const text = LANG === "en"
+    ? { add: "Start another timer", title: "Another timer, for a different client" }
+    : { add: "הפעלת טיימר נוסף", title: "טיימר נוסף, על לקוח אחר" };
+  await page.getByRole("button", { name: text.add }).click();
+  const card = page.getByText(text.title).first().locator("xpath=ancestor::*[contains(@class,'rounded')][1]");
+  const selects = card.locator("select");
+  await selects.nth(0).selectOption("demo-client-e");
+  await selects.nth(2).selectOption({ index: 1 });
+  await page.waitForFunction((el) => el && el.value !== "", await selects.nth(1).elementHandle(), { timeout: 10000 });
+}
 
 async function signIn(context, email) {
   const page = await context.newPage();
@@ -150,6 +178,8 @@ async function main() {
         const text = await page.evaluate(() => document.body.innerText);
         if (/אין לך הרשאה|This page could not be found|You do not have permission/.test(text)) throw new Error("the page refused this user");
         if (shot.user && new URL(page.url()).pathname.startsWith("/app/login")) throw new Error("landed on the sign-in page");
+        // A screen that only shows its state after a few clicks.
+        if (shot.prepare) await shot.prepare(page);
         if (shot.selector) {
           // An element by id, clipped from the full page (see `card` below for why).
           await page.evaluate(() => window.scrollTo(0, 0));
