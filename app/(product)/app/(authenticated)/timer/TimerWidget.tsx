@@ -349,7 +349,7 @@ export function TimerWidget({
               <button
                 type="button"
                 onClick={() => setAddOpen(true)}
-                className="flex items-center gap-2 text-[13px] font-medium text-app-text-primary hover:text-app-text-accent"
+                className="tap-area flex items-center gap-2 text-[13px] font-medium text-app-text-primary hover:text-app-text-accent"
               >
                 <Plus size={15} strokeWidth={2.25} />
                 {t("widget.addButton")}

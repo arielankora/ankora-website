@@ -248,7 +248,7 @@ export function AdminEntryRow({
             )}
             <div className="flex items-center gap-3">
               <SubmitButton pending={pending} />
-              <button type="button" onClick={() => setEditing(false)} className="text-xs text-app-text-secondary hover:text-app-text-primary">
+              <button type="button" onClick={() => setEditing(false)} className="tap-area text-xs text-app-text-secondary hover:text-app-text-primary">
                 {t("cancel")}
               </button>
               {saveError && <p className="text-xs text-app-error">{saveError}</p>}
@@ -267,7 +267,7 @@ export function AdminEntryRow({
             type="button"
             onClick={onToggleSelect}
             aria-label={t("select")}
-            className={`flex h-5 w-5 items-center justify-center rounded-md border text-[11px] ${
+            className={`tap-area flex h-5 w-5 items-center justify-center rounded-md border text-[11px] ${
               selected ? "border-gold bg-app-accent text-app-text-primary" : "border-app-border bg-white text-transparent"
             }`}
           >
@@ -303,13 +303,13 @@ export function AdminEntryRow({
         </td>
         <td className="px-5 py-3 text-end">
           <div className="flex items-center justify-end gap-3">
-            <button type="button" onClick={toggleHistory} className="text-xs text-app-text-secondary hover:text-app-text-primary">
+            <button type="button" onClick={toggleHistory} className="tap-area text-xs text-app-text-secondary hover:text-app-text-primary">
               {t("history")}
             </button>
-            <button type="button" onClick={() => setEditing(true)} className="text-xs text-app-text-secondary hover:text-app-text-primary">
+            <button type="button" onClick={() => setEditing(true)} className="tap-area text-xs text-app-text-secondary hover:text-app-text-primary">
               {t("edit")}
             </button>
-            <button type="button" onClick={() => void handleDelete()} className="text-xs text-app-text-tertiary hover:text-app-error">
+            <button type="button" onClick={() => void handleDelete()} className="tap-area text-xs text-app-text-tertiary hover:text-app-error">
               {t("delete")}
             </button>
           </div>
