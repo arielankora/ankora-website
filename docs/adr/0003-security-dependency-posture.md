@@ -79,6 +79,12 @@ a worse failure mode than a build-time DoS we cannot trigger.
 
 Revisit when Prisma ships a release depending on deepmerge-ts >= 8.
 
+The same path also carries `effect` 3.21.0 (GHSA-7589-6fvf-x4pw, high,
+ReDoS in `Schema.TemplateLiteral`, November 2026). `@prisma/config` uses it
+to validate our own Prisma config while the CLI runs at build time; no
+request input ever reaches it. npm's remediation is again `prisma@7.10.1`,
+a major. Accepted on the same reasoning as deepmerge-ts.
+
 ## Fixed, not accepted: the MCP input-size pair (25.10.2026)
 
 Two advisories a week apart, both reachable, both closed by a patch bump
@@ -142,23 +148,41 @@ Recorded so the weekly check does not re-derive them.
   token by prefix and hash against our own tables and trusts no external
   issuer.
 
-## Accepted: @vercel/oidc → @vercel/cli-config → zod 4.1.11 (high)
+## Fixed, no longer accepted: @vercel/oidc → @vercel/cli-config → zod 4.1.11 (22.11.2026)
 
-Survives the zod bump above, because this is a second, nested copy. npm's
-suggested remediation is `@vercel/oidc` 3.5.0, a major downgrade, which is
-the pattern the standing rule below forbids.
+Accepted until November 2026 because the only remediation npm offered was
+`@vercel/oidc` 3.5.0, a major downgrade. 4.x then shipped with
+`@vercel/cli-config` 0.4.0, which no longer carries the vulnerable nested
+zod, so the fix became a forward upgrade: `@vercel/oidc` 3.8.8 → 4.0.9.
+Production advisories went from 8 to 6.
 
-Not reachable here. `@vercel/cli-config` reads the Vercel CLI's own local
-configuration files, never network input, and `@vercel/oidc` is used only
-by `getVercelOidcToken` in `lib/google-drive.ts` and
-`lib/vault/gcp-token.ts`. Nothing an attacker controls is parsed by that
-copy of zod.
+What was checked before taking a major: the only import is
+`getVercelOidcToken` in `lib/google-drive.ts` and `lib/vault/gcp-token.ts`,
+and 4.x keeps that export and its signature. On Vercel the token is still
+read from the request's `x-vercel-oidc-token` header and refreshed only
+when it is missing or expired, which is the 3.x behaviour; the refresh
+path (the CLI's local configuration) is a local-development concern. The
+unit tests mock the package, so the real check is a preview where Google
+Drive and the vault both work.
 
-## Accepted: vite, vitest and @vitest/mocker (high and moderate)
+## Accepted: dev-only tooling (vite, vitest, @vitest/mocker, postcss-selector-parser, minimatch via typescript-eslint)
 
-All three are `dev: true` in the lockfile and run only under
-`npm test`. They never enter a deployed bundle, and the inputs they parse
-are this repository's own test files.
+All are `dev: true` in the lockfile and never enter a deployed bundle.
+`vite`, `vitest` and `@vitest/mocker` run only under `npm test`, on this
+repository's own test files. `postcss-selector-parser` is pulled by
+`tailwindcss` and `postcss-nested` at build time. The vite, vitest and
+postcss-selector-parser advisories were fixed in the lockfile in #343
+(October 2026); they stay listed here so a future advisory on them is read
+with the same reasoning.
+
+`minimatch` 10.x (GHSA-g3hv-75wg-m249, moderate, November 2026) arrives
+through `eslint-config-next` → `typescript-eslint` →
+`@typescript-eslint/typescript-estree`. It runs only when ESLint runs,
+the build command does not run ESLint, and the patterns it expands are
+this repository's own config globs. npm's suggested remediation is
+`eslint-config-next` 15.5.29, a major downgrade off the Next 16 line, and
+the newest `typescript-eslint` (8.72.2) is still in the affected range.
+Revisit when `typescript-eslint` ships a release outside that range.
 
 ## Standing rule
 
