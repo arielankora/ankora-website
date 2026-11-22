@@ -709,9 +709,13 @@ export default async function AppHomePage() {
           </div>
         )}
 
-        {/* App redesign: 1.5fr/1fr row - trend chart + upcoming dates. */}
+        {/* App redesign: 1.5fr/1fr row - trend chart + upcoming dates.
+            minmax(0, ...): a bare `fr` track never shrinks below its
+            content, and the chart scrolls sideways (#548) over columns with
+            a minimum width, so with two weeks or more of data it pushed the
+            dates card off the page at 1400px (found 22.11.2026). */}
         {(trend || (upcomingDates && upcomingDates.length > 0)) && (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
             {trend && <HoursTrendChart data={trend} />}
 
             {upcomingDates && upcomingDates.length > 0 && (
