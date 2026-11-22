@@ -63,6 +63,10 @@ const TABLES = [
   "client_contacts",
   "client_organizations",
   "extraction_guides",
+  "agent_client_values",
+  "agent_installations",
+  "agent_versions",
+  "agents",
   // Auto-apply (3.11.2026): its pauses and the switch. No foreign keys;
   // left alone, a pause from one test would hold the next.
   "auto_apply_pauses",

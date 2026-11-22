@@ -131,6 +131,10 @@ export const TOOL_ANNOTATIONS = {
   // 14.11.2026: a new version of the guide, as a draft an admin approves
   // on the screen. Each call adds a version.
   propose_extraction_guide_version: WRITES,
+  get_agent: READ_ONLY,
+  get_agent_client_context: READ_ONLY,
+  accept_agent_update: WRITES,
+  save_agent_draft: WRITES,
   // A client's processes, one in full, and the rules that bind them (spec
   // 8). Assembled on each call; nothing is written.
   list_processes: READ_ONLY,
@@ -235,6 +239,8 @@ export const WRITE_TOOLS = [
   "set_document_kind",
   "propose_knowledge",
   "propose_extraction_guide_version",
+  "accept_agent_update",
+  "save_agent_draft",
   "set_client_subprocessor_notice",
   "start_process",
   "record_process_check",

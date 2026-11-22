@@ -26,7 +26,7 @@ import type { ProcessStep } from "@/lib/process-rules";
 /// "internal" (22.10.2026): items of Ankora's own file, uncertain only
 /// because Ankora wrote them. There Ankora is the client, so they are a
 /// manager's decision, not a question to a client.
-export type ApprovalKind = "task" | "exception" | "rule" | "procedure" | "process" | "internal" | "knowledge" | "plan" | "summary" | "guide" | "check";
+export type ApprovalKind = "task" | "exception" | "rule" | "procedure" | "process" | "internal" | "knowledge" | "plan" | "summary" | "guide" | "agent" | "check";
 
 export type ApprovalTab = "all" | ApprovalKind;
 
@@ -44,6 +44,7 @@ export const APPROVAL_TABS: { key: ApprovalTab; label: string }[] = [
   { key: "plan", label: "תוכניות משימה" },
   { key: "summary", label: "סיכומים ללקוח" },
   { key: "guide", label: "מדריך חילוץ" },
+  { key: "agent", label: "סוכנים" },
   { key: "check", label: "לבדיקה" },
 ];
 
@@ -59,6 +60,7 @@ export const KIND_LABELS: Record<ApprovalKind, string> = {
   plan: "תוכנית",
   summary: "סיכום",
   guide: "מדריך",
+  agent: "סוכן",
   check: "לבדיקה",
 };
 
@@ -75,6 +77,7 @@ export const KIND_TONES: Record<ApprovalKind, KindTone> = {
   plan: "info",
   summary: "success",
   guide: "neutral",
+  agent: "neutral",
   check: "neutral",
 };
 

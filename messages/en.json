@@ -45,7 +45,8 @@
       "portalActivity": "Activity",
       "portalHours": "Hours and reports",
       "portalHistory": "History",
-      "portalFile": "My file"
+      "portalFile": "My file",
+      "agents": "Agents"
     },
     "sidebar": {
       "portalBadge": "Portal",
@@ -1931,6 +1932,33 @@
       "aliasInvalid": "\"{email}\" is not a valid email address.",
       "aliasTwice": "The address {email} is listed for two people. Each address belongs to one person.",
       "aliasTaken": "{email} is {name}'s own address in Ankora, so it cannot be assigned to someone else."
+    },
+    "agents": {
+      "notFound": "The agent was not found.",
+      "nameRequired": "The agent needs a name, up to 80 characters.",
+      "purposeRequired": "Write in one line what the agent does.",
+      "draftPending": "A version is waiting for approval. Approve or reject it before changing anything else.",
+      "draftRace": "Someone else opened a draft at the same moment. Refresh and try again.",
+      "invalidDraft": "The draft is not valid.",
+      "hasSecret": "The text has a password, key or token. Secrets are never written into an agent.",
+      "notDraft": "There is no open draft.",
+      "changeNoteRequired": "Write in one line what changed and why. This is what people see when offered the update.",
+      "draftProblems": "The draft has things to fix first. They are listed in the checks on the screen.",
+      "firstDraft": "This is the agent's first version. It can be edited, not discarded.",
+      "versionNotFound": "The version was not found.",
+      "alreadyDecided": "The version is not waiting for approval.",
+      "reasonRequired": "Write in one line why.",
+      "clientForbidden": "You do not have access to this client.",
+      "valueTooLong": "The value is too long.",
+      "noApprovedVersion": "The agent has no approved version to install yet.",
+      "clientsRequired": "Choose at least one client.",
+      "oneClient": "An installation for one client takes one client.",
+      "scheduleTz": "Every schedule needs a cron and a time zone, for example Asia/Jerusalem.",
+      "installationNotFound": "The installation was not found or was removed.",
+      "installationNotYours": "This installation belongs to someone else.",
+      "versionNotApproved": "Version {version} is not approved.",
+      "notLatest": "The latest version is {version}.",
+      "clientNotInScope": "The client is not in this installation, or is marked \"no AI\"."
     }
   },
   "auditLog": {
@@ -2200,7 +2228,17 @@
       "processReconfirmed": "Confirm the procedure document is still right",
       "processAuditPrep": "Prepare a procedure for an audit",
       "processKind": "Change the kind of a process (one that runs, or a work instruction)",
-      "commsChannelExtractionUpdated": "Changed whether the automatic extraction reads a WhatsApp number"
+      "commsChannelExtractionUpdated": "Changed whether the automatic extraction reads a WhatsApp number",
+      "agentCreate": "Agent created",
+      "agentDraftSave": "Agent draft saved",
+      "agentDraftDiscard": "Agent draft discarded",
+      "agentSubmit": "Agent version sent for approval",
+      "agentApprove": "Agent version approved",
+      "agentReject": "Agent version rejected",
+      "agentClientValue": "Agent client value set",
+      "agentInstall": "Agent installed",
+      "agentUninstall": "Agent installation removed",
+      "agentUpdateAccept": "Agent installation updated to a new version"
     },
     "kinds": {
       "failure": "Failure",
@@ -5987,7 +6025,8 @@
       "plan": "Task plans",
       "summary": "Client summaries",
       "guide": "Extraction guide",
-      "check": "To check"
+      "check": "To check",
+      "agent": "Agents"
     },
     "kinds": {
       "task": "Task",
@@ -6000,7 +6039,8 @@
       "plan": "Plan",
       "summary": "Summary",
       "guide": "Guide",
-      "check": "To check"
+      "check": "To check",
+      "agent": "Agent"
     },
     "empty": {
       "all": "Nothing is waiting for your decision right now.",
@@ -6169,6 +6209,13 @@
         "recommend": "Check and record",
         "why": "At the top of the user's page: the file, what to check in it, and recording or returning it with a reason. You can also ask Claude to check.",
         "go": "Check"
+      },
+      "agent": {
+        "title": "{name}, version {version}",
+        "approve": "Approve version",
+        "reject": "Reject",
+        "recommend": "Read the change and approve",
+        "why": "The version reaches everyone who runs the agent, once they accept it."
       }
     }
   },

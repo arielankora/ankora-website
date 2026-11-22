@@ -34,6 +34,7 @@ import { planPreview, procedurePreview, rulePreview } from "@/lib/approvals-prev
 //               for anyone on the task; these are the two it is waiting on).
 //   summaries   a manager, or the client's account manager.
 //   guide       a manager (approveGuide).
+//   agent       a manager (approveVersion in lib/app-domain/agents).
 
 type Scope = {
   user: User;
@@ -436,6 +437,31 @@ async function guides(s: Scope): Promise<ApprovalItem[]> {
   }));
 }
 
+async function agentVersions(s: Scope): Promise<ApprovalItem[]> {
+  if (!s.manager) return [];
+  const rows = await prisma.agentVersion.findMany({ where: { state: "PENDING" }, orderBy: { submittedAt: "asc" }, include: { agent: { select: { slug: true, name: true } } } });
+  const names = await namesOf(rows.map((r) => r.createdById));
+  return rows.map((v) => ({
+    kind: "agent",
+    id: v.id,
+    clientId: null,
+    clientName: null,
+    title: `${v.agent.name}, גרסה ${v.version}`,
+    detail: v.changeNote ? clip(v.changeNote) : null,
+    since: v.submittedAt ?? v.createdAt,
+    by: names.get(v.createdById ?? "") ?? null,
+    href: `/app/agents/${v.agent.slug}/versions`,
+    actions: { approve: "אישור הגרסה", reject: { label: "דחייה", note: true } },
+    recommend: { text: "לקרוא את השינוי ולאשר", why: "הגרסה מגיעה לכל מי שמריץ את הסוכן, אחרי שהוא מאשר אותה אצלו." },
+    screen: {
+      title: k("agent.title", { name: v.agent.name, version: String(v.version) }),
+      approve: k("agent.approve"),
+      reject: k("agent.reject"),
+      recommend: { text: k("agent.recommend"), why: k("agent.why") },
+    },
+  }));
+}
+
 /// The steps of a process that are decisions, on the approvals screen. The
 /// rest (a draft, fields to fill, access, an item not yet confirmed) are
 /// on the process itself and in "שאלות ללקוח".
@@ -564,7 +590,7 @@ async function checks(s: Scope): Promise<ApprovalItem[]> {
 export async function collectApprovals(user: User): Promise<ApprovalItem[]> {
   const s = await scopeOf(user);
   const parts = await Promise.all(
-    [tasks, exceptions, rules, procedures, processes, internalItems, knowledge, plans, summaries, guides, checks].map((read) =>
+    [tasks, exceptions, rules, procedures, processes, internalItems, knowledge, plans, summaries, guides, agentVersions, checks].map((read) =>
       read(s).catch((e: unknown) => {
         console.error(`approvals: ${read.name} failed`, e);
         return [] as ApprovalItem[];
