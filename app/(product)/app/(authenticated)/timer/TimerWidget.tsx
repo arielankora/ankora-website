@@ -19,11 +19,19 @@ import { formatClockMinutes } from "@/lib/hours-format";
 type Client = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
 type Recent = { clientId: string; clientName: string; categoryId: string; categoryName: string; lastUsedAt: string };
-/// An open promise on one of this person's clients. Team adoption's
-/// mechanism one needs exactly this much: which client it belongs to, so
-/// the picker can narrow to the one being worked on, and what to call it
-/// in the toast.
-export type OpenPromise = { id: string; clientId: string; label: string };
+/// An open task on one of this person's clients: which client it belongs
+/// to, so the picker can narrow to the one being worked on, and what to
+/// call it. 22.11.2026: every open task, not only promises. `clientVisible`
+/// marks a promise (a task the client sees), the only kind the stop asks
+/// "where does it stand" about and the only kind it attaches on its own;
+/// `categoryId` lets picking the task fill the category, as on "הזמן שלי".
+export type OpenTask = {
+  id: string;
+  clientId: string;
+  label: string;
+  categoryId: string | null;
+  clientVisible: boolean;
+};
 export type TodayEntry = {
   id: string;
   clientName: string;
@@ -117,14 +125,14 @@ export function TimerWidget({
   categories,
   recent,
   todayEntries,
-  openPromises,
+  openTasks,
 }: {
   activeTimers: ActiveTimer[];
   clients: Client[];
   categories: Category[];
   recent: Recent[];
   todayEntries: TodayEntry[];
-  openPromises: OpenPromise[];
+  openTasks: OpenTask[];
 }) {
   const { showToast } = useToast();
   const { announce } = useActiveTimer();
@@ -146,9 +154,9 @@ export function TimerWidget({
   // The quick-start / start-form note. A running timer's note lives in
   // its own card.
   const [note, setNote] = useState("");
-  // Team adoption: which promise this time is against, chosen before the
-  // start. Optional - most work is not a promise, and the mechanism is
-  // worthless the moment it becomes a field somebody has to clear.
+  // Which task this time is against, chosen before the start. Optional -
+  // plenty of work is on no task, and the mechanism is worthless the
+  // moment it becomes a field somebody has to clear.
   const [taskId, setTaskId] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -169,10 +177,22 @@ export function TimerWidget({
     [categories, clientId]
   );
 
-  const availablePromises = useMemo(
-    () => openPromises.filter((t) => t.clientId === clientId),
-    [openPromises, clientId]
+  const availableTasks = useMemo(
+    () => openTasks.filter((t) => t.clientId === clientId),
+    [openTasks, clientId]
   );
+
+  // Picking a task fills the category from it, the same default the
+  // manual entry, the task screen and the MCP tool use. Only when that
+  // category is offered for this client; otherwise the choice stays as
+  // it was. Clearing the task leaves the category alone.
+  function pickTask(id: string) {
+    setTaskId(id);
+    const task = availableTasks.find((x) => x.id === id);
+    if (task?.categoryId && availableCategories.some((cat) => cat.id === task.categoryId)) {
+      setCategoryId(task.categoryId);
+    }
+  }
 
   async function beginTimer(
     targetClientId: string,
@@ -187,7 +207,7 @@ export function TimerWidget({
       categoryId: targetCategoryId,
       note,
       // Quick start is one click by definition, and it carries no
-      // promise: the picker belongs to the deliberate start. A quick
+      // task: the picker belongs to the deliberate start. A quick
       // start still gets asked at the stop, which is where the question
       // costs nothing.
       taskId: startedFromQuickStart ? null : taskId || null,
@@ -294,9 +314,9 @@ export function TimerWidget({
       categories={availableCategories}
       categoryId={categoryId}
       onCategory={setCategoryId}
-      promises={availablePromises}
+      tasks={availableTasks}
       taskId={taskId}
-      onTask={setTaskId}
+      onTask={pickTask}
       note={note}
       onNote={setNote}
       error={error}
@@ -324,7 +344,7 @@ export function TimerWidget({
               compact={actives.length > 1}
               clients={clients}
               categories={categories}
-              openPromises={openPromises}
+              openTasks={openTasks}
               onStopped={(id) => {
                 setActives((prev) => prev.filter((t) => t.id !== id));
                 announce();
@@ -464,7 +484,7 @@ function RunningTimerCard({
   compact,
   clients,
   categories,
-  openPromises,
+  openTasks,
   onStopped,
   onReopened,
 }: {
@@ -472,7 +492,7 @@ function RunningTimerCard({
   compact: boolean;
   clients: Client[];
   categories: Category[];
-  openPromises: OpenPromise[];
+  openTasks: OpenTask[];
   onStopped: (id: string) => void;
   onReopened: (timer: ActiveTimer) => void;
 }) {
@@ -517,7 +537,9 @@ function RunningTimerCard({
 
   // The task the stop will attach, worked out the same way handleStop
   // does, so the field can say up front whether a note is required.
-  const clientPromisesForStop = openPromises.filter((p) => p.clientId === timer.clientId);
+  // The single-promise guess stays with promises: an internal task is
+  // attached only when someone chose it, never on a guess.
+  const clientPromisesForStop = openTasks.filter((p) => p.clientId === timer.clientId && p.clientVisible);
   const taskAtStop = timer.taskId || (clientPromisesForStop.length === 1 ? clientPromisesForStop[0].id : "");
   const noteRequired = !taskAtStop;
   const noteInputRef = useRef<HTMLInputElement>(null);
@@ -584,8 +606,12 @@ function RunningTimerCard({
 
     // Team adoption: time against a promise asks where the promise
     // stands now, in the same toast, instead of an undo. The question is
-    // the more valuable of the two at this moment.
-    const promise = attached ? openPromises.find((p) => p.id === attached) : undefined;
+    // the more valuable of the two at this moment. Only for a task the
+    // client sees: the answer updates what the client is told, which an
+    // internal task has nothing of. Time on an internal task gets the
+    // plain toast with the undo, naming the task.
+    const attachedTask = attached ? openTasks.find((p) => p.id === attached) : undefined;
+    const promise = attachedTask?.clientVisible ? attachedTask : undefined;
     if (promise) {
       showToast({
         tone: "success",
@@ -635,7 +661,7 @@ function RunningTimerCard({
     showToast({
       tone: "success",
       title: t("saved", { duration: durationText }),
-      description: [client?.name, category?.name].filter(Boolean).join(" · "),
+      description: [client?.name, category?.name, attachedTask?.label].filter(Boolean).join(" · "),
       undo: async () => {
         const reopened = await reopenTimerAction({ timeEntryId: timer.id });
         if (!reopened.ok) {
@@ -730,7 +756,7 @@ function RunningTimerCard({
   );
 }
 
-/// The client / category / promise / note fields and the start button.
+/// The client / category / task / note fields and the start button.
 /// Rendered in the dark hero when nothing runs, and in a light card under
 /// a running timer when a second one is being added.
 function StartFields({
@@ -741,7 +767,7 @@ function StartFields({
   categories,
   categoryId,
   onCategory,
-  promises,
+  tasks,
   taskId,
   onTask,
   note,
@@ -758,7 +784,7 @@ function StartFields({
   categories: Category[];
   categoryId: string;
   onCategory: (id: string) => void;
-  promises: OpenPromise[];
+  tasks: OpenTask[];
   taskId: string;
   onTask: (id: string) => void;
   note: string;
@@ -816,20 +842,21 @@ function StartFields({
             ))}
           </select>
         </label>
-        {/* Team adoption: the promise, when this client has any open.
-            Third and optional, and absent entirely for a client with
-            nothing open - an empty select is a question the screen asks
-            and cannot answer. */}
-        {clientId && promises.length > 0 && (
+        {/* The task, when this client has any open (22.11.2026: every
+            open task, internal ones too). Third and optional, and absent
+            entirely for a client with nothing open - an empty select is a
+            question the screen asks and cannot answer. A task the client
+            sees says so, because stopping on it asks where it stands. */}
+        {clientId && tasks.length > 0 && (
           <label className="block">
-            <span className={label}>{t("promise")}</span>
-            <select value={taskId} onChange={(e) => onTask(e.target.value)} className={field}>
+            <span className={label}>{t("task")}</span>
+            <select aria-label={t("task")} value={taskId} onChange={(e) => onTask(e.target.value)} className={field}>
               <option value="" className="text-app-text-primary">
                 {t("unlinked")}
               </option>
-              {promises.map((t) => (
-                <option key={t.id} value={t.id} className="text-app-text-primary">
-                  {t.label}
+              {tasks.map((task) => (
+                <option key={task.id} value={task.id} className="text-app-text-primary">
+                  {task.clientVisible ? t("clientSeesOption", { label: task.label }) : task.label}
                 </option>
               ))}
             </select>

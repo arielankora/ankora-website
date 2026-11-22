@@ -1221,9 +1221,10 @@
       "category": "Category",
       "pickCategory": "Choose a category",
       "pickClientFirst": "Choose a client first",
-      "promise": "Client commitment",
+      "task": "Task",
+      "clientSeesOption": "{label} (client sees it)",
       "unlinked": "Not linked",
-      "note": "Task / note",
+      "note": "Note",
       "notePlaceholder": "For example: weekly report update",
       "starting": "Starting..."
     },

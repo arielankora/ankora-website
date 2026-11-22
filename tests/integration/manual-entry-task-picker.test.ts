@@ -48,6 +48,26 @@ describe("listOpenTasksForTimeEntry", () => {
       category.id
     );
   });
+
+  // 22.11.2026: the timer's task picker reads the same list. It needs to
+  // know which tasks the client sees (only those get the stage question
+  // at the stop) and the name the client knows them by.
+  it("says which tasks the client sees and what the client calls them", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+
+    const internal = await prisma.task.create({
+      data: { clientId: client.id, title: "פנימית", clientVisible: false },
+    });
+    const visible = await prisma.task.create({
+      data: { clientId: client.id, title: "שם פנימי", clientTitle: "שם ללקוח", clientVisible: true },
+    });
+
+    const rows = await listOpenTasksForTimeEntry(actor);
+
+    expect(rows.find((r) => r.id === internal.id)).toMatchObject({ clientVisible: false });
+    expect(rows.find((r) => r.id === visible.id)).toMatchObject({ clientVisible: true, clientTitle: "שם ללקוח" });
+  });
 });
 
 describe("a manual entry against a task", () => {

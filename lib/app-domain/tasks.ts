@@ -431,7 +431,8 @@ export async function listOpenPromises(actor: User) {
 }
 
 /// Every open task a person can log time against, for the one-line
-/// manual entry on "הזמן שלי" (17.11.2026).
+/// manual entry on "הזמן שלי" (17.11.2026) and for the timer's task
+/// picker (22.11.2026), so both ask the same question with one list.
 ///
 /// Unlike listOpenPromises this is not limited to what the client sees:
 /// the person reporting wants the task the work was for, and most of the
@@ -455,7 +456,10 @@ export async function listOpenTasksForTimeEntry(actor: User) {
     orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
     // A picker, not a list: per client this is far more than anyone opens.
     take: 1000,
-    select: { id: true, clientId: true, title: true, categoryId: true },
+    // clientVisible and clientTitle are for the timer (22.11.2026): a task
+    // the client sees is shown by the name the client knows it by, and is
+    // the only kind the stop asks "where does it stand" about.
+    select: { id: true, clientId: true, title: true, categoryId: true, clientVisible: true, clientTitle: true },
   });
 }
 
