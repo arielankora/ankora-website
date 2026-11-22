@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveBlogWriter } from "@/lib/blog-agent-auth";
 import { putFile, isGithubConfigured } from "@/lib/github";
 import { slugify } from "@/lib/blog-shared";
+import { detectImageType } from "@/lib/image-signature";
 
 const ALLOWED_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -31,9 +32,15 @@ export async function POST(request: Request) {
   if (base64.length > 8_000_000) {
     return NextResponse.json({ error: "Image is too large (max ~5MB)." }, { status: 400 });
   }
+  // The extension comes from the file's own bytes, not from what the
+  // browser declared (a real JPEG saved as ".png" still goes up, as .jpg).
+  const actual = detectImageType(Buffer.from(base64, "base64"));
+  if (!actual) {
+    return NextResponse.json({ error: "The file is not a valid JPEG, PNG, or WebP image." }, { status: 400 });
+  }
 
   const safeSlug = slugify(body.slug) || "cover";
-  const filename = `${safeSlug}-${Date.now()}.${ext}`;
+  const filename = `${safeSlug}-${Date.now()}.${ALLOWED_EXT[actual]}`;
   const path = `public/blog/${filename}`;
 
   try {
