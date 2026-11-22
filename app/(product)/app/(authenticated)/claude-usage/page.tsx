@@ -229,7 +229,8 @@ export default async function ClaudeUsagePage({ searchParams }: { searchParams: 
   const topTool = report.tools[0];
 
   const detailsOpen = Boolean(sp.saved || sp.error);
-  const summaryClass = "cursor-pointer list-none text-base font-medium text-app-text-primary [&::-webkit-details-marker]:hidden";
+  // tap-area: a 24px section heading is too low to open with a thumb (iPhone level 3, 22.11.2026).
+  const summaryClass = "tap-area cursor-pointer list-none text-base font-medium text-app-text-primary [&::-webkit-details-marker]:hidden";
 
   return (
     <div className="space-y-6">

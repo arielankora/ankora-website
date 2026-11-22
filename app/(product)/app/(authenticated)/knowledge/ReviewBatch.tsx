@@ -531,14 +531,18 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
   return (
     <li id={proposalAnchor(p.id)} className={`py-3.5 scroll-mt-24 rounded-lg target:bg-app-accent-soft ${selected ? "bg-gold/[0.04]" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={(e) => onSelect(e.target.checked)}
-          aria-label={t("proposal.select", { headline: p.headline.slice(0, 60) })}
-          title={alone ? t("proposal.aloneHint", { reason: t(`tierReasons.${alone}`) }) : undefined}
-          className="mt-1 h-4 w-4 shrink-0 accent-gold"
-        />
+        {/* The label is the 44x44 target around a 16px box: a batch is approved by ticking
+            row after row with a thumb (iPhone level 3, 22.11.2026). */}
+        <label className="tap-area mt-1 flex shrink-0">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) => onSelect(e.target.checked)}
+            aria-label={t("proposal.select", { headline: p.headline.slice(0, 60) })}
+            title={alone ? t("proposal.aloneHint", { reason: t(`tierReasons.${alone}`) }) : undefined}
+            className="h-4 w-4 accent-gold"
+          />
+        </label>
         <div className="min-w-0 flex-1">
           <p className="text-xs text-app-text-tertiary">
             {kindLabel}
@@ -764,7 +768,7 @@ export function ReviewBatch({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-xs text-app-text-tertiary">
-            <a href={`/app/clients/${clientId}/client-file`} className="hover:text-app-text-accent" dir="auto">
+            <a href={`/app/clients/${clientId}/client-file`} className="tap-area hover:text-app-text-accent" dir="auto">
               {clientName}
             </a>
           </p>
@@ -802,9 +806,10 @@ export function ReviewBatch({
         // containing block of every fixed descendant, so the reject
         // drawer below opened inside the bar's 40px instead of the
         // viewport: clipped, with its reason field and button cut off
-        // (20.10.2026). Opaque enough without it.
-        <div className="sticky top-0 z-10 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-app-border bg-white px-3 py-2 text-xs">
-          <label className="flex items-center gap-1.5 text-app-text-primary">
+        // (20.10.2026). Opaque enough without it. Sticks below the status
+        // bar and the Dynamic Island in the installed app, not under them.
+        <div className="sticky top-[env(safe-area-inset-top)] z-10 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-app-border bg-white px-3 py-2 text-xs">
+          <label className="tap-area flex items-center gap-1.5 text-app-text-primary">
             <input
               type="checkbox"
               checked={chosen.length > 0 && chosen.length === decidable.length}

@@ -105,7 +105,7 @@ export function ReviewFilterBar({
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
         <details open={more} className="group">
-          <summary className="cursor-pointer list-none text-app-text-secondary hover:text-app-text-primary">
+          <summary className="tap-area cursor-pointer list-none text-app-text-secondary hover:text-app-text-primary">
             {t("more")}<span className="ms-1 inline-block transition-transform group-open:rotate-180">▾</span>
           </summary>
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -133,7 +133,7 @@ export function ReviewFilterBar({
           </div>
         </details>
         {any && (
-          <a href={reviewFiltersHref({ clientId: null, kinds: [], attention: false, source: null, by: null, age: null })} className="text-app-text-accent hover:underline">
+          <a href={reviewFiltersHref({ clientId: null, kinds: [], attention: false, source: null, by: null, age: null })} className="tap-area text-app-text-accent hover:underline">
             {t("clear")}
           </a>
         )}
