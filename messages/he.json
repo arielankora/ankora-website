@@ -45,7 +45,8 @@
       "portalActivity": "פעילות",
       "portalHours": "שעות ודוחות",
       "portalHistory": "היסטוריה",
-      "portalFile": "התיק שלי"
+      "portalFile": "התיק שלי",
+      "agents": "סוכנים"
     },
     "sidebar": {
       "portalBadge": "פורטל",
@@ -1931,6 +1932,33 @@
       "aliasInvalid": "\"{email}\" אינה כתובת מייל תקינה.",
       "aliasTwice": "הכתובת {email} רשומה אצל שני אנשים. כל כתובת שייכת לאדם אחד.",
       "aliasTaken": "הכתובת {email} היא הכתובת של {name} באנקורה, ולא אפשר לשייך אותה למישהו אחר."
+    },
+    "agents": {
+      "notFound": "הסוכן לא נמצא.",
+      "nameRequired": "צריך שם לסוכן, עד 80 תווים.",
+      "purposeRequired": "צריך לכתוב בשורה מה הסוכן עושה.",
+      "draftPending": "יש גרסה שממתינה לאישור. צריך לאשר או לדחות אותה לפני שינוי נוסף.",
+      "draftRace": "מישהו אחר פתח טיוטה באותו רגע. כדאי לרענן ולנסות שוב.",
+      "invalidDraft": "הטיוטה לא תקינה.",
+      "hasSecret": "יש בטקסט סיסמה, מפתח או טוקן. סודות לא נכתבים בסוכן.",
+      "notDraft": "אין טיוטה פתוחה.",
+      "changeNoteRequired": "צריך לכתוב בשורה מה השתנה ולמה. זה מה שאנשים יראו כשיציעו להם לעדכן.",
+      "draftProblems": "יש בטיוטה דברים לתקן לפני שממשיכים. הם מפורטים בבדיקות שבמסך.",
+      "firstDraft": "זו הגרסה הראשונה של הסוכן. אפשר לערוך אותה, לא לבטל.",
+      "versionNotFound": "הגרסה לא נמצאה.",
+      "alreadyDecided": "הגרסה לא ממתינה לאישור.",
+      "reasonRequired": "צריך לכתוב בשורה אחת למה.",
+      "clientForbidden": "אין לך גישה ללקוח הזה.",
+      "valueTooLong": "הערך ארוך מדי.",
+      "noApprovedVersion": "לסוכן עוד אין גרסה מאושרת להתקין.",
+      "clientsRequired": "צריך לבחור לפחות לקוח אחד.",
+      "oneClient": "בהתקנה ללקוח אחד בוחרים לקוח אחד.",
+      "scheduleTz": "לכל תזמון צריך cron ואזור זמן, למשל Asia/Jerusalem.",
+      "installationNotFound": "ההתקנה לא נמצאה או שהוסרה.",
+      "installationNotYours": "ההתקנה הזו שייכת למישהו אחר.",
+      "versionNotApproved": "גרסה {version} לא מאושרת.",
+      "notLatest": "הגרסה העדכנית היא {version}.",
+      "clientNotInScope": "הלקוח לא בהתקנה הזו, או שהוא מסומן \"בלי AI\"."
     }
   },
   "auditLog": {
@@ -2200,7 +2228,17 @@
       "processReconfirmed": "אישור שמסמך הנוהל עדיין נכון",
       "processAuditPrep": "הכנה לביקורת של נוהל",
       "processKind": "שינוי סוג של תהליך (תהליך שרץ או הוראת עבודה)",
-      "commsChannelExtractionUpdated": "שינוי קריאת החילוץ האוטומטי במספר WhatsApp"
+      "commsChannelExtractionUpdated": "שינוי קריאת החילוץ האוטומטי במספר WhatsApp",
+      "agentCreate": "יצירת סוכן",
+      "agentDraftSave": "שמירת טיוטה של סוכן",
+      "agentDraftDiscard": "ביטול טיוטה של סוכן",
+      "agentSubmit": "שליחת גרסה של סוכן לאישור",
+      "agentApprove": "אישור גרסה של סוכן",
+      "agentReject": "דחיית גרסה של סוכן",
+      "agentClientValue": "קביעת ערך ללקוח בסוכן",
+      "agentInstall": "התקנת סוכן",
+      "agentUninstall": "הסרת התקנה של סוכן",
+      "agentUpdateAccept": "עדכון התקנה של סוכן לגרסה חדשה"
     },
     "kinds": {
       "failure": "כשלון",
@@ -5987,7 +6025,8 @@
       "plan": "תוכניות משימה",
       "summary": "סיכומים ללקוח",
       "guide": "מדריך חילוץ",
-      "check": "לבדיקה"
+      "check": "לבדיקה",
+      "agent": "סוכנים"
     },
     "kinds": {
       "task": "משימה",
@@ -6000,7 +6039,8 @@
       "plan": "תוכנית",
       "summary": "סיכום",
       "guide": "מדריך",
-      "check": "לבדיקה"
+      "check": "לבדיקה",
+      "agent": "סוכן"
     },
     "empty": {
       "all": "אין כרגע שום דבר שמחכה להחלטה שלך.",
@@ -6169,6 +6209,13 @@
         "recommend": "לבדוק ולרשום",
         "why": "בראש דף המשתמש: הקובץ, מה לבדוק בו, ורישום או החזרה עם סיבה. אפשר גם לבקש מ-Claude לבדוק.",
         "go": "לבדיקה"
+      },
+      "agent": {
+        "title": "{name}, גרסה {version}",
+        "approve": "אישור הגרסה",
+        "reject": "דחייה",
+        "recommend": "לקרוא את השינוי ולאשר",
+        "why": "הגרסה מגיעה לכל מי שמריץ את הסוכן, אחרי שהוא מאשר אותה אצלו."
       }
     }
   },

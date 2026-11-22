@@ -162,6 +162,10 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   ClientPolicy: { decision: "DUMP", table: "client_policies", reason: "The client's own rules, who approved them and every version's status. Typed by people; binds the work." },
   ClientNarrative: { decision: "DUMP", table: "client_narratives", reason: "The client file's free text and every earlier version of it." },
   ExtractionGuide: { decision: "DUMP", table: "extraction_guides", reason: "Every version of the extraction guidance, and who proposed and approved it." },
+  Agent: { decision: "DUMP", table: "agents", reason: "Every agent the team runs on Claude: what it is for and who owns it." },
+  AgentVersion: { decision: "DUMP", table: "agent_versions", reason: "Every version of every agent's instructions, and who wrote and approved it." },
+  AgentClientValue: { decision: "DUMP", table: "agent_client_values", reason: "Per-client values agents run with (signatures, recipients): typed once, nowhere else." },
+  AgentInstallation: { decision: "DUMP", table: "agent_installations", reason: "Who runs which agent, where and on which version; the bootstrap texts point at these ids." },
   KnowledgeBatch: { decision: "DUMP", table: "knowledge_batches", reason: "Which meeting or document each batch of proposals came from, and what was dropped (reasons only, never the text)." },
   KnowledgeProposal: { decision: "DUMP", table: "knowledge_proposals", reason: "Proposals to client files and who decided them: the review history decision 1 is measured on." },
   AutoApplyPause: { decision: "DUMP", table: "auto_apply_pauses", reason: "Which kinds and clients were sent back to a person after auto-applied items turned out wrong, and who lifted it. Decided by people." },
@@ -318,6 +322,7 @@ export const ACKNOWLEDGED_SENSITIVE_COLUMNS: Readonly<Record<string, string>> = 
   "client_connections.credentialId": "The id of a vault row, a pointer. The connection's secret stays encrypted in client_credentials.",
   "auto_apply_pauses.key": "Which kind of proposal (FACT.NOTE) or which client id was paused from auto-apply. A label, not a key of any kind.",
   "app_settings.key": "A setting's name ('knowledge.auto_apply'). A label, not a key of any kind.",
+  "agent_client_values.key": "An agent parameter's name ('חתימה'). A label, not a key of any kind; the domain refuses a secret as a value.",
   // Credentials vault. Every one of these is either ciphertext that
   // needs the production key to open, or a flag that says a value exists.
   "client_credentials.secretCiphertext": "AES-256-GCM ciphertext; the data key that opens it is wrapped by a key that is not in the backup.",

@@ -79,6 +79,10 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   list_my_routines: "routines of a marked client are left out",
   record_process_check: "lookupClient",
   get_extraction_brief: "a marked client is listed by name and domains only, with the instruction to skip its meetings; its recordings are left out",
+  get_agent: "an installation's clients pass through resolveClients, which drops every client marked \"בלי AI\" before anything is compiled",
+  get_agent_client_context: "resolveClients drops \"בלי AI\" clients, so asking for one is refused like a client outside the installation",
+  accept_agent_update: "moves an installation's pinned version; returns no client data",
+  save_agent_draft: "writes Ankora's own agent instructions; a client addition names a client the user can access, and \"בלי AI\" clients never reach a compiled agent",
   propose_extraction_guide_version: "Ankora's own extraction guide, no client data; the guide it reads back is the same for every client",
 
   // lib/mcp/document-tools.ts

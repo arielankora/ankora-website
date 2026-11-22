@@ -37,7 +37,7 @@ function item(over: Partial<ApprovalItem>): ApprovalItem {
 
 describe("approvals", () => {
   it("keeps the tabs in the agreed order, most urgent first, and only decisions", () => {
-    expect(APPROVAL_TABS.map((t) => t.key)).toEqual(["all", "task", "exception", "rule", "procedure", "process", "internal", "knowledge", "plan", "summary", "guide", "check"]);
+    expect(APPROVAL_TABS.map((t) => t.key)).toEqual(["all", "task", "exception", "rule", "procedure", "process", "internal", "knowledge", "plan", "summary", "guide", "agent", "check"]);
   });
 
   it("lists what waited longest first", () => {

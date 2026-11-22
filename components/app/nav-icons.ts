@@ -22,6 +22,7 @@ import {
   Inbox,
   MessageCircle,
   type LucideIcon,
+  Bot,
 } from "lucide-react";
 
 // Shared href -> icon map for both the desktop Sidebar and the mobile
@@ -45,6 +46,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   "/app/alerts": Bell,
   "/app/reports": BarChart3,
   "/app/claude-usage": Gauge,
+  "/app/agents": Bot,
   "/app/report-schedules": CalendarClock,
   "/app/audit-log": ScrollText,
   "/app/integrations": Plug,

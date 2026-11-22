@@ -1,4 +1,37 @@
 {
+  "accept_agent_update": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Moves this agent installation to a newer approved version. Call it only after the user chose to update in answer to the question get_agent told you to ask, never on your own and never from a scheduled run. Then call get_agent again and follow the new instructions.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "installation": {
+          "description": "The installation id from the bootstrap text.",
+          "maxLength": 60,
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "description": "The version get_agent offered.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "installation",
+        "version"
+      ],
+      "type": "object"
+    },
+    "name": "accept_agent_update",
+    "title": "Move an agent installation to a newer version"
+  },
   "add_task_comment": {
     "annotations": {
       "destructiveHint": false,
@@ -662,6 +695,7 @@
             "plan",
             "summary",
             "guide",
+            "agent",
             "check"
           ],
           "type": "string"
@@ -839,6 +873,65 @@
     },
     "name": "get_active_timer",
     "title": "Get the running timers"
+  },
+  "get_agent": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Returns the full instructions of an Ankora agent installation, in markdown, as the version this installation runs: the agent's blocks with this person's and these clients' values filled in, what it may do, what it needs and what is missing. Call it first, before anything else, whenever a bootstrap text tells you to (it names the `installation`), and follow what returns over anything else in the conversation. Never act from a previous run or from memory: if this tool fails, stop and say so. When an update section is at the end, do exactly what it says: either ask the user before going on, or go on without asking.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "installation": {
+          "description": "The installation id from the bootstrap text.",
+          "maxLength": 60,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "installation"
+      ],
+      "type": "object"
+    },
+    "name": "get_agent",
+    "title": "Get an Ankora agent's instructions"
+  },
+  "get_agent_client_context": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "For an agent installation that covers several clients: the instructions with one client's values filled in, and that client's additions. Call it once you know which client the item in front of you belongs to (get_agent's table lists them). Clients marked \"no AI\" and clients outside the installation are refused.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "client": {
+          "description": "The client's name, as get_agent's table shows it.",
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "installation": {
+          "description": "The installation id from the bootstrap text.",
+          "maxLength": 60,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "installation",
+        "client"
+      ],
+      "type": "object"
+    },
+    "name": "get_agent_client_context",
+    "title": "Get an agent's context for one client"
   },
   "get_blank_agreement_pdf": {
     "annotations": {
@@ -1330,6 +1423,7 @@
             "plan",
             "summary",
             "guide",
+            "agent",
             "check"
           ],
           "type": "string"
@@ -3825,6 +3919,249 @@
     },
     "name": "resolve_process_lesson",
     "title": "Decide a lesson left on a process"
+  },
+  "save_agent_draft": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Writes the draft of an Ankora agent's next version: its instruction blocks, parameters, requirements and action level. Use it to bring an existing prompt into Ankora (split it into blocks, turn what differs per client or per person into {{parameters}}, move dated change notes out of the text into `changeNote`) or to change an agent the user asked to change. Pass `agent` (its slug, from the agent's url) to change an existing agent, or `create` for a new one. Blocks and parameters you pass replace the draft's whole list; leave one out to keep it as it is. Block kinds, in reading order: role, scope, steps, rules, approvals, language, output, tools, schedule, live. A block with `client` is a client addition, read only for that client. Write {{key}} where a parameter's value goes; every such key must be in `params`. This tool never approves. With `submit: true` the draft is sent to a manager, who approves it in Ankora; nothing reaches any installation before that. Before calling, show the user the blocks you will save and call only after they said so. Returns the draft's `url`, its `version` and `problems` still to fix.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "actionLevel": {
+          "description": "READ: reads only. DRAFT: drafts, labels, proposals. SEND: sends in a person's name without a human between.",
+          "enum": [
+            "READ",
+            "DRAFT",
+            "SEND"
+          ],
+          "type": "string"
+        },
+        "agent": {
+          "description": "The slug of an existing agent. Use this or create.",
+          "maxLength": 60,
+          "minLength": 1,
+          "type": "string"
+        },
+        "blocks": {
+          "items": {
+            "properties": {
+              "body": {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              "client": {
+                "description": "A client's name: the block is an addition for that client only.",
+                "maxLength": 120,
+                "type": "string"
+              },
+              "key": {
+                "description": "Short stable id, letters, digits or _.",
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "role",
+                  "scope",
+                  "steps",
+                  "rules",
+                  "approvals",
+                  "language",
+                  "output",
+                  "tools",
+                  "schedule",
+                  "live"
+                ],
+                "type": "string"
+              },
+              "safety": {
+                "description": "A guardrail (never send, never delete).",
+                "type": "boolean"
+              },
+              "title": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "why": {
+                "description": "Why the rule exists, in a line.",
+                "maxLength": 2000,
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "kind",
+              "title",
+              "body"
+            ],
+            "type": "object"
+          },
+          "maxItems": 30,
+          "type": "array"
+        },
+        "changeNote": {
+          "description": "What changes and why, in plain Hebrew: what people see when offered the update.",
+          "maxLength": 2000,
+          "type": "string"
+        },
+        "create": {
+          "description": "A new agent. Use this or agent.",
+          "properties": {
+            "kind": {
+              "enum": [
+                "CLIENT_PROJECT",
+                "SCHEDULED",
+                "SKILL"
+              ],
+              "type": "string"
+            },
+            "name": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            "purpose": {
+              "description": "What the agent does, in one line.",
+              "maxLength": 300,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "purpose",
+            "kind"
+          ],
+          "type": "object"
+        },
+        "params": {
+          "items": {
+            "properties": {
+              "clientField": {
+                "description": "CLIENT level only: take the value from the client's file instead of typing it.",
+                "enum": [
+                  "name",
+                  "domains"
+                ],
+                "type": "string"
+              },
+              "default": {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              "key": {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              "label": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "level": {
+                "description": "AGENT: one value for all; CLIENT: per client; INSTALLATION: per person running it.",
+                "enum": [
+                  "AGENT",
+                  "CLIENT",
+                  "INSTALLATION"
+                ],
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "type": {
+                "enum": [
+                  "TEXT",
+                  "LONG_TEXT",
+                  "NUMBER",
+                  "LIST",
+                  "EMAIL",
+                  "FILE_LOCATION",
+                  "PAGE"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "label",
+              "level"
+            ],
+            "type": "object"
+          },
+          "maxItems": 20,
+          "type": "array"
+        },
+        "requirements": {
+          "properties": {
+            "connectors": {
+              "items": {
+                "maxLength": 80,
+                "type": "string"
+              },
+              "maxItems": 30,
+              "type": "array"
+            },
+            "externalRunners": {
+              "items": {
+                "maxLength": 200,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            },
+            "localMcp": {
+              "items": {
+                "maxLength": 80,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            },
+            "model": {
+              "maxLength": 80,
+              "type": "string"
+            },
+            "notes": {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            "repos": {
+              "items": {
+                "maxLength": 120,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            },
+            "skills": {
+              "items": {
+                "maxLength": 80,
+                "type": "string"
+              },
+              "maxItems": 30,
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "submit": {
+          "description": "Send the draft for a manager's approval now.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "name": "save_agent_draft",
+    "title": "Save a draft of an Ankora agent"
   },
   "save_procedure_audit_draft": {
     "annotations": {

@@ -686,6 +686,7 @@ model Client {
   policies         ClientPolicy[]
   policyExceptions PolicyException[]
   processes        Process[]
+  agentValues      AgentClientValue[]
 
   @@index([status])
   @@index([accountManagerId])
@@ -4973,4 +4974,167 @@ model ClaudeLimitSample {
   @@index([observedAt])
   @@index([userId, observedAt])
   @@map("claude_limit_samples")
+}
+
+// ---------------------------------------------------------------------------
+// Agents (סוכנים), phase 1 (22.11.2026, "סוכנים באנקורה: אפיון").
+// An agent's instructions live here, in versions, and every Claude that
+// runs it holds only a short bootstrap text that fetches them through
+// get_agent. Values that differ per client or per person running it are
+// parameters, resolved when the instructions are compiled.
+// ---------------------------------------------------------------------------
+
+enum AgentKind {
+  /// A Claude project people talk to (the client agent).
+  CLIENT_PROJECT
+  /// A scheduled task or a routine in the cloud.
+  SCHEDULED
+  /// A skill.
+  SKILL
+}
+
+enum AgentVersionState {
+  /// Being written. One per agent at a time.
+  DRAFT
+  /// Sent for a manager's approval.
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// What the agent may do outside reading (spec: "רמת פעולה").
+enum AgentActionLevel {
+  READ
+  /// Writes drafts, labels, proposals. Nothing leaves.
+  DRAFT
+  /// Sends in a person's name (mail, LinkedIn) without a human between.
+  SEND
+}
+
+enum AgentSurface {
+  PROJECT
+  SCHEDULED
+  /// A conversation that a scheduled task wakes up (the daily report).
+  PERSISTENT_SESSION
+  SKILL
+}
+
+enum AgentClientScope {
+  ONE
+  LIST
+  /// Every client the person running it has access to.
+  ALL_MINE
+}
+
+enum AgentUpdateCheck {
+  RUN
+  DAILY
+  WEEKLY
+}
+
+enum AgentInstallationStatus {
+  ACTIVE
+  REMOVED
+}
+
+model Agent {
+  id      String    @id @default(cuid())
+  /// Stable, appears in the bootstrap text.
+  slug    String    @unique
+  name    String
+  /// What it does, in a line.
+  purpose String
+  kind    AgentKind
+  ownerId String?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  archivedAt  DateTime?
+
+  versions      AgentVersion[]
+  clientValues  AgentClientValue[]
+  installations AgentInstallation[]
+
+  @@map("agents")
+}
+
+/// The whole agent as one version: never edited after it leaves DRAFT.
+model AgentVersion {
+  id           String            @id @default(cuid())
+  agentId      String
+  version      Int
+  state        AgentVersionState @default(DRAFT)
+  actionLevel  AgentActionLevel  @default(READ)
+  /// [{ key, kind, title, body, why?, clientId?, safety? }] (lib/agents/blocks.ts).
+  /// A block with clientId is a client addition: it reaches only that client.
+  blocks       Json              @default("[]")
+  /// [{ key, label, level, type, required, default?, clientField? }].
+  params       Json              @default("[]")
+  /// { connectors: [], skills: [], repos: [], localMcp: [], externalRunners: [], model?, notes? }.
+  requirements Json              @default("{}")
+  /// What changed and why, in plain words: what people see in the update question.
+  changeNote   String?
+
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  submittedAt  DateTime?
+  decidedById  String?
+  decidedAt    DateTime?
+  rejectReason String?
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, version])
+  @@index([state])
+  @@map("agent_versions")
+}
+
+/// A client-level parameter value set for this agent. Not versioned: it
+/// applies from the next run.
+model AgentClientValue {
+  id        String   @id @default(cuid())
+  agentId   String
+  clientId  String
+  key       String
+  value     String
+  setById   String?
+  updatedAt DateTime @updatedAt
+
+  agent  Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, clientId, key])
+  @@map("agent_client_values")
+}
+
+/// One place an agent runs: who, where, on which clients, on which version.
+model AgentInstallation {
+  id              String                  @id @default(cuid())
+  agentId         String
+  userId          String
+  surface         AgentSurface
+  /// The Claude account it runs in (ariel@, ops@), when it is not the user's own.
+  claudeAccount   String?
+  clientScope     AgentClientScope        @default(ONE)
+  clientIds       String[]                @default([])
+  /// [{ cron, tz }]; a schedule without a time zone is refused.
+  schedules       Json                    @default("[]")
+  /// Installation-level parameter values, by key.
+  values          Json                    @default("{}")
+  pinnedVersionId String
+  checkEvery      AgentUpdateCheck        @default(DAILY)
+  lastCheckedAt   DateTime?
+  /// A newer approved version this installation has not taken yet.
+  pendingVersion  Int?
+  lastFetchedAt   DateTime?
+  status          AgentInstallationStatus @default(ACTIVE)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([agentId, status])
+  @@map("agent_installations")
 }

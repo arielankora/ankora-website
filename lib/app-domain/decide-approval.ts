@@ -8,6 +8,7 @@ import { approveProcessVersion } from "@/lib/app-domain/processes";
 import { approveTaskPlan } from "@/lib/app-domain/task-plans";
 import { approvePortalSummary, discardPortalSummary } from "@/lib/app-domain/portal-summary";
 import { approveGuide, rejectGuide } from "@/lib/app-domain/extraction-guide";
+import { approveVersion, rejectVersion } from "@/lib/app-domain/agents";
 import { runStep } from "@/lib/app-domain/process-next-steps";
 import type { ApprovalKind } from "@/lib/approvals";
 import { DomainError } from "@/lib/domain-error";
@@ -58,6 +59,10 @@ export async function decideApproval(user: User, input: DecideInput): Promise<vo
     case "summary":
       if (approve) await approvePortalSummary(user, input.id);
       else await discardPortalSummary(user, input.id);
+      return;
+    case "agent":
+      if (approve) await approveVersion(user, input.id);
+      else await rejectVersion(user, input.id, note);
       return;
     case "guide":
       if (approve) await approveGuide(user, input.id);
