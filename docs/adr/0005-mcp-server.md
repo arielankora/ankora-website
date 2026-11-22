@@ -727,3 +727,16 @@ take a raw id": a scheduled agent is handed the id once in its task's
 prompt, and matching a name afresh every morning is how a second person
 with the same first name would get in. An id that is not staff finds
 nothing.
+
+### Addendum, 19.11.2026: editing and deleting a time entry (#573)
+
+The Phase 2 decision "No `delete_time_entry`" above is reversed. A wrong
+entry made through Claude could only be fixed on the screen, and the only
+way from the connector was a second entry that billed the same work twice.
+`update_time_entry` and `delete_time_entry` call the same domain functions
+as the "הזמן שלי" screen (`updateTimeEntry`, `deleteTimeEntry`), so the
+48-hour edit window, the overlap rule, the closed bank, version history and
+the audit log apply as there. Only the person's own finished entries: not a
+running timer, and not an entry marked "בלי AI". `delete_time_entry` carries
+`destructiveHint: true` in `lib/mcp/annotations.ts`, and its description
+tells Claude to show the entry and ask for confirmation first.

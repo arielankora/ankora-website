@@ -32,6 +32,7 @@ enforced by hiding a UI element alone (spec §4.1: "אין להסתמך על ה�
 | `report.client.view` | Phase 6 | — | — | — | ✅ |
 | `integration.manage` | Phase 8 | ✅ | — | — | — |
 | `important_date.manage_catalog` | Phase 10 | ✅ | — | — | — |
+| `claude_usage.view` | Claude usage | ✅ | — | — | — |
 | `credential.view` | Vault | ✅ | ✅ | ✅ | — |
 | `credential.reveal` | Vault | ✅ | ✅ | ✅ | — |
 | `credential.manage` | Vault | ✅ | ✅ | ✅ | — |
@@ -40,12 +41,14 @@ enforced by hiding a UI element alone (spec §4.1: "אין להסתמך על ה�
 
 - **SUPER_ADMIN** — every permission that exists. The only role that can
   manage users, view the audit log, manage hour banks, manage alerts,
-  manage integrations, or subscribe a client to a holiday catalog
-  (`important_date.manage_catalog`).
+  manage integrations, subscribe a client to a holiday catalog
+  (`important_date.manage_catalog`), or see how much each employee uses
+  Claude (`claude_usage.view`: the "שימוש בקלוד" screen and the
+  `get_claude_usage` MCP tool, 17.11.2026).
 - **ANKORA_ADMIN** — clients, categories, and time entries (including
   editing other employees' entries) and internal reports. Deliberately
   *not* granted `user.manage`, `audit.view`, `hour_bank.manage`,
-  `alert.manage`, or `integration.manage` — spec §4's role table names
+  `alert.manage`, `integration.manage`, or `claude_usage.view` — spec §4's role table names
   these as Super-Admin-only "critical system actions," with no grant
   mechanism defined for extending them to Ankora Admin/Manager. The same
   reasoning applies to `important_date.manage_catalog` (Phase 10): an
