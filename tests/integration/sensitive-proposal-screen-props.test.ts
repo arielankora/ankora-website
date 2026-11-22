@@ -9,8 +9,8 @@ import { reviewProposals } from "@/app/(product)/app/(authenticated)/knowledge/r
 // browser for a sensitive proposal (R6) the viewer may not see.
 //
 // listOpenBatches blanks a hidden proposal's payload, reason and quote,
-// and the card shows only "waiting for X". But the rest of the row is
-// spread as it is: the flags, computed from the full payload when the
+// and the card shows only "waiting for X". The rest of the row was spread
+// as it was: the flags, computed from the full payload when the
 // proposal arrived, and the approver's rejectReason. The batch goes to
 // ReviewBatch, a client component, so whatever the proposal carries is
 // serialized into the page (the approvals tab and the client's file tab),
@@ -19,10 +19,10 @@ import { reviewProposals } from "@/app/(product)/app/(authenticated)/knowledge/r
 // The MCP side (lib/mcp/approval-tools.ts, serializeProposal) already
 // drops flags for a hidden proposal; the screen does not.
 //
-// it.fails: these pass today only because the leak is there. Each case
-// first asserts that the proposal really is hidden from the viewer, so a
-// change in who may see it cannot flip it for the wrong reason. When the
-// hidden proposal stops carrying content, drop `.fails`.
+// Fixed in the same week: the hidden branch keeps only the R6 flag and
+// drops the rejection reason. Each case first asserts that the proposal
+// really is hidden from the viewer, so a change in who may see it cannot
+// make it pass for the wrong reason.
 
 const WHO = "דנה פרלמן";
 const WHY_REJECTED = "כבר ידוע: אורן מאושפז עד סוף החודש";
@@ -53,7 +53,7 @@ async function propose(actorId: string, clientId: string) {
 }
 
 describe("a hidden sensitive proposal, as the review screen ships it", () => {
-  it.fails("does not name, in its flags, whom the item is about", async () => {
+  it("does not name, in its flags, whom the item is about", async () => {
     const { client, anna, hadas } = await setup();
     const r = await propose(anna.id, client.id);
 
@@ -63,11 +63,13 @@ describe("a hidden sensitive proposal, as the review screen ships it", () => {
 
     const batch = (await listOpenBatches(anna)).find((b) => b.id === r.batchId)!;
     expect(batch.proposals[0].hiddenFor).toBeTruthy();
+    // Still marked sensitive, in R6's fixed words.
+    expect((batch.proposals[0].flags as { code: string }[]).map((f) => f.code)).toEqual(["R6"]);
     // What ReviewBatch receives as props, i.e. what lands in the HTML.
     expect(JSON.stringify(reviewProposals(batch, () => ""))).not.toContain(WHO);
   });
 
-  it.fails("does not carry the approver's reason for rejecting it", async () => {
+  it("does not carry the approver's reason for rejecting it", async () => {
     const { client, anna, hadas } = await setup();
     const r = await propose(anna.id, client.id);
     const secretId = (await listOpenBatches(hadas)).find((b) => b.id === r.batchId)!.proposals[0].id;
