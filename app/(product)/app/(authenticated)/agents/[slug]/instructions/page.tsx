@@ -91,6 +91,26 @@ export default async function InstructionsPage({ params, searchParams }: { param
             ))}
           </section>
 
+          <section className="rounded-xl border border-app-border bg-white px-4 py-3">
+            <h2 className="text-sm font-medium text-app-text-primary">קבצים מצורפים</h2>
+            {content.files.length === 0 ? (
+              <p className="mt-1 text-[13px] text-app-text-secondary">אין. קובץ שההוראות מפנות אליו (סקריפט, תבנית, מסמך רקע) נשמר כאן מ-Claude, ב-save_agent_draft.</p>
+            ) : (
+              <ul className="mt-1.5 flex flex-col gap-1.5">
+                {content.files.map((f) => (
+                  <li key={f.path}>
+                    <details>
+                      <summary className="cursor-pointer text-[13.5px] text-app-text-primary" dir="ltr">
+                        {f.path} <span className="text-xs text-app-text-tertiary">({f.content.length.toLocaleString("en-US")} תווים)</span>
+                      </summary>
+                      <pre dir="auto" className="mt-1.5 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-app-surface-page p-3 font-jbmono text-[12px] leading-relaxed text-app-text-primary">{f.content}</pre>
+                    </details>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
           {canEdit && (
             <div className="flex flex-wrap items-center gap-3">
               <EditBlock agentId={agent.id} clients={clients} params={content.params} />

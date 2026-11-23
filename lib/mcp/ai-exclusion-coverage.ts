@@ -81,6 +81,7 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   get_extraction_brief: "a marked client is listed by name and domains only, with the instruction to skip its meetings; its recordings are left out",
   get_agent: "an installation's clients pass through resolveClients, which drops every client marked \"בלי AI\" before anything is compiled",
   get_agent_client_context: "resolveClients drops \"בלי AI\" clients, so asking for one is refused like a client outside the installation",
+  get_agent_file: "returns a file of the agent's own version, for the user's own installation; no client data is read",
   accept_agent_update: "moves an installation's pinned version; returns no client data",
   save_agent_draft: "writes Ankora's own agent instructions; a client addition names a client the user can access, and \"בלי AI\" clients never reach a compiled agent",
   record_agent_run: "records how a run of the user's own installation ended; it stores the agent's words, no client data is read",

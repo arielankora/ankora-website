@@ -133,6 +133,7 @@ export const TOOL_ANNOTATIONS = {
   propose_extraction_guide_version: WRITES,
   get_agent: READ_ONLY,
   get_agent_client_context: READ_ONLY,
+  get_agent_file: READ_ONLY,
   accept_agent_update: WRITES,
   save_agent_draft: WRITES,
   record_agent_run: WRITES,

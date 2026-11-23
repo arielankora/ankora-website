@@ -24,7 +24,7 @@ export async function loadAgent(slug: string) {
     throw err;
   }
   const editing = data.draft ?? data.approved;
-  const content = editing ? contentOf(editing) : { blocks: [], params: [], requirements: { connectors: [], skills: [], repos: [], localMcp: [], externalRunners: [] }, actionLevel: "READ" as const };
+  const content = editing ? contentOf(editing) : { blocks: [], params: [], requirements: { connectors: [], skills: [], repos: [], localMcp: [], externalRunners: [] }, actionLevel: "READ" as const, files: [] };
   const clients = (await listAccessibleClients(user)).map((c) => ({ id: c.id, name: c.name }));
   return { user, ...data, editing, content, clients, resolve: (ids: string[]) => resolveClients(user, data.agent.id, content.params, { clientScope: "LIST", clientIds: ids }) };
 }

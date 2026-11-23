@@ -5074,6 +5074,10 @@ model AgentVersion {
   params       Json              @default("[]")
   /// { connectors: [], skills: [], repos: [], localMcp: [], externalRunners: [], model?, notes? }.
   requirements Json              @default("{}")
+  /// [{ path, content }]: text files the agent uses (a script, a template, a
+  /// reference). Frozen with the version like the blocks; get_agent lists
+  /// them and get_agent_file returns one.
+  files        Json              @default("[]")
   /// What changed and why, in plain words: what people see in the update question.
   changeNote   String?
 

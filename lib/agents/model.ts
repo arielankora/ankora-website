@@ -57,10 +57,20 @@ export const requirementsSchema = z.object({
 });
 export type AgentRequirements = z.infer<typeof requirementsSchema>;
 
+/// A text file attached to a version (23.11.2026): a script, a template or a
+/// reference the instructions point to by path. Binary files do not belong
+/// here; a path names where it sits for the agent ("scripts/build.py").
+const FILE_PATH = /^(?!\/)(?!.*\.\.)[\p{L}\p{N}_.\- ]+(\/[\p{L}\p{N}_.\- ]+)*$/u;
+export const fileSchema = z.object({
+  path: z.string().trim().min(1).max(200).regex(FILE_PATH),
+  content: z.string().max(200_000),
+});
+export type AgentFile = z.infer<typeof fileSchema>;
+
 /// 30 parameters (23.11.2026, was 20): the outbound campaigns carry a sender,
 /// accounts, a dozen state files and their quotas as numbers, and the larger
 /// ones (DeepSignals, Grantor) passed 20 once the quotas became parameters.
-export const LIMITS = { blocks: 30, params: 30, compiledChars: 40000 } as const;
+export const LIMITS = { blocks: 30, params: 30, compiledChars: 40000, files: 30, filesChars: 1_000_000 } as const;
 
 export function parseBlocks(raw: unknown): AgentBlock[] {
   const r = z.array(blockSchema).safeParse(raw);
@@ -68,6 +78,10 @@ export function parseBlocks(raw: unknown): AgentBlock[] {
 }
 export function parseParams(raw: unknown): AgentParam[] {
   const r = z.array(paramSchema).safeParse(raw);
+  return r.success ? r.data : [];
+}
+export function parseFiles(raw: unknown): AgentFile[] {
+  const r = z.array(fileSchema).safeParse(raw ?? []);
   return r.success ? r.data : [];
 }
 export function parseRequirements(raw: unknown): AgentRequirements {
@@ -85,9 +99,13 @@ export type VersionProblem = { code: string; text: string };
 
 /// What stops a version from being sent for approval. Everything the
 /// version-screen checks list shows comes from here.
-export function versionProblems(input: { blocks: AgentBlock[]; params: AgentParam[]; changeNote?: string | null; clientIds?: Set<string> }): VersionProblem[] {
+export function versionProblems(input: { blocks: AgentBlock[]; params: AgentParam[]; files?: AgentFile[]; changeNote?: string | null; clientIds?: Set<string> }): VersionProblem[] {
   const out: VersionProblem[] = [];
   const { blocks, params } = input;
+  const files = input.files ?? [];
+  if (files.length > LIMITS.files) out.push({ code: "tooManyFiles", text: `יותר מ-${LIMITS.files} קבצים מצורפים.` });
+  if (files.reduce((n, f) => n + f.content.length, 0) > LIMITS.filesChars) out.push({ code: "filesTooLarge", text: "הקבצים המצורפים גדולים מדי יחד." });
+  if (new Set(files.map((f) => f.path)).size !== files.length) out.push({ code: "duplicateFile", text: "שני קבצים באותו נתיב." });
   if (blocks.length === 0) out.push({ code: "noBlocks", text: "אין בסוכן אף קטע הוראות." });
   if (blocks.length > LIMITS.blocks) out.push({ code: "tooManyBlocks", text: `יותר מ-${LIMITS.blocks} קטעים.` });
   if (params.length > LIMITS.params) out.push({ code: "tooManyParams", text: `יותר מ-${LIMITS.params} פרמטרים.` });
