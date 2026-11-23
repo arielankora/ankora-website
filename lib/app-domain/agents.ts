@@ -12,6 +12,7 @@ import { compileAgent, isCheckDue, type CompileClient } from "@/lib/agents/compi
 import type { LinkedProcedure } from "@/lib/agents/procedure";
 import { mcpGetProcess } from "@/lib/app-domain/mcp-processes";
 import { approvedLibrary } from "@/lib/app-domain/agent-library";
+import { approvedAdditions } from "@/lib/app-domain/agent-client-additions";
 import { z } from "zod";
 
 // Agents, phase 1 (22.11.2026, "סוכנים באנקורה: אפיון").
@@ -153,7 +154,8 @@ async function openDraft(actor: User, agentId: string) {
         agentId,
         version: (last?.version ?? 0) + 1,
         createdById: actor.id,
-        blocks: (approved?.blocks ?? []) as Prisma.InputJsonValue,
+        // Client blocks live in AgentClientAddition since 24.11.2026.
+        blocks: parseBlocks(approved?.blocks).filter((b) => !b.clientId) as Prisma.InputJsonValue,
         params: (approved?.params ?? []) as Prisma.InputJsonValue,
         requirements: (approved?.requirements ?? {}) as Prisma.InputJsonValue,
         files: (approved?.files ?? []) as Prisma.InputJsonValue,
@@ -179,7 +181,9 @@ export async function saveDraft(actor: User, agentId: string, raw: DraftInput) {
   const updated = await prisma.agentVersion.update({
     where: { id: draft.id },
     data: {
-      ...(input.blocks ? { blocks: input.blocks as Prisma.InputJsonValue } : {}),
+      // A legacy client block copied along from the version in use stays behind:
+      // its client's addition holds it now (AgentClientAddition).
+      ...(input.blocks ? { blocks: input.blocks.filter((b) => !b.clientId) as Prisma.InputJsonValue } : {}),
       ...(input.params ? { params: input.params as Prisma.InputJsonValue } : {}),
       ...(input.files ? { files: input.files as Prisma.InputJsonValue } : {}),
       ...(input.requirements ? { requirements: input.requirements as Prisma.InputJsonValue } : {}),
@@ -437,7 +441,7 @@ async function compileVersion(user: User, inst: { id: string; agentId: string; v
   const content = contentOf(v);
   const clients = await resolveClients(user, inst.agentId, content.params, inst);
   const values = (inst.values && typeof inst.values === "object" && !Array.isArray(inst.values) ? inst.values : {}) as Record<string, string>;
-  return compileAgent({ agent, version: { version: v.version, ...content }, installation: { id: inst.id, values, userName: user.name }, clients, library: await approvedLibrary() });
+  return compileAgent({ agent, version: { version: v.version, ...content }, installation: { id: inst.id, values, userName: user.name }, clients, library: await approvedLibrary(), additions: await approvedAdditions(inst.agentId, clients.map((c) => c.id)) });
 }
 
 /// What get_agent returns: the instructions of the pinned version, and an
@@ -573,7 +577,8 @@ export async function revertToVersion(actor: User, agentId: string, version: num
         agentId,
         version: (last?.version ?? 0) + 1,
         createdById: actor.id,
-        blocks: target.blocks as Prisma.InputJsonValue,
+        // Client blocks of an old version stay behind: they live in AgentClientAddition.
+        blocks: parseBlocks(target.blocks).filter((b) => !b.clientId) as Prisma.InputJsonValue,
         params: target.params as Prisma.InputJsonValue,
         requirements: target.requirements as Prisma.InputJsonValue,
         files: target.files as Prisma.InputJsonValue,
@@ -649,7 +654,7 @@ export async function clientContext(actor: User, installationId: string, clientN
   const needle = clientName.trim().toLowerCase();
   const client = clients.find((c) => c.name.toLowerCase() === needle) ?? clients.find((c) => c.name.toLowerCase().includes(needle));
   if (!client) throw new DomainError("agents.clientNotInScope", "הלקוח לא בהתקנה הזו, או שהוא מסומן \"בלי AI\".");
-  const one = compileAgent({ agent: inst.agent, version: { version: pinned.version, ...content }, installation: null, clients: [client], library: await approvedLibrary() });
+  const one = compileAgent({ agent: inst.agent, version: { version: pinned.version, ...content }, installation: null, clients: [client], library: await approvedLibrary(), additions: await approvedAdditions(inst.agentId, [client.id]) });
   return { client, compiled: one };
 }
 

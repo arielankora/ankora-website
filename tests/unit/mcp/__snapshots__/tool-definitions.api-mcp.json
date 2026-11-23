@@ -4195,6 +4195,103 @@
     "name": "revert_agent_to_version",
     "title": "Revert an Ankora agent to an earlier version"
   },
+  "save_agent_client_addition": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Writes the draft of one client's addition to an Ankora agent: blocks the agent reads only when it works on that client, versioned apart from the agent (the agent's version does not change; an installation on that client reads \"version 7 + <client> 2\"). Pass `agent` (its slug) and `client` (its name). The blocks you pass replace the addition's whole list; leave `blocks` out to keep them. A block with `replaces` takes the place of the agent block with that key for this client, only when that block is marked overridable and is not a safety block; otherwise it is added beside it and `problems` says so. This tool never approves. With `submit: true` the draft goes to a manager, who approves it in Ankora. Before calling, show the user the blocks you will save and call only after they said so. Returns the addition's `version`, `url` and `problems` still to fix.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "agent": {
+          "description": "The agent's slug, from its url.",
+          "maxLength": 60,
+          "minLength": 1,
+          "type": "string"
+        },
+        "blocks": {
+          "items": {
+            "properties": {
+              "body": {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              "key": {
+                "description": "Short stable id, letters, digits or _.",
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "role",
+                  "scope",
+                  "steps",
+                  "rules",
+                  "approvals",
+                  "language",
+                  "output",
+                  "tools",
+                  "schedule",
+                  "live"
+                ],
+                "type": "string"
+              },
+              "replaces": {
+                "description": "The key of the agent block this one replaces for this client.",
+                "maxLength": 40,
+                "type": "string"
+              },
+              "title": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "why": {
+                "description": "Why the rule exists, in a line.",
+                "maxLength": 2000,
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "kind",
+              "title",
+              "body"
+            ],
+            "type": "object"
+          },
+          "maxItems": 30,
+          "type": "array"
+        },
+        "changeNote": {
+          "description": "What changes and why, in plain Hebrew.",
+          "maxLength": 2000,
+          "type": "string"
+        },
+        "client": {
+          "description": "The client's name, as the user has it in Ankora.",
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "submit": {
+          "description": "Send the draft for a manager's approval now.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agent",
+        "client"
+      ],
+      "type": "object"
+    },
+    "name": "save_agent_client_addition",
+    "title": "Save a client's addition to an Ankora agent"
+  },
   "save_agent_draft": {
     "annotations": {
       "destructiveHint": false,
@@ -4202,7 +4299,7 @@
       "openWorldHint": false,
       "readOnlyHint": false
     },
-    "description": "Writes the draft of an Ankora agent's next version: its instruction blocks, parameters, requirements and action level. Use it to bring an existing prompt into Ankora (split it into blocks, turn what differs per client or per person into {{parameters}}, move dated change notes out of the text into `changeNote`) or to change an agent the user asked to change. Pass `agent` (its slug, from the agent's url) to change an existing agent, or `create` for a new one. Blocks, parameters and files you pass replace the draft's whole list; leave one out to keep it as it is. A text file the instructions use (a script, a template, a reference) goes in `files` with the path the instructions name. Block kinds, in reading order: role, scope, steps, rules, approvals, language, output, tools, schedule, live. A block with `client` is a client addition, read only for that client. Write {{key}} where a parameter's value goes; every such key must be in `params`. This tool never approves. With `submit: true` the draft is sent to a manager, who approves it in Ankora; nothing reaches any installation before that. Before calling, show the user the blocks you will save and call only after they said so. Returns the draft's `url`, its `version` and `problems` still to fix.",
+    "description": "Writes the draft of an Ankora agent's next version: its instruction blocks, parameters, requirements and action level. Use it to bring an existing prompt into Ankora (split it into blocks, turn what differs per client or per person into {{parameters}}, move dated change notes out of the text into `changeNote`) or to change an agent the user asked to change. Pass `agent` (its slug, from the agent's url) to change an existing agent, or `create` for a new one. Blocks, parameters and files you pass replace the draft's whole list; leave one out to keep it as it is. A text file the instructions use (a script, a template, a reference) goes in `files` with the path the instructions name. Block kinds, in reading order: role, scope, steps, rules, approvals, language, output, tools, schedule, live. A rule for one client only is a client addition: save it with save_agent_client_addition, not here. Mark a block `overridable` when a client addition may replace it. Write {{key}} where a parameter's value goes; every such key must be in `params`. This tool never approves. With `submit: true` the draft is sent to a manager, who approves it in Ankora; nothing reaches any installation before that. Before calling, show the user the blocks you will save and call only after they said so. Returns the draft's `url`, its `version` and `problems` still to fix.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -4228,11 +4325,6 @@
                 "maxLength": 20000,
                 "type": "string"
               },
-              "client": {
-                "description": "A client's name: the block is an addition for that client only.",
-                "maxLength": 120,
-                "type": "string"
-              },
               "key": {
                 "description": "Short stable id, letters, digits or _.",
                 "maxLength": 40,
@@ -4253,6 +4345,10 @@
                   "live"
                 ],
                 "type": "string"
+              },
+              "overridable": {
+                "description": "A client addition may replace this block for its client. Ignored on a safety block.",
+                "type": "boolean"
               },
               "safety": {
                 "description": "A guardrail (never send, never delete).",

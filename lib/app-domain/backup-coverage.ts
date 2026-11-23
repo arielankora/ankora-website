@@ -164,6 +164,7 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   ExtractionGuide: { decision: "DUMP", table: "extraction_guides", reason: "Every version of the extraction guidance, and who proposed and approved it." },
   Agent: { decision: "DUMP", table: "agents", reason: "Every agent the team runs on Claude: what it is for and who owns it." },
   AgentVersion: { decision: "DUMP", table: "agent_versions", reason: "Every version of every agent's instructions, and who wrote and approved it." },
+  AgentClientAddition: { decision: "DUMP", table: "agent_client_additions", reason: "Every version of every client's addition to an agent, and who wrote and approved it." },
   AgentClientValue: { decision: "DUMP", table: "agent_client_values", reason: "Per-client values agents run with (signatures, recipients): typed once, nowhere else." },
   SharedBlock: { decision: "DUMP", table: "shared_blocks", reason: "The library of blocks many agents share, by key." },
   SharedBlockVersion: { decision: "DUMP", table: "shared_block_versions", reason: "Every version of every library block, and who wrote and approved it." },

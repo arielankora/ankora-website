@@ -20,10 +20,16 @@ export const blockSchema = z.object({
   body: z.string().max(20000),
   /// Why the rule exists, for people and for the agent.
   why: z.string().max(2000).nullish(),
-  /// Set: a client addition, reaching only this client.
+  /// Set: a legacy client addition inside an agent version (before
+  /// 24.11.2026). Client additions live in AgentClientAddition now.
   clientId: z.string().nullish(),
   /// A guardrail ("never send"): shown apart and flagged when it changes.
   safety: z.boolean().optional(),
+  /// The owners allow a client addition to take this block's place for that
+  /// client. Never honoured on a safety block.
+  overridable: z.boolean().optional(),
+  /// In a client addition only: the key of the agent block this one replaces.
+  replaces: z.string().regex(KEY).nullish(),
   /// Phase 3: a copy of a library block, kept in step when the library's version is approved.
   sharedKey: z.string().max(60).nullish(),
   sharedVersion: z.number().int().nullish(),
@@ -151,6 +157,40 @@ export function versionProblems(input: { blocks: AgentBlock[]; params: AgentPara
   for (const b of blocks) for (const k of placeholdersIn(b.body)) if (!paramKeys.has(k)) missing.add(k);
   for (const k of missing) out.push({ code: "undefinedParam", text: `{{${k}}} מופיע בהוראות ולא מוגדר כפרמטר.` });
   const texts = [...blocks.flatMap((b) => [b.title, b.body, b.why ?? ""]), ...params.flatMap((p) => [p.label, p.default ?? ""]), input.changeNote ?? ""];
+  if (texts.some((t) => DASHES.test(t))) out.push({ code: "dash", text: "יש בטקסט מקף ארוך או בינוני." });
+  return out;
+}
+
+/// Whether a client addition may take the place of this agent block.
+export function canReplace(block: AgentBlock | undefined): boolean {
+  return !!block && !block.clientId && !!block.overridable && !block.safety;
+}
+
+/// What stops a client addition from being sent for approval. `agentBlocks`
+/// are the blocks of the agent's version in use, the ones it may replace.
+export function additionProblems(input: { blocks: AgentBlock[]; agentBlocks: AgentBlock[]; params: AgentParam[]; changeNote?: string | null }): VersionProblem[] {
+  const out: VersionProblem[] = [];
+  const { blocks } = input;
+  if (blocks.length > LIMITS.blocks) out.push({ code: "tooManyBlocks", text: `יותר מ-${LIMITS.blocks} קטעים.` });
+  const keys = new Set<string>();
+  const replaced = new Set<string>();
+  const agent = new Map(input.agentBlocks.filter((b) => !b.clientId).map((b) => [b.key, b]));
+  for (const b of blocks) {
+    if (keys.has(b.key)) out.push({ code: "duplicateBlock", text: `שני קטעים באותו מפתח: ${b.key}.` });
+    keys.add(b.key);
+    if (!b.replaces) continue;
+    const target = agent.get(b.replaces);
+    if (!target) out.push({ code: "replaceMissing", text: `"${b.title}" מחליף קטע שאין בסוכן (${b.replaces}).` });
+    else if (target.safety) out.push({ code: "replaceSafety", text: `"${target.title}" הוא גבול בטיחות, ולא ניתן להחליף אותו ללקוח.` });
+    else if (!target.overridable) out.push({ code: "replaceNotAllowed", text: `"${target.title}" לא מסומן "ניתן להחלפה ללקוח". בלי הסימון התוספת תתווסף לצידו.` });
+    if (replaced.has(b.replaces)) out.push({ code: "replaceTwice", text: `שני קטעים מחליפים את אותו קטע (${b.replaces}).` });
+    replaced.add(b.replaces);
+  }
+  const paramKeys = new Set(input.params.map((p) => p.key));
+  const missing = new Set<string>();
+  for (const b of blocks) for (const k of placeholdersIn(b.body)) if (!paramKeys.has(k)) missing.add(k);
+  for (const k of missing) out.push({ code: "undefinedParam", text: `{{${k}}} מופיע בתוספת ולא מוגדר כפרמטר בסוכן.` });
+  const texts = [...blocks.flatMap((b) => [b.title, b.body, b.why ?? ""]), input.changeNote ?? ""];
   if (texts.some((t) => DASHES.test(t))) out.push({ code: "dash", text: "יש בטקסט מקף ארוך או בינוני." });
   return out;
 }

@@ -16,7 +16,12 @@ import {
   archiveAgentAction,
   setAgentPurposeAction,
   createAgentAction,
+  deleteAdditionBlockAction,
   deleteBlockAction,
+  discardAdditionAction,
+  saveAdditionBlockAction,
+  saveAdditionNoteAction,
+  submitAdditionAction,
   deleteParamAction,
   discardDraftAction,
   installAction,
@@ -123,10 +128,11 @@ export function NewAgent() {
 
 type ClientOption = { id: string; name: string };
 
-function BlockForm({ agentId, block, clients, params }: { agentId: string; block?: AgentBlock; clients: ClientOption[]; params: AgentParam[] }) {
+function BlockForm({ agentId, block, params }: { agentId: string; block?: AgentBlock; params: AgentParam[] }) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(saveBlockAction, close);
   const [body, setBody] = useState(block?.body ?? "");
+  const [safety, setSafety] = useState(!!block?.safety);
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="agentId" value={agentId} />
@@ -158,18 +164,16 @@ function BlockForm({ agentId, block, clients, params }: { agentId: string; block
       <Field label="למה הכלל קיים (לא חובה)">
         <input name="why" maxLength={2000} dir="auto" defaultValue={block?.why ?? ""} className={INPUT} />
       </Field>
-      <Field label="רק ללקוח (תוספת ללקוח)">
-        <select name="clientId" defaultValue={block?.clientId ?? ""} className={INPUT}>
-          <option value="">לכל הלקוחות</option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-      </Field>
       <label className="flex items-center gap-2 text-sm text-app-text-primary">
-        <input type="checkbox" name="safety" defaultChecked={!!block?.safety} />
+        <input type="checkbox" name="safety" checked={safety} onChange={(e) => setSafety(e.target.checked)} />
         גבול בטיחות (מוצג ב&quot;לעולם לא&quot;)
       </label>
+      {!safety && (
+        <label className="flex items-center gap-2 text-sm text-app-text-primary">
+          <input type="checkbox" name="overridable" defaultChecked={!!block?.overridable} />
+          ניתן להחלפה ללקוח (תוספת ללקוח יכולה לבוא במקומו)
+        </label>
+      )}
       <Err error={error} />
       <button type="submit" disabled={pending} className={PRIMARY}>
         {pending ? "שומר..." : "לשמור בטיוטה"}
@@ -178,7 +182,7 @@ function BlockForm({ agentId, block, clients, params }: { agentId: string; block
   );
 }
 
-export function EditBlock(props: { agentId: string; block?: AgentBlock; clients: ClientOption[]; params: AgentParam[] }) {
+export function EditBlock(props: { agentId: string; block?: AgentBlock; params: AgentParam[] }) {
   return (
     <Drawer triggerLabel={props.block ? "לערוך" : "להוסיף קטע"} title={props.block ? `עריכה: ${props.block.title}` : "קטע חדש"} variant={props.block ? "link" : "primary"}>
       <BlockForm {...props} />
@@ -188,6 +192,108 @@ export function EditBlock(props: { agentId: string; block?: AgentBlock; clients:
 
 export function DeleteBlock({ agentId, blockKey }: { agentId: string; blockKey: string }) {
   return <ActionButton run={() => deleteBlockAction(agentId, blockKey)} label="להסיר" done="הקטע הוסר מהטיוטה" />;
+}
+
+// --- Client additions (24.11.2026) ------------------------------------------
+
+type ReplaceTarget = { key: string; title: string };
+
+function AdditionBlockForm({ agentId, clientId, clients, block, targets }: { agentId: string; clientId?: string; clients: ClientOption[]; block?: AgentBlock; targets: ReplaceTarget[] }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(saveAdditionBlockAction, close);
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="agentId" value={agentId} />
+      <input type="hidden" name="originalKey" value={block?.key ?? ""} />
+      {clientId ? (
+        <input type="hidden" name="clientId" value={clientId} />
+      ) : (
+        <Field label="לקוח">
+          <select name="clientId" required className={INPUT}>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </Field>
+      )}
+      <Field label="סוג הקטע">
+        <select name="kind" defaultValue={block?.kind ?? "rules"} className={INPUT}>
+          {Object.entries(BLOCK_KIND_LABEL).map(([k, l]) => (
+            <option key={k} value={k}>{l}</option>
+          ))}
+        </select>
+      </Field>
+      <Field label="כותרת">
+        <input name="title" required maxLength={120} dir="auto" defaultValue={block?.title ?? ""} className={INPUT} />
+      </Field>
+      <Field label="הטקסט" hint="פרמטר של הסוכן נכתב בסוגריים כפולים, למשל {{חתימה}}.">
+        <textarea name="body" rows={8} dir="auto" defaultValue={block?.body ?? ""} className={INPUT} />
+      </Field>
+      <Field label="למה הכלל קיים (לא חובה)">
+        <input name="why" maxLength={2000} dir="auto" defaultValue={block?.why ?? ""} className={INPUT} />
+      </Field>
+      <Field label="במקום קטע של הסוכן" hint="רק קטעים שסומנו &quot;ניתן להחלפה ללקוח&quot;. גבולות בטיחות לא מוחלפים.">
+        <select name="replaces" defaultValue={block?.replaces ?? ""} className={INPUT}>
+          <option value="">לא, נוסף לצד ההוראות</option>
+          {targets.map((t) => (
+            <option key={t.key} value={t.key}>{t.title}</option>
+          ))}
+        </select>
+      </Field>
+      <Err error={error} />
+      <button type="submit" disabled={pending} className={PRIMARY}>
+        {pending ? "שומר..." : "לשמור בטיוטת התוספת"}
+      </button>
+    </form>
+  );
+}
+
+export function EditAdditionBlock(props: { agentId: string; clientId?: string; clientName?: string; clients: ClientOption[]; block?: AgentBlock; targets: ReplaceTarget[] }) {
+  const title = props.block ? `עריכה: ${props.block.title}` : props.clientName ? `קטע חדש ל${props.clientName}` : "תוספת ללקוח";
+  return (
+    <Drawer triggerLabel={props.block ? "לערוך" : props.clientId ? "להוסיף קטע" : "תוספת ללקוח חדשה"} title={title} variant={props.block || props.clientId ? "link" : "primary"}>
+      <AdditionBlockForm {...props} />
+    </Drawer>
+  );
+}
+
+export function DeleteAdditionBlock({ agentId, clientId, blockKey }: { agentId: string; clientId: string; blockKey: string }) {
+  return <ActionButton run={() => deleteAdditionBlockAction(agentId, clientId, blockKey)} label="להסיר" done="הקטע הוסר מטיוטת התוספת" />;
+}
+
+function AdditionNoteForm({ agentId, clientId, changeNote }: { agentId: string; clientId: string; changeNote: string }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(saveAdditionNoteAction, close);
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="agentId" value={agentId} />
+      <input type="hidden" name="clientId" value={clientId} />
+      <Field label="מה השתנה ולמה">
+        <textarea name="changeNote" rows={3} dir="auto" defaultValue={changeNote} className={INPUT} />
+      </Field>
+      <Err error={error} />
+      <button type="submit" disabled={pending} className={PRIMARY}>
+        {pending ? "שומר..." : "לשמור"}
+      </button>
+    </form>
+  );
+}
+
+export function EditAdditionNote(props: { agentId: string; clientId: string; changeNote: string }) {
+  return (
+    <Drawer triggerLabel="הערת שינוי" title="הערת שינוי לתוספת" variant="link">
+      <AdditionNoteForm {...props} />
+    </Drawer>
+  );
+}
+
+export function AdditionDraftButtons({ id, canDiscard }: { id: string; canDiscard: boolean }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {canDiscard && <ActionButton run={() => discardAdditionAction(id)} label="לבטל טיוטה" done="הטיוטה בוטלה" />}
+      <ActionButton run={() => submitAdditionAction(id)} label="לשלוח לאישור" done="נשלח לאישור מנהל" tone="primary" />
+    </div>
+  );
 }
 
 // --- Parameters --------------------------------------------------------------

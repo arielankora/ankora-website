@@ -39,7 +39,7 @@ export function diffBlocks(before: AgentBlock[], after: AgentBlock[]): { changes
   for (const b of after) {
     const o = old.get(b.key);
     if (!o) changes.push({ key: b.key, title: b.title, kind: b.kind, clientId: b.clientId, status: "added", lines: b.body.split("\n").map((text) => ({ type: "add", text })) });
-    else if (whole(o) !== whole(b) || o.kind !== b.kind || (o.clientId ?? null) !== (b.clientId ?? null) || !!o.safety !== !!b.safety) {
+    else if (whole(o) !== whole(b) || o.kind !== b.kind || (o.clientId ?? null) !== (b.clientId ?? null) || !!o.safety !== !!b.safety || !!o.overridable !== !!b.overridable || (o.replaces ?? null) !== (b.replaces ?? null)) {
       changes.push({ key: b.key, title: b.title, kind: b.kind, clientId: b.clientId, status: "changed", lines: diffLines(whole(o), whole(b)) });
     } else unchanged++;
   }

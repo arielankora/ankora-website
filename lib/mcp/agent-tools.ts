@@ -11,6 +11,7 @@ import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, draftProblems, fetchAgent, linkedProcedure, listMyInstallations, recordRun, revertToVersion, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
 import { proposeLesson } from "@/lib/app-domain/agent-library";
 import { skillGaps } from "@/lib/app-domain/agent-skills";
+import { clientAdditionProblems, saveClientAddition, submitClientAddition } from "@/lib/app-domain/agent-client-additions";
 import { bootstrapText } from "@/lib/agents/compile";
 import { procedureSection } from "@/lib/agents/procedure";
 import { BLOCK_KINDS, CLIENT_FIELDS, LIMITS, PARAM_LEVELS, PARAM_TYPES, parseRequirements } from "@/lib/agents/model";
@@ -172,7 +173,7 @@ export function registerAgentTools(server: McpServer): void {
       description: [
         "Writes the draft of an Ankora agent's next version: its instruction blocks, parameters, requirements and action level. Use it to bring an existing prompt into Ankora (split it into blocks, turn what differs per client or per person into {{parameters}}, move dated change notes out of the text into `changeNote`) or to change an agent the user asked to change.",
         "Pass `agent` (its slug, from the agent's url) to change an existing agent, or `create` for a new one. Blocks, parameters and files you pass replace the draft's whole list; leave one out to keep it as it is. A text file the instructions use (a script, a template, a reference) goes in `files` with the path the instructions name.",
-        `Block kinds, in reading order: ${BLOCK_KINDS.join(", ")}. A block with \`client\` is a client addition, read only for that client. Write {{key}} where a parameter's value goes; every such key must be in \`params\`.`,
+        `Block kinds, in reading order: ${BLOCK_KINDS.join(", ")}. A rule for one client only is a client addition: save it with save_agent_client_addition, not here. Mark a block \`overridable\` when a client addition may replace it. Write {{key}} where a parameter's value goes; every such key must be in \`params\`.`,
         "This tool never approves. With `submit: true` the draft is sent to a manager, who approves it in Ankora; nothing reaches any installation before that. Before calling, show the user the blocks you will save and call only after they said so. Returns the draft's `url`, its `version` and `problems` still to fix.",
       ].join(" "),
       inputSchema: z.object({
@@ -193,8 +194,8 @@ export function registerAgentTools(server: McpServer): void {
               title: z.string().min(1).max(120),
               body: z.string().max(20000),
               why: z.string().max(2000).optional().describe("Why the rule exists, in a line."),
-              client: z.string().max(120).optional().describe("A client's name: the block is an addition for that client only."),
               safety: z.boolean().optional().describe("A guardrail (never send, never delete)."),
+              overridable: z.boolean().optional().describe("A client addition may replace this block for its client. Ignored on a safety block."),
             })
           )
           .max(LIMITS.blocks)
@@ -243,7 +244,7 @@ export function registerAgentTools(server: McpServer): void {
       args: {
         agent?: string;
         create?: { name: string; purpose: string; kind: "CLIENT_PROJECT" | "SCHEDULED" | "SKILL" };
-        blocks?: { key: string; kind: (typeof BLOCK_KINDS)[number]; title: string; body: string; why?: string; client?: string; safety?: boolean }[];
+        blocks?: { key: string; kind: (typeof BLOCK_KINDS)[number]; title: string; body: string; why?: string; safety?: boolean; overridable?: boolean }[];
         params?: { key: string; label: string; level: (typeof PARAM_LEVELS)[number]; type?: (typeof PARAM_TYPES)[number]; required?: boolean; default?: string; clientField?: (typeof CLIENT_FIELDS)[number] }[];
         files?: { path: string; content: string }[];
         requirements?: Record<string, unknown>;
@@ -268,21 +269,7 @@ export function registerAgentTools(server: McpServer): void {
           agentId = found.id;
           slug = found.slug;
         }
-        let blocks;
-        if (args.blocks) {
-          const clients = args.blocks.some((b) => b.client) ? await listAccessibleClients(actor) : [];
-          blocks = [];
-          for (const b of args.blocks) {
-            let clientId: string | null = null;
-            if (b.client) {
-              const name = b.client.trim().toLowerCase();
-              const c = clients.find((x) => x.name.toLowerCase() === name);
-              if (!c) return toolText(`No client you can access is named "${b.client}" (block "${b.title}"). Nothing was saved.`);
-              clientId = c.id;
-            }
-            blocks.push({ key: b.key, kind: b.kind, title: b.title, body: b.body, why: b.why ?? null, clientId, safety: b.safety ?? false });
-          }
-        }
+        const blocks = args.blocks?.map((b) => ({ key: b.key, kind: b.kind, title: b.title, body: b.body, why: b.why ?? null, safety: b.safety ?? false, overridable: b.overridable ?? false }));
         const v = await saveDraft(actor, agentId, {
           blocks,
           params: args.params?.map((p) => ({ ...p, type: p.type ?? "TEXT", required: p.required ?? false, default: p.default ?? null, clientField: p.clientField ?? null })),
@@ -337,6 +324,70 @@ export function registerAgentTools(server: McpServer): void {
         return toolJson({ saved: true, state, version: v.version, copyOf: args.version, url: agentUrl(found.slug, `versions?v=${v.version}`) });
       } catch (err) {
         console.error("[mcp] revert_agent_to_version failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "save_agent_client_addition",
+    {
+      title: "Save a client's addition to an Ankora agent",
+      description: [
+        "Writes the draft of one client's addition to an Ankora agent: blocks the agent reads only when it works on that client, versioned apart from the agent (the agent's version does not change; an installation on that client reads \"version 7 + <client> 2\").",
+        "Pass `agent` (its slug) and `client` (its name). The blocks you pass replace the addition's whole list; leave `blocks` out to keep them. A block with `replaces` takes the place of the agent block with that key for this client, only when that block is marked overridable and is not a safety block; otherwise it is added beside it and `problems` says so.",
+        "This tool never approves. With `submit: true` the draft goes to a manager, who approves it in Ankora. Before calling, show the user the blocks you will save and call only after they said so. Returns the addition's `version`, `url` and `problems` still to fix.",
+      ].join(" "),
+      inputSchema: z.object({
+        agent: z.string().min(1).max(60).describe("The agent's slug, from its url."),
+        client: z.string().min(1).max(120).describe("The client's name, as the user has it in Ankora."),
+        blocks: z
+          .array(
+            z.object({
+              key: z.string().min(1).max(40).describe("Short stable id, letters, digits or _."),
+              kind: z.enum(BLOCK_KINDS),
+              title: z.string().min(1).max(120),
+              body: z.string().max(20000),
+              why: z.string().max(2000).optional().describe("Why the rule exists, in a line."),
+              replaces: z.string().max(40).optional().describe("The key of the agent block this one replaces for this client."),
+            })
+          )
+          .max(LIMITS.blocks)
+          .optional(),
+        changeNote: z.string().max(2000).optional().describe("What changes and why, in plain Hebrew."),
+        submit: z.boolean().optional().describe("Send the draft for a manager's approval now."),
+      }),
+      annotations: TOOL_ANNOTATIONS.save_agent_client_addition,
+    },
+    async (
+      args: { agent: string; client: string; blocks?: { key: string; kind: (typeof BLOCK_KINDS)[number]; title: string; body: string; why?: string; replaces?: string }[]; changeNote?: string; submit?: boolean },
+      ctx: ServerContext
+    ) => {
+      try {
+        const actor = actorOf(ctx);
+        const agent = await prisma.agent.findUnique({ where: { slug: args.agent.trim() }, select: { id: true, slug: true, archivedAt: true } });
+        if (!agent || agent.archivedAt) return toolText(`No agent with the slug "${args.agent}". Nothing was saved.`);
+        const name = args.client.trim().toLowerCase();
+        const client = (await listAccessibleClients(actor)).find((c) => c.name.toLowerCase() === name);
+        if (!client) return toolText(`No client you can access is named "${args.client}". Nothing was saved.`);
+        const row = await saveClientAddition(actor, {
+          agentId: agent.id,
+          clientId: client.id,
+          blocks: args.blocks?.map((b) => ({ key: b.key, kind: b.kind, title: b.title, body: b.body, why: b.why ?? null, replaces: b.replaces?.trim() || null })),
+          changeNote: args.changeNote,
+        });
+        const problems = (await clientAdditionProblems(row)).map((p) => p.text);
+        if (!row.changeNote?.trim()) problems.push("חסרה הערת שינוי (changeNote): מה השתנה ולמה. בלעדיה אי אפשר לשלוח לאישור.");
+        const url = `${agentUrl(agent.slug, "instructions")}?client=${client.id}`;
+        let state = "draft: not sent for approval";
+        if (args.submit) {
+          if (problems.length) return toolJson({ saved: true, submitted: false, client: client.name, version: row.version, problems, url });
+          await submitClientAddition(actor, row.id);
+          state = "pending: waits for an Ankora manager to approve it";
+        }
+        return toolJson({ saved: true, state, client: client.name, version: row.version, problems: args.submit ? [] : problems, url });
+      } catch (err) {
+        console.error("[mcp] save_agent_client_addition failed", err);
         return toolFailure(err);
       }
     }

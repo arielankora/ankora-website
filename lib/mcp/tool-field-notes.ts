@@ -30,6 +30,8 @@ export const PROPOSAL_STATS_NOTES: FieldNotes = {
 export const LIST_APPROVALS_NOTES: FieldNotes = {
   approvals:
     "Each row has its kind and id (pass them to decide_approval), Ankora's recommendation and why, `approve` and `reject` (the button's label, or null when the row has none here; `reject.needsReason` when rejecting needs a reason), and `url`: a direct link that opens the screen on that very row. Give the user the links as they are.",
+  blockChanges:
+    'On an agent row that is one client\'s addition (versioned apart from the agent): its change against the addition in use, block by block, a line naming the block ("נוסף", "שונה" or "הוסר") and then its + and - lines. Show it to the user before deciding.',
   openLessons:
     "On a procedure row: the lessons people left on its process when closing runs, still open. Approving the version never closes them by itself. Ask the user which of them this version covers, and pass those ids to decide_approval as `appliedLessonIds`; they close as applied in this version, and the rest stay open.",
   proposals:
