@@ -4302,7 +4302,7 @@
             ],
             "type": "object"
           },
-          "maxItems": 20,
+          "maxItems": 30,
           "type": "array"
         },
         "requirements": {

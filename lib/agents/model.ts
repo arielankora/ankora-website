@@ -57,7 +57,10 @@ export const requirementsSchema = z.object({
 });
 export type AgentRequirements = z.infer<typeof requirementsSchema>;
 
-export const LIMITS = { blocks: 30, params: 20, compiledChars: 40000 } as const;
+/// 30 parameters (23.11.2026, was 20): the outbound campaigns carry a sender,
+/// accounts, a dozen state files and their quotas as numbers, and the larger
+/// ones (DeepSignals, Grantor) passed 20 once the quotas became parameters.
+export const LIMITS = { blocks: 30, params: 30, compiledChars: 40000 } as const;
 
 export function parseBlocks(raw: unknown): AgentBlock[] {
   const r = z.array(blockSchema).safeParse(raw);
