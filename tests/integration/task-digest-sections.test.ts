@@ -147,3 +147,34 @@ describe("a date coming up", () => {
     expect((await digestOf(hadas.id)).dates).toEqual([]);
   });
 });
+
+describe("an agent update nobody accepted", () => {
+  it("reaches its owner after 7 days, and the managers, with a link to the installation", async () => {
+    const client = await createTestClient({ name: "NUX" });
+    const hadas = await staffOn(client.id, "הדס");
+    const anna = await staffOn(client.id, "אנה");
+    const { user: ariel } = await createTestUser({ role: "SUPER_ADMIN" });
+    const now = new Date();
+    const agent = await prisma.agent.create({ data: { slug: "sorter", name: "ממיין", purpose: "בדיקה", kind: "SCHEDULED" } });
+    const v1 = await prisma.agentVersion.create({ data: { agentId: agent.id, version: 1, state: "APPROVED", decidedAt: new Date(now.getTime() - 30 * DAY) } });
+    const v2 = await prisma.agentVersion.create({ data: { agentId: agent.id, version: 2, state: "APPROVED", decidedAt: new Date(now.getTime() - 8 * DAY) } });
+    await prisma.agentVersion.create({ data: { agentId: agent.id, version: 3, state: "APPROVED", decidedAt: new Date(now.getTime() - DAY) } });
+    const inst = await prisma.agentInstallation.create({ data: { agentId: agent.id, userId: hadas.id, surface: "SCHEDULED", clientScope: "ONE", clientIds: [client.id], pinnedVersionId: v1.id, pendingVersion: 3 } });
+
+    // Waiting since version 2 was approved, 8 days ago: a newer one does not restart the clock.
+    const mine = await digestOf(hadas.id, now);
+    const line = mine.housekeeping!.find((h) => h.href.includes(inst.id));
+    expect(line?.text).toBe("ממיין: גרסה 3 ממתינה לאישור שלך כבר 8 ימים.");
+    expect(line?.href).toBe(`/app/agents/sorter/installations#installation-${inst.id}`);
+
+    const manager = await digestOf(ariel.id, now);
+    expect(manager.housekeeping!.find((h) => h.href.includes(inst.id))?.text).toBe("ממיין אצל הדס: גרסה 3 ממתינה לאישור כבר 8 ימים.");
+    expect((await digestOf(anna.id, now)).housekeeping!.some((h) => h.href.includes(inst.id))).toBe(false);
+
+    // Fewer than 7 days: nothing yet. Accepted: nothing.
+    await prisma.agentInstallation.update({ where: { id: inst.id }, data: { pinnedVersionId: v2.id } });
+    expect((await digestOf(hadas.id, now)).housekeeping!.some((h) => h.href.includes(inst.id))).toBe(false);
+    await prisma.agentInstallation.update({ where: { id: inst.id }, data: { pendingVersion: null } });
+    expect((await digestOf(ariel.id, now)).housekeeping!.some((h) => h.href.includes(inst.id))).toBe(false);
+  });
+});

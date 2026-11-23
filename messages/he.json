@@ -8512,7 +8512,10 @@
         "timer": "טיימר רץ {when} {time} על {client}.",
         "timerLink": "לעצור ולתקן",
         "noHours": "לא דווחו שעות ב{weekday}, {date}.",
-        "noHoursLink": "לדווח"
+        "noHoursLink": "לדווח",
+        "agentUpdate": "{agent}: גרסה {version} ממתינה לאישור שלך כבר {days}.",
+        "agentUpdateOther": "{agent} אצל {owner}: גרסה {version} ממתינה לאישור כבר {days}.",
+        "agentUpdateLink": "להתקנה"
       },
       "sensitiveDate": "מועד רגיש",
       "stepOf": "שלב במשימה: {parent}",
