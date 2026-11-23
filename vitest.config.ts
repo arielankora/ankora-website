@@ -44,5 +44,17 @@ export default defineConfig({
     // log), and a test that never ran failed the whole night. 30 seconds is
     // room for a slow runner; a reset that needs longer is a real problem.
     hookTimeout: 30_000,
+    // Coverage, scoped to the agents feature (23.11.2026): `npm run
+    // coverage:agents`. A report to read, not a gate: no threshold here and
+    // none in CI. The integration half needs a test database like any
+    // integration run.
+    coverage: {
+      provider: "v8",
+      include: ["lib/agents/**", "lib/app-domain/agent*.ts", "lib/mcp/agent-tools.ts", "app/(product)/app/(authenticated)/agents/actions.ts"],
+      reporter: ["text", "json-summary"],
+      reportsDirectory: "coverage/agents",
+      // One unrelated failure (a worktree without a git remote) must not hide the report.
+      reportOnFailure: true,
+    },
   },
 });
