@@ -26,7 +26,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const clientId = new URL(request.url).searchParams.get("client");
   const clients = clientId ? await resolveClients(user, agent.id, content.params, { clientScope: "ONE", clientIds: [clientId] }) : [];
   const additions = await approvedAdditions(agent.id, clients.map((c) => c.id));
-  const compiled = compileAgent({ agent, version: { version: version.version, ...content }, installation: null, clients, library: await approvedLibrary(), additions });
+  const compiled = compileAgent({ agent, version: { version: version.version, ...content }, installation: null, clients, library: await approvedLibrary(), additions, locale: user.locale });
   const plus = additions.map((a) => `-${a.version}`).join("");
   const description = agent.purpose.replace(/\s+/g, " ").replace(/"/g, "'");
   const text = `---\nname: ${agent.slug}\ndescription: "${description}"\n---\n\n${compiled.text.trim()}\n`;

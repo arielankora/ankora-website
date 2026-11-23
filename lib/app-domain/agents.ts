@@ -1,6 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { Prisma, type AgentVersion, type User } from "@prisma/client";
+import { outgoingForUser } from "@/lib/i18n/recipients";
+import type { OutgoingT } from "@/lib/i18n/outgoing";
 import { assertCan, canManageClients, ForbiddenError } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { findSecrets } from "@/lib/secret-scan";
@@ -441,7 +443,7 @@ async function compileVersion(user: User, inst: { id: string; agentId: string; v
   const content = contentOf(v);
   const clients = await resolveClients(user, inst.agentId, content.params, inst);
   const values = (inst.values && typeof inst.values === "object" && !Array.isArray(inst.values) ? inst.values : {}) as Record<string, string>;
-  return compileAgent({ agent, version: { version: v.version, ...content }, installation: { id: inst.id, values, userName: user.name }, clients, library: await approvedLibrary(), additions: await approvedAdditions(inst.agentId, clients.map((c) => c.id)) });
+  return compileAgent({ agent, version: { version: v.version, ...content }, installation: { id: inst.id, values, userName: user.name }, clients, library: await approvedLibrary(), additions: await approvedAdditions(inst.agentId, clients.map((c) => c.id)), locale: user.locale });
 }
 
 /// What get_agent returns: the instructions of the pinned version, and an
@@ -474,7 +476,7 @@ export async function fetchAgent(actor: User, installationId: string, now = new 
       const ask = inst.surface === "PROJECT" || inst.surface === "SKILL";
       update = { version: latest.version, notes: between.map((b) => ({ version: b.version, note: b.changeNote ?? "" })), ask };
       pendingVersion = latest.version;
-      if (!ask && inst.pendingVersion !== latest.version) await notifyOwner(inst.userId, inst.agent.slug, "agent.update_waiting", `${inst.agent.name}: גרסה ${latest.version} ממתינה לאישור שלך`, "ההתקנה המתוזמנת ממשיכה בגרסה הקודמת עד שתאשר את העדכון במסך ההתקנות.");
+      if (!ask && inst.pendingVersion !== latest.version) await notifyOwner(inst.userId, inst.agent.slug, "agent.update_waiting", (t) => ({ title: t("agents.updateWaitingTitle", { agent: inst.agent.name, version: latest.version }), body: t("agents.updateWaitingBody") }));
     }
   }
   await prisma.agentInstallation.update({
@@ -500,7 +502,10 @@ export async function agentFile(actor: User, installationId: string, path: strin
   return { path: file.path, content: file.content, version: pinned.version };
 }
 
-async function notifyOwner(userId: string, slug: string, type: string, title: string, body: string) {
+// ADR 0006: a bell row is worded in its recipient's language when it is created.
+async function notifyOwner(userId: string, slug: string, type: string, words: (t: OutgoingT) => { title: string; body: string }) {
+  const { t } = await outgoingForUser(userId);
+  const { title, body } = words(t);
   await prisma.notification.create({ data: { userId, type, title: title.slice(0, 200), body, entityType: "Agent", entityId: slug } });
 }
 
@@ -530,8 +535,10 @@ export async function recordRun(
     const since = new Date(Date.now() - 12 * 60 * 60 * 1000);
     const recent = await prisma.notification.count({ where: { userId: inst.userId, type: "agent.run_failed", entityId: inst.agent.slug, createdAt: { gte: since } } });
     if (recent === 0) {
-      const why = [...clean(input.missing).map((m) => `חסר: ${m}`), ...clean(input.problems)].slice(0, 3).join(" · ");
-      await notifyOwner(inst.userId, inst.agent.slug, "agent.run_failed", `${inst.agent.name}: ${input.outcome === "FAILED" ? "הריצה נכשלה" : "חסרה דרישה בריצה"}`, why || summary);
+      await notifyOwner(inst.userId, inst.agent.slug, "agent.run_failed", (t) => {
+        const why = [...clean(input.missing).map((m) => t("agents.missing", { item: m })), ...clean(input.problems)].slice(0, 3).join(" · ");
+        return { title: t(input.outcome === "FAILED" ? "agents.runFailedTitle" : "agents.runMissingTitle", { agent: inst.agent.name }), body: why || summary };
+      });
     }
   }
   return run;
@@ -654,7 +661,9 @@ export async function clientContext(actor: User, installationId: string, clientN
   const needle = clientName.trim().toLowerCase();
   const client = clients.find((c) => c.name.toLowerCase() === needle) ?? clients.find((c) => c.name.toLowerCase().includes(needle));
   if (!client) throw new DomainError("agents.clientNotInScope", "הלקוח לא בהתקנה הזו, או שהוא מסומן \"בלי AI\".");
-  const one = compileAgent({ agent: inst.agent, version: { version: pinned.version, ...content }, installation: null, clients: [client], library: await approvedLibrary(), additions: await approvedAdditions(inst.agentId, [client.id]) });
+  // The headings follow the installation owner's language, as get_agent does.
+  const owner = inst.userId === actor.id ? actor : await prisma.user.findUniqueOrThrow({ where: { id: inst.userId }, select: { locale: true } });
+  const one = compileAgent({ agent: inst.agent, version: { version: pinned.version, ...content }, installation: null, clients: [client], library: await approvedLibrary(), additions: await approvedAdditions(inst.agentId, [client.id]), locale: owner.locale });
   return { client, compiled: one };
 }
 

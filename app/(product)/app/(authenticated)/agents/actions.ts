@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
@@ -34,11 +35,12 @@ import { approveSharedVersion, decideLesson, proposeSharedBlock, rejectSharedVer
 type FormState = { error?: string; ok?: boolean; slug?: string; bootstrap?: string; version?: number };
 
 async function friendlyError(err: unknown): Promise<string> {
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה הזו.";
+  const t = await getTranslations("agents.errors");
+  if (err instanceof ForbiddenError) return t("forbidden");
   const domain = await domainErrorText(err);
   if (domain) return domain;
   if (err instanceof Error) return err.message;
-  return "משהו השתבש. כדאי לנסות שוב.";
+  return t("generic");
 }
 
 async function run(fn: () => Promise<FormState | void>): Promise<FormState> {
@@ -274,7 +276,7 @@ export async function installAction(_prev: FormState | undefined, f: FormData): 
       schedules: cron ? [{ cron, tz: str(f, "tz") || "Asia/Jerusalem" }] : [],
     });
     const agent = await prisma.agent.findUniqueOrThrow({ where: { id: agentId }, select: { name: true } });
-    return { bootstrap: bootstrapText(agent, inst.id) };
+    return { bootstrap: bootstrapText(agent, inst.id, user.locale) };
   });
 }
 

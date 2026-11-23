@@ -22,6 +22,10 @@ export const GLOBAL_MESSAGE_PATHS = [
 ] as const;
 
 export const AREA_MESSAGE_PATHS = {
+  "agents": [
+    "agents.forms",
+    "agents.labels",
+  ],
   "alerts": [
     "alerts.form",
     "alerts.panel",

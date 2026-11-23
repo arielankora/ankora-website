@@ -6146,7 +6146,12 @@
         "output": "Output: {output}",
         "verification": "Check: {verification}"
       },
-      "automatedSteps": "Steps {steps} and {last} are automated: write in each how a person makes sure the step happened."
+      "automatedSteps": "Steps {steps} and {last} are automated: write in each how a person makes sure the step happened.",
+      "addition": {
+        "added": "Added: {title}",
+        "removed": "Removed: {title}",
+        "changed": "Changed: {title}"
+      }
     },
     "bulk": {
       "label": "Approve {client}'s {count} rules",
@@ -6255,6 +6260,13 @@
         "recommend": "Read the change and approve",
         "why": "The version reaches everyone who runs the agent, once they accept it.",
         "additionWhy": "The addition reaches the agent only when it works on this client, from the next run. The agent's version does not change."
+      },
+      "agentLibrary": {
+        "title": "Block library: {name}, version {version}",
+        "why": "Approving writes the new wording into every agent that uses the block, as a new approved version of that agent."
+      },
+      "agentAddition": {
+        "title": "{agent}: addition for {client}, version {version}"
       }
     }
   },
@@ -8741,6 +8753,492 @@
         "billableMinutes": "Billable minutes",
         "employee": "Team member"
       }
+    },
+    "agents": {
+      "updateWaitingTitle": "{agent}: version {version} is waiting for your approval",
+      "updateWaitingBody": "The scheduled installation stays on the previous version until you approve the update on the installations screen.",
+      "runFailedTitle": "{agent}: the run failed",
+      "runMissingTitle": "{agent}: a requirement was missing in the run",
+      "missing": "Missing: {item}"
+    }
+  },
+  "agents": {
+    "labels": {
+      "blockKind": {
+        "role": "Role and identity",
+        "scope": "Scope",
+        "steps": "Work steps",
+        "rules": "Rules and prohibitions",
+        "approvals": "Required approvals",
+        "language": "Language and style",
+        "output": "Output format",
+        "tools": "Tools and connections",
+        "schedule": "Schedule",
+        "live": "Live context from Ankora"
+      },
+      "paramLevel": {
+        "AGENT": "Agent (one value for everyone)",
+        "CLIENT": "Client",
+        "INSTALLATION": "Installation (whoever runs it)"
+      },
+      "paramType": {
+        "TEXT": "Text",
+        "LONG_TEXT": "Long text",
+        "NUMBER": "Number (a quota, for example)",
+        "LIST": "List",
+        "EMAIL": "Email",
+        "FILE_LOCATION": "File location",
+        "PAGE": "Output page",
+        "LIBRARY_BLOCK": "Library block (by key)",
+        "CONNECTOR": "Connection (by name)",
+        "VAULT_REF": "Vault item (name only, not the value)"
+      },
+      "surface": {
+        "PROJECT": "Claude project",
+        "SCHEDULED": "Scheduled task",
+        "PERSISTENT_SESSION": "Persistent chat",
+        "SKILL": "Skill"
+      },
+      "kind": {
+        "CLIENT_PROJECT": "Claude project",
+        "SCHEDULED": "Scheduled task",
+        "SKILL": "Skill"
+      },
+      "actionLevel": {
+        "READ": "Read only",
+        "DRAFT": "Writes drafts",
+        "SEND": "Sends on a person's behalf"
+      },
+      "state": {
+        "DRAFT": "Draft",
+        "PENDING": "Awaiting approval",
+        "APPROVED": "Approved",
+        "REJECTED": "Rejected"
+      },
+      "run": {
+        "OK": "OK",
+        "PARTIAL": "Partial",
+        "FAILED": "Failed"
+      },
+      "check": {
+        "RUN": "Every run",
+        "DAILY": "Daily",
+        "WEEKLY": "Weekly"
+      }
+    },
+    "errors": {
+      "forbidden": "You do not have permission for this action.",
+      "generic": "Something went wrong. Please try again."
+    },
+    "forms": {
+      "common": {
+        "notDone": "Not done",
+        "saving": "Saving...",
+        "creating": "Creating...",
+        "saveDraft": "Save to draft",
+        "save": "Save",
+        "edit": "Edit",
+        "change": "Change",
+        "remove": "Remove",
+        "reject": "Reject",
+        "title": "Title",
+        "text": "Text",
+        "blockKind": "Block type",
+        "changeNote": "What changed and why",
+        "rejectNote": "Note for the author (required)",
+        "purpose": "What the agent does, in one line",
+        "newBlock": "New block"
+      },
+      "newAgent": {
+        "trigger": "New agent",
+        "name": "Agent name",
+        "purpose": "What it does, in one line",
+        "whereRuns": "Where it runs",
+        "kindProject": "Claude project (chat)",
+        "importHint": "You can also import an existing prompt: ask Claude to save it as a draft with the save_agent_draft tool.",
+        "submit": "Create agent"
+      },
+      "block": {
+        "addTrigger": "Add block",
+        "editTitle": "Edit: {title}",
+        "bodyHint": "A parameter is written in double braces, for example {example}.",
+        "exampleKey": "signature",
+        "addParam": "Add parameter:",
+        "why": "Why the rule exists (optional)",
+        "onlyClient": "Only for one client (client addition)",
+        "allClients": "All clients",
+        "safety": "Safety limit (shown under \"Never\")",
+        "removed": "The block was removed from the draft",
+        "overridable": "Can be replaced for a client (a client addition can take its place)"
+      },
+      "param": {
+        "key": "Name in the instructions",
+        "keyHint": "What goes between the braces, for example signature. Letters, digits and underscores.",
+        "label": "Description",
+        "level": "Set at level",
+        "type": "Type",
+        "default": "Default value",
+        "clientField": "From the client file",
+        "clientFieldHint": "Only for a client-level parameter. The value updates by itself from the file.",
+        "clientFieldNone": "No, type a value",
+        "clientFieldName": "Client name",
+        "clientFieldDomains": "Client domains",
+        "required": "Required. Without a value, the agent does not work on the client or the installation",
+        "newTrigger": "New parameter",
+        "editTitle": "Parameter: {label}",
+        "removed": "The parameter was removed from the draft"
+      },
+      "clientValue": {
+        "value": "Value",
+        "hint": "Empty: back to the default. The value applies from the next run, with no new version.",
+        "set": "Set"
+      },
+      "meta": {
+        "copied": "Copied",
+        "compose": "Draft with Claude",
+        "pasteHint": "Paste it into a new chat, then copy the line that comes back here.",
+        "openClaude": "Open Claude",
+        "promptAria": "The prompt to copy",
+        "changeNoteHint": "This is what whoever runs the agent sees when offered an update.",
+        "actionLevel": "Action level",
+        "levelRead": "Read only",
+        "levelDraft": "Writes drafts and labels",
+        "levelSend": "Sends on a person's behalf",
+        "connectors": "Required connections",
+        "commaHint": "Separated by commas.",
+        "skills": "Required skills",
+        "skillsHint": "Separated by commas. Minimum version after @, for example gmail-labels@3.",
+        "repos": "Repos",
+        "localMcp": "Local MCP on the computer",
+        "external": "External components (Apps Script and the like)",
+        "model": "Model",
+        "trigger": "Change note and requirements",
+        "title": "Change note, action level and requirements"
+      },
+      "process": {
+        "field": "The process the agent performs",
+        "hint": "get_agent adds the steps from the approved procedure on every run. A procedure that is re-approved reaches the agent without a new version of the agent.",
+        "none": "No process",
+        "link": "Link to a process"
+      },
+      "draft": {
+        "discard": "Discard draft",
+        "discarded": "The draft was discarded",
+        "submit": "Submit for approval",
+        "submitted": "Sent for manager approval"
+      },
+      "archive": {
+        "text": "The agent leaves the list, the approval queue and the connector. Its versions are kept. An agent with active installations cannot be archived.",
+        "reason": "Why (required)",
+        "submit": "Archive",
+        "title": "Archive \"{name}\""
+      },
+      "purpose": {
+        "text": "The line shown under the agent's name, in the list and in the connector. It is not part of the version, and the change takes effect immediately.",
+        "trigger": "Edit description",
+        "title": "Agent description"
+      },
+      "version": {
+        "approve": "Approve version {version}",
+        "approved": "Version {version} approved",
+        "rejectTitle": "Reject version {version}"
+      },
+      "faulty": {
+        "text": "Every installation running this version goes back at once to the previous approved version, without asking. Then you fix it in a new draft.",
+        "reason": "What went wrong (required)",
+        "submit": "Mark as faulty and go back to the previous version",
+        "trigger": "Mark as faulty",
+        "title": "Version {version} is faulty"
+      },
+      "install": {
+        "created": "The installation was created. This is the only text that stays in Claude: paste it into the project instructions, the scheduled task's prompt or the start of the persistent chat.",
+        "bootstrapLabel": "Startup text",
+        "surface": "Where it will run",
+        "scope": "Which clients",
+        "scopeOne": "One client",
+        "scopeList": "Several clients",
+        "scopeAll": "All my clients",
+        "clients": "Clients",
+        "cron": "Schedule (cron)",
+        "tz": "Time zone",
+        "check": "Update check",
+        "checkRun": "Every run",
+        "checkDaily": "Once a day",
+        "checkWeekly": "Once a week",
+        "account": "Claude account (if not yours)",
+        "paramRequired": "{label} (required)",
+        "submit": "Create installation",
+        "newTrigger": "New installation",
+        "removed": "The installation was removed",
+        "update": "Update",
+        "updated": "The installation was updated to version {version}"
+      },
+      "revert": {
+        "button": "Revert to version {version}",
+        "opened": "A draft was opened that is a copy of version {version}",
+        "openedNote": "It will take effect after manager approval."
+      },
+      "shared": {
+        "title": "Library: {title}",
+        "newTitle": "New library block",
+        "changeNoteHint": "Shown in the new version of every agent that uses the block.",
+        "submit": "Submit for manager approval",
+        "approve": "Approve version {version}",
+        "approveReach": "Approve version {version}, which will update {reach, plural, one {# agent} other {# agents}}",
+        "approved": "Approved, and the agents were updated"
+      },
+      "fromLibrary": {
+        "field": "Library block",
+        "hint": "The block goes into the draft as it is, and updates by itself when a new version of it is approved in the library.",
+        "submit": "Add to draft",
+        "trigger": "Add from the library",
+        "title": "Library block"
+      },
+      "lessons": {
+        "used": "Went into the draft",
+        "usedDone": "Marked as handled",
+        "dismissed": "Not relevant",
+        "dismissedDone": "The suggestion was closed"
+      },
+      "addition": {
+        "client": "Client",
+        "bodyHint": "An agent parameter is written in double braces, for example {example}.",
+        "replaces": "Instead of an agent block",
+        "replacesHint": "Only blocks marked \"can be replaced for a client\". Safety limits are never replaced.",
+        "notReplacing": "No, added beside the instructions",
+        "save": "Save in the addition draft",
+        "newForClient": "New block for {client}",
+        "title": "Client addition",
+        "newTrigger": "New client addition",
+        "removed": "The block was removed from the addition draft",
+        "changeNote": "What changed and why",
+        "save2": "Save",
+        "noteTrigger": "Change note",
+        "noteTitle": "Change note for the addition",
+        "discard": "Discard draft",
+        "discarded": "The draft was discarded",
+        "submit": "Send for approval",
+        "submitted": "Sent for a manager's approval"
+      }
+    },
+    "list": {
+      "title": "Agents",
+      "intro": "Each agent is written here once. Every operations manager installs it in their own account, and its updates come from here.",
+      "library": "Block library",
+      "attention": "What needs attention",
+      "agents": "Agents",
+      "installs": "Installations across the team",
+      "updates": "Updates waiting in installations",
+      "pendingDrafts": "Drafts awaiting approval",
+      "empty": "No agents yet. You can create a new agent, or ask Claude to import an existing prompt with save_agent_draft.",
+      "col": {
+        "agent": "Agent",
+        "where": "Where it runs",
+        "owner": "Owner",
+        "version": "Version",
+        "installs": "Installations",
+        "state": "Status"
+      },
+      "version": "Version {version}",
+      "noApproved": "None approved",
+      "updatesWaiting": "{count, plural, one {Update waiting} other {# updates waiting}}",
+      "pendingVersion": "Version {version} awaiting approval",
+      "draftVersion": "Draft of version {version}",
+      "lastRunFailed": "Last run failed",
+      "ok": "OK"
+    },
+    "library": {
+      "crumb": "Agents",
+      "title": "Block library",
+      "intro": "A rule that repeats across several agents is written here once. When a new version of it is approved, it goes into every agent that uses it, as a new approved version of that agent.",
+      "empty": "The library is empty.",
+      "approvedVersion": "Version {version} approved",
+      "noApproved": "No approved version",
+      "key": "Key:",
+      "usedBy": "Used by:",
+      "usedByNone": "No agent yet",
+      "pending": "Version {version} awaiting approval",
+      "pendingBy": "Version {version} awaiting approval, by {name}",
+      "why": "Why: {note}"
+    },
+    "header": {
+      "crumb": "Agents",
+      "owner": "Owner: {name}",
+      "approvedVersion": "Version {version} approved",
+      "noApproved": "No approved version",
+      "export": "Download as a skill (SKILL.md)",
+      "tabsLabel": "Agent tabs",
+      "tabs": {
+        "overview": "Overview",
+        "instructions": "Instructions",
+        "params": "Parameters",
+        "versions": "Versions",
+        "installations": "Installations"
+      },
+      "pendingTitle": "Version {version} is awaiting a manager's approval.",
+      "pendingKeepsVersion": "Installations stay on version {version} until it is approved.",
+      "pendingKeeps": "Installations stay on what they have until it is approved.",
+      "draftTitle": "Draft of version {version}.",
+      "draftKeepsVersion": "Installations keep running version {version} until a manager approves.",
+      "draftFirst": "Once a manager approves it, the agent can be installed."
+    },
+    "overview": {
+      "howItWorks": "How it works",
+      "builtFrom": "Built from the instruction blocks",
+      "builtFromVersion": "Built from the instruction blocks of version {version}",
+      "notWritten": "Not in the instructions",
+      "when": "When",
+      "reads": "What it reads",
+      "does": "What it does",
+      "outputs": "What comes out",
+      "tools": "Tools and connections:",
+      "skillMin": "{slug} (version {version}+)",
+      "never": "Never",
+      "neverEmpty": "No rules or prohibitions written.",
+      "from": "From: {title}",
+      "needsPerson": "Only with a person's approval",
+      "needsPersonEmpty": "Not written.",
+      "lessons": "Suggestions from runs ({count})",
+      "onBlock": "On the block: {title}",
+      "editInDraft": "Edit in a draft",
+      "process": "Carries out a procedure",
+      "processSteps": "The steps of the approved procedure go into the instructions on every run.",
+      "noProcess": "Not linked to a process in Ankora.",
+      "runsAt": "Runs for",
+      "noInstalls": "No installations.",
+      "install": "{user}, {surface}, version {version}",
+      "updateWaiting": ", update waiting",
+      "allInstalls": "All installations"
+    },
+    "instructions": {
+      "summary": "{count, plural, one {One block} other {# blocks}}, in the order Claude reads them · Action level: {level}",
+      "change": " · Change: {note}",
+      "safety": " · Safety limit",
+      "fromLibrary": "From the library, version {version}",
+      "why": "Why: {why}",
+      "additions": "Client additions",
+      "additionsEmpty": "None. A client addition is a block that is included only when the agent works on that client.",
+      "client": "Client",
+      "files": "Attached files",
+      "filesEmpty": "None. A file the instructions refer to (a script, a template, a background document) is saved here from Claude, with save_agent_draft.",
+      "chars": "{count} characters",
+      "previewLabel": "The file Claude receives",
+      "preview": "What Claude receives",
+      "previewFor": "Preview for",
+      "noClient": "No client",
+      "show": "Show",
+      "copy": "The full instructions",
+      "noVersion": "No version yet.",
+      "overridable": " · Can be replaced for a client",
+      "additionsIntro": "Blocks that are included only when the agent works on the client. Each client has its own versions, and changing them does not change the agent's version.",
+      "additionInUse": "Version {version} in use",
+      "additionNoApproved": "No approved version",
+      "additionPending": " · version {version} awaiting a manager's approval",
+      "additionDraft": " · draft of version {version}",
+      "additionChange": "Change: {note}",
+      "additionEmpty": "No blocks in this version.",
+      "replaces": " · instead of \"{title}\"",
+      "statusAdded": " · added",
+      "statusChanged": " · changed",
+      "removedInDraft": "Removed in the draft: {titles}",
+      "exportForClient": "Download as a skill for this client (SKILL.md)"
+    },
+    "versions": {
+      "nav": "Versions",
+      "version": "Version {version}",
+      "faulty": "Faulty",
+      "inUse": ", in use",
+      "approvedBy": " · approved by {name}",
+      "rejected": " · rejected: {reason}",
+      "compare": "Version {base} compared with version {version}",
+      "first": "Version {version}, the first",
+      "summary": "{changed, plural, one {One block changed} other {# blocks changed}}, {unchanged} unchanged · Action level: {level}",
+      "wasLevel": " (was {level})",
+      "why": "Why: {note}",
+      "params": "Parameters: {list}",
+      "added": "added {names}",
+      "removed": "removed {names}",
+      "changedParams": "changed {names}",
+      "effect": "What this changes in practice: {count, plural, one {one installation will get} other {# installations will get}} the version at its next update check. An installation the version changes nothing for is updated without asking.",
+      "additionFor": "Addition for {client}: ",
+      "client": "client",
+      "statusAdded": "Added",
+      "statusRemoved": "Removed",
+      "statusChanged": "Changed",
+      "faultyHint": "Is a version causing harm? Marking it faulty moves every installation on it back to the previous version at once.",
+      "revertBlocked": "Version {version} is still open. To go back to this version, finish it first: send or discard the draft, or approve or reject the version awaiting approval.",
+      "revertHint": "Going back to this version opens a new version that is a copy of it. It goes into use only after a manager approves it.",
+      "checks": "Checks before approval",
+      "checksOk": "✓ No long or medium dash, every parameter in the instructions is defined, no duplicate blocks",
+      "noChangeNote": "! Missing change note: what changed and why",
+      "sendWarning": "! The agent sends on a person's behalf with no person in between. Check that there is a quota and clear sending rules",
+      "awaitingManager": "Awaiting a manager's approval.",
+      "problems": {
+        "sendNeedsQuota": "An agent that sends on a person's behalf needs a quota: a number parameter (how many messages a day, for example) and instructions on how it is enforced.",
+        "tooManyFiles": "More than {max} attached files.",
+        "filesTooLarge": "The attached files are too large together.",
+        "duplicateFile": "Two files with the same path.",
+        "noBlocks": "The agent has no instruction blocks.",
+        "tooManyBlocks": "More than {max} blocks.",
+        "tooManyParams": "More than {max} parameters.",
+        "duplicateBlock": "Two blocks with the same key: {key}.",
+        "unknownClient": "The addition \"{title}\" points to a client that does not exist.",
+        "duplicateParam": "Two parameters with the same name.",
+        "clientFieldLevel": "\"{label}\" comes from the client file, so it is a client-level parameter.",
+        "undefinedParam": "{placeholder} appears in the instructions and is not defined as a parameter.",
+        "dash": "The text has a long or medium dash.",
+        "replaceMissing": "\"{title}\" replaces a block the agent does not have ({key}).",
+        "replaceSafety": "\"{title}\" is a safety limit and cannot be replaced for a client.",
+        "replaceNotAllowed": "\"{title}\" is not marked \"can be replaced for a client\". Without the mark, the addition is added beside it.",
+        "replaceTwice": "Two blocks replace the same block ({key})."
+      }
+    },
+    "installations": {
+      "intro": "Each installation is the agent running in someone's Claude account on the team, on a locked version. Only the bootstrap text stays in Claude.",
+      "afterApproval": "You can install it once a first version is approved.",
+      "empty": "No installations yet.",
+      "neverRan": "Has not run yet",
+      "col": {
+        "who": "Who runs it",
+        "where": "Where",
+        "clients": "Clients",
+        "version": "Version",
+        "check": "Update check",
+        "fetched": "Contacted Ankora",
+        "lastRun": "Last run",
+        "state": "Status"
+      },
+      "allClients": "All clients",
+      "client": "Client",
+      "runAt": "{outcome}, {when}",
+      "missing": "Missing: {item}",
+      "notReported": "Not reported",
+      "updateWaiting": "Update to version {version} waiting",
+      "upToDate": "OK, latest version",
+      "waitingFirst": "Waiting for its first run",
+      "bootstrap": "Bootstrap text"
+    },
+    "params": {
+      "intro": "The closest value wins: the agent's default, then a value for the client or for the installation. A value from the client file is edited in the file itself, so nothing is written twice.",
+      "title": "Parameters",
+      "empty": "No parameters. A parameter is a value that changes by client or by whoever runs the agent, and is written in the instructions as {example}.",
+      "required": " · required",
+      "fromFile": " · from the client file",
+      "default": " · default: {value}",
+      "perClient": "Per client",
+      "legendDefault": "Default",
+      "legendFile": "From the client file",
+      "legendAgent": "Set for the client in the agent",
+      "client": "Client",
+      "sameAsDefault": "Same as the default",
+      "missing": "Missing",
+      "none": "None",
+      "clientFile": "Client file",
+      "noAiNote": "Clients marked \"no AI\" are not shown here and never reach any agent.",
+      "perInstallation": "Per installation",
+      "perInstallationIntro": "Values that belong to the account of whoever runs the agent, not to the client. They are set when an installation is created.",
+      "installation": "Installation",
+      "exampleKey": "name"
     }
   }
 }

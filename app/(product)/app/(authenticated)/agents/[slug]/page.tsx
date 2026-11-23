@@ -1,9 +1,9 @@
+import { getTranslations } from "next-intl/server";
 import { Forbidden } from "@/components/app/Forbidden";
 import { AgentHeader, loadAgent } from "./shared";
 import { listLessons } from "@/lib/app-domain/agent-library";
 import { linkableProcesses } from "@/lib/app-domain/agents";
 import { LessonButtons, LinkProcess } from "../AgentForms";
-import { ACTION_LEVEL_LABEL, SURFACE_LABEL } from "../labels";
 import { skillOf, type AgentBlock } from "@/lib/agents/model";
 
 // Agents, phase 1: "סקירה". How the agent works, built from its blocks:
@@ -15,12 +15,12 @@ export const metadata = { robots: { index: false, follow: false } };
 
 const lines = (blocks: AgentBlock[]) => blocks.flatMap((b) => b.body.split("\n").map((l) => l.replace(/^\s*(\d+[.)]|[-*])\s*/, "").trim()).filter(Boolean));
 
-function Column({ title, items, numbered }: { title: string; items: string[]; numbered?: boolean }) {
+function Column({ title, items, numbered, empty }: { title: string; items: string[]; numbered?: boolean; empty: string }) {
   return (
     <div className="min-w-0 flex-1 basis-48 rounded-xl border border-app-border bg-app-surface-page p-3.5">
       <h3 className="text-xs font-medium text-app-text-secondary">{title}</h3>
       {items.length === 0 ? (
-        <p className="mt-2 text-[13px] text-app-text-tertiary">לא כתוב בהוראות</p>
+        <p className="mt-2 text-[13px] text-app-text-tertiary">{empty}</p>
       ) : (
         <ul className="mt-2 space-y-1.5 text-[13px] leading-relaxed" dir="auto">
           {items.slice(0, 8).map((t, i) => (
@@ -45,6 +45,9 @@ export default async function AgentOverviewPage({ params }: { params: Promise<{ 
   const req = shown.requirements;
   const lessons = await listLessons(data.user, data.agent.id);
   const processOptions = data.canDecide ? await linkableProcesses(data.user) : [];
+  const t = await getTranslations("agents.overview");
+  const tl = await getTranslations("agents.labels");
+  const notWritten = t("notWritten");
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
@@ -52,19 +55,19 @@ export default async function AgentOverviewPage({ params }: { params: Promise<{ 
       <div className="flex flex-wrap items-start gap-5">
         <section className="min-w-0 flex-[2_1_560px] rounded-xl border border-app-border bg-white p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-base font-medium">איך הוא עובד</h2>
-            <span className="text-xs text-app-text-tertiary">נבנה מקטעי ההוראות{data.editing ? ` של גרסה ${data.editing.version}` : ""} · {ACTION_LEVEL_LABEL[shown.actionLevel]}</span>
+            <h2 className="text-base font-medium">{t("howItWorks")}</h2>
+            <span className="text-xs text-app-text-tertiary">{data.editing ? t("builtFromVersion", { version: data.editing.version }) : t("builtFrom")} · {tl(`actionLevel.${shown.actionLevel}`)}</span>
           </div>
           <div className="mt-3 flex flex-wrap gap-3">
-            <Column title="מתי" items={lines(of("schedule"))} />
-            <Column title="מה הוא קורא" items={lines(of("scope", "live"))} />
-            <Column title="מה הוא עושה" items={lines(of("steps"))} numbered />
-            <Column title="מה יוצא" items={lines(of("output"))} />
+            <Column title={t("when")} items={lines(of("schedule"))} empty={notWritten} />
+            <Column title={t("reads")} items={lines(of("scope", "live"))} empty={notWritten} />
+            <Column title={t("does")} items={lines(of("steps"))} numbered empty={notWritten} />
+            <Column title={t("outputs")} items={lines(of("output"))} empty={notWritten} />
           </div>
           {(req.connectors.length > 0 || req.skills.length > 0) && (
             <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-app-text-secondary">
-              <span>כלים וחיבורים:</span>
-              {[...req.connectors, ...req.skills.map((s) => { const { slug, minVersion } = skillOf(s); return minVersion ? `${slug} (גרסה ${minVersion}+)` : slug; })].map((c) => (
+              <span>{t("tools")}</span>
+              {[...req.connectors, ...req.skills.map((s) => { const { slug, minVersion } = skillOf(s); return minVersion ? t("skillMin", { slug, version: minVersion }) : slug; })].map((c) => (
                 <span key={c} className="rounded-full border border-app-border bg-white px-2 py-0.5" dir="ltr">{c}</span>
               ))}
             </div>
@@ -73,69 +76,69 @@ export default async function AgentOverviewPage({ params }: { params: Promise<{ 
 
         <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-3">
           <section className="rounded-xl border border-app-error/30 bg-white p-4">
-            <h2 className="text-sm font-medium">לעולם לא</h2>
-            {never.length === 0 ? <p className="mt-1 text-[13px] text-app-text-tertiary">לא כתובים כללים ואיסורים.</p> : (
+            <h2 className="text-sm font-medium">{t("never")}</h2>
+            {never.length === 0 ? <p className="mt-1 text-[13px] text-app-text-tertiary">{t("neverEmpty")}</p> : (
               <ul className="mt-1.5 space-y-1 text-[13px]" dir="auto">
                 {never.map((b) => (
                   <li key={b.key}>
                     {lines([b]).slice(0, 4).map((l, i) => <div key={i}>✕ {l}</div>)}
-                    <div className="text-[11px] text-app-text-tertiary">מתוך: {b.title}</div>
+                    <div className="text-[11px] text-app-text-tertiary">{t("from", { title: b.title })}</div>
                   </li>
                 ))}
               </ul>
             )}
           </section>
           <section className="rounded-xl border border-app-border bg-white p-4">
-            <h2 className="text-sm font-medium">רק באישור של אדם</h2>
-            {needsPerson.length === 0 ? <p className="mt-1 text-[13px] text-app-text-tertiary">לא כתוב.</p> : (
+            <h2 className="text-sm font-medium">{t("needsPerson")}</h2>
+            {needsPerson.length === 0 ? <p className="mt-1 text-[13px] text-app-text-tertiary">{t("needsPersonEmpty")}</p> : (
               <ul className="mt-1.5 space-y-1 text-[13px]" dir="auto">
                 {lines(needsPerson).slice(0, 6).map((l, i) => <li key={i}>{l}</li>)}
-                <li className="text-[11px] text-app-text-tertiary">מתוך: {needsPerson.map((b) => b.title).join(", ")}</li>
+                <li className="text-[11px] text-app-text-tertiary">{t("from", { title: needsPerson.map((b) => b.title).join(", ") })}</li>
               </ul>
             )}
           </section>
           {lessons.length > 0 && (
             <section className="rounded-xl border border-app-accent bg-app-accent-soft p-4">
-              <h2 className="text-sm font-medium">הצעות מהריצות ({lessons.length})</h2>
+              <h2 className="text-sm font-medium">{t("lessons", { count: lessons.length })}</h2>
               <ul className="mt-2 space-y-3 text-[13px]">
                 {lessons.map((l) => (
                   <li key={l.id}>
                     <p dir="auto">{l.text}</p>
-                    {l.blockKey && <p className="text-[11px] text-app-text-tertiary">על הקטע: {shown.blocks.find((b) => b.key === l.blockKey)?.title ?? l.blockKey}</p>}
+                    {l.blockKey && <p className="text-[11px] text-app-text-tertiary">{t("onBlock", { title: shown.blocks.find((b) => b.key === l.blockKey)?.title ?? l.blockKey })}</p>}
                     <div className="mt-1.5"><LessonButtons id={l.id} /></div>
                   </li>
                 ))}
               </ul>
-              <a href={`/app/agents/${data.agent.slug}/instructions`} className="mt-2 inline-block text-xs text-app-text-accent">לערוך בטיוטה</a>
+              <a href={`/app/agents/${data.agent.slug}/instructions`} className="mt-2 inline-block text-xs text-app-text-accent">{t("editInDraft")}</a>
             </section>
           )}
           <section className="rounded-xl border border-app-border bg-white p-4">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-medium">מבצע נוהל</h2>
+              <h2 className="text-sm font-medium">{t("process")}</h2>
               {data.canDecide && <LinkProcess agentId={data.agent.id} current={data.process?.id ?? null} options={processOptions} />}
             </div>
             {data.process ? (
               <p className="mt-1 text-[13px]" dir="auto">
                 {data.process.clientName} · {data.process.code} {data.process.title}
-                <span className="block text-[11px] text-app-text-tertiary">השלבים מהנוהל המאושר נכנסים להוראות בכל ריצה.</span>
+                <span className="block text-[11px] text-app-text-tertiary">{t("processSteps")}</span>
               </p>
             ) : (
-              <p className="mt-1 text-[13px] text-app-text-tertiary">לא מקושר לתהליך באנקורה.</p>
+              <p className="mt-1 text-[13px] text-app-text-tertiary">{t("noProcess")}</p>
             )}
           </section>
           <section className="rounded-xl border border-app-border bg-white p-4">
-            <h2 className="text-sm font-medium">רץ אצל</h2>
-            {installations.length === 0 ? <p className="mt-1 text-[13px] text-app-text-tertiary">אין התקנות.</p> : (
+            <h2 className="text-sm font-medium">{t("runsAt")}</h2>
+            {installations.length === 0 ? <p className="mt-1 text-[13px] text-app-text-tertiary">{t("noInstalls")}</p> : (
               <ul className="mt-1.5 space-y-1 text-[13px]">
                 {installations.map((i) => (
                   <li key={i.id}>
-                    {i.userName}, {SURFACE_LABEL[i.surface]}, גרסה {i.pinnedVersion}
-                    {approved && (i.pinnedVersion ?? 0) < approved.version ? <span className="text-app-warning">, עדכון ממתין</span> : null}
+                    {t("install", { user: i.userName, surface: tl(`surface.${i.surface}`), version: i.pinnedVersion ?? "" })}
+                    {approved && (i.pinnedVersion ?? 0) < approved.version ? <span className="text-app-warning">{t("updateWaiting")}</span> : null}
                   </li>
                 ))}
               </ul>
             )}
-            <a href={`/app/agents/${data.agent.slug}/installations`} className="mt-2 inline-block text-xs text-app-text-accent">לכל ההתקנות</a>
+            <a href={`/app/agents/${data.agent.slug}/installations`} className="mt-2 inline-block text-xs text-app-text-accent">{t("allInstalls")}</a>
           </section>
         </div>
       </div>

@@ -13,6 +13,8 @@
 import type { MessageKeys, NestedKeyOf } from "next-intl";
 import type he from "@/messages/he.json";
 import type { ApprovalPreview, PreviewCheck } from "@/lib/approvals-preview";
+import type { BlockDiff } from "@/lib/agents/diff";
+import type { VersionProblem } from "@/lib/agents/model";
 import type { NextStepText, StepOp } from "@/lib/next-steps";
 import type { ProcessStep } from "@/lib/process-rules";
 
@@ -146,6 +148,9 @@ export type ApprovalItem = {
   /// the screen to word (approvals/procedure-words.ts). `preview` and
   /// `failing` keep the Hebrew.
   procedureWords?: { steps: ProcessStep[]; systemName: Record<string, string>; checks: PreviewCheck[] };
+  /// A client addition: its change and checks, for the screen to word
+  /// (ADR 0006). `preview` keeps the Hebrew.
+  additionWords?: { changes: BlockDiff[]; problems: VersionProblem[] };
   /// A knowledge batch: false when it waits on someone else (whoever sent
   /// it, the account manager). Out of the count and "היום", on screen
   /// under "של כולם" and with a client chosen (22.10.2026).

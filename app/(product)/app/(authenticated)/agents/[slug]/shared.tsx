@@ -1,6 +1,7 @@
 import "server-only";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { DomainError } from "@/lib/domain-error";
@@ -8,7 +9,6 @@ import { ViewTabs } from "@/components/app/ViewTabs";
 import { contentOf, getAgent, resolveClients } from "@/lib/app-domain/agents";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { ArchiveAgent, DraftButtons, EditPurpose } from "../AgentForms";
-import { KIND_LABEL } from "../labels";
 
 // Agents, phase 1: what every tab of one agent reads, and the header and
 // tabs they share.
@@ -32,40 +32,42 @@ export async function loadAgent(slug: string) {
 export type LoadedAgent = NonNullable<Awaited<ReturnType<typeof loadAgent>>>;
 
 const TABS = [
-  { key: "overview", label: "סקירה", path: "" },
-  { key: "instructions", label: "הוראות", path: "/instructions" },
-  { key: "params", label: "פרמטרים", path: "/params" },
-  { key: "versions", label: "גרסאות", path: "/versions" },
-  { key: "installations", label: "התקנות", path: "/installations" },
+  { key: "overview", path: "" },
+  { key: "instructions", path: "/instructions" },
+  { key: "params", path: "/params" },
+  { key: "versions", path: "/versions" },
+  { key: "installations", path: "/installations" },
 ] as const;
 
-export function AgentHeader({ data, active }: { data: LoadedAgent; active: (typeof TABS)[number]["key"] }) {
+export async function AgentHeader({ data, active }: { data: LoadedAgent; active: (typeof TABS)[number]["key"] }) {
   const { agent, approved, draft } = data;
+  const t = await getTranslations("agents.header");
+  const tl = await getTranslations("agents.labels");
   return (
     <div className="space-y-4">
       <div className="text-[13px] text-app-text-secondary">
-        <Link href="/app/agents" className="hover:underline">סוכנים</Link> / {agent.name}
+        <Link href="/app/agents" className="hover:underline">{t("crumb")}</Link> / <span dir="auto">{agent.name}</span>
       </div>
       <div>
-        <h1 className="text-xl font-medium text-app-text-primary">{agent.name}</h1>
-        <p className="mt-1 max-w-3xl text-sm text-app-text-secondary">{agent.purpose}</p>
+        <h1 className="text-xl font-medium text-app-text-primary" dir="auto">{agent.name}</h1>
+        <p className="mt-1 max-w-3xl text-sm text-app-text-secondary" dir="auto">{agent.purpose}</p>
         <div className="mt-2 flex flex-wrap gap-2 text-xs text-app-text-secondary">
-          <span className="rounded-full border border-app-border bg-white px-2.5 py-0.5">{KIND_LABEL[agent.kind]}</span>
-          {agent.ownerName && <span className="rounded-full border border-app-border bg-white px-2.5 py-0.5">אחראי: {agent.ownerName}</span>}
-          <span className="rounded-full border border-app-border bg-white px-2.5 py-0.5">{approved ? `גרסה ${approved.version} מאושרת` : "אין גרסה מאושרת"}</span>
-          {approved && <a href={`/api/agents/${agent.slug}/export`} className="rounded-full border border-app-border bg-white px-2.5 py-0.5 text-app-text-accent">להוריד כסקיל (SKILL.md)</a>}
+          <span className="rounded-full border border-app-border bg-white px-2.5 py-0.5">{tl(`kind.${agent.kind}`)}</span>
+          {agent.ownerName && <span className="rounded-full border border-app-border bg-white px-2.5 py-0.5">{t("owner", { name: agent.ownerName })}</span>}
+          <span className="rounded-full border border-app-border bg-white px-2.5 py-0.5">{approved ? t("approvedVersion", { version: approved.version }) : t("noApproved")}</span>
+          {approved && <a href={`/api/agents/${agent.slug}/export`} className="rounded-full border border-app-border bg-white px-2.5 py-0.5 text-app-text-accent">{t("export")}</a>}
           {data.canDecide && <EditPurpose agentId={agent.id} purpose={agent.purpose} />}
           {data.canDecide && <ArchiveAgent agentId={agent.id} name={agent.name} />}
         </div>
       </div>
-      <ViewTabs label="לשוניות הסוכן" active={active} tabs={TABS.map((t) => ({ key: t.key, label: t.label, href: `/app/agents/${agent.slug}${t.path}` }))} />
+      <ViewTabs label={t("tabsLabel")} active={active} tabs={TABS.map((tab) => ({ key: tab.key, label: t(`tabs.${tab.key}`), href: `/app/agents/${agent.slug}${tab.path}` }))} />
       {draft && (
         <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-app-border bg-app-accent-soft px-4 py-3">
           <div className="text-[13.5px] text-app-text-primary">
             {draft.state === "PENDING" ? (
-              <><strong className="font-medium">גרסה {draft.version} ממתינה לאישור מנהל.</strong> ההתקנות ממשיכות על {approved ? `גרסה ${approved.version}` : "מה שיש להן"} עד האישור.</>
+              <><strong className="font-medium">{t("pendingTitle", { version: draft.version })}</strong> {approved ? t("pendingKeepsVersion", { version: approved.version }) : t("pendingKeeps")}</>
             ) : (
-              <><strong className="font-medium">טיוטה לגרסה {draft.version}.</strong> {approved ? `ההתקנות ממשיכות לרוץ על גרסה ${approved.version} עד שמנהל יאשר.` : "אחרי אישור מנהל אפשר יהיה להתקין את הסוכן."}</>
+              <><strong className="font-medium">{t("draftTitle", { version: draft.version })}</strong> {approved ? t("draftKeepsVersion", { version: approved.version }) : t("draftFirst")}</>
             )}
           </div>
           {draft.state === "DRAFT" && <DraftButtons versionId={draft.id} canDiscard={!!approved} />}

@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import type { AppLocale } from "@prisma/client";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import { toolFailure, toolJson, toolText } from "@/lib/mcp/errors";
 import { actorOf } from "@/lib/mcp/task-extra-tools";
@@ -26,29 +27,47 @@ import { BLOCK_KINDS, CLIENT_FIELDS, LIMITS, PARAM_LEVELS, PARAM_TYPES, parseReq
 
 const agentUrl = (slug: string, tab = "") => appUrl(appBaseUrl(), `/app/agents/${slug}${tab ? `/${tab}` : ""}`);
 
-function updateSection(update: { version: number; notes: { version: number; note: string }[]; ask: boolean }, current: number): string {
-  const notes = update.notes.map((n) => `- גרסה ${n.version}: ${n.note}`).join("\n");
+// ADR 0006: the fixed lines get_agent adds around the compiled
+// instructions follow the installation owner's User.locale, like the
+// compiled headings (lib/agents/compile.ts). Hebrew by default.
+const GET_AGENT_TEXT = {
+  he: {
+    versionNote: (v: number, note: string) => `- גרסה ${v}: ${note}`,
+    changed: "מה השתנה:",
+    available: "## עדכון זמין",
+    availableBody: (next: number, current: number) => `יש גרסה ${next} לסוכן הזה. ההוראות למעלה הן של גרסה ${current}, שעדיין בשימוש.`,
+    ask: (next: number, current: number) => `לפני שמטפלים בבקשה, הצג למשתמש את רשימת השינויים בעברית פשוטה ושאל בשאלת כפתורים: "לעדכן לגרסה ${next}" או "להמשיך בגרסה ${current}".`,
+    askThen: (next: number) => `רק אם בחר לעדכן: קרא ל-accept_agent_update עם version ${next}, ואז ל-get_agent שוב ופעל לפי ההוראות החדשות. אם בחר להמשיך: המשך לפי ההוראות למעלה, והשאלה תחזור בבדיקה הבאה.`,
+    waiting: "## עדכון ממתין",
+    waitingBody: (next: number, current: number) => `יש גרסה ${next} לסוכן הזה. הריצה הזו ממשיכה בגרסה ${current}, ואל תשאל על כך. בעלי ההתקנה יאשרו את העדכון באנקורה, והריצה שאחרי האישור תקבל אותו.`,
+    fellBack: (from: number, reason: string | null, to: number) => `## הערה\n\nגרסה ${from} סומנה כתקולה${reason ? ` (${reason})` : ""}, וההתקנה חזרה לגרסה ${to}. ההוראות למעלה הן של גרסה ${to}.`,
+    skills: (gaps: string) => `## סקילים חסרים\n\n${gaps}\n\nאם סקיל חסר או ישן מדי: אל תנחש איך הוא עובד. דווח על כך בתחילת הריצה וב-record_agent_run (missing).`,
+    end: "## בסוף הריצה\n\nאם למדת בריצה משהו שכדאי לשנות בהוראות (כלל חסר, ניסוח שהטעה), הצע אותו ב-propose_agent_change. אדם יחליט.\n\nקרא ל-record_agent_run עם installation הזה: OK, PARTIAL או FAILED, שורה על מה שנעשה, מה השתבש ומה חסר (חיבור, סקיל, ערך). ריצה שלא דווחה נראית באנקורה כאילו לא קרתה.",
+    source: (url: string) => `---\nמקור: אנקורה, ${url}`,
+  },
+  en: {
+    versionNote: (v: number, note: string) => `- Version ${v}: ${note}`,
+    changed: "What changed:",
+    available: "## Update available",
+    availableBody: (next: number, current: number) => `Version ${next} of this agent is available. The instructions above are version ${current}, which is still in use.`,
+    ask: (next: number, current: number) => `Before handling the request, show the user the list of changes in plain English and ask with buttons: "Update to version ${next}" or "Stay on version ${current}".`,
+    askThen: (next: number) => `Only if they choose to update: call accept_agent_update with version ${next}, then call get_agent again and follow the new instructions. If they choose to stay: go on with the instructions above, and the question will come back at the next check.`,
+    waiting: "## Update waiting",
+    waitingBody: (next: number, current: number) => `Version ${next} of this agent is available. This run stays on version ${current}, and do not ask about it. The installation's owner will approve the update in Ankora, and the run after that approval will get it.`,
+    fellBack: (from: number, reason: string | null, to: number) => `## Note\n\nVersion ${from} was marked faulty${reason ? ` (${reason})` : ""}, and the installation went back to version ${to}. The instructions above are version ${to}.`,
+    skills: (gaps: string) => `## Missing skills\n\n${gaps}\n\nIf a skill is missing or too old: do not guess how it works. Report it at the start of the run and in record_agent_run (missing).`,
+    end: "## At the end of the run\n\nIf you learned something in this run that should change the instructions (a missing rule, wording that misled), propose it with propose_agent_change. A person will decide.\n\nCall record_agent_run with this installation: OK, PARTIAL or FAILED, a line on what was done, what went wrong and what was missing (a connection, a skill, a value). A run that is not reported looks in Ankora as if it never happened.",
+    source: (url: string) => `---\nSource: Ankora, ${url}`,
+  },
+};
+
+function updateSection(update: { version: number; notes: { version: number; note: string }[]; ask: boolean }, current: number, locale: AppLocale): string {
+  const w = GET_AGENT_TEXT[locale];
+  const notes = update.notes.map((n) => w.versionNote(n.version, n.note)).join("\n");
   if (update.ask) {
-    return [
-      "## עדכון זמין",
-      "",
-      `יש גרסה ${update.version} לסוכן הזה. ההוראות למעלה הן של גרסה ${current}, שעדיין בשימוש.`,
-      "",
-      "מה השתנה:",
-      notes,
-      "",
-      `לפני שמטפלים בבקשה, הצג למשתמש את רשימת השינויים בעברית פשוטה ושאל בשאלת כפתורים: "לעדכן לגרסה ${update.version}" או "להמשיך בגרסה ${current}".`,
-      `רק אם בחר לעדכן: קרא ל-accept_agent_update עם version ${update.version}, ואז ל-get_agent שוב ופעל לפי ההוראות החדשות. אם בחר להמשיך: המשך לפי ההוראות למעלה, והשאלה תחזור בבדיקה הבאה.`,
-    ].join("\n");
+    return [w.available, "", w.availableBody(update.version, current), "", w.changed, notes, "", w.ask(update.version, current), w.askThen(update.version)].join("\n");
   }
-  return [
-    "## עדכון ממתין",
-    "",
-    `יש גרסה ${update.version} לסוכן הזה. הריצה הזו ממשיכה בגרסה ${current}, ואל תשאל על כך. בעלי ההתקנה יאשרו את העדכון באנקורה, והריצה שאחרי האישור תקבל אותו.`,
-    "",
-    "מה השתנה:",
-    notes,
-  ].join("\n");
+  return [w.waiting, "", w.waitingBody(update.version, current), "", w.changed, notes].join("\n");
 }
 
 export function registerAgentTools(server: McpServer): void {
@@ -70,16 +89,18 @@ export function registerAgentTools(server: McpServer): void {
       try {
         const actor = actorOf(ctx);
         const got = await fetchAgent(actor, args.installation.trim());
+        // fetchAgent runs only for the installation's owner: their language.
+        const w = GET_AGENT_TEXT[actor.locale];
         const parts = [got.compiled.text.trim()];
         const procedure = await linkedProcedure(actor, got.agent.id);
-        if (procedure) parts.push(procedureSection(procedure).trim());
-        if (got.fellBackFrom) parts.push(`## הערה\n\nגרסה ${got.fellBackFrom.version} סומנה כתקולה${got.fellBackFrom.reason ? ` (${got.fellBackFrom.reason})` : ""}, וההתקנה חזרה לגרסה ${got.version}. ההוראות למעלה הן של גרסה ${got.version}.`);
+        if (procedure) parts.push(procedureSection(procedure, actor.locale).trim());
+        if (got.fellBackFrom) parts.push(w.fellBack(got.fellBackFrom.version, got.fellBackFrom.reason, got.version));
         const pinned = await prisma.agentVersion.findUnique({ where: { agentId_version: { agentId: got.agent.id, version: got.version } }, select: { requirements: true } });
         const gaps = pinned ? await skillGaps(actor, parseRequirements(pinned.requirements)) : [];
-        if (gaps.length) parts.push(`## סקילים חסרים\n\n${gaps.join("\n")}\n\nאם סקיל חסר או ישן מדי: אל תנחש איך הוא עובד. דווח על כך בתחילת הריצה וב-record_agent_run (missing).`);
-        if (got.update) parts.push(updateSection(got.update, got.version));
-        parts.push("## בסוף הריצה\n\nאם למדת בריצה משהו שכדאי לשנות בהוראות (כלל חסר, ניסוח שהטעה), הצע אותו ב-propose_agent_change. אדם יחליט.\n\nקרא ל-record_agent_run עם installation הזה: OK, PARTIAL או FAILED, שורה על מה שנעשה, מה השתבש ומה חסר (חיבור, סקיל, ערך). ריצה שלא דווחה נראית באנקורה כאילו לא קרתה.");
-        parts.push(`---\nמקור: אנקורה, ${agentUrl(got.agent.slug)}`);
+        if (gaps.length) parts.push(w.skills(gaps.join("\n")));
+        if (got.update) parts.push(updateSection(got.update, got.version, actor.locale));
+        parts.push(w.end);
+        parts.push(w.source(agentUrl(got.agent.slug)));
         return toolText(parts.join("\n\n"));
       } catch (err) {
         console.error("[mcp] get_agent failed", err);
