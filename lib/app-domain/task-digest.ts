@@ -19,6 +19,7 @@ import { sentForApprovalAt } from "@/lib/app-domain/task-approval-times";
 import { countApprovals } from "@/lib/app-domain/approvals";
 import { HEBREW, type Outgoing } from "@/lib/i18n/outgoing";
 import { outgoingOf } from "@/lib/i18n/recipients";
+import { isPendingUpdateStale } from "@/lib/agents/pending-update";
 
 // The morning digest.
 //
@@ -544,7 +545,7 @@ async function beyondTasks(
       );
     }),
     safe("clients", () => myClientLines(userId, clientName, now, out)),
-    safe("housekeeping", () => myHousekeeping(userId, now, out)),
+    safe("housekeeping", async () => [...(await myHousekeeping(userId, now, out)), ...(await agentUpdatesWaiting(actor, now, out))]),
   ]);
   let approvals = 0;
   try {
@@ -671,6 +672,43 @@ async function myHousekeeping(userId: string, now: Date, out: Outgoing): Promise
   if (thatDay === 0 && before > 0) {
     const weekday = new Intl.DateTimeFormat(out.tag, { weekday: "long", timeZone: out.timeZone }).format(prev);
     notes.push({ text: t("digest.house.noHours", { weekday, date: formatDue(prev, out) }), linkText: t("digest.house.noHoursLink"), href: "/app/my-time" });
+  }
+  return notes;
+}
+
+/// Agent updates waiting PENDING_UPDATE_DAYS or more for their owner to
+/// accept (a scheduled installation asks nobody, so its owner decides on
+/// the screen). The owner gets their own; a manager gets everybody else's.
+async function agentUpdatesWaiting(actor: { id: string; role: string }, now: Date, out: Outgoing): Promise<DigestNote[]> {
+  const { t } = out;
+  const manager = actor.role === "SUPER_ADMIN" || actor.role === "ANKORA_ADMIN";
+  const rows = await prisma.agentInstallation.findMany({
+    where: { status: "ACTIVE", pendingVersion: { not: null }, agent: { archivedAt: null }, ...(manager ? {} : { userId: actor.id }) },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, userId: true, agentId: true, pinnedVersionId: true, pendingVersion: true, agent: { select: { slug: true, name: true } } },
+  });
+  if (rows.length === 0) return [];
+  const versions = await prisma.agentVersion.findMany({
+    where: { agentId: { in: [...new Set(rows.map((r) => r.agentId))] }, state: "APPROVED", faultyAt: null },
+    select: { id: true, agentId: true, version: true, decidedAt: true },
+  });
+  const pinnedNo = new Map(versions.map((v) => [v.id, v.version]));
+  const owners = new Map((await prisma.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.userId))] } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
+  const notes: DigestNote[] = [];
+  for (const r of rows) {
+    const pinned = pinnedNo.get(r.pinnedVersionId) ?? 0;
+    const waiting = versions
+      .filter((v) => v.agentId === r.agentId && v.version > pinned && v.version <= (r.pendingVersion ?? 0))
+      .sort((a, b) => a.version - b.version);
+    const since = waiting[0]?.decidedAt ?? null;
+    if (!since || !isPendingUpdateStale(since, now)) continue;
+    const mine = r.userId === actor.id;
+    const vars = { agent: r.agent.name, version: r.pendingVersion ?? 0, days: days(daysBetween(since, now), out), owner: owners.get(r.userId) ?? "" };
+    notes.push({
+      text: mine ? t("digest.house.agentUpdate", vars) : t("digest.house.agentUpdateOther", vars),
+      linkText: t("digest.house.agentUpdateLink"),
+      href: `/app/agents/${r.agent.slug}/installations#installation-${r.id}`,
+    });
   }
   return notes;
 }

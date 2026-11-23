@@ -58,7 +58,7 @@ export default async function InstallationsPage({ params }: { params: Promise<{ 
                 const mine = i.userId === user.id;
                 const behind = approved && (i.pinnedVersion ?? 0) < approved.version;
                 return (
-                  <tr key={i.id} className="border-b border-app-border align-top last:border-0">
+                  <tr key={i.id} id={`installation-${i.id}`} className="border-b border-app-border align-top last:border-0">
                     <td className="px-4 py-3 font-medium">
                       {i.userName}
                       {i.claudeAccount && <div className="text-xs font-normal text-app-text-tertiary" dir="ltr">{i.claudeAccount}</div>}

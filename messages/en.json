@@ -8508,7 +8508,10 @@
         "timer": "A timer has been running {when} {time} on {client}.",
         "timerLink": "Stop and fix",
         "noHours": "No hours were reported on {weekday}, {date}.",
-        "noHoursLink": "Report"
+        "noHoursLink": "Report",
+        "agentUpdate": "{agent}: version {version} has waited for your approval for {days}.",
+        "agentUpdateOther": "{agent} for {owner}: version {version} has waited for approval for {days}.",
+        "agentUpdateLink": "Open the installation"
       },
       "sensitiveDate": "Sensitive date",
       "stepOf": "Step in the task: {parent}",
