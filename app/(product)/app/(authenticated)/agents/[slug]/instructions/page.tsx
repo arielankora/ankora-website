@@ -4,7 +4,7 @@ import { BLOCK_KINDS } from "@/lib/agents/model";
 import { compileAgent } from "@/lib/agents/compile";
 import { AgentHeader, loadAgent } from "../shared";
 import Link from "next/link";
-import { listSharedBlocks } from "@/lib/app-domain/agent-library";
+import { approvedLibrary, listSharedBlocks } from "@/lib/app-domain/agent-library";
 import { AddFromLibrary, DeleteBlock, EditBlock, EditMeta } from "../../AgentForms";
 import { ACTION_LEVEL_LABEL, BLOCK_KIND_LABEL } from "../../labels";
 
@@ -33,7 +33,7 @@ export default async function InstructionsPage({ params, searchParams }: { param
   const additions = content.blocks.filter((b) => b.clientId);
   const clientName = new Map(clients.map((c) => [c.id, c.name]));
   const previewClients = client ? await data.resolve([client]) : [];
-  const preview = editing ? compileAgent({ agent, version: { version: editing.version, ...content }, installation: null, clients: previewClients }) : null;
+  const preview = editing ? compileAgent({ agent, version: { version: editing.version, ...content }, installation: null, clients: previewClients, library: await approvedLibrary() }) : null;
   const canEdit = !data.draft || data.draft.state === "DRAFT";
   const library = (await listSharedBlocks(data.user)).filter((b) => b.approved).map((b) => ({ key: b.key, title: b.title }));
 

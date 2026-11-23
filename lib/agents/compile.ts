@@ -18,6 +18,8 @@ export type CompileInput = {
   /// Installation-level values by key. The person running it, by name.
   installation?: { id: string; values: Record<string, string>; userName: string } | null;
   clients: CompileClient[];
+  /// Approved library blocks by key, for LIBRARY_BLOCK parameters.
+  library?: Record<string, { title: string; body: string }>;
 };
 
 export type Compiled = {
@@ -57,12 +59,18 @@ export function compileAgent(input: CompileInput): Compiled {
     const v = c.values[p.key];
     return v !== undefined && v !== "" ? v : p.default ?? undefined;
   };
+  // A LIBRARY_BLOCK value names a library block: its approved body goes in.
+  const fromLibrary = (p: AgentParam, v: string | undefined) => {
+    if (p.type !== "LIBRARY_BLOCK" || v === undefined) return v;
+    const block = input.library?.[v.trim()];
+    return block ? block.body.trim() : `[קטע הספרייה "${v}" לא נמצא או שאין לו גרסה מאושרת. דווח על כך.]`;
+  };
   const value = (key: string): string | undefined => {
     const p = byKey.get(key);
     if (!p) return undefined;
-    if (p.level === "INSTALLATION") return inst[key] || p.default || undefined;
-    if (p.level === "CLIENT") return single ? clientValue(single, p) : `${p.label} (לפי לקוח, בטבלה למטה)`;
-    return p.default ?? undefined;
+    if (p.level === "INSTALLATION") return fromLibrary(p, inst[key] || p.default || undefined);
+    if (p.level === "CLIENT") return single ? fromLibrary(p, clientValue(single, p)) : `${p.label} (לפי לקוח, בטבלה למטה)`;
+    return fromLibrary(p, p.default ?? undefined);
   };
 
   const missingInstallation = version.params.filter((p) => p.level === "INSTALLATION" && p.required && !inst[p.key] && !p.default).map((p) => p.label);

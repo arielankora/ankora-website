@@ -4,6 +4,7 @@ import { can } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { contentOf } from "@/lib/app-domain/agents";
 import { compileAgent } from "@/lib/agents/compile";
+import { approvedLibrary } from "@/lib/app-domain/agent-library";
 import { attachmentDisposition } from "@/lib/http-headers";
 
 // Agents, phase 3: the version in use as a skill file (SKILL.md), for a
@@ -18,7 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   if (!agent || agent.archivedAt) return NextResponse.json({ error: "not found" }, { status: 404 });
   const version = await prisma.agentVersion.findFirst({ where: { agentId: agent.id, state: "APPROVED", faultyAt: null }, orderBy: { version: "desc" } });
   if (!version) return NextResponse.json({ error: "no approved version" }, { status: 404 });
-  const compiled = compileAgent({ agent, version: { version: version.version, ...contentOf(version) }, installation: null, clients: [] });
+  const compiled = compileAgent({ agent, version: { version: version.version, ...contentOf(version) }, installation: null, clients: [], library: await approvedLibrary() });
   const description = agent.purpose.replace(/\s+/g, " ").replace(/"/g, "'");
   const text = `---\nname: ${agent.slug}\ndescription: "${description}"\n---\n\n${compiled.text.trim()}\n`;
   return new NextResponse(text, {

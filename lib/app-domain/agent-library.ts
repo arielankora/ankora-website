@@ -144,6 +144,13 @@ export async function rejectSharedVersion(actor: User, versionId: string, reason
 }
 
 /// The block an agent copies from the library, at its approved version.
+/// The approved body of every library block, by key: what a LIBRARY_BLOCK
+/// parameter puts in its place when an agent is compiled.
+export async function approvedLibrary(): Promise<Record<string, { title: string; body: string }>> {
+  const rows = await prisma.sharedBlock.findMany({ select: { key: true, title: true, versions: { where: { state: "APPROVED" }, orderBy: { version: "desc" }, take: 1, select: { body: true } } } });
+  return Object.fromEntries(rows.filter((r) => r.versions[0]).map((r) => [r.key, { title: r.title, body: r.versions[0].body }]));
+}
+
 export async function sharedBlockForAgent(key: string): Promise<AgentBlock> {
   const b = await prisma.sharedBlock.findUnique({ where: { key }, include: { versions: { where: { state: "APPROVED" }, orderBy: { version: "desc" }, take: 1 } } });
   const v = b?.versions[0];
