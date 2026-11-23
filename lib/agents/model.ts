@@ -31,7 +31,10 @@ export const blockSchema = z.object({
 export type AgentBlock = z.infer<typeof blockSchema>;
 
 export const PARAM_LEVELS = ["AGENT", "CLIENT", "INSTALLATION"] as const;
-export const PARAM_TYPES = ["TEXT", "LONG_TEXT", "NUMBER", "LIST", "EMAIL", "FILE_LOCATION", "PAGE"] as const;
+/// LIBRARY_BLOCK (23.11.2026): the value is a library block's key, and the
+/// compiled text gets that block's approved body in its place. A voice per
+/// person: an installation picks ariel-voice or nadav-voice.
+export const PARAM_TYPES = ["TEXT", "LONG_TEXT", "NUMBER", "LIST", "EMAIL", "FILE_LOCATION", "PAGE", "LIBRARY_BLOCK"] as const;
 /// Client-level values that come from the client's file instead of being typed twice.
 export const CLIENT_FIELDS = ["name", "domains"] as const;
 

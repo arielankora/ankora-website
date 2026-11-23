@@ -42,7 +42,7 @@ export default async function LibraryPage() {
             <div>
               <h2 className="text-base font-medium" dir="auto">{b.title}</h2>
               <div className="mt-0.5 text-xs text-app-text-secondary">
-                {BLOCK_KIND_LABEL[b.kind as keyof typeof BLOCK_KIND_LABEL] ?? b.kind} · {b.approved ? `גרסה ${b.approved.version} מאושרת` : "אין גרסה מאושרת"}
+                {BLOCK_KIND_LABEL[b.kind as keyof typeof BLOCK_KIND_LABEL] ?? b.kind} · {b.approved ? `גרסה ${b.approved.version} מאושרת` : "אין גרסה מאושרת"} · מפתח: <span dir="ltr" className="font-jbmono">{b.key}</span>
               </div>
             </div>
             {b.approved && !b.pending && <EditShared block={{ key: b.key, title: b.title, kind: b.kind, body: b.approved.body }} />}

@@ -11,6 +11,7 @@ import { LIMITS, fileSchema, parseBlocks, parseFiles, parseParams, parseRequirem
 import { compileAgent, isCheckDue, type CompileClient } from "@/lib/agents/compile";
 import type { LinkedProcedure } from "@/lib/agents/procedure";
 import { mcpGetProcess } from "@/lib/app-domain/mcp-processes";
+import { approvedLibrary } from "@/lib/app-domain/agent-library";
 import { z } from "zod";
 
 // Agents, phase 1 (22.11.2026, "סוכנים באנקורה: אפיון").
@@ -423,7 +424,7 @@ async function compileVersion(user: User, inst: { id: string; agentId: string; v
   const content = contentOf(v);
   const clients = await resolveClients(user, inst.agentId, content.params, inst);
   const values = (inst.values && typeof inst.values === "object" && !Array.isArray(inst.values) ? inst.values : {}) as Record<string, string>;
-  return compileAgent({ agent, version: { version: v.version, ...content }, installation: { id: inst.id, values, userName: user.name }, clients });
+  return compileAgent({ agent, version: { version: v.version, ...content }, installation: { id: inst.id, values, userName: user.name }, clients, library: await approvedLibrary() });
 }
 
 /// What get_agent returns: the instructions of the pinned version, and an
@@ -596,7 +597,7 @@ export async function clientContext(actor: User, installationId: string, clientN
   const needle = clientName.trim().toLowerCase();
   const client = clients.find((c) => c.name.toLowerCase() === needle) ?? clients.find((c) => c.name.toLowerCase().includes(needle));
   if (!client) throw new DomainError("agents.clientNotInScope", "הלקוח לא בהתקנה הזו, או שהוא מסומן \"בלי AI\".");
-  const one = compileAgent({ agent: inst.agent, version: { version: pinned.version, ...content }, installation: null, clients: [client] });
+  const one = compileAgent({ agent: inst.agent, version: { version: pinned.version, ...content }, installation: null, clients: [client], library: await approvedLibrary() });
   return { client, compiled: one };
 }
 
