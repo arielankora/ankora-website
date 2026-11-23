@@ -439,7 +439,7 @@ async function guides(s: Scope): Promise<ApprovalItem[]> {
 
 async function agentVersions(s: Scope): Promise<ApprovalItem[]> {
   if (!s.manager) return [];
-  const rows = await prisma.agentVersion.findMany({ where: { state: "PENDING" }, orderBy: { submittedAt: "asc" }, include: { agent: { select: { slug: true, name: true } } } });
+  const rows = await prisma.agentVersion.findMany({ where: { state: "PENDING", agent: { archivedAt: null } }, orderBy: { submittedAt: "asc" }, include: { agent: { select: { slug: true, name: true } } } });
   const shared = await prisma.sharedBlockVersion.findMany({ where: { state: "PENDING" }, orderBy: { createdAt: "asc" }, include: { sharedBlock: { select: { title: true } } } });
   const names = await namesOf([...rows.map((r) => r.createdById), ...shared.map((r) => r.createdById)]);
   // Phase 3: a library block's version is decided with the agents it reaches.

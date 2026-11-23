@@ -236,6 +236,23 @@ export async function rejectVersion(actor: User, versionId: string, reason: stri
   return updated;
 }
 
+/// Takes an agent out of the library (23.11.2026). A manager's decision,
+/// with a reason, and only once nobody runs it: an installation still
+/// fetching would otherwise lose its instructions in the middle of a run.
+/// The agent and its versions stay in the database; it just leaves every
+/// list, the approvals queue and the connector.
+export async function archiveAgent(actor: User, agentId: string, reason: string) {
+  assertApprover(actor);
+  const why = reason.trim();
+  if (!why) throw new DomainError("agents.reasonRequired", "צריך לכתוב בשורה אחת למה.");
+  const agent = await prisma.agent.findUnique({ where: { id: agentId }, select: { id: true, slug: true, archivedAt: true } });
+  if (!agent || agent.archivedAt) throw new DomainError("agents.notFound", "הסוכן לא נמצא.");
+  const active = await prisma.agentInstallation.count({ where: { agentId, status: "ACTIVE" } });
+  if (active > 0) throw new DomainError("agents.archiveInstalled", "לסוכן יש התקנות פעילות. צריך להסיר אותן לפני שמעבירים אותו לארכיון.", { count: active });
+  await prisma.agent.update({ where: { id: agentId }, data: { archivedAt: new Date() } });
+  await recordAudit({ actorId: actor.id, action: "agent.archive", entityType: "Agent", entityId: agentId, after: { slug: agent.slug, reason: why } });
+}
+
 // --- Client values ----------------------------------------------------------
 
 async function assertClientAccess(actor: User, clientId: string) {
@@ -510,5 +527,5 @@ export async function clientContext(actor: User, installationId: string, clientN
 // --- Approvals screen -------------------------------------------------------
 
 export async function pendingAgentVersions() {
-  return prisma.agentVersion.findMany({ where: { state: "PENDING" }, orderBy: { submittedAt: "asc" }, include: { agent: { select: { slug: true, name: true } } } });
+  return prisma.agentVersion.findMany({ where: { state: "PENDING", agent: { archivedAt: null } }, orderBy: { submittedAt: "asc" }, include: { agent: { select: { slug: true, name: true } } } });
 }

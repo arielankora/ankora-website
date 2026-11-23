@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { User } from "@prisma/client";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
-import { approveVersion, createInstallation, markFaulty, saveDraft, setClientValue, submitDraft } from "@/lib/app-domain/agents";
+import { approveVersion, archiveAgent, createInstallation, listAgents, markFaulty, removeInstallation, saveDraft, setClientValue, submitDraft } from "@/lib/app-domain/agents";
 import { collectApprovals } from "@/lib/app-domain/approvals";
 import type { AgentBlock } from "@/lib/agents/model";
 import { approveSharedVersion, listLessons, proposeSharedBlock, sharedBlockForAgent } from "@/lib/app-domain/agent-library";
@@ -225,5 +225,28 @@ describe("agents, phase 3", () => {
     expect(lesson.json).toMatchObject({ proposed: true });
     const agent = await prisma.agent.findUniqueOrThrow({ where: { slug: "installable" } });
     expect((await listLessons(hadas, agent.id)).map((l) => l.text)).toEqual(["להוסיף כלל: לא לענות בשבת"]);
+  });
+});
+
+describe("archiving an agent", () => {
+  it("is a manager's call with a reason, waits for its installations, and takes it out of every list and the connector", async () => {
+    const { hadas, ariel, nux } = await setup();
+    const agent = await prisma.agent.create({ data: { slug: "old-report", name: "Old report", purpose: "דוח ישן", kind: "SCHEDULED", versions: { create: [{ version: 1, state: "APPROVED", blocks: BLOCKS, params: PARAMS }, { version: 2, state: "PENDING", blocks: BLOCKS, params: PARAMS, changeNote: "שינוי", submittedAt: new Date() }] } }, include: { versions: true } });
+    const pending = agent.versions.find((v) => v.version === 2)!;
+    const inst = await createInstallation(hadas, { agentId: agent.id, surface: "SCHEDULED", clientScope: "ONE", clientIds: [nux.id], checkEvery: "RUN" });
+
+    await expect(archiveAgent(hadas, agent.id, "לא בשימוש")).rejects.toThrow();
+    await expect(archiveAgent(ariel, agent.id, " ")).rejects.toMatchObject({ code: "agents.reasonRequired" });
+    await expect(archiveAgent(ariel, agent.id, "לא בשימוש")).rejects.toMatchObject({ code: "agents.archiveInstalled" });
+
+    await removeInstallation(hadas, inst.id);
+    await archiveAgent(ariel, agent.id, "לא בשימוש");
+
+    expect((await prisma.agent.findUniqueOrThrow({ where: { id: agent.id } })).archivedAt).not.toBeNull();
+    expect((await listAgents(hadas)).some((a) => a.id === agent.id)).toBe(false);
+    expect((await collectApprovals(ariel)).some((row) => row.kind === "agent" && row.id === pending.id)).toBe(false);
+    const draft = await call(hadas, "save_agent_draft", { agent: "old-report", changeNote: "עוד שינוי" });
+    expect(draft.text).toContain("No agent with the slug");
+    await expect(archiveAgent(ariel, agent.id, "שוב")).rejects.toMatchObject({ code: "agents.notFound" });
   });
 });

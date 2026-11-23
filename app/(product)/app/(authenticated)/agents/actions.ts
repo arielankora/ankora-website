@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import {
   acceptUpdate,
   approveVersion,
+  archiveAgent,
   contentOf,
   createAgent,
   createInstallation,
@@ -155,6 +156,11 @@ export async function approveVersionAction(versionId: string): Promise<FormState
 export async function rejectVersionAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
   const user = await requireUser();
   return run(() => rejectVersion(user, str(f, "id"), str(f, "reason")).then(() => undefined));
+}
+
+export async function archiveAgentAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => archiveAgent(user, str(f, "agentId"), str(f, "reason")));
 }
 
 export async function markFaultyAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {

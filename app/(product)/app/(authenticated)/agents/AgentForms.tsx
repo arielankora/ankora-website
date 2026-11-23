@@ -13,6 +13,7 @@ import {
   proposeSharedAction,
   rejectSharedAction,
   approveVersionAction,
+  archiveAgentAction,
   createAgentAction,
   deleteBlockAction,
   deleteParamAction,
@@ -333,6 +334,36 @@ export function DraftButtons({ versionId, canDiscard }: { versionId: string; can
       {canDiscard && <ActionButton run={() => discardDraftAction(versionId)} label="לבטל טיוטה" done="הטיוטה בוטלה" />}
       <ActionButton run={() => submitDraftAction(versionId)} label="לשלוח לאישור" done="נשלח לאישור מנהל" tone="primary" />
     </div>
+  );
+}
+
+function ArchiveForm({ agentId }: { agentId: string }) {
+  const router = useRouter();
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(archiveAgentAction, () => {
+    close();
+    router.push("/app/agents");
+  });
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="agentId" value={agentId} />
+      <p className="text-[13px] text-app-text-secondary">הסוכן יוצא מהרשימה, מתור האישורים ומהמחבר. הגרסאות שלו נשמרות. סוכן עם התקנות פעילות לא עובר לארכיון.</p>
+      <Field label="למה (חובה)">
+        <input name="reason" required dir="auto" className={INPUT} />
+      </Field>
+      <Err error={error} />
+      <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+        {pending ? "שומר..." : "להעביר לארכיון"}
+      </button>
+    </form>
+  );
+}
+
+export function ArchiveAgent({ agentId, name }: { agentId: string; name: string }) {
+  return (
+    <Drawer triggerLabel="להעביר לארכיון" title={`העברת "${name}" לארכיון`} variant="link">
+      <ArchiveForm agentId={agentId} />
+    </Drawer>
   );
 }
 
