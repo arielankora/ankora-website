@@ -1946,6 +1946,7 @@
       "draftProblems": "The draft has things to fix first. They are listed in the checks on the screen.",
       "firstDraft": "This is the agent's first version. It can be edited, not discarded.",
       "archiveInstalled": "The agent has active installations ({count}). Remove them before archiving it.",
+      "fileNotFound": "No such file in this installation's version. Files: {files}.",
       "versionNotFound": "The version was not found.",
       "alreadyDecided": "The version is not waiting for approval.",
       "reasonRequired": "Write in one line why.",

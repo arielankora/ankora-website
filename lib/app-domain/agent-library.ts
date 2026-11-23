@@ -124,7 +124,7 @@ export async function approveSharedVersion(actor: User, versionId: string) {
         const next = open ? open.version : (last?.version ?? 0) + 1;
         if (open) await tx.agentVersion.update({ where: { id: open.id }, data: { version: (last?.version ?? 0) + 1 } });
         await tx.agentVersion.create({
-          data: { agentId: a.id, version: next, state: "APPROVED", actionLevel: current.actionLevel, blocks: fromCurrent.blocks as Prisma.InputJsonValue, params: current.params as Prisma.InputJsonValue, requirements: current.requirements as Prisma.InputJsonValue, changeNote: note, createdById: actor.id, submittedAt: now, decidedById: actor.id, decidedAt: now },
+          data: { agentId: a.id, version: next, state: "APPROVED", actionLevel: current.actionLevel, blocks: fromCurrent.blocks as Prisma.InputJsonValue, params: current.params as Prisma.InputJsonValue, requirements: current.requirements as Prisma.InputJsonValue, files: current.files as Prisma.InputJsonValue, changeNote: note, createdById: actor.id, submittedAt: now, decidedById: actor.id, decidedAt: now },
         });
       }
       if (open && fromOpen.changed) await tx.agentVersion.update({ where: { id: open.id }, data: { blocks: fromOpen.blocks as Prisma.InputJsonValue } });

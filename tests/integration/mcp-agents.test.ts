@@ -250,3 +250,47 @@ describe("archiving an agent", () => {
     await expect(archiveAgent(ariel, agent.id, "שוב")).rejects.toMatchObject({ code: "agents.notFound" });
   });
 });
+
+describe("files attached to an agent", () => {
+  it("saves them from Claude, lists them in get_agent, returns one by path, and refuses a secret in one", async () => {
+    const { hadas, ariel, nux } = await setup();
+    const script = "import csv\nprint('hello')\n";
+    const saved = await call(hadas, "save_agent_draft", {
+      create: { name: "Campaign", purpose: "קמפיין פניות", kind: "SKILL" },
+      blocks: [{ key: "steps", kind: "steps", title: "צעדים", body: "הרץ את scripts/build.py." }],
+      files: [{ path: "scripts/build.py", content: script }, { path: "assets/template.md", content: "# תבנית" }],
+      changeNote: "ייבוא",
+      submit: true,
+    });
+    expect(saved.isError).toBeFalsy();
+    const agent = await prisma.agent.findFirstOrThrow({ where: { name: "Campaign" } });
+    const v = await prisma.agentVersion.findFirstOrThrow({ where: { agentId: agent.id } });
+    await approveVersion(ariel, v.id);
+    const inst = await createInstallation(hadas, { agentId: agent.id, surface: "SKILL", clientScope: "ONE", clientIds: [nux.id], checkEvery: "RUN" });
+
+    const got = await call(hadas, "get_agent", { installation: inst.id });
+    expect(got.text).toContain("## קבצים מצורפים");
+    expect(got.text).toContain("- scripts/build.py");
+    expect(got.text).toContain(`get_agent_file עם installation ${inst.id}`);
+
+    const file = await call(hadas, "get_agent_file", { installation: inst.id, path: "scripts/build.py" });
+    expect(file.isError).toBeFalsy();
+    expect(file.text).toBe(script);
+    const missing = await call(hadas, "get_agent_file", { installation: inst.id, path: "nope.txt" });
+    expect(missing.isError).toBe(true);
+    expect(missing.text).toContain("assets/template.md");
+    const other = await call(ariel, "get_agent_file", { installation: inst.id, path: "scripts/build.py" });
+    expect(other.isError).toBe(true);
+
+    // A new draft keeps the files it did not touch.
+    await saveDraft(hadas, agent.id, { changeNote: "רק הערה" });
+    const draft = await prisma.agentVersion.findFirstOrThrow({ where: { agentId: agent.id, state: "DRAFT" } });
+    expect((draft.files as { path: string }[]).map((f) => f.path)).toEqual(["scripts/build.py", "assets/template.md"]);
+
+    const leaky = await call(hadas, "save_agent_draft", { agent: agent.slug, files: [{ path: "config.env", content: "TOKEN=ghp_1234567890abcdefghijklmnopqrstuvwxyzAB" }] });
+    expect(leaky.isError).toBe(true);
+    expect(leaky.text).toContain("סודות לא נכתבים");
+    const escape = await call(hadas, "save_agent_draft", { agent: agent.slug, files: [{ path: "../etc/passwd", content: "x" }] });
+    expect(escape.isError).toBe(true);
+  });
+});

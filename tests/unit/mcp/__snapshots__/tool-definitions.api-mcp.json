@@ -933,6 +933,39 @@
     "name": "get_agent_client_context",
     "title": "Get an agent's context for one client"
   },
+  "get_agent_file": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Returns one text file attached to the agent version an installation runs (a script, a template, a reference). get_agent lists the files by path under \"קבצים מצורפים\". Call it when the instructions point to a file by path, with the same installation id. Use the file as it comes back; do not change it in place.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "installation": {
+          "description": "The installation id from the bootstrap text.",
+          "maxLength": 60,
+          "minLength": 1,
+          "type": "string"
+        },
+        "path": {
+          "description": "The file's path, exactly as get_agent lists it.",
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "installation",
+        "path"
+      ],
+      "type": "object"
+    },
+    "name": "get_agent_file",
+    "title": "Get a file attached to an Ankora agent"
+  },
   "get_blank_agreement_pdf": {
     "annotations": {
       "destructiveHint": false,
@@ -4132,7 +4165,7 @@
       "openWorldHint": false,
       "readOnlyHint": false
     },
-    "description": "Writes the draft of an Ankora agent's next version: its instruction blocks, parameters, requirements and action level. Use it to bring an existing prompt into Ankora (split it into blocks, turn what differs per client or per person into {{parameters}}, move dated change notes out of the text into `changeNote`) or to change an agent the user asked to change. Pass `agent` (its slug, from the agent's url) to change an existing agent, or `create` for a new one. Blocks and parameters you pass replace the draft's whole list; leave one out to keep it as it is. Block kinds, in reading order: role, scope, steps, rules, approvals, language, output, tools, schedule, live. A block with `client` is a client addition, read only for that client. Write {{key}} where a parameter's value goes; every such key must be in `params`. This tool never approves. With `submit: true` the draft is sent to a manager, who approves it in Ankora; nothing reaches any installation before that. Before calling, show the user the blocks you will save and call only after they said so. Returns the draft's `url`, its `version` and `problems` still to fix.",
+    "description": "Writes the draft of an Ankora agent's next version: its instruction blocks, parameters, requirements and action level. Use it to bring an existing prompt into Ankora (split it into blocks, turn what differs per client or per person into {{parameters}}, move dated change notes out of the text into `changeNote`) or to change an agent the user asked to change. Pass `agent` (its slug, from the agent's url) to change an existing agent, or `create` for a new one. Blocks, parameters and files you pass replace the draft's whole list; leave one out to keep it as it is. A text file the instructions use (a script, a template, a reference) goes in `files` with the path the instructions name. Block kinds, in reading order: role, scope, steps, rules, approvals, language, output, tools, schedule, live. A block with `client` is a client addition, read only for that client. Write {{key}} where a parameter's value goes; every such key must be in `params`. This tool never approves. With `submit: true` the draft is sent to a manager, who approves it in Ankora; nothing reaches any installation before that. Before calling, show the user the blocks you will save and call only after they said so. Returns the draft's `url`, its `version` and `problems` still to fix.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -4244,6 +4277,30 @@
             "kind"
           ],
           "type": "object"
+        },
+        "files": {
+          "items": {
+            "properties": {
+              "content": {
+                "description": "The file's full text. No secrets.",
+                "maxLength": 200000,
+                "type": "string"
+              },
+              "path": {
+                "description": "Relative path the instructions use, for example scripts/build.py.",
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "content"
+            ],
+            "type": "object"
+          },
+          "maxItems": 30,
+          "type": "array"
         },
         "params": {
           "items": {

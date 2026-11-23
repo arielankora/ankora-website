@@ -8,7 +8,7 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { appUrl } from "@/lib/approval-links";
 import { prisma } from "@/lib/prisma";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { acceptUpdate, clientContext, createAgent, createInstallation, draftProblems, fetchAgent, listMyInstallations, recordRun, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
+import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, draftProblems, fetchAgent, listMyInstallations, recordRun, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
 import { proposeLesson } from "@/lib/app-domain/agent-library";
 import { bootstrapText } from "@/lib/agents/compile";
 import { BLOCK_KINDS, CLIENT_FIELDS, LIMITS, PARAM_LEVELS, PARAM_TYPES } from "@/lib/agents/model";
@@ -133,12 +133,38 @@ export function registerAgentTools(server: McpServer): void {
   );
 
   server.registerTool(
+    "get_agent_file",
+    {
+      title: "Get a file attached to an Ankora agent",
+      description: [
+        "Returns one text file attached to the agent version an installation runs (a script, a template, a reference). get_agent lists the files by path under \"קבצים מצורפים\".",
+        "Call it when the instructions point to a file by path, with the same installation id. Use the file as it comes back; do not change it in place.",
+      ].join(" "),
+      inputSchema: z.object({
+        installation: z.string().min(1).max(60).describe("The installation id from the bootstrap text."),
+        path: z.string().min(1).max(200).describe("The file's path, exactly as get_agent lists it."),
+      }),
+      annotations: TOOL_ANNOTATIONS.get_agent_file,
+    },
+    async (args: { installation: string; path: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const file = await agentFile(actor, args.installation.trim(), args.path);
+        return toolText(file.content);
+      } catch (err) {
+        console.error("[mcp] get_agent_file failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
     "save_agent_draft",
     {
       title: "Save a draft of an Ankora agent",
       description: [
         "Writes the draft of an Ankora agent's next version: its instruction blocks, parameters, requirements and action level. Use it to bring an existing prompt into Ankora (split it into blocks, turn what differs per client or per person into {{parameters}}, move dated change notes out of the text into `changeNote`) or to change an agent the user asked to change.",
-        "Pass `agent` (its slug, from the agent's url) to change an existing agent, or `create` for a new one. Blocks and parameters you pass replace the draft's whole list; leave one out to keep it as it is.",
+        "Pass `agent` (its slug, from the agent's url) to change an existing agent, or `create` for a new one. Blocks, parameters and files you pass replace the draft's whole list; leave one out to keep it as it is. A text file the instructions use (a script, a template, a reference) goes in `files` with the path the instructions name.",
         `Block kinds, in reading order: ${BLOCK_KINDS.join(", ")}. A block with \`client\` is a client addition, read only for that client. Write {{key}} where a parameter's value goes; every such key must be in \`params\`.`,
         "This tool never approves. With `submit: true` the draft is sent to a manager, who approves it in Ankora; nothing reaches any installation before that. Before calling, show the user the blocks you will save and call only after they said so. Returns the draft's `url`, its `version` and `problems` still to fix.",
       ].join(" "),
@@ -180,6 +206,15 @@ export function registerAgentTools(server: McpServer): void {
           )
           .max(LIMITS.params)
           .optional(),
+        files: z
+          .array(
+            z.object({
+              path: z.string().min(1).max(200).describe("Relative path the instructions use, for example scripts/build.py."),
+              content: z.string().max(200_000).describe("The file's full text. No secrets."),
+            })
+          )
+          .max(LIMITS.files)
+          .optional(),
         requirements: z
           .object({
             connectors: z.array(z.string().max(80)).max(30).optional(),
@@ -203,6 +238,7 @@ export function registerAgentTools(server: McpServer): void {
         create?: { name: string; purpose: string; kind: "CLIENT_PROJECT" | "SCHEDULED" | "SKILL" };
         blocks?: { key: string; kind: (typeof BLOCK_KINDS)[number]; title: string; body: string; why?: string; client?: string; safety?: boolean }[];
         params?: { key: string; label: string; level: (typeof PARAM_LEVELS)[number]; type?: (typeof PARAM_TYPES)[number]; required?: boolean; default?: string; clientField?: (typeof CLIENT_FIELDS)[number] }[];
+        files?: { path: string; content: string }[];
         requirements?: Record<string, unknown>;
         actionLevel?: "READ" | "DRAFT" | "SEND";
         changeNote?: string;
@@ -243,6 +279,7 @@ export function registerAgentTools(server: McpServer): void {
         const v = await saveDraft(actor, agentId, {
           blocks,
           params: args.params?.map((p) => ({ ...p, type: p.type ?? "TEXT", required: p.required ?? false, default: p.default ?? null, clientField: p.clientField ?? null })),
+          files: args.files,
           requirements: args.requirements as never,
           actionLevel: args.actionLevel,
           changeNote: args.changeNote,

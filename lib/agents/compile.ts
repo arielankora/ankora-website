@@ -1,4 +1,4 @@
-import { BLOCK_KINDS, PLACEHOLDER, type AgentBlock, type AgentParam, type AgentRequirements } from "./model";
+import { BLOCK_KINDS, PLACEHOLDER, type AgentBlock, type AgentFile, type AgentParam, type AgentRequirements } from "./model";
 
 // Agents, phase 1: one function turns a version, its parameter values and
 // the clients an installation covers into the markdown Claude receives.
@@ -14,7 +14,7 @@ export type CompileClient = {
 
 export type CompileInput = {
   agent: { name: string; slug: string; purpose: string };
-  version: { version: number; actionLevel: "READ" | "DRAFT" | "SEND"; blocks: AgentBlock[]; params: AgentParam[]; requirements: AgentRequirements };
+  version: { version: number; actionLevel: "READ" | "DRAFT" | "SEND"; blocks: AgentBlock[]; params: AgentParam[]; requirements: AgentRequirements; files?: AgentFile[] };
   /// Installation-level values by key. The person running it, by name.
   installation?: { id: string; values: Record<string, string>; userName: string } | null;
   clients: CompileClient[];
@@ -88,6 +88,12 @@ export function compileAgent(input: CompileInput): Compiled {
   for (const b of version.blocks.filter((x) => x.clientId && inScope.has(x.clientId)).sort((a, b) => order(a) - order(b))) {
     const c = inScope.get(b.clientId!)!;
     parts.push(section(`ללקוח ${c.name}: ${b.title}`, fill(b.body, (k) => { const p = byKey.get(k); return p?.level === "CLIENT" ? clientValue(c, p) : value(k); })));
+  }
+
+  const files = version.files ?? [];
+  if (files.length) {
+    const how = installation ? `קרא קובץ כשההוראות מפנות אליו: get_agent_file עם installation ${installation.id} והנתיב.` : "Claude קורא אותם בכלי get_agent_file, לפי הנתיב.";
+    parts.push(section("קבצים מצורפים", files.map((f) => `- ${f.path} (${f.content.length.toLocaleString("en-US")} תווים)`).join("\n") + `\n\n${how}`));
   }
 
   const req = version.requirements;

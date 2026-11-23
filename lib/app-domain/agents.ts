@@ -7,7 +7,7 @@ import { findSecrets } from "@/lib/secret-scan";
 import { DomainError } from "@/lib/domain-error";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { aiExcludedClientIds } from "@/lib/app-domain/ai-exclusion-db";
-import { LIMITS, parseBlocks, parseParams, parseRequirements, requirementsSchema, versionProblems, blockSchema, paramSchema, type AgentBlock, type AgentParam, type AgentRequirements } from "@/lib/agents/model";
+import { LIMITS, fileSchema, parseBlocks, parseFiles, parseParams, parseRequirements, requirementsSchema, versionProblems, blockSchema, paramSchema, type AgentBlock, type AgentFile, type AgentParam, type AgentRequirements } from "@/lib/agents/model";
 import { compileAgent, isCheckDue, type CompileClient } from "@/lib/agents/compile";
 import { z } from "zod";
 
@@ -26,10 +26,10 @@ function assertApprover(actor: User) {
   if (!canManageClients(actor.role)) throw new ForbiddenError("רק מנהל מאשר גרסה של סוכן.");
 }
 
-export type VersionContent = { blocks: AgentBlock[]; params: AgentParam[]; requirements: AgentRequirements; actionLevel: AgentVersion["actionLevel"] };
+export type VersionContent = { blocks: AgentBlock[]; params: AgentParam[]; requirements: AgentRequirements; actionLevel: AgentVersion["actionLevel"]; files: AgentFile[] };
 
-export function contentOf(v: Pick<AgentVersion, "blocks" | "params" | "requirements" | "actionLevel">): VersionContent {
-  return { blocks: parseBlocks(v.blocks), params: parseParams(v.params), requirements: parseRequirements(v.requirements), actionLevel: v.actionLevel };
+export function contentOf(v: Pick<AgentVersion, "blocks" | "params" | "requirements" | "actionLevel"> & { files?: AgentVersion["files"] }): VersionContent {
+  return { blocks: parseBlocks(v.blocks), params: parseParams(v.params), requirements: parseRequirements(v.requirements), actionLevel: v.actionLevel, files: parseFiles(v.files) };
 }
 
 /// The version in use: the newest approved one that no manager marked faulty.
@@ -128,6 +128,7 @@ export async function createAgent(actor: User, input: { name: string; purpose: s
 const draftInput = z.object({
   blocks: z.array(blockSchema).max(LIMITS.blocks).optional(),
   params: z.array(paramSchema).max(LIMITS.params).optional(),
+  files: z.array(fileSchema).max(LIMITS.files).optional(),
   requirements: requirementsSchema.optional(),
   actionLevel: z.enum(["READ", "DRAFT", "SEND"]).optional(),
   changeNote: z.string().max(2000).nullish(),
@@ -150,6 +151,7 @@ async function openDraft(actor: User, agentId: string) {
         blocks: (approved?.blocks ?? []) as Prisma.InputJsonValue,
         params: (approved?.params ?? []) as Prisma.InputJsonValue,
         requirements: (approved?.requirements ?? {}) as Prisma.InputJsonValue,
+        files: (approved?.files ?? []) as Prisma.InputJsonValue,
         actionLevel: approved?.actionLevel ?? "READ",
       },
     });
@@ -166,7 +168,7 @@ export async function saveDraft(actor: User, agentId: string, raw: DraftInput) {
   const input = parsed.data;
   const agent = await prisma.agent.findUnique({ where: { id: agentId }, select: { id: true, archivedAt: true } });
   if (!agent || agent.archivedAt) throw new DomainError("agents.notFound", "הסוכן לא נמצא.");
-  const texts = [...(input.blocks ?? []).flatMap((b) => [b.body, b.why ?? ""]), ...(input.params ?? []).map((p) => p.default ?? ""), input.changeNote ?? ""];
+  const texts = [...(input.blocks ?? []).flatMap((b) => [b.body, b.why ?? ""]), ...(input.params ?? []).map((p) => p.default ?? ""), ...(input.files ?? []).map((f) => f.content), input.changeNote ?? ""];
   if (texts.some((t) => findSecrets(t).length > 0)) throw new DomainError("agents.hasSecret", "בטיוטה יש סיסמה, מפתח או טוקן. סודות לא נכתבים בסוכן.");
   const draft = await openDraft(actor, agentId);
   const updated = await prisma.agentVersion.update({
@@ -174,6 +176,7 @@ export async function saveDraft(actor: User, agentId: string, raw: DraftInput) {
     data: {
       ...(input.blocks ? { blocks: input.blocks as Prisma.InputJsonValue } : {}),
       ...(input.params ? { params: input.params as Prisma.InputJsonValue } : {}),
+      ...(input.files ? { files: input.files as Prisma.InputJsonValue } : {}),
       ...(input.requirements ? { requirements: input.requirements as Prisma.InputJsonValue } : {}),
       ...(input.actionLevel ? { actionLevel: input.actionLevel } : {}),
       ...(input.changeNote !== undefined ? { changeNote: input.changeNote?.trim() || null } : {}),
@@ -404,6 +407,22 @@ export async function fetchAgent(actor: User, installationId: string, now = new 
     data: { lastFetchedAt: now, ...(due ? { lastCheckedAt: now } : {}), pinnedVersionId: pinned.id, pendingVersion },
   });
   return { installation: inst, agent: inst.agent, version: pinned.version, compiled, update, fellBackFrom };
+}
+
+/// What get_agent_file returns: one attached file of the version this
+/// installation runs (the same version get_agent just compiled).
+export async function agentFile(actor: User, installationId: string, path: string) {
+  const inst = await ownInstallation(actor, installationId);
+  if (inst.userId !== actor.id) throw new DomainError("agents.installationNotYours", "ההתקנה הזו שייכת למישהו אחר.");
+  let pinned = await prisma.agentVersion.findUniqueOrThrow({ where: { id: inst.pinnedVersionId } });
+  if (pinned.faultyAt) pinned = (await currentApproved(inst.agentId)) ?? pinned;
+  const files = parseFiles(pinned.files);
+  const file = files.find((f) => f.path === path.trim());
+  if (!file) {
+    const list = files.map((f) => f.path).join(", ") || "אין";
+    throw new DomainError("agents.fileNotFound", `אין קובץ כזה בגרסה של ההתקנה. הקבצים: ${list}.`, { files: list });
+  }
+  return { path: file.path, content: file.content, version: pinned.version };
 }
 
 async function notifyOwner(userId: string, slug: string, type: string, title: string, body: string) {
