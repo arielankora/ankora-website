@@ -16,6 +16,7 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:all": "vitest run",
+    "coverage:agents": "vitest run --coverage tests/unit tests/integration",
     "qa": "node qa/run.mjs",
     "qa:1": "node qa/run.mjs 1",
     "qa:2": "node qa/run.mjs 2",
