@@ -6,11 +6,12 @@
 
 import { ACTION_TAG_LABELS, CHANNEL_LABELS, STEP_MODE_LABELS, mergeStepChecks, type KeyedCheck, type ProcessStep } from "@/lib/process-rules";
 import { formatAmount } from "@/lib/policy-params";
+import type { BlockDiff } from "@/lib/agents/diff";
 
 /// The screen's words for the toggle and the headings are keys under
 /// approvals.preview (ADR 0006): toggle.<toggleKey>, headings.<headingKey>.
 /// `toggle` and `heading` keep the Hebrew, the same text he.json holds.
-export type PreviewToggleKey = "procedure" | "rule" | "plan";
+export type PreviewToggleKey = "procedure" | "rule" | "plan" | "addition";
 export type PreviewHeadingKey = "steps" | "highlights" | "outputs" | "excepted" | "rule" | "interim" | "why" | "planSteps";
 
 export type ApprovalPreview = {
@@ -76,4 +77,17 @@ export function planPreview(p: { body: string; steps: string[] }): ApprovalPrevi
   const sections: ApprovalPreview["sections"] = [{ heading: null, headingKey: null, lines: [p.body] }];
   if (p.steps.length) sections.push({ heading: "שלבים שהתוכנית מציעה", headingKey: "planSteps", lines: p.steps.map((s, i) => `${i + 1}. ${s}`) });
   return { toggle: "הצגת התוכנית", toggleKey: "plan", sections, problems: [] };
+}
+
+const CHANGE: Record<BlockDiff["status"], string> = { added: "נוסף", removed: "הוסר", changed: "שונה" };
+
+/// A client addition's change, block by block (24.11.2026): the lines that
+/// were added and removed against the version in use.
+export function additionPreview(changes: BlockDiff[], problems: string[]): ApprovalPreview {
+  const sections = changes.map((c) => ({
+    heading: null,
+    headingKey: null,
+    lines: [`${CHANGE[c.status]}: ${c.title}`, ...c.lines.filter((l) => l.type !== "same").map((l) => `${l.type === "add" ? "+" : "-"} ${l.text}`)],
+  }));
+  return { toggle: "הצגת השינוי", toggleKey: "addition", sections, problems };
 }

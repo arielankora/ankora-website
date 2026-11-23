@@ -101,6 +101,8 @@ function serializeItem(base: string, i: ApprovalItem, timeZone: string, proposal
     blocked: i.blocked ?? undefined,
     // A procedure held back: each check it fails, as the client's file says it.
     failing: i.failing?.length ? i.failing : undefined,
+    // An agent's client addition: the block diff against the version in use.
+    blockChanges: i.kind === "agent" && i.preview ? i.preview.sections.flatMap((sec) => sec.lines) : undefined,
     // A procedure: the lessons still open on its process (appliedLessonIds).
     openLessons: i.openLessons?.length ? i.openLessons.map((l) => ({ id: l.id, lesson: l.body, fromVersion: l.version })) : undefined,
     // What decide_approval can do with it, in the screen's own words.

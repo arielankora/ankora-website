@@ -1,4 +1,4 @@
-import { BLOCK_KINDS, PLACEHOLDER, skillOf, type AgentBlock, type AgentFile, type AgentParam, type AgentRequirements } from "./model";
+import { BLOCK_KINDS, PLACEHOLDER, canReplace, skillOf, type AgentBlock, type AgentFile, type AgentParam, type AgentRequirements } from "./model";
 
 // Agents, phase 1: one function turns a version, its parameter values and
 // the clients an installation covers into the markdown Claude receives.
@@ -20,7 +20,12 @@ export type CompileInput = {
   clients: CompileClient[];
   /// Approved library blocks by key, for LIBRARY_BLOCK parameters.
   library?: Record<string, { title: string; body: string }>;
+  /// The newest approved addition of each client in scope (24.11.2026).
+  /// A client that has one no longer reads the version's legacy client blocks.
+  additions?: CompileAddition[];
 };
+
+export type CompileAddition = { clientId: string; version: number; blocks: AgentBlock[] };
 
 export type Compiled = {
   /// Version and installation line: left out when two versions are compared.
@@ -88,8 +93,18 @@ export function compileAgent(input: CompileInput): Compiled {
   const parts: string[] = [];
   parts.push(`${agent.purpose.trim()}\n`);
   parts.push(section("רמת פעולה", ACTION_LEVEL[version.actionLevel]));
+  const inScope = new Map(clients.map((c) => [c.id, c]));
+  const added = new Map((input.additions ?? []).filter((a) => inScope.has(a.clientId)).map((a) => [a.clientId, a]));
   const general = version.blocks.filter((b) => !b.clientId).sort((a, b) => order(a) - order(b));
-  for (const b of general) parts.push(section(b.title, fill(b.body, value) + (b.why ? `\n\nלמה: ${b.why.trim()}` : "")));
+  const generalByKey = new Map(general.map((b) => [b.key, b]));
+  // With one client, an allowed replacement takes the agent block's place.
+  const own = single ? added.get(single.id) : undefined;
+  const replacing = new Map((own?.blocks ?? []).filter((r) => r.replaces && canReplace(generalByKey.get(r.replaces))).map((r) => [r.replaces!, r]));
+  const why = (b: AgentBlock) => (b.why ? `\n\nלמה: ${b.why.trim()}` : "");
+  for (const g of general) {
+    const b = replacing.get(g.key) ?? g;
+    parts.push(section(b.title, fill(b.body, value) + why(b)));
+  }
 
   if (!single && clients.length > 0 && clientParams.length > 0) {
     const head = `| לקוח | ${clientParams.map((p) => p.label).join(" | ")} |`;
@@ -98,10 +113,21 @@ export function compileAgent(input: CompileInput): Compiled {
     parts.push(section("לפי לקוח", [head, rule, ...rows].join("\n") + "\n\nכשזיהית לקוח, אפשר לבקש את ההקשר המלא שלו בכלי get_agent_client_context."));
   }
 
-  const inScope = new Map(clients.map((c) => [c.id, c]));
-  for (const b of version.blocks.filter((x) => x.clientId && inScope.has(x.clientId)).sort((a, b) => order(a) - order(b))) {
+  const forClient = (c: CompileClient) => (k: string) => { const p = byKey.get(k); return p?.level === "CLIENT" ? clientValue(c, p) : value(k); };
+  // Legacy client blocks inside the version, for a client not yet moved to an addition.
+  for (const b of version.blocks.filter((x) => x.clientId && inScope.has(x.clientId) && !added.has(x.clientId)).sort((a, b) => order(a) - order(b))) {
     const c = inScope.get(b.clientId!)!;
-    parts.push(section(`ללקוח ${c.name}: ${b.title}`, fill(b.body, (k) => { const p = byKey.get(k); return p?.level === "CLIENT" ? clientValue(c, p) : value(k); })));
+    parts.push(section(`ללקוח ${c.name}: ${b.title}`, fill(b.body, forClient(c))));
+  }
+  for (const c of clients) {
+    const a = added.get(c.id);
+    if (!a) continue;
+    for (const b of [...a.blocks].sort((x, y) => order(x) - order(y))) {
+      if (replacing.get(b.replaces ?? "") === b) continue;
+      const target = b.replaces ? generalByKey.get(b.replaces) : undefined;
+      const instead = canReplace(target) ? `, במקום "${target!.title}"` : "";
+      parts.push(section(`ללקוח ${c.name}${instead}: ${b.title}`, fill(b.body, forClient(c)) + why(b)));
+    }
   }
 
   const files = version.files ?? [];
@@ -127,7 +153,8 @@ export function compileAgent(input: CompileInput): Compiled {
   if (stops.length) parts.push(section("חסר", stops.join("\n")));
 
   const body = parts.join("\n");
-  const header = `# ${agent.name}\n\nגרסה ${version.version}${installation ? ` · התקנה ${installation.id} · עבור ${installation.userName}` : ""}${single ? ` · לקוח ${single.name}` : ""}\n`;
+  const plus = clients.filter((c) => added.has(c.id)).map((c) => ` + ${c.name} ${added.get(c.id)!.version}`).join("");
+  const header = `# ${agent.name}\n\nגרסה ${version.version}${plus}${installation ? ` · התקנה ${installation.id} · עבור ${installation.userName}` : ""}${single ? ` · לקוח ${single.name}` : ""}\n`;
   return { header, body, text: `${header}\n${body}`, blocked, missingInstallation };
 }
 

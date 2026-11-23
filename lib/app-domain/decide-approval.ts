@@ -10,6 +10,7 @@ import { approvePortalSummary, discardPortalSummary } from "@/lib/app-domain/por
 import { approveGuide, rejectGuide } from "@/lib/app-domain/extraction-guide";
 import { approveVersion, rejectVersion } from "@/lib/app-domain/agents";
 import { approveSharedVersion, isSharedBlockVersion, rejectSharedVersion } from "@/lib/app-domain/agent-library";
+import { approveClientAddition, isClientAddition, rejectClientAddition } from "@/lib/app-domain/agent-client-additions";
 import { runStep } from "@/lib/app-domain/process-next-steps";
 import type { ApprovalKind } from "@/lib/approvals";
 import { DomainError } from "@/lib/domain-error";
@@ -62,10 +63,13 @@ export async function decideApproval(user: User, input: DecideInput): Promise<vo
       else await discardPortalSummary(user, input.id);
       return;
     case "agent":
-      // A library block's version or an agent's version: the id says which.
+      // A library block's version, a client addition's or an agent's: the id says which.
       if (await isSharedBlockVersion(input.id)) {
         if (approve) await approveSharedVersion(user, input.id);
         else await rejectSharedVersion(user, input.id, note);
+      } else if (await isClientAddition(input.id)) {
+        if (approve) await approveClientAddition(user, input.id);
+        else await rejectClientAddition(user, input.id, note);
       } else if (approve) await approveVersion(user, input.id);
       else await rejectVersion(user, input.id, note);
       return;

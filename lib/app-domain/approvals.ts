@@ -17,7 +17,10 @@ import { nextSteps, type NextStepKind } from "@/lib/next-steps";
 import { processChecks, ruleContext } from "@/lib/app-domain/processes";
 import { readSteps } from "@/lib/process-rules";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
-import { planPreview, procedurePreview, rulePreview } from "@/lib/approvals-preview";
+import { additionPreview, planPreview, procedurePreview, rulePreview } from "@/lib/approvals-preview";
+import { diffBlocks } from "@/lib/agents/diff";
+import { parseBlocks } from "@/lib/agents/model";
+import { clientAdditionProblems } from "@/lib/app-domain/agent-client-additions";
 
 // What is waiting on one person's approval, read from the state each thing
 // is in now (lib/approvals.ts says why this screen exists). Each kind is
@@ -441,7 +444,36 @@ async function agentVersions(s: Scope): Promise<ApprovalItem[]> {
   if (!s.manager) return [];
   const rows = await prisma.agentVersion.findMany({ where: { state: "PENDING", agent: { archivedAt: null } }, orderBy: { submittedAt: "asc" }, include: { agent: { select: { slug: true, name: true } } } });
   const shared = await prisma.sharedBlockVersion.findMany({ where: { state: "PENDING" }, orderBy: { createdAt: "asc" }, include: { sharedBlock: { select: { title: true } } } });
-  const names = await namesOf([...rows.map((r) => r.createdById), ...shared.map((r) => r.createdById)]);
+  // 24.11.2026: a client's addition, versioned on its own, for the clients this manager has.
+  const clientName = new Map(s.clients.map((c) => [c.id, c.name]));
+  const additionRows = await prisma.agentClientAddition.findMany({ where: { state: "PENDING", clientId: { in: [...clientName.keys()] }, agent: { archivedAt: null } }, orderBy: { submittedAt: "asc" }, include: { agent: { select: { slug: true, name: true } } } });
+  const names = await namesOf([...rows.map((r) => r.createdById), ...shared.map((r) => r.createdById), ...additionRows.map((r) => r.createdById)]);
+  const additions: ApprovalItem[] = [];
+  for (const a of additionRows) {
+    const before = await prisma.agentClientAddition.findFirst({ where: { agentId: a.agentId, clientId: a.clientId, state: "APPROVED" }, orderBy: { version: "desc" }, select: { blocks: true } });
+    const { changes } = diffBlocks(parseBlocks(before?.blocks), parseBlocks(a.blocks));
+    const name = `${a.agent.name}: תוספת ל${clientName.get(a.clientId) ?? "לקוח"}`;
+    additions.push({
+      kind: "agent",
+      id: a.id,
+      clientId: a.clientId,
+      clientName: clientName.get(a.clientId) ?? null,
+      title: `${name}, גרסה ${a.version}`,
+      detail: a.changeNote ? clip(a.changeNote) : null,
+      since: a.submittedAt ?? a.createdAt,
+      by: names.get(a.createdById ?? "") ?? null,
+      href: `/app/agents/${a.agent.slug}/instructions?client=${a.clientId}`,
+      actions: { approve: "אישור הגרסה", reject: { label: "דחייה", note: true } },
+      recommend: { text: "לקרוא את השינוי ולאשר", why: "התוספת מגיעה רק כשהסוכן עובד על הלקוח הזה, מהריצה הבאה. גרסת הסוכן לא משתנה." },
+      preview: additionPreview(changes, (await clientAdditionProblems(a)).map((p) => p.text)),
+      screen: {
+        title: k("agent.title", { name, version: String(a.version) }),
+        approve: k("agent.approve"),
+        reject: k("agent.reject"),
+        recommend: { text: k("agent.recommend"), why: k("agent.additionWhy") },
+      },
+    });
+  }
   // Phase 3: a library block's version is decided with the agents it reaches.
   const library: ApprovalItem[] = shared.map((v) => ({
     kind: "agent",
@@ -462,7 +494,7 @@ async function agentVersions(s: Scope): Promise<ApprovalItem[]> {
       recommend: { text: k("agent.recommend"), why: k("agent.why") },
     },
   }));
-  return [...library, ...rows.map((v): ApprovalItem => ({
+  return [...library, ...additions, ...rows.map((v): ApprovalItem => ({
     kind: "agent",
     id: v.id,
     clientId: null,

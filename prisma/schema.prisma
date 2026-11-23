@@ -687,6 +687,7 @@ model Client {
   policyExceptions PolicyException[]
   processes        Process[]
   agentValues      AgentClientValue[]
+  agentAdditions   AgentClientAddition[]
 
   @@index([status])
   @@index([accountManagerId])
@@ -5061,6 +5062,7 @@ model Agent {
   process       Process?            @relation(fields: [processId], references: [id], onDelete: SetNull)
   versions      AgentVersion[]
   clientValues  AgentClientValue[]
+  additions     AgentClientAddition[]
   installations AgentInstallation[]
   lessons       AgentLesson[]
 
@@ -5075,8 +5077,9 @@ model AgentVersion {
   version      Int
   state        AgentVersionState @default(DRAFT)
   actionLevel  AgentActionLevel  @default(READ)
-  /// [{ key, kind, title, body, why?, clientId?, safety? }] (lib/agents/blocks.ts).
-  /// A block with clientId is a client addition: it reaches only that client.
+  /// [{ key, kind, title, body, why?, clientId?, safety?, overridable? }] (lib/agents/model.ts).
+  /// A block with clientId is a legacy client addition (before 24.11.2026,
+  /// AgentClientAddition): still read until its client has an addition row.
   blocks       Json              @default("[]")
   /// [{ key, label, level, type, required, default?, clientField? }].
   params       Json              @default("[]")
@@ -5124,6 +5127,37 @@ model AgentClientValue {
 
   @@unique([agentId, clientId, key])
   @@map("agent_client_values")
+}
+
+/// A client's additions to an agent (24.11.2026), versioned on their own:
+/// editing NUX's rule does not bump the agent's version for everyone. An
+/// installation working on NUX reads "גרסה 7 + NUX 2": the agent's pinned
+/// version, then the newest approved addition of that client. A block may
+/// replace an agent block by key (`replaces`) only when the agent block is
+/// marked overridable and is not a safety block. One open draft (DRAFT or
+/// PENDING) per agent and client, by a partial unique index in the migration.
+model AgentClientAddition {
+  id           String            @id @default(cuid())
+  agentId      String
+  clientId     String
+  version      Int
+  state        AgentVersionState @default(DRAFT)
+  /// [{ key, kind, title, body, why?, replaces? }] (lib/agents/model.ts).
+  blocks       Json              @default("[]")
+  changeNote   String?
+  createdById  String?
+  createdAt    DateTime          @default(now())
+  submittedAt  DateTime?
+  decidedById  String?
+  decidedAt    DateTime?
+  rejectReason String?
+
+  agent  Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, clientId, version])
+  @@index([state])
+  @@map("agent_client_additions")
 }
 
 /// One place an agent runs: who, where, on which clients, on which version.

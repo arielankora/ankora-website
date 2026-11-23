@@ -1934,6 +1934,8 @@
       "aliasTaken": "{email} is {name}'s own address in Ankora, so it cannot be assigned to someone else."
     },
     "agents": {
+      "additionPending": "This client's addition has a version waiting for approval. Approve or reject it before another change.",
+      "clientAiExcluded": "The client is marked \"no AI\", and agents do not work on it.",
       "notFound": "The agent was not found.",
       "nameRequired": "The agent needs a name, up to 80 characters.",
       "purposeRequired": "Write in one line what the agent does.",
@@ -2257,6 +2259,11 @@
       "agentApprove": "Agent version approved",
       "agentReject": "Agent version rejected",
       "agentClientValue": "Agent client value set",
+      "agentAdditionSave": "Agent client addition draft saved",
+      "agentAdditionSubmit": "Agent client addition sent for approval",
+      "agentAdditionDiscard": "Agent client addition draft discarded",
+      "agentAdditionApprove": "Agent client addition approved",
+      "agentAdditionReject": "Agent client addition rejected",
       "agentInstall": "Agent installed",
       "agentUninstall": "Agent installation removed",
       "agentUpdateAccept": "Agent installation updated to a new version",
@@ -6117,7 +6124,8 @@
       "toggle": {
         "procedure": "Show procedure",
         "rule": "Show rule",
-        "plan": "Show plan"
+        "plan": "Show plan",
+        "addition": "Show the change"
       },
       "headings": {
         "steps": "Steps",
@@ -6245,7 +6253,8 @@
         "approve": "Approve version",
         "reject": "Reject",
         "recommend": "Read the change and approve",
-        "why": "The version reaches everyone who runs the agent, once they accept it."
+        "why": "The version reaches everyone who runs the agent, once they accept it.",
+        "additionWhy": "The addition reaches the agent only when it works on this client, from the next run. The agent's version does not change."
       }
     }
   },

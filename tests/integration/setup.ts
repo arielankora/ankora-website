@@ -67,6 +67,7 @@ const TABLES = [
   "agent_runs",
   "shared_block_versions",
   "shared_blocks",
+  "agent_client_additions",
   "agent_client_values",
   "agent_installations",
   "agent_versions",

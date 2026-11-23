@@ -24,6 +24,8 @@ import {
 } from "@/lib/app-domain/agents";
 import { BLOCK_KINDS, CLIENT_FIELDS, PARAM_LEVELS, PARAM_TYPES, parseSkillText, type AgentBlock, type AgentParam } from "@/lib/agents/model";
 import { bootstrapText } from "@/lib/agents/compile";
+import { approveClientAddition, discardClientAddition, isClientAddition, rejectClientAddition, saveClientAddition, submitClientAddition } from "@/lib/app-domain/agent-client-additions";
+import { parseBlocks } from "@/lib/agents/model";
 import { approveSharedVersion, decideLesson, proposeSharedBlock, rejectSharedVersion, sharedBlockForAgent } from "@/lib/app-domain/agent-library";
 
 // Agents, phase 1: the screens' writes. Every one goes through
@@ -81,8 +83,8 @@ export async function saveBlockAction(_prev: FormState | undefined, f: FormData)
       title,
       body: String(f.get("body") ?? "").trim(),
       why: str(f, "why") || null,
-      clientId: str(f, "clientId") || null,
       safety: f.get("safety") === "on",
+      overridable: f.get("overridable") === "on" && f.get("safety") !== "on",
     };
     const { blocks } = await editable(agentId);
     const next = original ? blocks.map((b) => (b.key === original ? block : b)) : [...blocks, block];
@@ -151,14 +153,74 @@ export async function discardDraftAction(versionId: string): Promise<FormState> 
   return run(() => discardDraft(user, versionId));
 }
 
+// An agent version or a client addition's version: the id says which.
 export async function approveVersionAction(versionId: string): Promise<FormState> {
   const user = await requireUser();
-  return run(() => approveVersion(user, versionId).then(() => undefined));
+  return run(async () => {
+    if (await isClientAddition(versionId)) await approveClientAddition(user, versionId);
+    else await approveVersion(user, versionId);
+  });
 }
 
 export async function rejectVersionAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
   const user = await requireUser();
-  return run(() => rejectVersion(user, str(f, "id"), str(f, "reason")).then(() => undefined));
+  return run(async () => {
+    const id = str(f, "id");
+    if (await isClientAddition(id)) await rejectClientAddition(user, id, str(f, "reason"));
+    else await rejectVersion(user, id, str(f, "reason"));
+  });
+}
+
+// --- Client additions (24.11.2026) -------------------------------------------
+
+/// The addition's open draft when there is one, else its version in use.
+async function editableAddition(agentId: string, clientId: string) {
+  const row = await prisma.agentClientAddition.findFirst({ where: { agentId, clientId, state: { in: ["DRAFT", "APPROVED"] } }, orderBy: { version: "desc" } });
+  return parseBlocks(row?.blocks);
+}
+
+export async function saveAdditionBlockAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  return run(async () => {
+    const agentId = str(f, "agentId");
+    const clientId = str(f, "clientId");
+    const original = str(f, "originalKey");
+    const kind = str(f, "kind") as AgentBlock["kind"];
+    const block: AgentBlock = {
+      key: original || `c${Date.now().toString(36)}`,
+      kind: BLOCK_KINDS.includes(kind) ? kind : "rules",
+      title: str(f, "title"),
+      body: String(f.get("body") ?? "").trim(),
+      why: str(f, "why") || null,
+      replaces: str(f, "replaces") || null,
+    };
+    const blocks = await editableAddition(agentId, clientId);
+    const next = original ? blocks.map((b) => (b.key === original ? block : b)) : [...blocks, block];
+    await saveClientAddition(user, { agentId, clientId, blocks: next });
+  });
+}
+
+export async function deleteAdditionBlockAction(agentId: string, clientId: string, key: string): Promise<FormState> {
+  const user = await requireUser();
+  return run(async () => {
+    const blocks = await editableAddition(agentId, clientId);
+    await saveClientAddition(user, { agentId, clientId, blocks: blocks.filter((b) => b.key !== key) });
+  });
+}
+
+export async function saveAdditionNoteAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => saveClientAddition(user, { agentId: str(f, "agentId"), clientId: str(f, "clientId"), changeNote: str(f, "changeNote") || null }).then(() => undefined));
+}
+
+export async function submitAdditionAction(id: string): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => submitClientAddition(user, id).then(() => undefined));
+}
+
+export async function discardAdditionAction(id: string): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => discardClientAddition(user, id));
 }
 
 export async function archiveAgentAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
