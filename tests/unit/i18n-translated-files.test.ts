@@ -328,6 +328,7 @@ const TRANSLATED_FILES = [
   "app/(product)/app/(authenticated)/agents/[slug]/versions/page.tsx",
   "app/(product)/app/(authenticated)/agents/[slug]/installations/page.tsx",
   "app/(product)/app/(authenticated)/agents/[slug]/params/page.tsx",
+  "app/(product)/app/(authenticated)/agents/problem-words.ts",
 ];
 
 describe("translated screens (ADR 0006)", () => {

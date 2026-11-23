@@ -452,6 +452,7 @@ async function agentVersions(s: Scope): Promise<ApprovalItem[]> {
   for (const a of additionRows) {
     const before = await prisma.agentClientAddition.findFirst({ where: { agentId: a.agentId, clientId: a.clientId, state: "APPROVED" }, orderBy: { version: "desc" }, select: { blocks: true } });
     const { changes } = diffBlocks(parseBlocks(before?.blocks), parseBlocks(a.blocks));
+    const problems = await clientAdditionProblems(a);
     const name = `${a.agent.name}: תוספת ל${clientName.get(a.clientId) ?? "לקוח"}`;
     additions.push({
       kind: "agent",
@@ -465,7 +466,8 @@ async function agentVersions(s: Scope): Promise<ApprovalItem[]> {
       href: `/app/agents/${a.agent.slug}/instructions?client=${a.clientId}`,
       actions: { approve: "אישור הגרסה", reject: { label: "דחייה", note: true } },
       recommend: { text: "לקרוא את השינוי ולאשר", why: "התוספת מגיעה רק כשהסוכן עובד על הלקוח הזה, מהריצה הבאה. גרסת הסוכן לא משתנה." },
-      preview: additionPreview(changes, (await clientAdditionProblems(a)).map((p) => p.text)),
+      preview: additionPreview(changes, problems.map((p) => p.text)),
+      additionWords: { changes, problems },
       screen: {
         title: k("agentAddition.title", { agent: a.agent.name, client: clientName.get(a.clientId) ?? "", version: String(a.version) }),
         approve: k("agent.approve"),

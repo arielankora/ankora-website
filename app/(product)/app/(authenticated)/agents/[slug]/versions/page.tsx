@@ -2,7 +2,8 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { Forbidden } from "@/components/app/Forbidden";
 import { contentOf, draftProblems } from "@/lib/app-domain/agents";
 import { diffBlocks, diffParams } from "@/lib/agents/diff";
-import { AgentHeader, loadAgent, problemWords } from "../shared";
+import { AgentHeader, loadAgent } from "../shared";
+import { problemWords } from "../../problem-words";
 import { DecideVersion, MarkFaulty, RevertToVersion } from "../../AgentForms";
 
 // Agents, phase 1: "גרסאות". Every version, and one compared with the

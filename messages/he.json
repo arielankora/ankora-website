@@ -6146,7 +6146,12 @@
         "output": "תוצר: {output}",
         "verification": "אימות: {verification}"
       },
-      "automatedSteps": "שלבים {steps} ו-{last} אוטומטיים: צריך לכתוב בכל אחד איך אדם מוודא שהשלב קרה."
+      "automatedSteps": "שלבים {steps} ו-{last} אוטומטיים: צריך לכתוב בכל אחד איך אדם מוודא שהשלב קרה.",
+      "addition": {
+        "added": "נוסף: {title}",
+        "removed": "הוסר: {title}",
+        "changed": "שונה: {title}"
+      }
     },
     "bulk": {
       "label": "לאשר את {count} הכללים של {client}",

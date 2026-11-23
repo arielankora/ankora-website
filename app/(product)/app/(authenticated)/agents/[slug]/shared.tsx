@@ -7,7 +7,6 @@ import { can } from "@/lib/app-auth/permissions";
 import { DomainError } from "@/lib/domain-error";
 import { ViewTabs } from "@/components/app/ViewTabs";
 import { contentOf, getAgent, resolveClients } from "@/lib/app-domain/agents";
-import type { VersionProblem } from "@/lib/agents/model";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { ArchiveAgent, DraftButtons, EditPurpose } from "../AgentForms";
 
@@ -28,17 +27,6 @@ export async function loadAgent(slug: string) {
   const content = editing ? contentOf(editing) : { blocks: [], params: [], requirements: { connectors: [], skills: [], repos: [], localMcp: [], externalRunners: [] }, actionLevel: "READ" as const, files: [] };
   const clients = (await listAccessibleClients(user)).map((c) => ({ id: c.id, name: c.name }));
   return { user, ...data, editing, content, clients, resolve: (ids: string[]) => resolveClients(user, data.agent.id, content.params, { clientScope: "LIST", clientIds: ids }) };
-}
-
-/// ADR 0006: a version's or a client addition's checks, in the reader's
-/// language, by code. A check the dictionary does not know keeps its Hebrew.
-export async function problemWords() {
-  const t = await getTranslations("agents.versions.problems");
-  return (p: VersionProblem) => {
-    if (!t.has(p.code as "dash")) return p.text;
-    const values = p.code === "undefinedParam" ? { placeholder: `{{${p.values?.key ?? ""}}}` } : p.values;
-    return t(p.code as "dash", values as never);
-  };
 }
 
 export type LoadedAgent = NonNullable<Awaited<ReturnType<typeof loadAgent>>>;

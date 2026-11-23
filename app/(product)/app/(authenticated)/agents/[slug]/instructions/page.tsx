@@ -8,7 +8,8 @@ import { approvedAdditions, listClientAdditions } from "@/lib/app-domain/agent-c
 import { compileAgent } from "@/lib/agents/compile";
 import { changeNotePrompt } from "@/lib/agents/change-note-prompt";
 import { contentOf } from "@/lib/app-domain/agents";
-import { AgentHeader, loadAgent, problemWords } from "../shared";
+import { AgentHeader, loadAgent } from "../shared";
+import { problemWords } from "../../problem-words";
 import Link from "next/link";
 import { approvedLibrary, listSharedBlocks } from "@/lib/app-domain/agent-library";
 import { AddFromLibrary, AdditionDraftButtons, DecideVersion, DeleteAdditionBlock, DeleteBlock, EditAdditionBlock, EditAdditionNote, EditBlock, EditMeta } from "../../AgentForms";

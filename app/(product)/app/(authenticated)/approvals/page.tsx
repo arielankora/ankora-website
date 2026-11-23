@@ -24,6 +24,7 @@ import {
 import { rankApprovals } from "@/lib/next-steps";
 import { ApprovalRow } from "./ApprovalRow";
 import { procedureWords, stepTextWords, type LooseT } from "./procedure-words";
+import { problemWords } from "../agents/problem-words";
 import { BulkRules } from "./BulkRules";
 import { aiExcludedClientIds, aiExcludedTaskIds } from "@/lib/app-domain/ai-exclusion-db";
 import { KnowledgeReview } from "../knowledge/KnowledgeReview";
@@ -61,6 +62,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
   // gives as keys and data (./procedure-words.ts).
   const tProc = (await getTranslations("clients.processes")) as unknown as LooseT;
   const tPrev = (await getTranslations("approvals.preview")) as unknown as LooseT;
+  const problemText = await problemWords();
   const say = (m: ApprovalText): string =>
     tItems(
       `items.${m.key}`,
@@ -128,7 +130,17 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
               sec.headingKey === "steps" ? { ...sec, lines: proc.steps } : sec.headingKey === "excepted" ? { ...sec, lines: proc.excepted } : sec
             ),
           }
-        : (i.preview ?? null);
+        : i.additionWords && i.preview
+          ? {
+              ...i.preview,
+              sections: i.additionWords.changes.map((c) => ({
+                heading: null,
+                headingKey: null,
+                lines: [tPrev(`addition.${c.status}`, { title: c.title }), ...c.lines.filter((l) => l.type !== "same").map((l) => `${l.type === "add" ? "+" : "-"} ${l.text}`)],
+              })),
+              problems: i.additionWords.problems.map(problemText),
+            }
+          : (i.preview ?? null);
     return {
       kind: i.kind,
       id: i.id,

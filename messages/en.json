@@ -6146,7 +6146,12 @@
         "output": "Output: {output}",
         "verification": "Check: {verification}"
       },
-      "automatedSteps": "Steps {steps} and {last} are automated: write in each how a person makes sure the step happened."
+      "automatedSteps": "Steps {steps} and {last} are automated: write in each how a person makes sure the step happened.",
+      "addition": {
+        "added": "Added: {title}",
+        "removed": "Removed: {title}",
+        "changed": "Changed: {title}"
+      }
     },
     "bulk": {
       "label": "Approve {client}'s {count} rules",
