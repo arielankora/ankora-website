@@ -7,7 +7,7 @@ import { DomainError } from "@/lib/domain-error";
 import { ViewTabs } from "@/components/app/ViewTabs";
 import { contentOf, getAgent, resolveClients } from "@/lib/app-domain/agents";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { ArchiveAgent, DraftButtons } from "../AgentForms";
+import { ArchiveAgent, DraftButtons, EditPurpose } from "../AgentForms";
 import { KIND_LABEL } from "../labels";
 
 // Agents, phase 1: what every tab of one agent reads, and the header and
@@ -54,6 +54,7 @@ export function AgentHeader({ data, active }: { data: LoadedAgent; active: (type
           {agent.ownerName && <span className="rounded-full border border-app-border bg-white px-2.5 py-0.5">אחראי: {agent.ownerName}</span>}
           <span className="rounded-full border border-app-border bg-white px-2.5 py-0.5">{approved ? `גרסה ${approved.version} מאושרת` : "אין גרסה מאושרת"}</span>
           {approved && <a href={`/api/agents/${agent.slug}/export`} className="rounded-full border border-app-border bg-white px-2.5 py-0.5 text-app-text-accent">להוריד כסקיל (SKILL.md)</a>}
+          {data.canDecide && <EditPurpose agentId={agent.id} purpose={agent.purpose} />}
           {data.canDecide && <ArchiveAgent agentId={agent.id} name={agent.name} />}
         </div>
       </div>

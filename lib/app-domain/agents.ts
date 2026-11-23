@@ -314,6 +314,19 @@ export async function linkedProcedure(user: User, agentId: string): Promise<Link
   };
 }
 
+/// The one-line description under the agent's name (23.11.2026). It is not
+/// part of a version, so a manager changes it in place, with an audit entry.
+export async function setAgentPurpose(actor: User, agentId: string, purpose: string) {
+  assertApprover(actor);
+  const text = purpose.trim();
+  if (!text || text.length > 300) throw new DomainError("agents.purposeRequired", "צריך לכתוב בשורה מה הסוכן עושה.");
+  const agent = await prisma.agent.findUnique({ where: { id: agentId }, select: { id: true, purpose: true, archivedAt: true } });
+  if (!agent || agent.archivedAt) throw new DomainError("agents.notFound", "הסוכן לא נמצא.");
+  if (agent.purpose === text) return;
+  await prisma.agent.update({ where: { id: agentId }, data: { purpose: text } });
+  await recordAudit({ actorId: actor.id, action: "agent.purpose", entityType: "Agent", entityId: agentId, before: { purpose: agent.purpose }, after: { purpose: text } });
+}
+
 // --- Client values ----------------------------------------------------------
 
 async function assertClientAccess(actor: User, clientId: string) {

@@ -14,6 +14,7 @@ import {
   rejectSharedAction,
   approveVersionAction,
   archiveAgentAction,
+  setAgentPurposeAction,
   createAgentAction,
   deleteBlockAction,
   deleteParamAction,
@@ -394,6 +395,36 @@ export function ArchiveAgent({ agentId, name }: { agentId: string; name: string 
   return (
     <Drawer triggerLabel="להעביר לארכיון" title={`העברת "${name}" לארכיון`} variant="link">
       <ArchiveForm agentId={agentId} />
+    </Drawer>
+  );
+}
+
+function PurposeForm({ agentId, purpose }: { agentId: string; purpose: string }) {
+  const router = useRouter();
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(setAgentPurposeAction, () => {
+    close();
+    router.refresh();
+  });
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="agentId" value={agentId} />
+      <p className="text-[13px] text-app-text-secondary">השורה שמופיעה מתחת לשם הסוכן, ברשימה ובמחבר. היא לא חלק מהגרסה, והשינוי נכנס מיד.</p>
+      <Field label="מה הסוכן עושה, בשורה">
+        <input name="purpose" required maxLength={300} defaultValue={purpose} dir="auto" className={INPUT} />
+      </Field>
+      <Err error={error} />
+      <button type="submit" disabled={pending} className={PRIMARY}>
+        {pending ? "שומר..." : "לשמור"}
+      </button>
+    </form>
+  );
+}
+
+export function EditPurpose({ agentId, purpose }: { agentId: string; purpose: string }) {
+  return (
+    <Drawer triggerLabel="לערוך תיאור" title="תיאור הסוכן" variant="link">
+      <PurposeForm agentId={agentId} purpose={purpose} />
     </Drawer>
   );
 }

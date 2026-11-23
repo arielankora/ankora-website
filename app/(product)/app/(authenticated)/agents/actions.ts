@@ -8,6 +8,7 @@ import {
   acceptUpdate,
   approveVersion,
   archiveAgent,
+  setAgentPurpose,
   contentOf,
   createAgent,
   createInstallation,
@@ -167,6 +168,11 @@ export async function archiveAgentAction(_prev: FormState | undefined, f: FormDa
 export async function setAgentProcessAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
   const user = await requireUser();
   return run(() => setAgentProcess(user, str(f, "agentId"), str(f, "processId") || null));
+}
+
+export async function setAgentPurposeAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => setAgentPurpose(user, str(f, "agentId"), str(f, "purpose")));
 }
 
 export async function markFaultyAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {

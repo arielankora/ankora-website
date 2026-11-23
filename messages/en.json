@@ -2249,6 +2249,7 @@
       "agentDraftDiscard": "Agent draft discarded",
       "agentArchive": "Agent archived",
       "agentProcess": "Agent linked to a process",
+      "agentPurpose": "Agent description changed",
       "agentSubmit": "Agent version sent for approval",
       "agentApprove": "Agent version approved",
       "agentReject": "Agent version rejected",

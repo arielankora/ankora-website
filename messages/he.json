@@ -2249,6 +2249,7 @@
       "agentDraftDiscard": "ביטול טיוטה של סוכן",
       "agentArchive": "העברת סוכן לארכיון",
       "agentProcess": "קישור סוכן לתהליך",
+      "agentPurpose": "עדכון תיאור של סוכן",
       "agentSubmit": "שליחת גרסה של סוכן לאישור",
       "agentApprove": "אישור גרסה של סוכן",
       "agentReject": "דחיית גרסה של סוכן",
