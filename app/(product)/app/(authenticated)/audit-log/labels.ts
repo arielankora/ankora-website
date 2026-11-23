@@ -229,6 +229,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "agent.draft_save": "שמירת טיוטה של סוכן",
   "agent.draft_discard": "ביטול טיוטה של סוכן",
   "agent.archive": "העברת סוכן לארכיון",
+  "agent.process": "קישור סוכן לתהליך",
   "agent.submit": "שליחת גרסה של סוכן לאישור",
   "agent.approve": "אישור גרסה של סוכן",
   "agent.reject": "דחיית גרסה של סוכן",

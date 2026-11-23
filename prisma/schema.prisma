@@ -542,7 +542,7 @@ model Client {
   /// audited (SOC 2, ISO). Adds to each procedure the compliance fields,
   /// the readiness for an audit and "להכין לביקורת". On for NUX and
   /// Ankora's own file.
-  auditRequirements Boolean @default(false)
+  auditRequirements           Boolean @default(false)
 
   /// 12.11.2026 (ADR 0006, outgoing channels, part B): the language Ankora
   /// writes to this client's people who have no account in the app (its
@@ -1023,12 +1023,12 @@ model Task {
   // the task is reopened, exactly like `completedAt` - an approval that
   // survived a reopen would be a signature on work that changed after it
   // was given.
-  supervisorId     String?
+  supervisorId      String?
   /// Tasks phase 5. Null means this is a task in its own right.
-  parentId         String?
-  requiresApproval Boolean   @default(false)
-  approvedById     String?
-  approvedAt       DateTime?
+  parentId          String?
+  requiresApproval  Boolean   @default(false)
+  approvedById      String?
+  approvedAt        DateTime?
   /// 14.11.2026 (processes redesign, stage 3, spec 4.5): a run's step
   /// approved by a contact at the client. Not a gate like `supervisorId`:
   /// the run goes on, but the step reaches done only with
@@ -4152,6 +4152,7 @@ model Process {
   starts        ProcessStart[]
   checks        ProcessCheck[]
   strangerTests ProcessStrangerTest[]
+  agents        Agent[]
 
   @@unique([clientId, seq])
   @@unique([clientId, code])
@@ -4355,10 +4356,10 @@ model ProcessVersion {
   outputs    String?
   changeNote String?
 
-  createdById    String?
-  createdAt      DateTime  @default(now())
-  approvedById   String?
-  approvedAt     DateTime?
+  createdById     String?
+  createdAt       DateTime  @default(now())
+  approvedById    String?
+  approvedAt      DateTime?
   /// 14.11.2026: a person who approves procedures said the approved
   /// document is still right after something changed around it (the
   /// rhythm, a rule). "לעדכן" counts from here, not from approvedAt.
@@ -4368,7 +4369,7 @@ model ProcessVersion {
   /// approved, as they were: [{ code, message, severity, policyId?,
   /// excepted? }]. The live checks may say otherwise later; this says what
   /// the approver saw.
-  approvalChecks Json?
+  approvalChecks  Json?
 
   /// The procedure document as it was approved (lib/procedure-document.ts,
   /// ProcedureSnapshot): the process's fields, names resolved, frozen at
@@ -5038,25 +5039,32 @@ enum AgentInstallationStatus {
 }
 
 model Agent {
-  id      String    @id @default(cuid())
+  id        String    @id @default(cuid())
   /// Stable, appears in the bootstrap text.
-  slug    String    @unique
-  name    String
+  slug      String    @unique
+  name      String
   /// What it does, in a line.
-  purpose String
-  kind    AgentKind
-  ownerId String?
+  purpose   String
+  kind      AgentKind
+  ownerId   String?
+  /// The Ankora process whose approved procedure this agent carries out
+  /// (23.11.2026). get_agent adds its steps from the approved version at
+  /// fetch time, so a procedure change reaches the agent without a new
+  /// agent version. Live, not versioned; a manager sets it.
+  processId String?
 
   createdById String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   archivedAt  DateTime?
 
+  process       Process?            @relation(fields: [processId], references: [id], onDelete: SetNull)
   versions      AgentVersion[]
   clientValues  AgentClientValue[]
   installations AgentInstallation[]
   lessons       AgentLesson[]
 
+  @@index([processId])
   @@map("agents")
 }
 

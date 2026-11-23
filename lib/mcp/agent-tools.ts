@@ -8,9 +8,10 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { appUrl } from "@/lib/approval-links";
 import { prisma } from "@/lib/prisma";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, draftProblems, fetchAgent, listMyInstallations, recordRun, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
+import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, draftProblems, fetchAgent, linkedProcedure, listMyInstallations, recordRun, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
 import { proposeLesson } from "@/lib/app-domain/agent-library";
 import { bootstrapText } from "@/lib/agents/compile";
+import { procedureSection } from "@/lib/agents/procedure";
 import { BLOCK_KINDS, CLIENT_FIELDS, LIMITS, PARAM_LEVELS, PARAM_TYPES } from "@/lib/agents/model";
 
 // Agents, phase 1 (22.11.2026): the connector side of "סוכנים".
@@ -68,6 +69,8 @@ export function registerAgentTools(server: McpServer): void {
         const actor = actorOf(ctx);
         const got = await fetchAgent(actor, args.installation.trim());
         const parts = [got.compiled.text.trim()];
+        const procedure = await linkedProcedure(actor, got.agent.id);
+        if (procedure) parts.push(procedureSection(procedure).trim());
         if (got.fellBackFrom) parts.push(`## הערה\n\nגרסה ${got.fellBackFrom.version} סומנה כתקולה${got.fellBackFrom.reason ? ` (${got.fellBackFrom.reason})` : ""}, וההתקנה חזרה לגרסה ${got.version}. ההוראות למעלה הן של גרסה ${got.version}.`);
         if (got.update) parts.push(updateSection(got.update, got.version));
         parts.push("## בסוף הריצה\n\nאם למדת בריצה משהו שכדאי לשנות בהוראות (כלל חסר, ניסוח שהטעה), הצע אותו ב-propose_agent_change. אדם יחליט.\n\nקרא ל-record_agent_run עם installation הזה: OK, PARTIAL או FAILED, שורה על מה שנעשה, מה השתבש ומה חסר (חיבור, סקיל, ערך). ריצה שלא דווחה נראית באנקורה כאילו לא קרתה.");

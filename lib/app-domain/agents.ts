@@ -9,6 +9,8 @@ import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { aiExcludedClientIds } from "@/lib/app-domain/ai-exclusion-db";
 import { LIMITS, fileSchema, parseBlocks, parseFiles, parseParams, parseRequirements, requirementsSchema, versionProblems, blockSchema, paramSchema, type AgentBlock, type AgentFile, type AgentParam, type AgentRequirements } from "@/lib/agents/model";
 import { compileAgent, isCheckDue, type CompileClient } from "@/lib/agents/compile";
+import type { LinkedProcedure } from "@/lib/agents/procedure";
+import { mcpGetProcess } from "@/lib/app-domain/mcp-processes";
 import { z } from "zod";
 
 // Agents, phase 1 (22.11.2026, "סוכנים באנקורה: אפיון").
@@ -85,6 +87,7 @@ export async function getAgent(actor: User, slug: string) {
       versions: { orderBy: { version: "desc" } },
       installations: { where: { status: "ACTIVE" }, orderBy: { createdAt: "asc" }, include: { runs: { orderBy: { createdAt: "desc" }, take: 5 } } },
       clientValues: true,
+      process: { select: { id: true, code: true, title: true, deletedAt: true, client: { select: { name: true } } } },
     },
   });
   if (!agent || agent.archivedAt) throw new DomainError("agents.notFound", "הסוכן לא נמצא.");
@@ -94,6 +97,7 @@ export async function getAgent(actor: User, slug: string) {
   const versionNo = new Map(agent.versions.map((v) => [v.id, v.version]));
   return {
     agent: { id: agent.id, slug: agent.slug, name: agent.name, purpose: agent.purpose, kind: agent.kind, ownerId: agent.ownerId, ownerName: agent.ownerId ? names.get(agent.ownerId) ?? null : null },
+    process: agent.process && !agent.process.deletedAt ? { id: agent.process.id, code: agent.process.code, title: agent.process.title, clientName: agent.process.client.name } : null,
     approved,
     draft,
     versions: agent.versions.map((v) => ({ ...v, createdByName: v.createdById ? names.get(v.createdById) ?? null : null, decidedByName: v.decidedById ? names.get(v.decidedById) ?? null : null })),
@@ -254,6 +258,59 @@ export async function archiveAgent(actor: User, agentId: string, reason: string)
   if (active > 0) throw new DomainError("agents.archiveInstalled", "לסוכן יש התקנות פעילות. צריך להסיר אותן לפני שמעבירים אותו לארכיון.", { count: active });
   await prisma.agent.update({ where: { id: agentId }, data: { archivedAt: new Date() } });
   await recordAudit({ actorId: actor.id, action: "agent.archive", entityType: "Agent", entityId: agentId, after: { slug: agent.slug, reason: why } });
+}
+
+// --- The process an agent carries out (23.11.2026) ----------------------------
+
+/// Links an agent to the Ankora process it carries out, or unlinks it
+/// (null). A manager's decision: every installation gets the procedure from
+/// its next fetch.
+export async function setAgentProcess(actor: User, agentId: string, processId: string | null) {
+  assertApprover(actor);
+  const agent = await prisma.agent.findUnique({ where: { id: agentId }, select: { id: true, archivedAt: true, processId: true } });
+  if (!agent || agent.archivedAt) throw new DomainError("agents.notFound", "הסוכן לא נמצא.");
+  if (processId) {
+    const process = await prisma.process.findUnique({ where: { id: processId }, select: { id: true, clientId: true, deletedAt: true } });
+    if (!process || process.deletedAt) throw new DomainError("agents.processNotFound", "התהליך לא נמצא.");
+    const clients = await listAccessibleClients(actor);
+    if (!clients.some((c) => c.id === process.clientId)) throw new DomainError("agents.clientForbidden", "אין לך גישה ללקוח הזה.");
+  }
+  await prisma.agent.update({ where: { id: agentId }, data: { processId } });
+  await recordAudit({ actorId: actor.id, action: "agent.process", entityType: "Agent", entityId: agentId, before: { processId: agent.processId }, after: { processId } });
+}
+
+/// The processes a manager can link, by client.
+export async function linkableProcesses(actor: User) {
+  const clients = (await listAccessibleClients(actor)).filter((c) => !c.aiExcluded);
+  const rows = await prisma.process.findMany({ where: { clientId: { in: clients.map((c) => c.id) }, deletedAt: null, status: { not: "RETIRED" } }, orderBy: [{ clientId: "asc" }, { seq: "asc" }], select: { id: true, code: true, title: true, clientId: true } });
+  const name = new Map(clients.map((c) => [c.id, c.name]));
+  return rows.map((r) => ({ id: r.id, label: `${name.get(r.clientId) ?? ""} · ${r.code} ${r.title}` }));
+}
+
+/// The approved procedure of the agent's process, as the person running it
+/// may see it. Null when the agent carries out no process.
+export async function linkedProcedure(user: User, agentId: string): Promise<LinkedProcedure | null> {
+  const agent = await prisma.agent.findUnique({ where: { id: agentId }, select: { process: { select: { id: true, code: true, title: true, clientId: true, deletedAt: true, client: { select: { name: true, aiExcluded: true } } } } } });
+  const p = agent?.process;
+  if (!p || p.deletedAt) return null;
+  if (p.client.aiExcluded) return { ok: false, code: p.code, title: p.title, reason: "aiExcluded" };
+  const clients = await listAccessibleClients(user);
+  if (!clients.some((c) => c.id === p.clientId)) return { ok: false, code: p.code, title: p.title, reason: "noAccess" };
+  const detail = await mcpGetProcess(user, p.clientId, p.id);
+  if (!detail) return { ok: false, code: p.code, title: p.title, reason: "noAccess" };
+  const proc = detail.procedure;
+  if (!proc) return { ok: false, code: p.code, title: p.title, reason: "noApproved" };
+  return {
+    ok: true,
+    code: p.code,
+    title: p.title,
+    clientName: p.client.name,
+    version: proc.version,
+    steps: proc.steps.map((s) => ({ n: s.n, title: s.title, output: s.output ?? null, verification: s.verification ?? null, needsApproval: !!s.needsApproval })),
+    highlights: proc.highlights,
+    outputs: proc.outputs,
+    failsRules: proc.failsRules,
+  };
 }
 
 // --- Client values ----------------------------------------------------------
