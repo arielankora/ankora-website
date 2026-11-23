@@ -23,6 +23,7 @@ import {
   markFaultyAction,
   rejectVersionAction,
   removeInstallationAction,
+  revertToVersionAction,
   saveBlockAction,
   saveMetaAction,
   saveParamAction,
@@ -572,6 +573,26 @@ export function RemoveInstallation({ id }: { id: string }) {
 
 export function AcceptUpdate({ id, version }: { id: string; version: number }) {
   return <ActionButton run={() => acceptUpdateAction(id, version)} label="לעדכן" done={`ההתקנה עודכנה לגרסה ${version}`} tone="primary" />;
+}
+
+/// "להחזיר לגרסה N": opens a draft that copies it, then shows that draft.
+export function RevertToVersion({ agentId, slug, version }: { agentId: string; slug: string; version: number }) {
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [busy, setBusy] = useState(false);
+  async function click() {
+    setBusy(true);
+    const r = await revertToVersionAction(agentId, version);
+    setBusy(false);
+    if (r.error) return showToast({ tone: "error", title: "לא בוצע", description: r.error });
+    showToast({ tone: "info", title: `נפתחה טיוטה שהיא עותק של גרסה ${version}`, description: "היא תיכנס לשימוש אחרי אישור מנהל." });
+    router.push(`/app/agents/${slug}/versions?v=${r.version}`);
+  }
+  return (
+    <button type="button" onClick={click} disabled={busy} className="tap-area rounded-full border border-app-border bg-white px-4 py-2 text-[13px] text-app-text-primary disabled:opacity-50">
+      להחזיר לגרסה {version}
+    </button>
+  );
 }
 
 // --- Phase 3: library and lessons -------------------------------------------

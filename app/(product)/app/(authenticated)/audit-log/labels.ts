@@ -239,6 +239,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "agent.uninstall": "הסרת התקנה של סוכן",
   "agent.update_accept": "עדכון התקנה של סוכן לגרסה חדשה",
   "agent.mark_faulty": "סימון גרסה של סוכן כתקולה",
+  "agent.revert": "חזרה לגרסה קודמת של סוכן",
   "agent.installation_value": "שמירת ערך של התקנת סוכן",
   "agent.library_propose": "הצעת גרסה לקטע בספריית הסוכנים",
   "agent.library_approve": "אישור גרסה של קטע בספריית הסוכנים",

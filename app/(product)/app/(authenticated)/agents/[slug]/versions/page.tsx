@@ -3,7 +3,7 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { contentOf, draftProblems } from "@/lib/app-domain/agents";
 import { diffBlocks, diffParams } from "@/lib/agents/diff";
 import { AgentHeader, loadAgent } from "../shared";
-import { DecideVersion, MarkFaulty } from "../../AgentForms";
+import { DecideVersion, MarkFaulty, RevertToVersion } from "../../AgentForms";
 import { ACTION_LEVEL_LABEL, BLOCK_KIND_LABEL, STATE_LABEL } from "../../labels";
 
 // Agents, phase 1: "גרסאות". Every version, and one compared with the
@@ -98,6 +98,13 @@ export default async function VersionsPage({ params, searchParams }: { params: P
               <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-app-border bg-white px-5 py-3 text-[13px] text-app-text-secondary">
                 <span>גרסה שגורמת נזק? סימון כתקולה מחזיר מיד את כל ההתקנות שעליה לגרסה הקודמת.</span>
                 <MarkFaulty id={selected.id} version={selected.version} />
+              </section>
+            )}
+
+            {selected.state === "APPROVED" && !selected.faultyAt && approved && selected.version < approved.version && (
+              <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-app-border bg-white px-5 py-3 text-[13px] text-app-text-secondary">
+                <span>{data.draft ? `גרסה ${data.draft.version} עוד פתוחה. כדי לחזור לגרסה הזו צריך קודם לסיים אותה: לשלוח או לבטל טיוטה, לאשר או לדחות גרסה שממתינה.` : "חזרה לגרסה הזו פותחת גרסה חדשה שהיא עותק שלה. היא נכנסת לשימוש רק אחרי אישור מנהל."}</span>
+                {!data.draft && <RevertToVersion agentId={agent.id} slug={agent.slug} version={selected.version} />}
               </section>
             )}
 
