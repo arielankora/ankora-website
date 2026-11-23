@@ -2,6 +2,8 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { CopyValue } from "@/components/app/CopyValue";
 import { BLOCK_KINDS } from "@/lib/agents/model";
 import { compileAgent } from "@/lib/agents/compile";
+import { changeNotePrompt } from "@/lib/agents/change-note-prompt";
+import { contentOf } from "@/lib/app-domain/agents";
 import { AgentHeader, loadAgent } from "../shared";
 import Link from "next/link";
 import { approvedLibrary, listSharedBlocks } from "@/lib/app-domain/agent-library";
@@ -35,6 +37,7 @@ export default async function InstructionsPage({ params, searchParams }: { param
   const previewClients = client ? await data.resolve([client]) : [];
   const preview = editing ? compileAgent({ agent, version: { version: editing.version, ...content }, installation: null, clients: previewClients, library: await approvedLibrary() }) : null;
   const canEdit = !data.draft || data.draft.state === "DRAFT";
+  const notePrompt = data.draft?.state === "DRAFT" ? changeNotePrompt({ agentName: agent.name, before: data.approved ? contentOf(data.approved) : null, after: content }) : undefined;
   const library = (await listSharedBlocks(data.user)).filter((b) => b.approved).map((b) => ({ key: b.key, title: b.title }));
 
   return (
@@ -46,7 +49,7 @@ export default async function InstructionsPage({ params, searchParams }: { param
           {general.length} קטעים, לפי הסדר שבו Claude קורא אותם · רמת פעולה: {ACTION_LEVEL_LABEL[content.actionLevel]}
           {editing?.changeNote ? ` · שינוי: ${editing.changeNote}` : ""}
         </span>
-        {canEdit && <EditMeta agentId={agent.id} actionLevel={content.actionLevel} changeNote={data.draft?.changeNote ?? ""} requirements={content.requirements} />}
+        {canEdit && <EditMeta agentId={agent.id} actionLevel={content.actionLevel} changeNote={data.draft?.changeNote ?? ""} requirements={content.requirements} notePrompt={notePrompt} />}
       </div>
 
       <div className="flex flex-wrap items-start gap-5">

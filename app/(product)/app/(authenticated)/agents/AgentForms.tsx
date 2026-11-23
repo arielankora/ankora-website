@@ -31,8 +31,9 @@ import {
   setClientValueAction,
   submitDraftAction,
 } from "./actions";
+import { recordPromptCopiedAction } from "../prompt-copy-actions";
 import { BLOCK_KIND_LABEL, PARAM_LEVEL_LABEL, PARAM_TYPE_LABEL, SURFACE_LABEL } from "./labels";
-import type { AgentBlock, AgentParam, AgentRequirements } from "@/lib/agents/model";
+import { skillText, type AgentBlock, type AgentParam, type AgentRequirements } from "@/lib/agents/model";
 
 // Agents, phase 1: the screens' forms. Drawers, like every write form in
 // the app; the server pages around them only read.
@@ -281,7 +282,38 @@ export function EditClientValue(props: { agentId: string; clientId: string; clie
 
 // --- Version meta, draft and decision ---------------------------------------
 
-function MetaForm({ agentId, actionLevel, changeNote, requirements }: { agentId: string; actionLevel: string; changeNote: string; requirements: AgentRequirements }) {
+/// "נסח עם קלוד": copies a prompt built from the draft's differences.
+function ChangeNoteWithClaude({ prompt }: { prompt: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "manual">("idle");
+  async function copy() {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("no clipboard");
+      await navigator.clipboard.writeText(prompt);
+      setState("copied");
+      void recordPromptCopiedAction({ kind: "agent_change_note", chars: prompt.length });
+    } catch {
+      setState("manual");
+    }
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={copy} className="tap-area rounded-full border border-app-border bg-white px-3 py-1 text-[12.5px] font-medium text-app-text-primary hover:border-gold">
+          {state === "copied" ? "הועתק" : "נסח עם קלוד"}
+        </button>
+        {state === "copied" && (
+          <span className="text-[12px] text-app-text-secondary" role="status">
+            הדביקו בשיחה חדשה, והעתיקו את השורה שחוזרת לכאן.{" "}
+            <a href="https://claude.ai/new" target="_blank" rel="noopener noreferrer" className="font-medium text-app-text-accent">פתיחת קלוד</a>
+          </span>
+        )}
+      </div>
+      {state === "manual" && <textarea readOnly value={prompt} rows={5} dir="rtl" className="w-full rounded-lg border border-app-border p-2 text-xs" aria-label="הפרומט להעתקה" onFocus={(e) => e.currentTarget.select()} />}
+    </div>
+  );
+}
+
+function MetaForm({ agentId, actionLevel, changeNote, requirements, notePrompt }: { agentId: string; actionLevel: string; changeNote: string; requirements: AgentRequirements; notePrompt?: string }) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(saveMetaAction, close);
   return (
@@ -290,6 +322,7 @@ function MetaForm({ agentId, actionLevel, changeNote, requirements }: { agentId:
       <Field label="מה השתנה ולמה" hint="זה מה שמי שמריץ את הסוכן יראה כשיציעו לו לעדכן.">
         <textarea name="changeNote" rows={3} dir="auto" defaultValue={changeNote} className={INPUT} />
       </Field>
+      {notePrompt && <ChangeNoteWithClaude prompt={notePrompt} />}
       <Field label="רמת פעולה">
         <select name="actionLevel" defaultValue={actionLevel} className={INPUT}>
           <option value="READ">קורא בלבד</option>
@@ -300,8 +333,8 @@ function MetaForm({ agentId, actionLevel, changeNote, requirements }: { agentId:
       <Field label="חיבורים נדרשים" hint="מופרדים בפסיק.">
         <input name="connectors" dir="ltr" defaultValue={requirements.connectors.join(", ")} className={INPUT} />
       </Field>
-      <Field label="סקילים נדרשים">
-        <input name="skills" dir="ltr" defaultValue={requirements.skills.join(", ")} className={INPUT} />
+      <Field label="סקילים נדרשים" hint="מופרדים בפסיק. גרסה מינימלית אחרי @, למשל gmail-labels@3.">
+        <input name="skills" dir="ltr" defaultValue={requirements.skills.map(skillText).join(", ")} className={INPUT} />
       </Field>
       <Field label="ריפואים">
         <input name="repos" dir="ltr" defaultValue={requirements.repos.join(", ")} className={INPUT} />
@@ -323,7 +356,7 @@ function MetaForm({ agentId, actionLevel, changeNote, requirements }: { agentId:
   );
 }
 
-export function EditMeta(props: { agentId: string; actionLevel: string; changeNote: string; requirements: AgentRequirements }) {
+export function EditMeta(props: { agentId: string; actionLevel: string; changeNote: string; requirements: AgentRequirements; notePrompt?: string }) {
   return (
     <Drawer triggerLabel="הערת שינוי ודרישות" title="הערת שינוי, רמת פעולה ודרישות" variant="link">
       <MetaForm {...props} />

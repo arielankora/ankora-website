@@ -22,7 +22,7 @@ import {
   setClientValue,
   submitDraft,
 } from "@/lib/app-domain/agents";
-import { BLOCK_KINDS, CLIENT_FIELDS, PARAM_LEVELS, PARAM_TYPES, type AgentBlock, type AgentParam } from "@/lib/agents/model";
+import { BLOCK_KINDS, CLIENT_FIELDS, PARAM_LEVELS, PARAM_TYPES, parseSkillText, type AgentBlock, type AgentParam } from "@/lib/agents/model";
 import { bootstrapText } from "@/lib/agents/compile";
 import { approveSharedVersion, decideLesson, proposeSharedBlock, rejectSharedVersion, sharedBlockForAgent } from "@/lib/app-domain/agent-library";
 
@@ -136,7 +136,7 @@ export async function saveMetaAction(_prev: FormState | undefined, f: FormData):
     await saveDraft(user, str(f, "agentId"), {
       actionLevel: (["READ", "DRAFT", "SEND"].includes(level) ? level : "READ") as "READ" | "DRAFT" | "SEND",
       changeNote: str(f, "changeNote") || null,
-      requirements: { connectors: list(f, "connectors"), skills: list(f, "skills"), repos: list(f, "repos"), localMcp: list(f, "localMcp"), externalRunners: list(f, "externalRunners"), model: str(f, "model") || null, notes: str(f, "notes") || null },
+      requirements: { connectors: list(f, "connectors"), skills: list(f, "skills").map(parseSkillText), repos: list(f, "repos"), localMcp: list(f, "localMcp"), externalRunners: list(f, "externalRunners"), model: str(f, "model") || null, notes: str(f, "notes") || null },
     });
   });
 }

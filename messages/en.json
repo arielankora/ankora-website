@@ -2396,7 +2396,8 @@
         "advance_lessons": "Summary and lessons",
         "extract": "Extract knowledge",
         "translation": "Procedure translation",
-        "client_activity": "Client summary"
+        "client_activity": "Client summary",
+        "agent_change_note": "Agent change note"
       }
     },
     "heavy": {

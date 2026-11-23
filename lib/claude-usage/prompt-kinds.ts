@@ -14,6 +14,8 @@ export const PROMPT_KINDS = [
   "translation",
   /// The client activity summary on the reports screen.
   "client_activity",
+  /// "נסח עם קלוד" beside an agent draft's change note.
+  "agent_change_note",
 ] as const;
 
 export type PromptKind = (typeof PROMPT_KINDS)[number];

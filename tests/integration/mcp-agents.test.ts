@@ -385,3 +385,39 @@ describe("going back to an earlier version", () => {
     expect((await listAgents(hadas)).find((a) => a.id === agent.id)?.version).toBe(3);
   });
 });
+
+describe("what the spec asked for on 23.11", () => {
+  it("tells get_agent when a required Ankora skill is older than its minimum version", async () => {
+    const { hadas, nux } = await setup();
+    const skill = await prisma.agent.create({ data: { slug: "gmail-labels", name: "Gmail labels", purpose: "תוויות", kind: "SKILL", versions: { create: [{ version: 1, state: "APPROVED", blocks: BLOCKS.slice(0, 1) }, { version: 2, state: "APPROVED", blocks: BLOCKS.slice(0, 1) }] } } });
+    const agent = await prisma.agent.create({ data: { slug: "sorter", name: "Sorter", purpose: "ממיין", kind: "SCHEDULED", versions: { create: { version: 1, state: "APPROVED", blocks: BLOCKS, params: PARAMS, requirements: { skills: ["drive-search", { slug: "gmail-labels", minVersion: 2 }] } } } } });
+    await setClientValue(hadas, { agentId: agent.id, clientId: nux.id, key: "חתימה", value: "הדס" });
+    const inst = await createInstallation(hadas, { agentId: agent.id, surface: "SCHEDULED", clientScope: "ONE", clientIds: [nux.id], checkEvery: "RUN" });
+
+    const missing = await call(hadas, "get_agent", { installation: inst.id });
+    expect(missing.text).toContain("gmail-labels (גרסה 2 ומעלה)");
+    expect(missing.text).toContain("הסקיל gmail-labels (גרסה 2 ומעלה) לא מותקן אצלך באנקורה.");
+
+    const skillInst = await createInstallation(hadas, { agentId: skill.id, surface: "SKILL", clientScope: "ALL_MINE", clientIds: [], checkEvery: "WEEKLY" });
+    const v1 = await prisma.agentVersion.findFirstOrThrow({ where: { agentId: skill.id, version: 1 } });
+    await prisma.agentInstallation.update({ where: { id: skillInst.id }, data: { pinnedVersionId: v1.id } });
+    expect((await call(hadas, "get_agent", { installation: inst.id })).text).toContain("מותקן אצלך בגרסה 1, וצריך לפחות גרסה 2");
+
+    const v2 = await prisma.agentVersion.findFirstOrThrow({ where: { agentId: skill.id, version: 2 } });
+    await prisma.agentInstallation.update({ where: { id: skillInst.id }, data: { pinnedVersionId: v2.id } });
+    expect((await call(hadas, "get_agent", { installation: inst.id })).text).not.toContain("סקילים חסרים");
+  });
+
+  it("refuses to approve a sending version without a quota parameter", async () => {
+    const { hadas, ariel } = await setup();
+    const agent = await prisma.agent.create({ data: { slug: "sender", name: "Sender", purpose: "שולח", kind: "SCHEDULED", versions: { create: { version: 1, state: "APPROVED", blocks: BLOCKS, params: PARAMS } } } });
+    const v2 = await saveDraft(hadas, agent.id, { actionLevel: "SEND", changeNote: "שולח בעצמו" });
+    await expect(submitDraft(hadas, v2.id)).rejects.toThrow(/חייב מכסה/);
+    await prisma.agentVersion.update({ where: { id: v2.id }, data: { state: "PENDING" } });
+    await expect(approveVersion(ariel, v2.id)).rejects.toThrow(/חייב מכסה/);
+    await prisma.agentVersion.update({ where: { id: v2.id }, data: { state: "DRAFT", params: [...PARAMS, { key: "מכסה", label: "מכסה יומית", level: "AGENT", type: "NUMBER", default: "20" }] } });
+    await submitDraft(hadas, v2.id);
+    await approveVersion(ariel, v2.id);
+    expect((await prisma.agentVersion.findUniqueOrThrow({ where: { id: v2.id } })).state).toBe("APPROVED");
+  });
+});
