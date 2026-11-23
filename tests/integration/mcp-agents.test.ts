@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { User } from "@prisma/client";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
-import { approveVersion, archiveAgent, createInstallation, listAgents, markFaulty, removeInstallation, saveDraft, setAgentProcess, setAgentPurpose, setClientValue, submitDraft } from "@/lib/app-domain/agents";
+import { approveVersion, archiveAgent, createInstallation, listAgents, markFaulty, removeInstallation, revertToVersion, saveDraft, setAgentProcess, setAgentPurpose, setClientValue, submitDraft } from "@/lib/app-domain/agents";
 import { collectApprovals } from "@/lib/app-domain/approvals";
 import type { AgentBlock } from "@/lib/agents/model";
 import { approveSharedVersion, listLessons, proposeSharedBlock, sharedBlockForAgent } from "@/lib/app-domain/agent-library";
@@ -344,5 +344,44 @@ describe("an agent's description", () => {
     expect((await prisma.agent.findUniqueOrThrow({ where: { id: agent.id } })).purpose).toBe("משימות באנקורה");
     expect(await prisma.auditEvent.count({ where: { action: "agent.purpose", entityId: agent.id } })).toBe(1);
     expect((await listAgents(hadas)).find((a) => a.id === agent.id)?.purpose).toBe("משימות באנקורה");
+  });
+});
+
+describe("going back to an earlier version", () => {
+  it("opens a copy of it as the next version, through approval, and refuses while another is open", async () => {
+    const { hadas, ariel, nux } = await setup();
+    const lib = { key: "lib", kind: "language" as const, title: "כתיבה", body: "עברית.", sharedKey: "hebrew" };
+    const files = [{ path: "t.md", content: "תבנית" }];
+    const agent = await prisma.agent.create({ data: { slug: "reverts", name: "Reverts", purpose: "בדיקה", kind: "SKILL", versions: { create: { version: 1, state: "APPROVED", actionLevel: "DRAFT", blocks: [...BLOCKS, lib], params: PARAMS, files, requirements: { connectors: ["Gmail"] } } } } });
+    const inst = await createInstallation(hadas, { agentId: agent.id, surface: "PROJECT", clientScope: "ONE", clientIds: [nux.id], checkEvery: "RUN" });
+    const v2 = await saveDraft(hadas, agent.id, { blocks: [BLOCKS[0]], params: [], files: [], actionLevel: "READ", changeNote: "קצר יותר" });
+    await submitDraft(hadas, v2.id);
+    await approveVersion(ariel, v2.id);
+
+    // Not to the version in use, and not while a draft is open.
+    await expect(revertToVersion(hadas, agent.id, 2)).rejects.toThrow(/בשימוש/);
+    const open = await saveDraft(hadas, agent.id, { changeNote: "טיוטה" });
+    await expect(revertToVersion(hadas, agent.id, 1)).rejects.toThrow(/טיוטה פתוחה/);
+    await prisma.agentVersion.delete({ where: { id: open.id } });
+
+    // From Claude: version 3 is a copy of 1, waiting for a manager.
+    const r = await call(hadas, "revert_agent_to_version", { agent: agent.slug, version: 1, submit: true });
+    expect(r.isError).toBeFalsy();
+    expect(r.json).toMatchObject({ saved: true, version: 3, copyOf: 1, state: expect.stringContaining("pending") });
+    const v1 = await prisma.agentVersion.findFirstOrThrow({ where: { agentId: agent.id, version: 1 } });
+    const v3 = await prisma.agentVersion.findFirstOrThrow({ where: { agentId: agent.id, version: 3 } });
+    expect(v3).toMatchObject({ state: "PENDING", changeNote: "חזרה לגרסה 1", actionLevel: "DRAFT", blocks: v1.blocks, params: v1.params, files: v1.files, requirements: v1.requirements });
+    expect(parseBlocks(v3.blocks).find((b) => b.key === "lib")?.sharedKey).toBe("hebrew");
+    expect(await prisma.auditEvent.count({ where: { action: "agent.revert", entityId: v3.id } })).toBe(1);
+
+    // Pending: refused in the connector's words, not "unexpected error".
+    const again = await call(hadas, "revert_agent_to_version", { agent: agent.slug, version: 1 });
+    expect(again.isError).toBe(true);
+    expect(again.text).toContain("ממתינה לאישור");
+
+    // Nothing moves before approval; after it, the installation is offered version 3.
+    expect((await prisma.agentInstallation.findUniqueOrThrow({ where: { id: inst.id } })).pinnedVersionId).not.toBe(v3.id);
+    await approveVersion(ariel, v3.id);
+    expect((await listAgents(hadas)).find((a) => a.id === agent.id)?.version).toBe(3);
   });
 });

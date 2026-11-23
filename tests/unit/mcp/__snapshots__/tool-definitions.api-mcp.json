@@ -4158,6 +4158,43 @@
     "name": "resolve_process_lesson",
     "title": "Decide a lesson left on a process"
   },
+  "revert_agent_to_version": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Opens a draft of an Ankora agent's next version that is a copy of an earlier approved version (\"go back to version 5\" makes version 8, a copy of 5), with the change note \"חזרה לגרסה 5\". The history stays in one line. Pass `agent` (its slug) and `version`. Refused while the agent has a draft or a version waiting for approval: finish that one first. Before calling, tell the user which version you will copy and call only after they said so. This tool never approves. With `submit: true` the draft is sent to a manager, who approves it in Ankora. Returns the draft's `url` and its `version`.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "agent": {
+          "description": "The agent's slug, from its url.",
+          "maxLength": 60,
+          "minLength": 1,
+          "type": "string"
+        },
+        "submit": {
+          "description": "Send the draft for a manager's approval now.",
+          "type": "boolean"
+        },
+        "version": {
+          "description": "The earlier approved version to copy.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agent",
+        "version"
+      ],
+      "type": "object"
+    },
+    "name": "revert_agent_to_version",
+    "title": "Revert an Ankora agent to an earlier version"
+  },
   "save_agent_draft": {
     "annotations": {
       "destructiveHint": false,

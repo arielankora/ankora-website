@@ -550,6 +550,45 @@ export async function markFaulty(actor: User, versionId: string, reason: string)
   return fallback;
 }
 
+/// "החזר לגרסה 5" (23.11.2026): opens a draft that is a copy of an earlier
+/// approved version, so the history stays one line read top to bottom.
+/// The copy goes through the normal approval like any other draft.
+export async function revertToVersion(actor: User, agentId: string, version: number) {
+  assertCan(actor.role, PROPOSE);
+  const agent = await prisma.agent.findUnique({ where: { id: agentId }, select: { id: true, archivedAt: true } });
+  if (!agent || agent.archivedAt) throw new DomainError("agents.notFound", "הסוכן לא נמצא.");
+  const target = await prisma.agentVersion.findUnique({ where: { agentId_version: { agentId, version } } });
+  if (!target || target.state !== "APPROVED") throw new DomainError("agents.versionNotApproved", `גרסה ${version} לא מאושרת.`, { version });
+  if (target.faultyAt) throw new DomainError("agents.revertFaulty", `גרסה ${version} סומנה כתקולה. אי אפשר לחזור אליה.`, { version });
+  const current = await currentApproved(agentId);
+  if (current?.id === target.id) throw new DomainError("agents.revertCurrent", `גרסה ${version} היא הגרסה שבשימוש.`, { version });
+  const open = await prisma.agentVersion.findFirst({ where: { agentId, state: { in: ["DRAFT", "PENDING"] } }, select: { state: true } });
+  if (open?.state === "PENDING") throw new DomainError("agents.draftPending", "יש גרסה שממתינה לאישור. צריך לאשר או לדחות אותה לפני שינוי נוסף.");
+  if (open) throw new DomainError("agents.revertDraftOpen", "יש טיוטה פתוחה. צריך לשלוח אותה או לבטל אותה לפני שחוזרים לגרסה קודמת.");
+  const last = await prisma.agentVersion.findFirst({ where: { agentId }, orderBy: { version: "desc" }, select: { version: true } });
+  let draft;
+  try {
+    draft = await prisma.agentVersion.create({
+      data: {
+        agentId,
+        version: (last?.version ?? 0) + 1,
+        createdById: actor.id,
+        blocks: target.blocks as Prisma.InputJsonValue,
+        params: target.params as Prisma.InputJsonValue,
+        requirements: target.requirements as Prisma.InputJsonValue,
+        files: target.files as Prisma.InputJsonValue,
+        actionLevel: target.actionLevel,
+        changeNote: `חזרה לגרסה ${version}`,
+      },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") throw new DomainError("agents.draftRace", "מישהו אחר פתח טיוטה באותו רגע. כדאי לרענן ולנסות שוב.");
+    throw err;
+  }
+  await recordAudit({ actorId: actor.id, action: "agent.revert", entityType: "AgentVersion", entityId: draft.id, after: { version: draft.version, from: version } });
+  return draft;
+}
+
 /// The agent fills an installation-level value it found itself (a label id).
 export async function setInstallationValue(actor: User, installationId: string, key: string, value: string) {
   const inst = await ownInstallation(actor, installationId);

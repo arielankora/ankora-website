@@ -8,7 +8,7 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { appUrl } from "@/lib/approval-links";
 import { prisma } from "@/lib/prisma";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, draftProblems, fetchAgent, linkedProcedure, listMyInstallations, recordRun, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
+import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, draftProblems, fetchAgent, linkedProcedure, listMyInstallations, recordRun, revertToVersion, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
 import { proposeLesson } from "@/lib/app-domain/agent-library";
 import { bootstrapText } from "@/lib/agents/compile";
 import { procedureSection } from "@/lib/agents/procedure";
@@ -298,6 +298,41 @@ export function registerAgentTools(server: McpServer): void {
         return toolJson({ saved: true, state, version: v.version, problems: args.submit ? [] : problems, url: agentUrl(slug, "instructions") });
       } catch (err) {
         console.error("[mcp] save_agent_draft failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "revert_agent_to_version",
+    {
+      title: "Revert an Ankora agent to an earlier version",
+      description: [
+        "Opens a draft of an Ankora agent's next version that is a copy of an earlier approved version (\"go back to version 5\" makes version 8, a copy of 5), with the change note \"חזרה לגרסה 5\". The history stays in one line.",
+        "Pass `agent` (its slug) and `version`. Refused while the agent has a draft or a version waiting for approval: finish that one first. Before calling, tell the user which version you will copy and call only after they said so.",
+        "This tool never approves. With `submit: true` the draft is sent to a manager, who approves it in Ankora. Returns the draft's `url` and its `version`.",
+      ].join(" "),
+      inputSchema: z.object({
+        agent: z.string().min(1).max(60).describe("The agent's slug, from its url."),
+        version: z.number().int().min(1).describe("The earlier approved version to copy."),
+        submit: z.boolean().optional().describe("Send the draft for a manager's approval now."),
+      }),
+      annotations: TOOL_ANNOTATIONS.revert_agent_to_version,
+    },
+    async (args: { agent: string; version: number; submit?: boolean }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const found = await prisma.agent.findUnique({ where: { slug: args.agent.trim() }, select: { id: true, slug: true, archivedAt: true } });
+        if (!found || found.archivedAt) return toolText(`No agent with the slug "${args.agent}". Nothing was saved.`);
+        const v = await revertToVersion(actor, found.id, args.version);
+        let state = "draft: not sent for approval";
+        if (args.submit) {
+          await submitDraft(actor, v.id);
+          state = "pending: waits for an Ankora manager to approve it";
+        }
+        return toolJson({ saved: true, state, version: v.version, copyOf: args.version, url: agentUrl(found.slug, `versions?v=${v.version}`) });
+      } catch (err) {
+        console.error("[mcp] revert_agent_to_version failed", err);
         return toolFailure(err);
       }
     }

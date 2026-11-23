@@ -84,6 +84,7 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   get_agent_file: "returns a file of the agent's own version, for the user's own installation; no client data is read",
   accept_agent_update: "moves an installation's pinned version; returns no client data",
   save_agent_draft: "writes Ankora's own agent instructions; a client addition names a client the user can access, and \"בלי AI\" clients never reach a compiled agent",
+  revert_agent_to_version: "copies an earlier approved version of Ankora's own agent instructions into a new draft; no client data is read",
   record_agent_run: "records how a run of the user's own installation ended; it stores the agent's words, no client data is read",
   set_agent_installation_value: "stores a value of the user's own installation (a label id); no client data is read",
   list_my_agents: "lists the user's own installations and their agents; no client data",

@@ -16,6 +16,7 @@ import {
   markFaulty,
   rejectVersion,
   removeInstallation,
+  revertToVersion,
   saveDraft,
   setAgentProcess,
   setClientValue,
@@ -28,7 +29,7 @@ import { approveSharedVersion, decideLesson, proposeSharedBlock, rejectSharedVer
 // Agents, phase 1: the screens' writes. Every one goes through
 // lib/app-domain/agents.ts, the same functions the MCP tools call.
 
-type FormState = { error?: string; ok?: boolean; slug?: string; bootstrap?: string };
+type FormState = { error?: string; ok?: boolean; slug?: string; bootstrap?: string; version?: number };
 
 async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה הזו.";
@@ -178,6 +179,11 @@ export async function setAgentPurposeAction(_prev: FormState | undefined, f: For
 export async function markFaultyAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
   const user = await requireUser();
   return run(() => markFaulty(user, str(f, "id"), str(f, "reason")).then(() => undefined));
+}
+
+export async function revertToVersionAction(agentId: string, version: number): Promise<FormState> {
+  const user = await requireUser();
+  return run(async () => ({ version: (await revertToVersion(user, agentId, version)).version }));
 }
 
 export async function setClientValueAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
