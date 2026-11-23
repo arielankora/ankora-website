@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { User } from "@prisma/client";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
-import { approveVersion, archiveAgent, createInstallation, listAgents, markFaulty, removeInstallation, saveDraft, setAgentProcess, setClientValue, submitDraft } from "@/lib/app-domain/agents";
+import { approveVersion, archiveAgent, createInstallation, listAgents, markFaulty, removeInstallation, saveDraft, setAgentProcess, setAgentPurpose, setClientValue, submitDraft } from "@/lib/app-domain/agents";
 import { collectApprovals } from "@/lib/app-domain/approvals";
 import type { AgentBlock } from "@/lib/agents/model";
 import { approveSharedVersion, listLessons, proposeSharedBlock, sharedBlockForAgent } from "@/lib/app-domain/agent-library";
@@ -329,5 +329,20 @@ describe("an agent that carries out a process", () => {
     await setAgentProcess(ariel, agent.id, null);
     const unlinked = await call(hadas, "get_agent", { installation: inst.id });
     expect(unlinked.text).not.toContain("## הנוהל");
+  });
+});
+
+describe("an agent's description", () => {
+  it("is changed in place by a manager, with an audit entry", async () => {
+    const { hadas, ariel } = await setup();
+    const agent = await prisma.agent.create({ data: { slug: "client-agent", name: "Client agent", purpose: "משימות ב-ClickUp", kind: "CLIENT_PROJECT", versions: { create: [{ version: 1, state: "APPROVED", blocks: BLOCKS, params: PARAMS }] } } });
+
+    await expect(setAgentPurpose(hadas, agent.id, "משימות באנקורה")).rejects.toThrow();
+    await expect(setAgentPurpose(ariel, agent.id, " ")).rejects.toMatchObject({ code: "agents.purposeRequired" });
+    await setAgentPurpose(ariel, agent.id, "  משימות באנקורה ");
+
+    expect((await prisma.agent.findUniqueOrThrow({ where: { id: agent.id } })).purpose).toBe("משימות באנקורה");
+    expect(await prisma.auditEvent.count({ where: { action: "agent.purpose", entityId: agent.id } })).toBe(1);
+    expect((await listAgents(hadas)).find((a) => a.id === agent.id)?.purpose).toBe("משימות באנקורה");
   });
 });
