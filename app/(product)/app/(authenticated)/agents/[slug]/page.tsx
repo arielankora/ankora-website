@@ -1,7 +1,8 @@
 import { Forbidden } from "@/components/app/Forbidden";
 import { AgentHeader, loadAgent } from "./shared";
 import { listLessons } from "@/lib/app-domain/agent-library";
-import { LessonButtons } from "../AgentForms";
+import { linkableProcesses } from "@/lib/app-domain/agents";
+import { LessonButtons, LinkProcess } from "../AgentForms";
 import { ACTION_LEVEL_LABEL, SURFACE_LABEL } from "../labels";
 import type { AgentBlock } from "@/lib/agents/model";
 
@@ -43,6 +44,7 @@ export default async function AgentOverviewPage({ params }: { params: Promise<{ 
   const needsPerson = of("approvals");
   const req = shown.requirements;
   const lessons = await listLessons(data.user, data.agent.id);
+  const processOptions = data.canDecide ? await linkableProcesses(data.user) : [];
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
@@ -107,6 +109,20 @@ export default async function AgentOverviewPage({ params }: { params: Promise<{ 
               <a href={`/app/agents/${data.agent.slug}/instructions`} className="mt-2 inline-block text-xs text-app-text-accent">לערוך בטיוטה</a>
             </section>
           )}
+          <section className="rounded-xl border border-app-border bg-white p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-medium">מבצע נוהל</h2>
+              {data.canDecide && <LinkProcess agentId={data.agent.id} current={data.process?.id ?? null} options={processOptions} />}
+            </div>
+            {data.process ? (
+              <p className="mt-1 text-[13px]" dir="auto">
+                {data.process.clientName} · {data.process.code} {data.process.title}
+                <span className="block text-[11px] text-app-text-tertiary">השלבים מהנוהל המאושר נכנסים להוראות בכל ריצה.</span>
+              </p>
+            ) : (
+              <p className="mt-1 text-[13px] text-app-text-tertiary">לא מקושר לתהליך באנקורה.</p>
+            )}
+          </section>
           <section className="rounded-xl border border-app-border bg-white p-4">
             <h2 className="text-sm font-medium">רץ אצל</h2>
             {installations.length === 0 ? <p className="mt-1 text-[13px] text-app-text-tertiary">אין התקנות.</p> : (

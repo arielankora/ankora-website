@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { User } from "@prisma/client";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
-import { approveVersion, archiveAgent, createInstallation, listAgents, markFaulty, removeInstallation, saveDraft, setClientValue, submitDraft } from "@/lib/app-domain/agents";
+import { approveVersion, archiveAgent, createInstallation, listAgents, markFaulty, removeInstallation, saveDraft, setAgentProcess, setClientValue, submitDraft } from "@/lib/app-domain/agents";
 import { collectApprovals } from "@/lib/app-domain/approvals";
 import type { AgentBlock } from "@/lib/agents/model";
 import { approveSharedVersion, listLessons, proposeSharedBlock, sharedBlockForAgent } from "@/lib/app-domain/agent-library";
@@ -292,5 +292,42 @@ describe("files attached to an agent", () => {
     expect(leaky.text).toContain("סודות לא נכתבים");
     const escape = await call(hadas, "save_agent_draft", { agent: agent.slug, files: [{ path: "../etc/passwd", content: "x" }] });
     expect(escape.isError).toBe(true);
+  });
+});
+
+describe("an agent that carries out a process", () => {
+  it("gets the approved procedure in get_agent, follows a newly approved one, and says why when it cannot", async () => {
+    const { hadas, ariel, nux, secret } = await setup();
+    await prisma.userClientAccess.create({ data: { userId: ariel.id, clientId: nux.id } });
+    const proc = await prisma.process.create({ data: { clientId: nux.id, seq: 9, code: "P9", title: "דוח יומי", status: "ACTIVE" } });
+    const agent = await prisma.agent.create({ data: { slug: "daily-report", name: "Daily report", purpose: "דוח יומי", kind: "SCHEDULED", versions: { create: { version: 1, state: "APPROVED", blocks: BLOCKS, params: PARAMS } } } });
+    await setClientValue(hadas, { agentId: agent.id, clientId: nux.id, key: "חתימה", value: "הדס" });
+    const inst = await createInstallation(hadas, { agentId: agent.id, surface: "SCHEDULED", clientScope: "ONE", clientIds: [nux.id], checkEvery: "RUN" });
+
+    await expect(setAgentProcess(hadas, agent.id, proc.id)).rejects.toThrow();
+    await setAgentProcess(ariel, agent.id, proc.id);
+
+    // Linked, no approved procedure yet: get_agent says so.
+    const before = await call(hadas, "get_agent", { installation: inst.id });
+    expect(before.text).toContain("ל" + "P9 דוח יומי אין עדיין נוהל מאושר");
+
+    await prisma.processVersion.create({ data: { processId: proc.id, version: 1, status: "APPROVED", steps: [{ title: "אוספים את הסטטוס", output: "טבלה", verification: "יש שורה לכל משימה" }, { title: "שולחים לאריאל", requiresApproval: true }] } });
+    const after = await call(hadas, "get_agent", { installation: inst.id });
+    expect(after.text).toContain("## הנוהל: P9 דוח יומי (NUX, גרסה 1)");
+    expect(after.text).toContain("1. אוספים את הסטטוס");
+    expect(after.text).toContain("   - תוצר: טבלה");
+    expect(after.text).toContain("2. שולחים לאריאל (באישור אדם)");
+
+    // A process of a "no AI" client is never sent.
+    const hidden = await prisma.process.create({ data: { clientId: secret.id, seq: 1, code: "P1", title: "סודי", status: "ACTIVE" } });
+    await prisma.processVersion.create({ data: { processId: hidden.id, version: 1, status: "APPROVED", steps: [{ title: "שלב סודי" }] } });
+    await prisma.agent.update({ where: { id: agent.id }, data: { processId: hidden.id } });
+    const excluded = await call(hadas, "get_agent", { installation: inst.id });
+    expect(excluded.text).not.toContain("שלב סודי");
+    expect(excluded.text).toContain("בלי AI");
+
+    await setAgentProcess(ariel, agent.id, null);
+    const unlinked = await call(hadas, "get_agent", { installation: inst.id });
+    expect(unlinked.text).not.toContain("## הנוהל");
   });
 });

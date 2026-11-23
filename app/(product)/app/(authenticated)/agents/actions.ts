@@ -16,6 +16,7 @@ import {
   rejectVersion,
   removeInstallation,
   saveDraft,
+  setAgentProcess,
   setClientValue,
   submitDraft,
 } from "@/lib/app-domain/agents";
@@ -161,6 +162,11 @@ export async function rejectVersionAction(_prev: FormState | undefined, f: FormD
 export async function archiveAgentAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
   const user = await requireUser();
   return run(() => archiveAgent(user, str(f, "agentId"), str(f, "reason")));
+}
+
+export async function setAgentProcessAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => setAgentProcess(user, str(f, "agentId"), str(f, "processId") || null));
 }
 
 export async function markFaultyAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {

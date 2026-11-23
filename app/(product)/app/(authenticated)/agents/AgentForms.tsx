@@ -25,6 +25,7 @@ import {
   saveBlockAction,
   saveMetaAction,
   saveParamAction,
+  setAgentProcessAction,
   setClientValueAction,
   submitDraftAction,
 } from "./actions";
@@ -324,6 +325,36 @@ export function EditMeta(props: { agentId: string; actionLevel: string; changeNo
   return (
     <Drawer triggerLabel="הערת שינוי ודרישות" title="הערת שינוי, רמת פעולה ודרישות" variant="link">
       <MetaForm {...props} />
+    </Drawer>
+  );
+}
+
+function ProcessForm({ agentId, current, options }: { agentId: string; current: string | null; options: { id: string; label: string }[] }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(setAgentProcessAction, close);
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="agentId" value={agentId} />
+      <Field label="התהליך שהסוכן מבצע" hint="get_agent מוסיף את השלבים מהנוהל המאושר בכל ריצה. נוהל שמאושר מחדש מגיע לסוכן בלי גרסה חדשה של הסוכן.">
+        <select name="processId" defaultValue={current ?? ""} className={INPUT}>
+          <option value="">בלי תהליך</option>
+          {options.map((o) => (
+            <option key={o.id} value={o.id}>{o.label}</option>
+          ))}
+        </select>
+      </Field>
+      <Err error={error} />
+      <button type="submit" disabled={pending} className={PRIMARY}>
+        {pending ? "שומר..." : "לשמור"}
+      </button>
+    </form>
+  );
+}
+
+export function LinkProcess({ agentId, current, options }: { agentId: string; current: string | null; options: { id: string; label: string }[] }) {
+  return (
+    <Drawer triggerLabel={current ? "לשנות" : "לקשר לתהליך"} title="התהליך שהסוכן מבצע" variant="link">
+      <ProcessForm agentId={agentId} current={current} options={options} />
     </Drawer>
   );
 }
