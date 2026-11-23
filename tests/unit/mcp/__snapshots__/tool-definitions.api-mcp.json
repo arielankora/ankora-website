@@ -4377,6 +4377,7 @@
                 "type": "boolean"
               },
               "type": {
+                "description": "CONNECTOR: the value is a connector's name. VAULT_REF: the name of an item in Ankora's vault, never the secret itself.",
                 "enum": [
                   "TEXT",
                   "LONG_TEXT",
@@ -4385,7 +4386,9 @@
                   "EMAIL",
                   "FILE_LOCATION",
                   "PAGE",
-                  "LIBRARY_BLOCK"
+                  "LIBRARY_BLOCK",
+                  "CONNECTOR",
+                  "VAULT_REF"
                 ],
                 "type": "string"
               }
@@ -4443,9 +4446,32 @@
               "type": "array"
             },
             "skills": {
+              "description": "A skill's slug, or { slug, minVersion } when an older version of an Ankora skill is not enough.",
               "items": {
-                "maxLength": 80,
-                "type": "string"
+                "anyOf": [
+                  {
+                    "maxLength": 80,
+                    "type": "string"
+                  },
+                  {
+                    "properties": {
+                      "minVersion": {
+                        "maximum": 9007199254740991,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "slug": {
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug"
+                    ],
+                    "type": "object"
+                  }
+                ]
               },
               "maxItems": 30,
               "type": "array"

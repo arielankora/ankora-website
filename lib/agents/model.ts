@@ -34,7 +34,10 @@ export const PARAM_LEVELS = ["AGENT", "CLIENT", "INSTALLATION"] as const;
 /// LIBRARY_BLOCK (23.11.2026): the value is a library block's key, and the
 /// compiled text gets that block's approved body in its place. A voice per
 /// person: an installation picks ariel-voice or nadav-voice.
-export const PARAM_TYPES = ["TEXT", "LONG_TEXT", "NUMBER", "LIST", "EMAIL", "FILE_LOCATION", "PAGE", "LIBRARY_BLOCK"] as const;
+/// CONNECTOR and VAULT_REF (23.11.2026): the value only names a connector,
+/// or an item in Ankora's vault. A secret's value never reaches the
+/// instructions; VAULT_REF compiles to a reference the agent reads itself.
+export const PARAM_TYPES = ["TEXT", "LONG_TEXT", "NUMBER", "LIST", "EMAIL", "FILE_LOCATION", "PAGE", "LIBRARY_BLOCK", "CONNECTOR", "VAULT_REF"] as const;
 /// Client-level values that come from the client's file instead of being typed twice.
 export const CLIENT_FIELDS = ["name", "domains"] as const;
 
@@ -49,9 +52,28 @@ export const paramSchema = z.object({
 });
 export type AgentParam = z.infer<typeof paramSchema>;
 
+/// A skill the agent needs: its slug, or { slug, minVersion } when an older
+/// version of an Ankora skill is not enough (23.11.2026).
+export const skillRequirementSchema = z.union([z.string().max(80), z.object({ slug: z.string().trim().min(1).max(80), minVersion: z.number().int().min(1).nullish() })]);
+export type SkillRequirement = z.infer<typeof skillRequirementSchema>;
+
+export function skillOf(s: SkillRequirement): { slug: string; minVersion: number | null } {
+  return typeof s === "string" ? { slug: s, minVersion: null } : { slug: s.slug, minVersion: s.minVersion ?? null };
+}
+
+/// "gmail-labels@3" in the requirements form, and back.
+export function skillText(s: SkillRequirement): string {
+  const { slug, minVersion } = skillOf(s);
+  return minVersion ? `${slug}@${minVersion}` : slug;
+}
+export function parseSkillText(text: string): SkillRequirement {
+  const m = /^(.+?)@(\d+)$/.exec(text.trim());
+  return m ? { slug: m[1].trim(), minVersion: Number(m[2]) } : text.trim();
+}
+
 export const requirementsSchema = z.object({
   connectors: z.array(z.string().max(80)).max(30).default([]),
-  skills: z.array(z.string().max(80)).max(30).default([]),
+  skills: z.array(skillRequirementSchema).max(30).default([]),
   repos: z.array(z.string().max(120)).max(10).default([]),
   localMcp: z.array(z.string().max(80)).max(10).default([]),
   externalRunners: z.array(z.string().max(200)).max(10).default([]),
@@ -102,9 +124,11 @@ export type VersionProblem = { code: string; text: string };
 
 /// What stops a version from being sent for approval. Everything the
 /// version-screen checks list shows comes from here.
-export function versionProblems(input: { blocks: AgentBlock[]; params: AgentParam[]; files?: AgentFile[]; changeNote?: string | null; clientIds?: Set<string> }): VersionProblem[] {
+export function versionProblems(input: { blocks: AgentBlock[]; params: AgentParam[]; files?: AgentFile[]; changeNote?: string | null; clientIds?: Set<string>; actionLevel?: "READ" | "DRAFT" | "SEND" }): VersionProblem[] {
   const out: VersionProblem[] = [];
   const { blocks, params } = input;
+  // "סוכן ששולח חייב להגדיר מכסה" (23.11.2026): checked on new approvals only.
+  if (input.actionLevel === "SEND" && !params.some((p) => p.type === "NUMBER")) out.push({ code: "sendNeedsQuota", text: "סוכן ששולח בשם אדם חייב מכסה: צריך פרמטר מסוג מספר (למשל כמה הודעות ביום) ולכתוב בהוראות איך הוא נאכף." });
   const files = input.files ?? [];
   if (files.length > LIMITS.files) out.push({ code: "tooManyFiles", text: `יותר מ-${LIMITS.files} קבצים מצורפים.` });
   if (files.reduce((n, f) => n + f.content.length, 0) > LIMITS.filesChars) out.push({ code: "filesTooLarge", text: "הקבצים המצורפים גדולים מדי יחד." });

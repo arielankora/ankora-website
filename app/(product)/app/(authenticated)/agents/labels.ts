@@ -15,7 +15,7 @@ export const BLOCK_KIND_LABEL = {
 
 export const PARAM_LEVEL_LABEL = { AGENT: "הסוכן (ערך אחד לכולם)", CLIENT: "לקוח", INSTALLATION: "התקנה (מי שמריץ)" } as const;
 
-export const PARAM_TYPE_LABEL = { TEXT: "טקסט", LONG_TEXT: "טקסט ארוך", NUMBER: "מספר (למשל מכסה)", LIST: "רשימה", EMAIL: "מייל", FILE_LOCATION: "מיקום קובץ", PAGE: "דף פלט", LIBRARY_BLOCK: "קטע מהספרייה (לפי מפתח)" } as const;
+export const PARAM_TYPE_LABEL = { TEXT: "טקסט", LONG_TEXT: "טקסט ארוך", NUMBER: "מספר (למשל מכסה)", LIST: "רשימה", EMAIL: "מייל", FILE_LOCATION: "מיקום קובץ", PAGE: "דף פלט", LIBRARY_BLOCK: "קטע מהספרייה (לפי מפתח)", CONNECTOR: "חיבור (לפי שם)", VAULT_REF: "פריט בכספת (שם בלבד, בלי הערך)" } as const;
 
 export const SURFACE_LABEL = { PROJECT: "פרויקט Claude", SCHEDULED: "משימה מתוזמנת", PERSISTENT_SESSION: "שיחה קבועה", SKILL: "סקיל" } as const;
 

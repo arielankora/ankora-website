@@ -10,9 +10,10 @@ import { prisma } from "@/lib/prisma";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, draftProblems, fetchAgent, linkedProcedure, listMyInstallations, recordRun, revertToVersion, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
 import { proposeLesson } from "@/lib/app-domain/agent-library";
+import { skillGaps } from "@/lib/app-domain/agent-skills";
 import { bootstrapText } from "@/lib/agents/compile";
 import { procedureSection } from "@/lib/agents/procedure";
-import { BLOCK_KINDS, CLIENT_FIELDS, LIMITS, PARAM_LEVELS, PARAM_TYPES } from "@/lib/agents/model";
+import { BLOCK_KINDS, CLIENT_FIELDS, LIMITS, PARAM_LEVELS, PARAM_TYPES, parseRequirements } from "@/lib/agents/model";
 
 // Agents, phase 1 (22.11.2026): the connector side of "סוכנים".
 //
@@ -72,6 +73,9 @@ export function registerAgentTools(server: McpServer): void {
         const procedure = await linkedProcedure(actor, got.agent.id);
         if (procedure) parts.push(procedureSection(procedure).trim());
         if (got.fellBackFrom) parts.push(`## הערה\n\nגרסה ${got.fellBackFrom.version} סומנה כתקולה${got.fellBackFrom.reason ? ` (${got.fellBackFrom.reason})` : ""}, וההתקנה חזרה לגרסה ${got.version}. ההוראות למעלה הן של גרסה ${got.version}.`);
+        const pinned = await prisma.agentVersion.findUnique({ where: { agentId_version: { agentId: got.agent.id, version: got.version } }, select: { requirements: true } });
+        const gaps = pinned ? await skillGaps(actor, parseRequirements(pinned.requirements)) : [];
+        if (gaps.length) parts.push(`## סקילים חסרים\n\n${gaps.join("\n")}\n\nאם סקיל חסר או ישן מדי: אל תנחש איך הוא עובד. דווח על כך בתחילת הריצה וב-record_agent_run (missing).`);
         if (got.update) parts.push(updateSection(got.update, got.version));
         parts.push("## בסוף הריצה\n\nאם למדת בריצה משהו שכדאי לשנות בהוראות (כלל חסר, ניסוח שהטעה), הצע אותו ב-propose_agent_change. אדם יחליט.\n\nקרא ל-record_agent_run עם installation הזה: OK, PARTIAL או FAILED, שורה על מה שנעשה, מה השתבש ומה חסר (חיבור, סקיל, ערך). ריצה שלא דווחה נראית באנקורה כאילו לא קרתה.");
         parts.push(`---\nמקור: אנקורה, ${agentUrl(got.agent.slug)}`);
@@ -201,7 +205,7 @@ export function registerAgentTools(server: McpServer): void {
               key: z.string().min(1).max(40),
               label: z.string().min(1).max(80),
               level: z.enum(PARAM_LEVELS).describe("AGENT: one value for all; CLIENT: per client; INSTALLATION: per person running it."),
-              type: z.enum(PARAM_TYPES).optional(),
+              type: z.enum(PARAM_TYPES).optional().describe("CONNECTOR: the value is a connector's name. VAULT_REF: the name of an item in Ankora's vault, never the secret itself."),
               required: z.boolean().optional(),
               default: z.string().max(2000).optional(),
               clientField: z.enum(CLIENT_FIELDS).optional().describe("CLIENT level only: take the value from the client's file instead of typing it."),
@@ -221,7 +225,7 @@ export function registerAgentTools(server: McpServer): void {
         requirements: z
           .object({
             connectors: z.array(z.string().max(80)).max(30).optional(),
-            skills: z.array(z.string().max(80)).max(30).optional(),
+            skills: z.array(z.union([z.string().max(80), z.object({ slug: z.string().min(1).max(80), minVersion: z.number().int().min(1).optional() })])).max(30).optional().describe("A skill's slug, or { slug, minVersion } when an older version of an Ankora skill is not enough."),
             repos: z.array(z.string().max(120)).max(10).optional(),
             localMcp: z.array(z.string().max(80)).max(10).optional(),
             externalRunners: z.array(z.string().max(200)).max(10).optional(),

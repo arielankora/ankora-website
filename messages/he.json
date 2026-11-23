@@ -2396,7 +2396,8 @@
         "advance_lessons": "סיכום ולקחים",
         "extract": "חלץ ידע",
         "translation": "תרגום נוהל",
-        "client_activity": "סיכום לקוח"
+        "client_activity": "סיכום לקוח",
+        "agent_change_note": "הערת שינוי של סוכן"
       }
     },
     "heavy": {

@@ -1,4 +1,4 @@
-import { BLOCK_KINDS, PLACEHOLDER, type AgentBlock, type AgentFile, type AgentParam, type AgentRequirements } from "./model";
+import { BLOCK_KINDS, PLACEHOLDER, skillOf, type AgentBlock, type AgentFile, type AgentParam, type AgentRequirements } from "./model";
 
 // Agents, phase 1: one function turns a version, its parameter values and
 // the clients an installation covers into the markdown Claude receives.
@@ -39,6 +39,8 @@ const ACTION_LEVEL: Record<CompileInput["version"]["actionLevel"], string> = {
   SEND: "שולח בשם אדם, לפי הכללים והמכסות שכאן בלבד.",
 };
 
+const vaultRef = (name: string) => (name.startsWith("[סוד: ") ? name : `[סוד: ${name.trim()}, נקרא מהכספת]`);
+
 const order = (b: AgentBlock) => BLOCK_KINDS.indexOf(b.kind);
 
 function fill(text: string, value: (key: string) => string | undefined): string {
@@ -57,11 +59,15 @@ export function compileAgent(input: CompileInput): Compiled {
 
   const clientValue = (c: CompileClient, p: AgentParam) => {
     const v = c.values[p.key];
-    return v !== undefined && v !== "" ? v : p.default ?? undefined;
+    const got = v !== undefined && v !== "" ? v : p.default ?? undefined;
+    return got !== undefined && p.type === "VAULT_REF" ? vaultRef(got) : got;
   };
   // A LIBRARY_BLOCK value names a library block: its approved body goes in.
   const fromLibrary = (p: AgentParam, v: string | undefined) => {
-    if (p.type !== "LIBRARY_BLOCK" || v === undefined) return v;
+    if (v === undefined) return v;
+    // A vault item is named, never resolved: the agent reads it itself.
+    if (p.type === "VAULT_REF") return vaultRef(v);
+    if (p.type !== "LIBRARY_BLOCK") return v;
     const block = input.library?.[v.trim()];
     return block ? block.body.trim() : `[קטע הספרייה "${v}" לא נמצא או שאין לו גרסה מאושרת. דווח על כך.]`;
   };
@@ -107,7 +113,7 @@ export function compileAgent(input: CompileInput): Compiled {
   const req = version.requirements;
   const needs = [
     req.connectors.length ? `חיבורים: ${req.connectors.join(", ")}` : null,
-    req.skills.length ? `סקילים: ${req.skills.join(", ")}` : null,
+    req.skills.length ? `סקילים: ${req.skills.map((s) => { const { slug, minVersion } = skillOf(s); return minVersion ? `${slug} (גרסה ${minVersion} ומעלה)` : slug; }).join(", ")}` : null,
     req.repos.length ? `ריפואים: ${req.repos.join(", ")}` : null,
     req.localMcp.length ? `MCP מקומי: ${req.localMcp.join(", ")}` : null,
     req.externalRunners.length ? `רכיבים חיצוניים: ${req.externalRunners.join(", ")}` : null,

@@ -4,7 +4,7 @@ import { listLessons } from "@/lib/app-domain/agent-library";
 import { linkableProcesses } from "@/lib/app-domain/agents";
 import { LessonButtons, LinkProcess } from "../AgentForms";
 import { ACTION_LEVEL_LABEL, SURFACE_LABEL } from "../labels";
-import type { AgentBlock } from "@/lib/agents/model";
+import { skillOf, type AgentBlock } from "@/lib/agents/model";
 
 // Agents, phase 1: "סקירה". How the agent works, built from its blocks:
 // when it runs, what it reads, what it does, what comes out, and beside it
@@ -64,7 +64,7 @@ export default async function AgentOverviewPage({ params }: { params: Promise<{ 
           {(req.connectors.length > 0 || req.skills.length > 0) && (
             <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-app-text-secondary">
               <span>כלים וחיבורים:</span>
-              {[...req.connectors, ...req.skills].map((c) => (
+              {[...req.connectors, ...req.skills.map((s) => { const { slug, minVersion } = skillOf(s); return minVersion ? `${slug} (גרסה ${minVersion}+)` : slug; })].map((c) => (
                 <span key={c} className="rounded-full border border-app-border bg-white px-2 py-0.5" dir="ltr">{c}</span>
               ))}
             </div>
