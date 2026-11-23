@@ -467,7 +467,7 @@ async function agentVersions(s: Scope): Promise<ApprovalItem[]> {
       recommend: { text: "לקרוא את השינוי ולאשר", why: "התוספת מגיעה רק כשהסוכן עובד על הלקוח הזה, מהריצה הבאה. גרסת הסוכן לא משתנה." },
       preview: additionPreview(changes, (await clientAdditionProblems(a)).map((p) => p.text)),
       screen: {
-        title: k("agent.title", { name, version: String(a.version) }),
+        title: k("agentAddition.title", { agent: a.agent.name, client: clientName.get(a.clientId) ?? "", version: String(a.version) }),
         approve: k("agent.approve"),
         reject: k("agent.reject"),
         recommend: { text: k("agent.recommend"), why: k("agent.additionWhy") },
@@ -488,10 +488,10 @@ async function agentVersions(s: Scope): Promise<ApprovalItem[]> {
     actions: { approve: "אישור הגרסה", reject: { label: "דחייה", note: true } },
     recommend: { text: "לקרוא את השינוי ולאשר", why: "האישור כותב את הנוסח החדש בכל סוכן שמשתמש בקטע, כגרסה מאושרת חדשה שלו." },
     screen: {
-      title: k("agent.title", { name: `ספריית קטעים: ${v.sharedBlock.title}`, version: String(v.version) }),
+      title: k("agentLibrary.title", { name: v.sharedBlock.title, version: String(v.version) }),
       approve: k("agent.approve"),
       reject: k("agent.reject"),
-      recommend: { text: k("agent.recommend"), why: k("agent.why") },
+      recommend: { text: k("agent.recommend"), why: k("agentLibrary.why") },
     },
   }));
   return [...library, ...additions, ...rows.map((v): ApprovalItem => ({

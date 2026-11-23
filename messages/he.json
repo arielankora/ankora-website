@@ -6255,6 +6255,13 @@
         "recommend": "לקרוא את השינוי ולאשר",
         "why": "הגרסה מגיעה לכל מי שמריץ את הסוכן, אחרי שהוא מאשר אותה אצלו.",
         "additionWhy": "התוספת מגיעה רק כשהסוכן עובד על הלקוח הזה, מהריצה הבאה. גרסת הסוכן לא משתנה."
+      },
+      "agentLibrary": {
+        "title": "ספריית קטעים: {name}, גרסה {version}",
+        "why": "האישור כותב את הנוסח החדש בכל סוכן שמשתמש בקטע, כגרסה מאושרת חדשה שלו."
+      },
+      "agentAddition": {
+        "title": "{agent}: תוספת ל{client}, גרסה {version}"
       }
     }
   },
@@ -8741,6 +8748,492 @@
         "billableMinutes": "דקות לחיוב",
         "employee": "איש צוות"
       }
+    },
+    "agents": {
+      "updateWaitingTitle": "{agent}: גרסה {version} ממתינה לאישור שלך",
+      "updateWaitingBody": "ההתקנה המתוזמנת ממשיכה בגרסה הקודמת עד שתאשר את העדכון במסך ההתקנות.",
+      "runFailedTitle": "{agent}: הריצה נכשלה",
+      "runMissingTitle": "{agent}: חסרה דרישה בריצה",
+      "missing": "חסר: {item}"
+    }
+  },
+  "agents": {
+    "labels": {
+      "blockKind": {
+        "role": "תפקיד וזהות",
+        "scope": "היקף",
+        "steps": "צעדי עבודה",
+        "rules": "כללים ואיסורים",
+        "approvals": "אישורים נדרשים",
+        "language": "שפה וסגנון",
+        "output": "פורמט פלט",
+        "tools": "כלים וחיבורים",
+        "schedule": "תזמון",
+        "live": "הקשר חי מאנקורה"
+      },
+      "paramLevel": {
+        "AGENT": "הסוכן (ערך אחד לכולם)",
+        "CLIENT": "לקוח",
+        "INSTALLATION": "התקנה (מי שמריץ)"
+      },
+      "paramType": {
+        "TEXT": "טקסט",
+        "LONG_TEXT": "טקסט ארוך",
+        "NUMBER": "מספר (למשל מכסה)",
+        "LIST": "רשימה",
+        "EMAIL": "מייל",
+        "FILE_LOCATION": "מיקום קובץ",
+        "PAGE": "דף פלט",
+        "LIBRARY_BLOCK": "קטע מהספרייה (לפי מפתח)",
+        "CONNECTOR": "חיבור (לפי שם)",
+        "VAULT_REF": "פריט בכספת (שם בלבד, בלי הערך)"
+      },
+      "surface": {
+        "PROJECT": "פרויקט Claude",
+        "SCHEDULED": "משימה מתוזמנת",
+        "PERSISTENT_SESSION": "שיחה קבועה",
+        "SKILL": "סקיל"
+      },
+      "kind": {
+        "CLIENT_PROJECT": "פרויקט Claude",
+        "SCHEDULED": "משימה מתוזמנת",
+        "SKILL": "סקיל"
+      },
+      "actionLevel": {
+        "READ": "קורא בלבד",
+        "DRAFT": "כותב טיוטות",
+        "SEND": "שולח בשם אדם"
+      },
+      "state": {
+        "DRAFT": "טיוטה",
+        "PENDING": "ממתינה לאישור",
+        "APPROVED": "מאושרת",
+        "REJECTED": "נדחתה"
+      },
+      "run": {
+        "OK": "תקינה",
+        "PARTIAL": "חלקית",
+        "FAILED": "נכשלה"
+      },
+      "check": {
+        "RUN": "בכל ריצה",
+        "DAILY": "יומית",
+        "WEEKLY": "שבועית"
+      }
+    },
+    "errors": {
+      "forbidden": "אין לך הרשאה לפעולה הזו.",
+      "generic": "משהו השתבש. כדאי לנסות שוב."
+    },
+    "forms": {
+      "common": {
+        "notDone": "לא בוצע",
+        "saving": "שומר...",
+        "creating": "יוצר...",
+        "saveDraft": "לשמור בטיוטה",
+        "save": "לשמור",
+        "edit": "לערוך",
+        "change": "לשנות",
+        "remove": "להסיר",
+        "reject": "לדחות",
+        "title": "כותרת",
+        "text": "הטקסט",
+        "blockKind": "סוג הקטע",
+        "changeNote": "מה השתנה ולמה",
+        "rejectNote": "הערה למי שכתב (חובה)",
+        "purpose": "מה הסוכן עושה, בשורה",
+        "newBlock": "קטע חדש"
+      },
+      "newAgent": {
+        "trigger": "סוכן חדש",
+        "name": "שם הסוכן",
+        "purpose": "מה הוא עושה, בשורה",
+        "whereRuns": "איפה הוא רץ",
+        "kindProject": "פרויקט Claude (שיחה)",
+        "importHint": "אפשר גם לייבא פרומפט קיים: לבקש מ-Claude לשמור אותו כטיוטה עם הכלי save_agent_draft.",
+        "submit": "ליצור סוכן"
+      },
+      "block": {
+        "addTrigger": "להוסיף קטע",
+        "editTitle": "עריכה: {title}",
+        "bodyHint": "פרמטר נכתב בסוגריים כפולים, למשל {example}.",
+        "exampleKey": "חתימה",
+        "addParam": "להוסיף פרמטר:",
+        "why": "למה הכלל קיים (לא חובה)",
+        "onlyClient": "רק ללקוח (תוספת ללקוח)",
+        "allClients": "לכל הלקוחות",
+        "safety": "גבול בטיחות (מוצג ב\"לעולם לא\")",
+        "removed": "הקטע הוסר מהטיוטה",
+        "overridable": "ניתן להחלפה ללקוח (תוספת ללקוח יכולה לבוא במקומו)"
+      },
+      "param": {
+        "key": "שם בהוראות",
+        "keyHint": "מה שנכתב בין הסוגריים, למשל חתימה. אותיות, ספרות וקו תחתון.",
+        "label": "תיאור",
+        "level": "נקבע ברמה",
+        "type": "סוג",
+        "default": "ערך ברירת מחדל",
+        "clientField": "מתיק הלקוח",
+        "clientFieldHint": "רק לפרמטר ברמת לקוח. הערך מתעדכן לבד מהתיק.",
+        "clientFieldNone": "לא, מקלידים ערך",
+        "clientFieldName": "שם הלקוח",
+        "clientFieldDomains": "הדומיינים של הלקוח",
+        "required": "חובה. בלי ערך, הסוכן לא עובד על הלקוח או על ההתקנה",
+        "newTrigger": "פרמטר חדש",
+        "editTitle": "פרמטר: {label}",
+        "removed": "הפרמטר הוסר מהטיוטה"
+      },
+      "clientValue": {
+        "value": "ערך",
+        "hint": "ריק: חוזרים לברירת המחדל. הערך חל מהריצה הבאה, בלי גרסה חדשה.",
+        "set": "לקבוע"
+      },
+      "meta": {
+        "copied": "הועתק",
+        "compose": "נסח עם קלוד",
+        "pasteHint": "הדביקו בשיחה חדשה, והעתיקו את השורה שחוזרת לכאן.",
+        "openClaude": "פתיחת קלוד",
+        "promptAria": "הפרומפט להעתקה",
+        "changeNoteHint": "זה מה שמי שמריץ את הסוכן יראה כשיציעו לו לעדכן.",
+        "actionLevel": "רמת פעולה",
+        "levelRead": "קורא בלבד",
+        "levelDraft": "כותב טיוטות ותוויות",
+        "levelSend": "שולח בשם אדם",
+        "connectors": "חיבורים נדרשים",
+        "commaHint": "מופרדים בפסיק.",
+        "skills": "סקילים נדרשים",
+        "skillsHint": "מופרדים בפסיק. גרסה מינימלית אחרי @, למשל gmail-labels@3.",
+        "repos": "ריפואים",
+        "localMcp": "MCP מקומי במחשב",
+        "external": "רכיבים חיצוניים (Apps Script וכדומה)",
+        "model": "מודל",
+        "trigger": "הערת שינוי ודרישות",
+        "title": "הערת שינוי, רמת פעולה ודרישות"
+      },
+      "process": {
+        "field": "התהליך שהסוכן מבצע",
+        "hint": "get_agent מוסיף את השלבים מהנוהל המאושר בכל ריצה. נוהל שמאושר מחדש מגיע לסוכן בלי גרסה חדשה של הסוכן.",
+        "none": "בלי תהליך",
+        "link": "לקשר לתהליך"
+      },
+      "draft": {
+        "discard": "לבטל טיוטה",
+        "discarded": "הטיוטה בוטלה",
+        "submit": "לשלוח לאישור",
+        "submitted": "נשלח לאישור מנהל"
+      },
+      "archive": {
+        "text": "הסוכן יוצא מהרשימה, מתור האישורים ומהמחבר. הגרסאות שלו נשמרות. סוכן עם התקנות פעילות לא עובר לארכיון.",
+        "reason": "למה (חובה)",
+        "submit": "להעביר לארכיון",
+        "title": "העברת \"{name}\" לארכיון"
+      },
+      "purpose": {
+        "text": "השורה שמופיעה מתחת לשם הסוכן, ברשימה ובמחבר. היא לא חלק מהגרסה, והשינוי נכנס מיד.",
+        "trigger": "לערוך תיאור",
+        "title": "תיאור הסוכן"
+      },
+      "version": {
+        "approve": "לאשר גרסה {version}",
+        "approved": "גרסה {version} אושרה",
+        "rejectTitle": "דחיית גרסה {version}"
+      },
+      "faulty": {
+        "text": "כל ההתקנות שרצות על הגרסה הזו יחזרו מיד לגרסה המאושרת הקודמת, בלי לשאול. אחר כך מתקנים בטיוטה חדשה.",
+        "reason": "מה התקלה (חובה)",
+        "submit": "לסמן כתקולה ולחזור לגרסה הקודמת",
+        "trigger": "לסמן כתקולה",
+        "title": "גרסה {version} תקולה"
+      },
+      "install": {
+        "created": "ההתקנה נוצרה. זה הטקסט היחיד שנשאר ב-Claude: להדביק אותו בהוראות הפרויקט, בפרומפט של המשימה המתוזמנת או בתחילת השיחה הקבועה.",
+        "bootstrapLabel": "טקסט ההפעלה",
+        "surface": "איפה זה ירוץ",
+        "scope": "על אילו לקוחות",
+        "scopeOne": "לקוח אחד",
+        "scopeList": "כמה לקוחות",
+        "scopeAll": "כל הלקוחות שלי",
+        "clients": "לקוחות",
+        "cron": "תזמון (cron)",
+        "tz": "אזור זמן",
+        "check": "בדיקת עדכון",
+        "checkRun": "בכל ריצה",
+        "checkDaily": "פעם ביום",
+        "checkWeekly": "פעם בשבוע",
+        "account": "חשבון Claude (אם לא שלך)",
+        "paramRequired": "{label} (חובה)",
+        "submit": "ליצור התקנה",
+        "newTrigger": "התקנה חדשה",
+        "removed": "ההתקנה הוסרה",
+        "update": "לעדכן",
+        "updated": "ההתקנה עודכנה לגרסה {version}"
+      },
+      "revert": {
+        "button": "להחזיר לגרסה {version}",
+        "opened": "נפתחה טיוטה שהיא עותק של גרסה {version}",
+        "openedNote": "היא תיכנס לשימוש אחרי אישור מנהל."
+      },
+      "shared": {
+        "title": "ספרייה: {title}",
+        "newTitle": "קטע חדש בספרייה",
+        "changeNoteHint": "מופיע בגרסה החדשה של כל סוכן שמשתמש בקטע.",
+        "submit": "לשלוח לאישור מנהל",
+        "approve": "לאשר גרסה {version}",
+        "approveReach": "לאשר גרסה {version}, ותעדכן {reach, plural, one {סוכן אחד} other {# סוכנים}}",
+        "approved": "אושר, והסוכנים עודכנו"
+      },
+      "fromLibrary": {
+        "field": "קטע מהספרייה",
+        "hint": "הקטע נכנס לטיוטה כמו שהוא, ומתעדכן לבד כשגרסה חדשה שלו מאושרת בספרייה.",
+        "submit": "להוסיף לטיוטה",
+        "trigger": "להוסיף מהספרייה",
+        "title": "קטע מהספרייה"
+      },
+      "lessons": {
+        "used": "נכנס לטיוטה",
+        "usedDone": "סומן כטופל",
+        "dismissed": "לא רלוונטי",
+        "dismissedDone": "ההצעה נסגרה"
+      },
+      "addition": {
+        "client": "לקוח",
+        "bodyHint": "פרמטר של הסוכן נכתב בסוגריים כפולים, למשל {example}.",
+        "replaces": "במקום קטע של הסוכן",
+        "replacesHint": "רק קטעים שסומנו \"ניתן להחלפה ללקוח\". גבולות בטיחות לא מוחלפים.",
+        "notReplacing": "לא, נוסף לצד ההוראות",
+        "save": "לשמור בטיוטת התוספת",
+        "newForClient": "קטע חדש ל{client}",
+        "title": "תוספת ללקוח",
+        "newTrigger": "תוספת ללקוח חדשה",
+        "removed": "הקטע הוסר מטיוטת התוספת",
+        "changeNote": "מה השתנה ולמה",
+        "save2": "לשמור",
+        "noteTrigger": "הערת שינוי",
+        "noteTitle": "הערת שינוי לתוספת",
+        "discard": "לבטל טיוטה",
+        "discarded": "הטיוטה בוטלה",
+        "submit": "לשלוח לאישור",
+        "submitted": "נשלח לאישור מנהל"
+      }
+    },
+    "list": {
+      "title": "סוכנים",
+      "intro": "כל סוכן נכתב כאן פעם אחת. כל מנהל תפעול מתקין אותו אצלו, והעדכונים מגיעים אליו מכאן.",
+      "library": "ספריית קטעים",
+      "attention": "מה דורש תשומת לב",
+      "agents": "סוכנים",
+      "installs": "התקנות אצל הצוות",
+      "updates": "עדכונים ממתינים בהתקנות",
+      "pendingDrafts": "טיוטות שמחכות לאישור",
+      "empty": "עוד אין סוכנים. אפשר ליצור סוכן חדש, או לבקש מ-Claude לייבא פרומפט קיים עם save_agent_draft.",
+      "col": {
+        "agent": "סוכן",
+        "where": "איפה רץ",
+        "owner": "אחראי",
+        "version": "גרסה",
+        "installs": "התקנות",
+        "state": "מצב"
+      },
+      "version": "גרסה {version}",
+      "noApproved": "אין מאושרת",
+      "updatesWaiting": "{count, plural, one {עדכון ממתין} other {# עדכונים ממתינים}}",
+      "pendingVersion": "גרסה {version} לאישור",
+      "draftVersion": "טיוטה לגרסה {version}",
+      "lastRunFailed": "הריצה האחרונה נכשלה",
+      "ok": "תקין"
+    },
+    "library": {
+      "crumb": "סוכנים",
+      "title": "ספריית קטעים",
+      "intro": "כלל שחוזר בכמה סוכנים נכתב כאן פעם אחת. כשגרסה חדשה שלו מאושרת, היא נכנסת לכל סוכן שמשתמש בו כגרסה מאושרת חדשה שלו.",
+      "empty": "הספרייה ריקה.",
+      "approvedVersion": "גרסה {version} מאושרת",
+      "noApproved": "אין גרסה מאושרת",
+      "key": "מפתח:",
+      "usedBy": "משמש:",
+      "usedByNone": "אף סוכן עדיין",
+      "pending": "גרסה {version} ממתינה לאישור",
+      "pendingBy": "גרסה {version} ממתינה לאישור, מאת {name}",
+      "why": "למה: {note}"
+    },
+    "header": {
+      "crumb": "סוכנים",
+      "owner": "אחראי: {name}",
+      "approvedVersion": "גרסה {version} מאושרת",
+      "noApproved": "אין גרסה מאושרת",
+      "export": "להוריד כסקיל (SKILL.md)",
+      "tabsLabel": "לשוניות הסוכן",
+      "tabs": {
+        "overview": "סקירה",
+        "instructions": "הוראות",
+        "params": "פרמטרים",
+        "versions": "גרסאות",
+        "installations": "התקנות"
+      },
+      "pendingTitle": "גרסה {version} ממתינה לאישור מנהל.",
+      "pendingKeepsVersion": "ההתקנות ממשיכות על גרסה {version} עד האישור.",
+      "pendingKeeps": "ההתקנות ממשיכות על מה שיש להן עד האישור.",
+      "draftTitle": "טיוטה לגרסה {version}.",
+      "draftKeepsVersion": "ההתקנות ממשיכות לרוץ על גרסה {version} עד שמנהל יאשר.",
+      "draftFirst": "אחרי אישור מנהל אפשר יהיה להתקין את הסוכן."
+    },
+    "overview": {
+      "howItWorks": "איך הוא עובד",
+      "builtFrom": "נבנה מקטעי ההוראות",
+      "builtFromVersion": "נבנה מקטעי ההוראות של גרסה {version}",
+      "notWritten": "לא כתוב בהוראות",
+      "when": "מתי",
+      "reads": "מה הוא קורא",
+      "does": "מה הוא עושה",
+      "outputs": "מה יוצא",
+      "tools": "כלים וחיבורים:",
+      "skillMin": "{slug} (גרסה {version}+)",
+      "never": "לעולם לא",
+      "neverEmpty": "לא כתובים כללים ואיסורים.",
+      "from": "מתוך: {title}",
+      "needsPerson": "רק באישור של אדם",
+      "needsPersonEmpty": "לא כתוב.",
+      "lessons": "הצעות מהריצות ({count})",
+      "onBlock": "על הקטע: {title}",
+      "editInDraft": "לערוך בטיוטה",
+      "process": "מבצע נוהל",
+      "processSteps": "השלבים מהנוהל המאושר נכנסים להוראות בכל ריצה.",
+      "noProcess": "לא מקושר לתהליך באנקורה.",
+      "runsAt": "רץ אצל",
+      "noInstalls": "אין התקנות.",
+      "install": "{user}, {surface}, גרסה {version}",
+      "updateWaiting": ", עדכון ממתין",
+      "allInstalls": "לכל ההתקנות"
+    },
+    "instructions": {
+      "summary": "{count, plural, one {קטע אחד} other {# קטעים}}, לפי הסדר שבו Claude קורא אותם · רמת פעולה: {level}",
+      "change": " · שינוי: {note}",
+      "safety": " · גבול בטיחות",
+      "fromLibrary": "מספרייה, גרסה {version}",
+      "why": "למה: {why}",
+      "additions": "תוספות ללקוח",
+      "additionsEmpty": "אין. תוספת ללקוח היא קטע שמגיע רק כשהסוכן עובד על הלקוח הזה.",
+      "client": "לקוח",
+      "files": "קבצים מצורפים",
+      "filesEmpty": "אין. קובץ שההוראות מפנות אליו (סקריפט, תבנית, מסמך רקע) נשמר כאן מ-Claude, ב-save_agent_draft.",
+      "chars": "{count} תווים",
+      "previewLabel": "הקובץ ש-Claude מקבל",
+      "preview": "מה Claude מקבל",
+      "previewFor": "תצוגה עבור",
+      "noClient": "בלי לקוח",
+      "show": "להציג",
+      "copy": "ההוראות המלאות",
+      "noVersion": "אין עדיין גרסה.",
+      "overridable": " · ניתן להחלפה ללקוח",
+      "additionsIntro": "קטעים שמגיעים רק כשהסוכן עובד על הלקוח. לכל לקוח גרסאות משלו, ושינוי בהן לא משנה את גרסת הסוכן.",
+      "additionInUse": "גרסה {version} בשימוש",
+      "additionNoApproved": "אין גרסה מאושרת",
+      "additionPending": " · גרסה {version} ממתינה לאישור מנהל",
+      "additionDraft": " · טיוטה לגרסה {version}",
+      "additionChange": "שינוי: {note}",
+      "additionEmpty": "אין קטעים בגרסה הזו.",
+      "replaces": " · במקום \"{title}\"",
+      "statusAdded": " · נוסף",
+      "statusChanged": " · שונה",
+      "removedInDraft": "הוסרו בטיוטה: {titles}",
+      "exportForClient": "להוריד כסקיל ללקוח הזה (SKILL.md)"
+    },
+    "versions": {
+      "nav": "גרסאות",
+      "version": "גרסה {version}",
+      "faulty": "תקולה",
+      "inUse": ", בשימוש",
+      "approvedBy": " · אישר {name}",
+      "rejected": " · נדחתה: {reason}",
+      "compare": "גרסה {base} מול גרסה {version}",
+      "first": "גרסה {version}, הראשונה",
+      "summary": "{changed, plural, one {קטע אחד שונה} other {# קטעים שונו}}, {unchanged} לא השתנו · רמת פעולה: {level}",
+      "wasLevel": " (הייתה {level})",
+      "why": "למה: {note}",
+      "params": "פרמטרים: {list}",
+      "added": "נוספו {names}",
+      "removed": "הוסרו {names}",
+      "changedParams": "שונו {names}",
+      "effect": "מה זה ישנה בפועל: {count, plural, one {התקנה אחת תקבל} other {# התקנות יקבלו}} את הגרסה בבדיקת העדכון הבאה. התקנה שהגרסה לא משנה לה דבר מתעדכנת בלי שאלה.",
+      "additionFor": "תוספת ל{client}: ",
+      "client": "לקוח",
+      "statusAdded": "נוסף",
+      "statusRemoved": "הוסר",
+      "statusChanged": "שונה",
+      "faultyHint": "גרסה שגורמת נזק? סימון כתקולה מחזיר מיד את כל ההתקנות שעליה לגרסה הקודמת.",
+      "revertBlocked": "גרסה {version} עוד פתוחה. כדי לחזור לגרסה הזו צריך קודם לסיים אותה: לשלוח או לבטל טיוטה, לאשר או לדחות גרסה שממתינה.",
+      "revertHint": "חזרה לגרסה הזו פותחת גרסה חדשה שהיא עותק שלה. היא נכנסת לשימוש רק אחרי אישור מנהל.",
+      "checks": "בדיקות לפני אישור",
+      "checksOk": "✓ אין מקף ארוך או בינוני, כל פרמטר בהוראות מוגדר, אין קטעים כפולים",
+      "noChangeNote": "! חסרה הערת שינוי: מה השתנה ולמה",
+      "sendWarning": "! הסוכן שולח בשם אדם בלי אדם באמצע. כדאי לבדוק שיש מכסה וכללי שליחה ברורים",
+      "awaitingManager": "ממתינה לאישור מנהל.",
+      "problems": {
+        "sendNeedsQuota": "סוכן ששולח בשם אדם חייב מכסה: צריך פרמטר מסוג מספר (למשל כמה הודעות ביום) ולכתוב בהוראות איך הוא נאכף.",
+        "tooManyFiles": "יותר מ-{max} קבצים מצורפים.",
+        "filesTooLarge": "הקבצים המצורפים גדולים מדי יחד.",
+        "duplicateFile": "שני קבצים באותו נתיב.",
+        "noBlocks": "אין בסוכן אף קטע הוראות.",
+        "tooManyBlocks": "יותר מ-{max} קטעים.",
+        "tooManyParams": "יותר מ-{max} פרמטרים.",
+        "duplicateBlock": "שני קטעים באותו מפתח: {key}.",
+        "unknownClient": "התוספת \"{title}\" מפנה ללקוח שלא קיים.",
+        "duplicateParam": "שני פרמטרים באותו שם.",
+        "clientFieldLevel": "\"{label}\" נלקח מתיק הלקוח, ולכן הוא פרמטר ברמת לקוח.",
+        "undefinedParam": "{placeholder} מופיע בהוראות ולא מוגדר כפרמטר.",
+        "dash": "יש בטקסט מקף ארוך או בינוני.",
+        "replaceMissing": "\"{title}\" מחליף קטע שאין בסוכן ({key}).",
+        "replaceSafety": "\"{title}\" הוא גבול בטיחות, ולא ניתן להחליף אותו ללקוח.",
+        "replaceNotAllowed": "\"{title}\" לא מסומן \"ניתן להחלפה ללקוח\". בלי הסימון התוספת תתווסף לצידו.",
+        "replaceTwice": "שני קטעים מחליפים את אותו קטע ({key})."
+      }
+    },
+    "installations": {
+      "intro": "כל התקנה היא הסוכן שרץ בחשבון Claude של מישהו בצוות, על גרסה נעולה. ב-Claude נשאר רק טקסט ההפעלה.",
+      "afterApproval": "אפשר להתקין אחרי שגרסה ראשונה מאושרת.",
+      "empty": "אין עדיין התקנות.",
+      "neverRan": "עוד לא רץ",
+      "col": {
+        "who": "מי מריץ",
+        "where": "איפה",
+        "clients": "לקוחות",
+        "version": "גרסה",
+        "check": "בדיקת עדכון",
+        "fetched": "פנה לאנקורה",
+        "lastRun": "ריצה אחרונה",
+        "state": "מצב"
+      },
+      "allClients": "כל הלקוחות",
+      "client": "לקוח",
+      "runAt": "{outcome}, {when}",
+      "missing": "חסר: {item}",
+      "notReported": "לא דווחה",
+      "updateWaiting": "עדכון לגרסה {version} ממתין",
+      "upToDate": "תקין, גרסה אחרונה",
+      "waitingFirst": "מחכה להפעלה ראשונה",
+      "bootstrap": "טקסט ההפעלה"
+    },
+    "params": {
+      "intro": "הערך הקרוב ביותר גובר: ברירת המחדל של הסוכן, ואחריה ערך של הלקוח או של ההתקנה. ערך מתיק הלקוח נערך בתיק עצמו, כך ששום דבר לא נכתב פעמיים.",
+      "title": "הפרמטרים",
+      "empty": "אין פרמטרים. פרמטר הוא ערך שמשתנה לפי לקוח או לפי מי שמריץ, ונכתב בהוראות כ-{example}.",
+      "required": " · חובה",
+      "fromFile": " · מתיק הלקוח",
+      "default": " · ברירת מחדל: {value}",
+      "perClient": "לפי לקוח",
+      "legendDefault": "ברירת מחדל",
+      "legendFile": "מתיק הלקוח",
+      "legendAgent": "הוגדר ללקוח בסוכן",
+      "client": "לקוח",
+      "sameAsDefault": "כמו ברירת המחדל",
+      "missing": "חסר",
+      "none": "אין",
+      "clientFile": "תיק הלקוח",
+      "noAiNote": "לקוחות שמסומנים \"בלי AI\" לא מופיעים כאן, ולא מגיעים לאף סוכן.",
+      "perInstallation": "לפי התקנה",
+      "perInstallationIntro": "ערכים ששייכים לחשבון של מי שמריץ, לא ללקוח. נקבעים כשיוצרים התקנה.",
+      "installation": "התקנה",
+      "exampleKey": "שם"
     }
   }
 }

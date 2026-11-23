@@ -126,7 +126,8 @@ export function placeholdersIn(text: string): string[] {
 
 const DASHES = /[\u2013\u2014]/;
 
-export type VersionProblem = { code: string; text: string };
+/// `text` is Hebrew, for the MCP answers; the screen words `code` with `values` (ADR 0006).
+export type VersionProblem = { code: string; text: string; values?: Record<string, string | number> };
 
 /// What stops a version from being sent for approval. Everything the
 /// version-screen checks list shows comes from here.
@@ -136,26 +137,26 @@ export function versionProblems(input: { blocks: AgentBlock[]; params: AgentPara
   // "סוכן ששולח חייב להגדיר מכסה" (23.11.2026): checked on new approvals only.
   if (input.actionLevel === "SEND" && !params.some((p) => p.type === "NUMBER")) out.push({ code: "sendNeedsQuota", text: "סוכן ששולח בשם אדם חייב מכסה: צריך פרמטר מסוג מספר (למשל כמה הודעות ביום) ולכתוב בהוראות איך הוא נאכף." });
   const files = input.files ?? [];
-  if (files.length > LIMITS.files) out.push({ code: "tooManyFiles", text: `יותר מ-${LIMITS.files} קבצים מצורפים.` });
+  if (files.length > LIMITS.files) out.push({ code: "tooManyFiles", text: `יותר מ-${LIMITS.files} קבצים מצורפים.`, values: { max: LIMITS.files } });
   if (files.reduce((n, f) => n + f.content.length, 0) > LIMITS.filesChars) out.push({ code: "filesTooLarge", text: "הקבצים המצורפים גדולים מדי יחד." });
   if (new Set(files.map((f) => f.path)).size !== files.length) out.push({ code: "duplicateFile", text: "שני קבצים באותו נתיב." });
   if (blocks.length === 0) out.push({ code: "noBlocks", text: "אין בסוכן אף קטע הוראות." });
-  if (blocks.length > LIMITS.blocks) out.push({ code: "tooManyBlocks", text: `יותר מ-${LIMITS.blocks} קטעים.` });
-  if (params.length > LIMITS.params) out.push({ code: "tooManyParams", text: `יותר מ-${LIMITS.params} פרמטרים.` });
+  if (blocks.length > LIMITS.blocks) out.push({ code: "tooManyBlocks", text: `יותר מ-${LIMITS.blocks} קטעים.`, values: { max: LIMITS.blocks } });
+  if (params.length > LIMITS.params) out.push({ code: "tooManyParams", text: `יותר מ-${LIMITS.params} פרמטרים.`, values: { max: LIMITS.params } });
   const keys = new Set<string>();
   for (const b of blocks) {
-    if (keys.has(b.key)) out.push({ code: "duplicateBlock", text: `שני קטעים באותו מפתח: ${b.key}.` });
+    if (keys.has(b.key)) out.push({ code: "duplicateBlock", text: `שני קטעים באותו מפתח: ${b.key}.`, values: { key: b.key } });
     keys.add(b.key);
-    if (b.clientId && input.clientIds && !input.clientIds.has(b.clientId)) out.push({ code: "unknownClient", text: `התוספת "${b.title}" מפנה ללקוח שלא קיים.` });
+    if (b.clientId && input.clientIds && !input.clientIds.has(b.clientId)) out.push({ code: "unknownClient", text: `התוספת "${b.title}" מפנה ללקוח שלא קיים.`, values: { title: b.title } });
   }
   const paramKeys = new Set(params.map((p) => p.key));
   if (paramKeys.size !== params.length) out.push({ code: "duplicateParam", text: "שני פרמטרים באותו שם." });
   for (const p of params) {
-    if (p.clientField && p.level !== "CLIENT") out.push({ code: "clientFieldLevel", text: `"${p.label}" נלקח מתיק הלקוח, ולכן הוא פרמטר ברמת לקוח.` });
+    if (p.clientField && p.level !== "CLIENT") out.push({ code: "clientFieldLevel", text: `"${p.label}" נלקח מתיק הלקוח, ולכן הוא פרמטר ברמת לקוח.`, values: { label: p.label } });
   }
   const missing = new Set<string>();
   for (const b of blocks) for (const k of placeholdersIn(b.body)) if (!paramKeys.has(k)) missing.add(k);
-  for (const k of missing) out.push({ code: "undefinedParam", text: `{{${k}}} מופיע בהוראות ולא מוגדר כפרמטר.` });
+  for (const k of missing) out.push({ code: "undefinedParam", text: `{{${k}}} מופיע בהוראות ולא מוגדר כפרמטר.`, values: { key: k } });
   const texts = [...blocks.flatMap((b) => [b.title, b.body, b.why ?? ""]), ...params.flatMap((p) => [p.label, p.default ?? ""]), input.changeNote ?? ""];
   if (texts.some((t) => DASHES.test(t))) out.push({ code: "dash", text: "יש בטקסט מקף ארוך או בינוני." });
   return out;
@@ -171,25 +172,25 @@ export function canReplace(block: AgentBlock | undefined): boolean {
 export function additionProblems(input: { blocks: AgentBlock[]; agentBlocks: AgentBlock[]; params: AgentParam[]; changeNote?: string | null }): VersionProblem[] {
   const out: VersionProblem[] = [];
   const { blocks } = input;
-  if (blocks.length > LIMITS.blocks) out.push({ code: "tooManyBlocks", text: `יותר מ-${LIMITS.blocks} קטעים.` });
+  if (blocks.length > LIMITS.blocks) out.push({ code: "tooManyBlocks", text: `יותר מ-${LIMITS.blocks} קטעים.`, values: { max: LIMITS.blocks } });
   const keys = new Set<string>();
   const replaced = new Set<string>();
   const agent = new Map(input.agentBlocks.filter((b) => !b.clientId).map((b) => [b.key, b]));
   for (const b of blocks) {
-    if (keys.has(b.key)) out.push({ code: "duplicateBlock", text: `שני קטעים באותו מפתח: ${b.key}.` });
+    if (keys.has(b.key)) out.push({ code: "duplicateBlock", text: `שני קטעים באותו מפתח: ${b.key}.`, values: { key: b.key } });
     keys.add(b.key);
     if (!b.replaces) continue;
     const target = agent.get(b.replaces);
-    if (!target) out.push({ code: "replaceMissing", text: `"${b.title}" מחליף קטע שאין בסוכן (${b.replaces}).` });
-    else if (target.safety) out.push({ code: "replaceSafety", text: `"${target.title}" הוא גבול בטיחות, ולא ניתן להחליף אותו ללקוח.` });
-    else if (!target.overridable) out.push({ code: "replaceNotAllowed", text: `"${target.title}" לא מסומן "ניתן להחלפה ללקוח". בלי הסימון התוספת תתווסף לצידו.` });
-    if (replaced.has(b.replaces)) out.push({ code: "replaceTwice", text: `שני קטעים מחליפים את אותו קטע (${b.replaces}).` });
+    if (!target) out.push({ code: "replaceMissing", text: `"${b.title}" מחליף קטע שאין בסוכן (${b.replaces}).`, values: { title: b.title, key: b.replaces } });
+    else if (target.safety) out.push({ code: "replaceSafety", text: `"${target.title}" הוא גבול בטיחות, ולא ניתן להחליף אותו ללקוח.`, values: { title: target.title } });
+    else if (!target.overridable) out.push({ code: "replaceNotAllowed", text: `"${target.title}" לא מסומן "ניתן להחלפה ללקוח". בלי הסימון התוספת תתווסף לצידו.`, values: { title: target.title } });
+    if (replaced.has(b.replaces)) out.push({ code: "replaceTwice", text: `שני קטעים מחליפים את אותו קטע (${b.replaces}).`, values: { key: b.replaces } });
     replaced.add(b.replaces);
   }
   const paramKeys = new Set(input.params.map((p) => p.key));
   const missing = new Set<string>();
   for (const b of blocks) for (const k of placeholdersIn(b.body)) if (!paramKeys.has(k)) missing.add(k);
-  for (const k of missing) out.push({ code: "undefinedParam", text: `{{${k}}} מופיע בתוספת ולא מוגדר כפרמטר בסוכן.` });
+  for (const k of missing) out.push({ code: "undefinedParam", text: `{{${k}}} מופיע בתוספת ולא מוגדר כפרמטר בסוכן.`, values: { key: k } });
   const texts = [...blocks.flatMap((b) => [b.title, b.body, b.why ?? ""]), input.changeNote ?? ""];
   if (texts.some((t) => DASHES.test(t))) out.push({ code: "dash", text: "יש בטקסט מקף ארוך או בינוני." });
   return out;

@@ -316,6 +316,18 @@ const TRANSLATED_FILES = [
   "app/(product)/app/(authenticated)/portal/weekly/WeeklyView.tsx",
   "app/(product)/app/(authenticated)/portal/weekly/page.tsx",
   "app/api/portal/documents/[documentId]/route.ts",
+  // Agents (23.11.2026). The text compile.ts and get_agent give Claude follows the
+  // installation owner's language in lib/agents; the blocks people wrote stay as written.
+  "app/(product)/app/(authenticated)/agents/page.tsx",
+  "app/(product)/app/(authenticated)/agents/AgentForms.tsx",
+  "app/(product)/app/(authenticated)/agents/actions.ts",
+  "app/(product)/app/(authenticated)/agents/library/page.tsx",
+  "app/(product)/app/(authenticated)/agents/[slug]/shared.tsx",
+  "app/(product)/app/(authenticated)/agents/[slug]/page.tsx",
+  "app/(product)/app/(authenticated)/agents/[slug]/instructions/page.tsx",
+  "app/(product)/app/(authenticated)/agents/[slug]/versions/page.tsx",
+  "app/(product)/app/(authenticated)/agents/[slug]/installations/page.tsx",
+  "app/(product)/app/(authenticated)/agents/[slug]/params/page.tsx",
 ];
 
 describe("translated screens (ADR 0006)", () => {

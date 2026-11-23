@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -37,14 +38,16 @@ import {
   submitDraftAction,
 } from "./actions";
 import { recordPromptCopiedAction } from "../prompt-copy-actions";
-import { BLOCK_KIND_LABEL, PARAM_LEVEL_LABEL, PARAM_TYPE_LABEL, SURFACE_LABEL } from "./labels";
-import { skillText, type AgentBlock, type AgentParam, type AgentRequirements } from "@/lib/agents/model";
+import { BLOCK_KINDS, PARAM_LEVELS, PARAM_TYPES, skillText, type AgentBlock, type AgentParam, type AgentRequirements } from "@/lib/agents/model";
 
 // Agents, phase 1: the screens' forms. Drawers, like every write form in
 // the app; the server pages around them only read.
 
 const INPUT = "mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
 const LABEL = "block text-xs font-medium text-app-text-secondary";
+// Option order of the surfaces, as the old labels.ts had it.
+const SURFACES = ["PROJECT", "SCHEDULED", "PERSISTENT_SESSION", "SKILL"] as const;
+
 const PRIMARY = "tap-area w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50";
 
 function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
@@ -63,13 +66,14 @@ function Err({ error }: { error?: string | null }) {
 
 /// A one-click action with a toast for its answer.
 export function ActionButton({ run, label, done, tone = "quiet" }: { run: () => Promise<{ error?: string }>; label: string; done: string; tone?: "primary" | "quiet" }) {
+  const t = useTranslations("agents.forms.common");
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
   async function click() {
     setBusy(true);
     const r = await run();
     setBusy(false);
-    if (r.error) showToast({ tone: "error", title: "לא בוצע", description: r.error });
+    if (r.error) showToast({ tone: "error", title: t("notDone"), description: r.error });
     else showToast({ tone: "info", title: done });
   }
   const cls =
@@ -86,6 +90,8 @@ export function ActionButton({ run, label, done, tone = "quiet" }: { run: () => 
 // --- New agent ---------------------------------------------------------------
 
 function NewAgentForm() {
+  const t = useTranslations("agents.forms");
+  const tl = useTranslations("agents.labels");
   const router = useRouter();
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(createAgentAction, (r) => {
@@ -94,31 +100,32 @@ function NewAgentForm() {
   });
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
-      <Field label="שם הסוכן">
+      <Field label={t("newAgent.name")}>
         <input name="name" required maxLength={80} dir="auto" className={INPUT} />
       </Field>
-      <Field label="מה הוא עושה, בשורה">
+      <Field label={t("newAgent.purpose")}>
         <input name="purpose" required maxLength={300} dir="auto" className={INPUT} />
       </Field>
-      <Field label="איפה הוא רץ">
+      <Field label={t("newAgent.whereRuns")}>
         <select name="kind" className={INPUT} defaultValue="SCHEDULED">
-          <option value="CLIENT_PROJECT">פרויקט Claude (שיחה)</option>
-          <option value="SCHEDULED">משימה מתוזמנת</option>
-          <option value="SKILL">סקיל</option>
+          <option value="CLIENT_PROJECT">{t("newAgent.kindProject")}</option>
+          <option value="SCHEDULED">{tl("kind.SCHEDULED")}</option>
+          <option value="SKILL">{tl("kind.SKILL")}</option>
         </select>
       </Field>
-      <p className="text-[11px] text-app-text-tertiary">אפשר גם לייבא פרומפט קיים: לבקש מ-Claude לשמור אותו כטיוטה עם הכלי save_agent_draft.</p>
+      <p className="text-[11px] text-app-text-tertiary">{t("newAgent.importHint")}</p>
       <Err error={error} />
       <button type="submit" disabled={pending} className={PRIMARY}>
-        {pending ? "שומר..." : "ליצור סוכן"}
+        {pending ? t("common.saving") : t("newAgent.submit")}
       </button>
     </form>
   );
 }
 
 export function NewAgent() {
+  const t = useTranslations("agents.forms");
   return (
-    <Drawer triggerLabel="סוכן חדש" title="סוכן חדש">
+    <Drawer triggerLabel={t("newAgent.trigger")} title={t("newAgent.trigger")}>
       <NewAgentForm />
     </Drawer>
   );
@@ -129,6 +136,8 @@ export function NewAgent() {
 type ClientOption = { id: string; name: string };
 
 function BlockForm({ agentId, block, params }: { agentId: string; block?: AgentBlock; params: AgentParam[] }) {
+  const t = useTranslations("agents.forms");
+  const tl = useTranslations("agents.labels");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(saveBlockAction, close);
   const [body, setBody] = useState(block?.body ?? "");
@@ -138,22 +147,22 @@ function BlockForm({ agentId, block, params }: { agentId: string; block?: AgentB
       <input type="hidden" name="agentId" value={agentId} />
       <input type="hidden" name="originalKey" value={block?.key ?? ""} />
       <input type="hidden" name="key" value={block?.key ?? ""} />
-      <Field label="סוג הקטע">
+      <Field label={t("common.blockKind")}>
         <select name="kind" defaultValue={block?.kind ?? "steps"} className={INPUT}>
-          {Object.entries(BLOCK_KIND_LABEL).map(([k, l]) => (
-            <option key={k} value={k}>{l}</option>
+          {BLOCK_KINDS.map((k) => (
+            <option key={k} value={k}>{tl(`blockKind.${k}`)}</option>
           ))}
         </select>
       </Field>
-      <Field label="כותרת">
+      <Field label={t("common.title")}>
         <input name="title" required maxLength={120} dir="auto" defaultValue={block?.title ?? ""} className={INPUT} />
       </Field>
-      <Field label="הטקסט" hint="פרמטר נכתב בסוגריים כפולים, למשל {{חתימה}}.">
+      <Field label={t("common.text")} hint={t("block.bodyHint", { example: `{{${t("block.exampleKey")}}}` })}>
         <textarea name="body" rows={10} dir="auto" value={body} onChange={(e) => setBody(e.target.value)} className={INPUT} />
       </Field>
       {params.length > 0 && (
         <div className="-mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="text-app-text-secondary">להוסיף פרמטר:</span>
+          <span className="text-app-text-secondary">{t("block.addParam")}</span>
           {params.map((p) => (
             <button key={p.key} type="button" onClick={() => setBody((b) => `${b}{{${p.key}}}`)} className="rounded-md border border-dashed border-app-accent px-2 py-1 text-app-text-accent">
               {p.label}
@@ -161,37 +170,39 @@ function BlockForm({ agentId, block, params }: { agentId: string; block?: AgentB
           ))}
         </div>
       )}
-      <Field label="למה הכלל קיים (לא חובה)">
+      <Field label={t("block.why")}>
         <input name="why" maxLength={2000} dir="auto" defaultValue={block?.why ?? ""} className={INPUT} />
       </Field>
       <label className="flex items-center gap-2 text-sm text-app-text-primary">
         <input type="checkbox" name="safety" checked={safety} onChange={(e) => setSafety(e.target.checked)} />
-        גבול בטיחות (מוצג ב&quot;לעולם לא&quot;)
+        {t("block.safety")}
       </label>
       {!safety && (
         <label className="flex items-center gap-2 text-sm text-app-text-primary">
           <input type="checkbox" name="overridable" defaultChecked={!!block?.overridable} />
-          ניתן להחלפה ללקוח (תוספת ללקוח יכולה לבוא במקומו)
+          {t("block.overridable")}
         </label>
       )}
       <Err error={error} />
       <button type="submit" disabled={pending} className={PRIMARY}>
-        {pending ? "שומר..." : "לשמור בטיוטה"}
+        {pending ? t("common.saving") : t("common.saveDraft")}
       </button>
     </form>
   );
 }
 
 export function EditBlock(props: { agentId: string; block?: AgentBlock; params: AgentParam[] }) {
+  const t = useTranslations("agents.forms");
   return (
-    <Drawer triggerLabel={props.block ? "לערוך" : "להוסיף קטע"} title={props.block ? `עריכה: ${props.block.title}` : "קטע חדש"} variant={props.block ? "link" : "primary"}>
+    <Drawer triggerLabel={props.block ? t("common.edit") : t("block.addTrigger")} title={props.block ? t("block.editTitle", { title: props.block.title }) : t("common.newBlock")} variant={props.block ? "link" : "primary"}>
       <BlockForm {...props} />
     </Drawer>
   );
 }
 
 export function DeleteBlock({ agentId, blockKey }: { agentId: string; blockKey: string }) {
-  return <ActionButton run={() => deleteBlockAction(agentId, blockKey)} label="להסיר" done="הקטע הוסר מהטיוטה" />;
+  const t = useTranslations("agents.forms");
+  return <ActionButton run={() => deleteBlockAction(agentId, blockKey)} label={t("common.remove")} done={t("block.removed")} />;
 }
 
 // --- Client additions (24.11.2026) ------------------------------------------
@@ -201,6 +212,8 @@ type ReplaceTarget = { key: string; title: string };
 function AdditionBlockForm({ agentId, clientId, clients, block, targets }: { agentId: string; clientId?: string; clients: ClientOption[]; block?: AgentBlock; targets: ReplaceTarget[] }) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(saveAdditionBlockAction, close);
+  const t = useTranslations("agents.forms");
+  const tl = useTranslations("agents.labels");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="agentId" value={agentId} />
@@ -208,7 +221,7 @@ function AdditionBlockForm({ agentId, clientId, clients, block, targets }: { age
       {clientId ? (
         <input type="hidden" name="clientId" value={clientId} />
       ) : (
-        <Field label="לקוח">
+        <Field label={t("addition.client")}>
           <select name="clientId" required className={INPUT}>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
@@ -216,82 +229,88 @@ function AdditionBlockForm({ agentId, clientId, clients, block, targets }: { age
           </select>
         </Field>
       )}
-      <Field label="סוג הקטע">
+      <Field label={t("common.blockKind")}>
         <select name="kind" defaultValue={block?.kind ?? "rules"} className={INPUT}>
-          {Object.entries(BLOCK_KIND_LABEL).map(([k, l]) => (
-            <option key={k} value={k}>{l}</option>
+          {BLOCK_KINDS.map((k) => (
+            <option key={k} value={k}>{tl(`blockKind.${k}`)}</option>
           ))}
         </select>
       </Field>
-      <Field label="כותרת">
+      <Field label={t("common.title")}>
         <input name="title" required maxLength={120} dir="auto" defaultValue={block?.title ?? ""} className={INPUT} />
       </Field>
-      <Field label="הטקסט" hint="פרמטר של הסוכן נכתב בסוגריים כפולים, למשל {{חתימה}}.">
+      <Field label={t("common.text")} hint={t("addition.bodyHint", { example: `{{${t("block.exampleKey")}}}` })}>
         <textarea name="body" rows={8} dir="auto" defaultValue={block?.body ?? ""} className={INPUT} />
       </Field>
-      <Field label="למה הכלל קיים (לא חובה)">
+      <Field label={t("block.why")}>
         <input name="why" maxLength={2000} dir="auto" defaultValue={block?.why ?? ""} className={INPUT} />
       </Field>
-      <Field label="במקום קטע של הסוכן" hint="רק קטעים שסומנו &quot;ניתן להחלפה ללקוח&quot;. גבולות בטיחות לא מוחלפים.">
+      <Field label={t("addition.replaces")} hint={t("addition.replacesHint")}>
         <select name="replaces" defaultValue={block?.replaces ?? ""} className={INPUT}>
-          <option value="">לא, נוסף לצד ההוראות</option>
-          {targets.map((t) => (
-            <option key={t.key} value={t.key}>{t.title}</option>
+          <option value="">{t("addition.notReplacing")}</option>
+          {targets.map((target) => (
+            <option key={target.key} value={target.key}>{target.title}</option>
           ))}
         </select>
       </Field>
       <Err error={error} />
       <button type="submit" disabled={pending} className={PRIMARY}>
-        {pending ? "שומר..." : "לשמור בטיוטת התוספת"}
+        {pending ? t("common.saving") : t("addition.save")}
       </button>
     </form>
   );
 }
 
 export function EditAdditionBlock(props: { agentId: string; clientId?: string; clientName?: string; clients: ClientOption[]; block?: AgentBlock; targets: ReplaceTarget[] }) {
-  const title = props.block ? `עריכה: ${props.block.title}` : props.clientName ? `קטע חדש ל${props.clientName}` : "תוספת ללקוח";
+  const t = useTranslations("agents.forms");
+  const title = props.block ? t("block.editTitle", { title: props.block.title }) : props.clientName ? t("addition.newForClient", { client: props.clientName }) : t("addition.title");
   return (
-    <Drawer triggerLabel={props.block ? "לערוך" : props.clientId ? "להוסיף קטע" : "תוספת ללקוח חדשה"} title={title} variant={props.block || props.clientId ? "link" : "primary"}>
+    <Drawer triggerLabel={props.block ? t("common.edit") : props.clientId ? t("block.addTrigger") : t("addition.newTrigger")} title={title} variant={props.block || props.clientId ? "link" : "primary"}>
       <AdditionBlockForm {...props} />
     </Drawer>
   );
 }
 
 export function DeleteAdditionBlock({ agentId, clientId, blockKey }: { agentId: string; clientId: string; blockKey: string }) {
-  return <ActionButton run={() => deleteAdditionBlockAction(agentId, clientId, blockKey)} label="להסיר" done="הקטע הוסר מטיוטת התוספת" />;
+  const t = useTranslations("agents.forms");
+  return <ActionButton run={() => deleteAdditionBlockAction(agentId, clientId, blockKey)} label={t("common.remove")} done={t("addition.removed")} />;
 }
 
 function AdditionNoteForm({ agentId, clientId, changeNote }: { agentId: string; clientId: string; changeNote: string }) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(saveAdditionNoteAction, close);
+  const t = useTranslations("agents.forms.addition");
+  const tc = useTranslations("agents.forms.common");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="agentId" value={agentId} />
       <input type="hidden" name="clientId" value={clientId} />
-      <Field label="מה השתנה ולמה">
+      <Field label={t("changeNote")}>
         <textarea name="changeNote" rows={3} dir="auto" defaultValue={changeNote} className={INPUT} />
       </Field>
       <Err error={error} />
       <button type="submit" disabled={pending} className={PRIMARY}>
-        {pending ? "שומר..." : "לשמור"}
+        {pending ? tc("saving") : t("save2")}
       </button>
     </form>
   );
 }
 
 export function EditAdditionNote(props: { agentId: string; clientId: string; changeNote: string }) {
+  const t = useTranslations("agents.forms.addition");
   return (
-    <Drawer triggerLabel="הערת שינוי" title="הערת שינוי לתוספת" variant="link">
+    <Drawer triggerLabel={t("noteTrigger")} title={t("noteTitle")} variant="link">
       <AdditionNoteForm {...props} />
     </Drawer>
   );
 }
 
 export function AdditionDraftButtons({ id, canDiscard }: { id: string; canDiscard: boolean }) {
+  const t = useTranslations("agents.forms.addition");
   return (
     <div className="flex flex-wrap gap-2">
-      {canDiscard && <ActionButton run={() => discardAdditionAction(id)} label="לבטל טיוטה" done="הטיוטה בוטלה" />}
-      <ActionButton run={() => submitAdditionAction(id)} label="לשלוח לאישור" done="נשלח לאישור מנהל" tone="primary" />
+      {canDiscard && <ActionButton run={() => discardAdditionAction(id)} label={t("discard")} done={t("discarded")} />}
+      <ActionButton run={() => submitAdditionAction(id)} label={t("submit")} done={t("submitted")} tone="primary" />
     </div>
   );
 }
@@ -299,67 +318,72 @@ export function AdditionDraftButtons({ id, canDiscard }: { id: string; canDiscar
 // --- Parameters --------------------------------------------------------------
 
 function ParamForm({ agentId, param }: { agentId: string; param?: AgentParam }) {
+  const t = useTranslations("agents.forms");
+  const tl = useTranslations("agents.labels");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(saveParamAction, close);
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="agentId" value={agentId} />
       <input type="hidden" name="originalKey" value={param?.key ?? ""} />
-      <Field label="שם בהוראות" hint="מה שנכתב בין הסוגריים, למשל חתימה. אותיות, ספרות וקו תחתון.">
+      <Field label={t("param.key")} hint={t("param.keyHint")}>
         <input name="key" required maxLength={40} dir="auto" defaultValue={param?.key ?? ""} className={INPUT} />
       </Field>
-      <Field label="תיאור">
+      <Field label={t("param.label")}>
         <input name="label" required maxLength={80} dir="auto" defaultValue={param?.label ?? ""} className={INPUT} />
       </Field>
-      <Field label="נקבע ברמה">
+      <Field label={t("param.level")}>
         <select name="level" defaultValue={param?.level ?? "CLIENT"} className={INPUT}>
-          {Object.entries(PARAM_LEVEL_LABEL).map(([k, l]) => (
-            <option key={k} value={k}>{l}</option>
+          {PARAM_LEVELS.map((k) => (
+            <option key={k} value={k}>{tl(`paramLevel.${k}`)}</option>
           ))}
         </select>
       </Field>
-      <Field label="סוג">
+      <Field label={t("param.type")}>
         <select name="type" defaultValue={param?.type ?? "TEXT"} className={INPUT}>
-          {Object.entries(PARAM_TYPE_LABEL).map(([k, l]) => (
-            <option key={k} value={k}>{l}</option>
+          {PARAM_TYPES.map((k) => (
+            <option key={k} value={k}>{tl(`paramType.${k}`)}</option>
           ))}
         </select>
       </Field>
-      <Field label="ערך ברירת מחדל">
+      <Field label={t("param.default")}>
         <input name="default" maxLength={2000} dir="auto" defaultValue={param?.default ?? ""} className={INPUT} />
       </Field>
-      <Field label="מתיק הלקוח" hint="רק לפרמטר ברמת לקוח. הערך מתעדכן לבד מהתיק.">
+      <Field label={t("param.clientField")} hint={t("param.clientFieldHint")}>
         <select name="clientField" defaultValue={param?.clientField ?? ""} className={INPUT}>
-          <option value="">לא, מקלידים ערך</option>
-          <option value="name">שם הלקוח</option>
-          <option value="domains">הדומיינים של הלקוח</option>
+          <option value="">{t("param.clientFieldNone")}</option>
+          <option value="name">{t("param.clientFieldName")}</option>
+          <option value="domains">{t("param.clientFieldDomains")}</option>
         </select>
       </Field>
       <label className="flex items-center gap-2 text-sm text-app-text-primary">
         <input type="checkbox" name="required" defaultChecked={!!param?.required} />
-        חובה. בלי ערך, הסוכן לא עובד על הלקוח או על ההתקנה
+        {t("param.required")}
       </label>
       <Err error={error} />
       <button type="submit" disabled={pending} className={PRIMARY}>
-        {pending ? "שומר..." : "לשמור בטיוטה"}
+        {pending ? t("common.saving") : t("common.saveDraft")}
       </button>
     </form>
   );
 }
 
 export function EditParam({ agentId, param }: { agentId: string; param?: AgentParam }) {
+  const t = useTranslations("agents.forms");
   return (
-    <Drawer triggerLabel={param ? "לערוך" : "פרמטר חדש"} title={param ? `פרמטר: ${param.label}` : "פרמטר חדש"} variant={param ? "link" : "primary"}>
+    <Drawer triggerLabel={param ? t("common.edit") : t("param.newTrigger")} title={param ? t("param.editTitle", { label: param.label }) : t("param.newTrigger")} variant={param ? "link" : "primary"}>
       <ParamForm agentId={agentId} param={param} />
     </Drawer>
   );
 }
 
 export function DeleteParam({ agentId, paramKey }: { agentId: string; paramKey: string }) {
-  return <ActionButton run={() => deleteParamAction(agentId, paramKey)} label="להסיר" done="הפרמטר הוסר מהטיוטה" />;
+  const t = useTranslations("agents.forms");
+  return <ActionButton run={() => deleteParamAction(agentId, paramKey)} label={t("common.remove")} done={t("param.removed")} />;
 }
 
 function ClientValueForm({ agentId, clientId, paramKey, value }: { agentId: string; clientId: string; paramKey: string; value: string }) {
+  const t = useTranslations("agents.forms");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(setClientValueAction, close);
   return (
@@ -367,20 +391,21 @@ function ClientValueForm({ agentId, clientId, paramKey, value }: { agentId: stri
       <input type="hidden" name="agentId" value={agentId} />
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="key" value={paramKey} />
-      <Field label="ערך" hint="ריק: חוזרים לברירת המחדל. הערך חל מהריצה הבאה, בלי גרסה חדשה.">
+      <Field label={t("clientValue.value")} hint={t("clientValue.hint")}>
         <textarea name="value" rows={3} dir="auto" defaultValue={value} className={INPUT} />
       </Field>
       <Err error={error} />
       <button type="submit" disabled={pending} className={PRIMARY}>
-        {pending ? "שומר..." : "לשמור"}
+        {pending ? t("common.saving") : t("common.save")}
       </button>
     </form>
   );
 }
 
 export function EditClientValue(props: { agentId: string; clientId: string; clientName: string; paramKey: string; paramLabel: string; value: string }) {
+  const t = useTranslations("agents.forms");
   return (
-    <Drawer triggerLabel={props.value ? "לשנות" : "לקבוע"} title={`${props.paramLabel}: ${props.clientName}`} variant="link">
+    <Drawer triggerLabel={props.value ? t("common.change") : t("clientValue.set")} title={`${props.paramLabel}: ${props.clientName}`} variant="link">
       <ClientValueForm {...props} />
     </Drawer>
   );
@@ -388,8 +413,9 @@ export function EditClientValue(props: { agentId: string; clientId: string; clie
 
 // --- Version meta, draft and decision ---------------------------------------
 
-/// "נסח עם קלוד": copies a prompt built from the draft's differences.
+/// "Draft with Claude": copies a prompt built from the draft's differences.
 function ChangeNoteWithClaude({ prompt }: { prompt: string }) {
+  const t = useTranslations("agents.forms");
   const [state, setState] = useState<"idle" | "copied" | "manual">("idle");
   async function copy() {
     try {
@@ -405,80 +431,83 @@ function ChangeNoteWithClaude({ prompt }: { prompt: string }) {
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={copy} className="tap-area rounded-full border border-app-border bg-white px-3 py-1 text-[12.5px] font-medium text-app-text-primary hover:border-gold">
-          {state === "copied" ? "הועתק" : "נסח עם קלוד"}
+          {state === "copied" ? t("meta.copied") : t("meta.compose")}
         </button>
         {state === "copied" && (
           <span className="text-[12px] text-app-text-secondary" role="status">
-            הדביקו בשיחה חדשה, והעתיקו את השורה שחוזרת לכאן.{" "}
-            <a href="https://claude.ai/new" target="_blank" rel="noopener noreferrer" className="font-medium text-app-text-accent">פתיחת קלוד</a>
+            {t("meta.pasteHint")}{" "}
+            <a href="https://claude.ai/new" target="_blank" rel="noopener noreferrer" className="font-medium text-app-text-accent">{t("meta.openClaude")}</a>
           </span>
         )}
       </div>
-      {state === "manual" && <textarea readOnly value={prompt} rows={5} dir="rtl" className="w-full rounded-lg border border-app-border p-2 text-xs" aria-label="הפרומט להעתקה" onFocus={(e) => e.currentTarget.select()} />}
+      {state === "manual" && <textarea readOnly value={prompt} rows={5} dir="auto" className="w-full rounded-lg border border-app-border p-2 text-xs" aria-label={t("meta.promptAria")} onFocus={(e) => e.currentTarget.select()} />}
     </div>
   );
 }
 
 function MetaForm({ agentId, actionLevel, changeNote, requirements, notePrompt }: { agentId: string; actionLevel: string; changeNote: string; requirements: AgentRequirements; notePrompt?: string }) {
+  const t = useTranslations("agents.forms");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(saveMetaAction, close);
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="agentId" value={agentId} />
-      <Field label="מה השתנה ולמה" hint="זה מה שמי שמריץ את הסוכן יראה כשיציעו לו לעדכן.">
+      <Field label={t("common.changeNote")} hint={t("meta.changeNoteHint")}>
         <textarea name="changeNote" rows={3} dir="auto" defaultValue={changeNote} className={INPUT} />
       </Field>
       {notePrompt && <ChangeNoteWithClaude prompt={notePrompt} />}
-      <Field label="רמת פעולה">
+      <Field label={t("meta.actionLevel")}>
         <select name="actionLevel" defaultValue={actionLevel} className={INPUT}>
-          <option value="READ">קורא בלבד</option>
-          <option value="DRAFT">כותב טיוטות ותוויות</option>
-          <option value="SEND">שולח בשם אדם</option>
+          <option value="READ">{t("meta.levelRead")}</option>
+          <option value="DRAFT">{t("meta.levelDraft")}</option>
+          <option value="SEND">{t("meta.levelSend")}</option>
         </select>
       </Field>
-      <Field label="חיבורים נדרשים" hint="מופרדים בפסיק.">
+      <Field label={t("meta.connectors")} hint={t("meta.commaHint")}>
         <input name="connectors" dir="ltr" defaultValue={requirements.connectors.join(", ")} className={INPUT} />
       </Field>
-      <Field label="סקילים נדרשים" hint="מופרדים בפסיק. גרסה מינימלית אחרי @, למשל gmail-labels@3.">
+      <Field label={t("meta.skills")} hint={t("meta.skillsHint")}>
         <input name="skills" dir="ltr" defaultValue={requirements.skills.map(skillText).join(", ")} className={INPUT} />
       </Field>
-      <Field label="ריפואים">
+      <Field label={t("meta.repos")}>
         <input name="repos" dir="ltr" defaultValue={requirements.repos.join(", ")} className={INPUT} />
       </Field>
-      <Field label="MCP מקומי במחשב">
+      <Field label={t("meta.localMcp")}>
         <input name="localMcp" dir="ltr" defaultValue={requirements.localMcp.join(", ")} className={INPUT} />
       </Field>
-      <Field label="רכיבים חיצוניים (Apps Script וכדומה)">
+      <Field label={t("meta.external")}>
         <input name="externalRunners" dir="auto" defaultValue={requirements.externalRunners.join(", ")} className={INPUT} />
       </Field>
-      <Field label="מודל">
+      <Field label={t("meta.model")}>
         <input name="model" dir="ltr" defaultValue={requirements.model ?? ""} className={INPUT} />
       </Field>
       <Err error={error} />
       <button type="submit" disabled={pending} className={PRIMARY}>
-        {pending ? "שומר..." : "לשמור בטיוטה"}
+        {pending ? t("common.saving") : t("common.saveDraft")}
       </button>
     </form>
   );
 }
 
 export function EditMeta(props: { agentId: string; actionLevel: string; changeNote: string; requirements: AgentRequirements; notePrompt?: string }) {
+  const t = useTranslations("agents.forms");
   return (
-    <Drawer triggerLabel="הערת שינוי ודרישות" title="הערת שינוי, רמת פעולה ודרישות" variant="link">
+    <Drawer triggerLabel={t("meta.trigger")} title={t("meta.title")} variant="link">
       <MetaForm {...props} />
     </Drawer>
   );
 }
 
 function ProcessForm({ agentId, current, options }: { agentId: string; current: string | null; options: { id: string; label: string }[] }) {
+  const t = useTranslations("agents.forms");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(setAgentProcessAction, close);
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="agentId" value={agentId} />
-      <Field label="התהליך שהסוכן מבצע" hint="get_agent מוסיף את השלבים מהנוהל המאושר בכל ריצה. נוהל שמאושר מחדש מגיע לסוכן בלי גרסה חדשה של הסוכן.">
+      <Field label={t("process.field")} hint={t("process.hint")}>
         <select name="processId" defaultValue={current ?? ""} className={INPUT}>
-          <option value="">בלי תהליך</option>
+          <option value="">{t("process.none")}</option>
           {options.map((o) => (
             <option key={o.id} value={o.id}>{o.label}</option>
           ))}
@@ -486,30 +515,33 @@ function ProcessForm({ agentId, current, options }: { agentId: string; current: 
       </Field>
       <Err error={error} />
       <button type="submit" disabled={pending} className={PRIMARY}>
-        {pending ? "שומר..." : "לשמור"}
+        {pending ? t("common.saving") : t("common.save")}
       </button>
     </form>
   );
 }
 
 export function LinkProcess({ agentId, current, options }: { agentId: string; current: string | null; options: { id: string; label: string }[] }) {
+  const t = useTranslations("agents.forms");
   return (
-    <Drawer triggerLabel={current ? "לשנות" : "לקשר לתהליך"} title="התהליך שהסוכן מבצע" variant="link">
+    <Drawer triggerLabel={current ? t("common.change") : t("process.link")} title={t("process.field")} variant="link">
       <ProcessForm agentId={agentId} current={current} options={options} />
     </Drawer>
   );
 }
 
 export function DraftButtons({ versionId, canDiscard }: { versionId: string; canDiscard: boolean }) {
+  const t = useTranslations("agents.forms");
   return (
     <div className="flex flex-wrap gap-2">
-      {canDiscard && <ActionButton run={() => discardDraftAction(versionId)} label="לבטל טיוטה" done="הטיוטה בוטלה" />}
-      <ActionButton run={() => submitDraftAction(versionId)} label="לשלוח לאישור" done="נשלח לאישור מנהל" tone="primary" />
+      {canDiscard && <ActionButton run={() => discardDraftAction(versionId)} label={t("draft.discard")} done={t("draft.discarded")} />}
+      <ActionButton run={() => submitDraftAction(versionId)} label={t("draft.submit")} done={t("draft.submitted")} tone="primary" />
     </div>
   );
 }
 
 function ArchiveForm({ agentId }: { agentId: string }) {
+  const t = useTranslations("agents.forms");
   const router = useRouter();
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(archiveAgentAction, () => {
@@ -519,27 +551,29 @@ function ArchiveForm({ agentId }: { agentId: string }) {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="agentId" value={agentId} />
-      <p className="text-[13px] text-app-text-secondary">הסוכן יוצא מהרשימה, מתור האישורים ומהמחבר. הגרסאות שלו נשמרות. סוכן עם התקנות פעילות לא עובר לארכיון.</p>
-      <Field label="למה (חובה)">
+      <p className="text-[13px] text-app-text-secondary">{t("archive.text")}</p>
+      <Field label={t("archive.reason")}>
         <input name="reason" required dir="auto" className={INPUT} />
       </Field>
       <Err error={error} />
       <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : "להעביר לארכיון"}
+        {pending ? t("common.saving") : t("archive.submit")}
       </button>
     </form>
   );
 }
 
 export function ArchiveAgent({ agentId, name }: { agentId: string; name: string }) {
+  const t = useTranslations("agents.forms");
   return (
-    <Drawer triggerLabel="להעביר לארכיון" title={`העברת "${name}" לארכיון`} variant="link">
+    <Drawer triggerLabel={t("archive.submit")} title={t("archive.title", { name })} variant="link">
       <ArchiveForm agentId={agentId} />
     </Drawer>
   );
 }
 
 function PurposeForm({ agentId, purpose }: { agentId: string; purpose: string }) {
+  const t = useTranslations("agents.forms");
   const router = useRouter();
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(setAgentPurposeAction, () => {
@@ -549,48 +583,51 @@ function PurposeForm({ agentId, purpose }: { agentId: string; purpose: string })
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="agentId" value={agentId} />
-      <p className="text-[13px] text-app-text-secondary">השורה שמופיעה מתחת לשם הסוכן, ברשימה ובמחבר. היא לא חלק מהגרסה, והשינוי נכנס מיד.</p>
-      <Field label="מה הסוכן עושה, בשורה">
+      <p className="text-[13px] text-app-text-secondary">{t("purpose.text")}</p>
+      <Field label={t("common.purpose")}>
         <input name="purpose" required maxLength={300} defaultValue={purpose} dir="auto" className={INPUT} />
       </Field>
       <Err error={error} />
       <button type="submit" disabled={pending} className={PRIMARY}>
-        {pending ? "שומר..." : "לשמור"}
+        {pending ? t("common.saving") : t("common.save")}
       </button>
     </form>
   );
 }
 
 export function EditPurpose({ agentId, purpose }: { agentId: string; purpose: string }) {
+  const t = useTranslations("agents.forms");
   return (
-    <Drawer triggerLabel="לערוך תיאור" title="תיאור הסוכן" variant="link">
+    <Drawer triggerLabel={t("purpose.trigger")} title={t("purpose.title")} variant="link">
       <PurposeForm agentId={agentId} purpose={purpose} />
     </Drawer>
   );
 }
 
 function RejectForm({ id }: { id: string }) {
+  const t = useTranslations("agents.forms");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(rejectVersionAction, close);
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="id" value={id} />
-      <Field label="הערה למי שכתב (חובה)">
+      <Field label={t("common.rejectNote")}>
         <input name="reason" required dir="auto" className={INPUT} />
       </Field>
       <Err error={error} />
       <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : "לדחות"}
+        {pending ? t("common.saving") : t("common.reject")}
       </button>
     </form>
   );
 }
 
 export function DecideVersion({ id, version }: { id: string; version: number }) {
+  const t = useTranslations("agents.forms");
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <ActionButton run={() => approveVersionAction(id)} label={`לאשר גרסה ${version}`} done={`גרסה ${version} אושרה`} tone="primary" />
-      <Drawer triggerLabel="לדחות" title={`דחיית גרסה ${version}`} variant="link">
+      <ActionButton run={() => approveVersionAction(id)} label={t("version.approve", { version })} done={t("version.approved", { version })} tone="primary" />
+      <Drawer triggerLabel={t("common.reject")} title={t("version.rejectTitle", { version })} variant="link">
         <RejectForm id={id} />
       </Drawer>
     </div>
@@ -598,26 +635,28 @@ export function DecideVersion({ id, version }: { id: string; version: number }) 
 }
 
 function FaultyForm({ id }: { id: string }) {
+  const t = useTranslations("agents.forms");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(markFaultyAction, close);
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="id" value={id} />
-      <p className="text-sm text-app-text-primary">כל ההתקנות שרצות על הגרסה הזו יחזרו מיד לגרסה המאושרת הקודמת, בלי לשאול. אחר כך מתקנים בטיוטה חדשה.</p>
-      <Field label="מה התקלה (חובה)">
+      <p className="text-sm text-app-text-primary">{t("faulty.text")}</p>
+      <Field label={t("faulty.reason")}>
         <input name="reason" required dir="auto" className={INPUT} />
       </Field>
       <Err error={error} />
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-error px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50">
-        {pending ? "שומר..." : "לסמן כתקולה ולחזור לגרסה הקודמת"}
+        {pending ? t("common.saving") : t("faulty.submit")}
       </button>
     </form>
   );
 }
 
 export function MarkFaulty({ id, version }: { id: string; version: number }) {
+  const t = useTranslations("agents.forms");
   return (
-    <Drawer triggerLabel="לסמן כתקולה" title={`גרסה ${version} תקולה`} variant="link">
+    <Drawer triggerLabel={t("faulty.trigger")} title={t("faulty.title", { version })} variant="link">
       <FaultyForm id={id} />
     </Drawer>
   );
@@ -626,6 +665,8 @@ export function MarkFaulty({ id, version }: { id: string; version: number }) {
 // --- Installations -----------------------------------------------------------
 
 function InstallForm({ agentId, clients, installParams, defaultSurface }: { agentId: string; clients: ClientOption[]; installParams: AgentParam[]; defaultSurface: string }) {
+  const t = useTranslations("agents.forms");
+  const tl = useTranslations("agents.labels");
   const [bootstrap, setBootstrap] = useState<string | null>(null);
   const [scope, setScope] = useState("ONE");
   const [surface, setSurface] = useState(defaultSurface);
@@ -633,31 +674,31 @@ function InstallForm({ agentId, clients, installParams, defaultSurface }: { agen
   if (bootstrap) {
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-sm text-app-text-primary">ההתקנה נוצרה. זה הטקסט היחיד שנשאר ב-Claude: להדביק אותו בהוראות הפרויקט, בפרומפט של המשימה המתוזמנת או בתחילת השיחה הקבועה.</p>
-        <pre dir="rtl" className="whitespace-pre-wrap rounded-lg bg-app-surface-sunken p-3 text-[13px] leading-relaxed text-app-text-primary">{bootstrap}</pre>
-        <CopyValue value={bootstrap} label="טקסט ההפעלה" />
+        <p className="text-sm text-app-text-primary">{t("install.created")}</p>
+        <pre dir="auto" className="whitespace-pre-wrap rounded-lg bg-app-surface-sunken p-3 text-[13px] leading-relaxed text-app-text-primary">{bootstrap}</pre>
+        <CopyValue value={bootstrap} label={t("install.bootstrapLabel")} />
       </div>
     );
   }
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="agentId" value={agentId} />
-      <Field label="איפה זה ירוץ">
+      <Field label={t("install.surface")}>
         <select name="surface" value={surface} onChange={(e) => setSurface(e.target.value)} className={INPUT}>
-          {Object.entries(SURFACE_LABEL).map(([k, l]) => (
-            <option key={k} value={k}>{l}</option>
+          {SURFACES.map((k) => (
+            <option key={k} value={k}>{tl(`surface.${k}`)}</option>
           ))}
         </select>
       </Field>
-      <Field label="על אילו לקוחות">
+      <Field label={t("install.scope")}>
         <select name="clientScope" value={scope} onChange={(e) => setScope(e.target.value)} className={INPUT}>
-          <option value="ONE">לקוח אחד</option>
-          <option value="LIST">כמה לקוחות</option>
-          <option value="ALL_MINE">כל הלקוחות שלי</option>
+          <option value="ONE">{t("install.scopeOne")}</option>
+          <option value="LIST">{t("install.scopeList")}</option>
+          <option value="ALL_MINE">{t("install.scopeAll")}</option>
         </select>
       </Field>
       {scope !== "ALL_MINE" && (
-        <Field label="לקוחות">
+        <Field label={t("install.clients")}>
           <select name="clientIds" multiple={scope === "LIST"} required className={`${INPUT} ${scope === "LIST" ? "h-36" : ""}`}>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
@@ -667,55 +708,59 @@ function InstallForm({ agentId, clients, installParams, defaultSurface }: { agen
       )}
       {(surface === "SCHEDULED" || surface === "PERSISTENT_SESSION") && (
         <div className="grid grid-cols-2 gap-3">
-          <Field label="תזמון (cron)">
+          <Field label={t("install.cron")}>
             <input name="cron" dir="ltr" placeholder="52 7,14 * * *" className={INPUT} />
           </Field>
-          <Field label="אזור זמן">
+          <Field label={t("install.tz")}>
             <input name="tz" dir="ltr" defaultValue="Asia/Jerusalem" className={INPUT} />
           </Field>
         </div>
       )}
-      <Field label="בדיקת עדכון">
+      <Field label={t("install.check")}>
         <select name="checkEvery" defaultValue="DAILY" className={INPUT}>
-          <option value="RUN">בכל ריצה</option>
-          <option value="DAILY">פעם ביום</option>
-          <option value="WEEKLY">פעם בשבוע</option>
+          <option value="RUN">{t("install.checkRun")}</option>
+          <option value="DAILY">{t("install.checkDaily")}</option>
+          <option value="WEEKLY">{t("install.checkWeekly")}</option>
         </select>
       </Field>
-      <Field label="חשבון Claude (אם לא שלך)">
+      <Field label={t("install.account")}>
         <input name="claudeAccount" dir="ltr" placeholder="ops@ankora.co.il" className={INPUT} />
       </Field>
       {installParams.map((p) => (
-        <Field key={p.key} label={`${p.label}${p.required ? " (חובה)" : ""}`}>
+        <Field key={p.key} label={p.required ? t("install.paramRequired", { label: p.label }) : p.label}>
           <input name={`value:${p.key}`} dir="auto" defaultValue={p.default ?? ""} className={INPUT} />
         </Field>
       ))}
       <Err error={error} />
       <button type="submit" disabled={pending} className={PRIMARY}>
-        {pending ? "יוצר..." : "ליצור התקנה"}
+        {pending ? t("common.creating") : t("install.submit")}
       </button>
     </form>
   );
 }
 
 export function NewInstallation(props: { agentId: string; clients: ClientOption[]; installParams: AgentParam[]; defaultSurface: string }) {
+  const t = useTranslations("agents.forms");
   return (
-    <Drawer triggerLabel="התקנה חדשה" title="התקנה חדשה">
+    <Drawer triggerLabel={t("install.newTrigger")} title={t("install.newTrigger")}>
       <InstallForm {...props} />
     </Drawer>
   );
 }
 
 export function RemoveInstallation({ id }: { id: string }) {
-  return <ActionButton run={() => removeInstallationAction(id)} label="להסיר" done="ההתקנה הוסרה" />;
+  const t = useTranslations("agents.forms");
+  return <ActionButton run={() => removeInstallationAction(id)} label={t("common.remove")} done={t("install.removed")} />;
 }
 
 export function AcceptUpdate({ id, version }: { id: string; version: number }) {
-  return <ActionButton run={() => acceptUpdateAction(id, version)} label="לעדכן" done={`ההתקנה עודכנה לגרסה ${version}`} tone="primary" />;
+  const t = useTranslations("agents.forms");
+  return <ActionButton run={() => acceptUpdateAction(id, version)} label={t("install.update")} done={t("install.updated", { version })} tone="primary" />;
 }
 
-/// "להחזיר לגרסה N": opens a draft that copies it, then shows that draft.
+/// "Revert to version N": opens a draft that copies it, then shows that draft.
 export function RevertToVersion({ agentId, slug, version }: { agentId: string; slug: string; version: number }) {
+  const t = useTranslations("agents.forms");
   const router = useRouter();
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
@@ -723,13 +768,13 @@ export function RevertToVersion({ agentId, slug, version }: { agentId: string; s
     setBusy(true);
     const r = await revertToVersionAction(agentId, version);
     setBusy(false);
-    if (r.error) return showToast({ tone: "error", title: "לא בוצע", description: r.error });
-    showToast({ tone: "info", title: `נפתחה טיוטה שהיא עותק של גרסה ${version}`, description: "היא תיכנס לשימוש אחרי אישור מנהל." });
+    if (r.error) return showToast({ tone: "error", title: t("common.notDone"), description: r.error });
+    showToast({ tone: "info", title: t("revert.opened", { version }), description: t("revert.openedNote") });
     router.push(`/app/agents/${slug}/versions?v=${r.version}`);
   }
   return (
     <button type="button" onClick={click} disabled={busy} className="tap-area rounded-full border border-app-border bg-white px-4 py-2 text-[13px] text-app-text-primary disabled:opacity-50">
-      להחזיר לגרסה {version}
+      {t("revert.button", { version })}
     </button>
   );
 }
@@ -737,65 +782,70 @@ export function RevertToVersion({ agentId, slug, version }: { agentId: string; s
 // --- Phase 3: library and lessons -------------------------------------------
 
 function SharedForm({ block }: { block?: { key: string; title: string; kind: string; body: string } }) {
+  const t = useTranslations("agents.forms");
+  const tl = useTranslations("agents.labels");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(proposeSharedAction, close);
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="key" value={block?.key ?? ""} />
-      <Field label="כותרת">
+      <Field label={t("common.title")}>
         <input name="title" required maxLength={120} dir="auto" defaultValue={block?.title ?? ""} className={INPUT} />
       </Field>
-      <Field label="סוג הקטע">
+      <Field label={t("common.blockKind")}>
         <select name="kind" defaultValue={block?.kind ?? "language"} className={INPUT}>
-          {Object.entries(BLOCK_KIND_LABEL).map(([k, l]) => (
-            <option key={k} value={k}>{l}</option>
+          {BLOCK_KINDS.map((k) => (
+            <option key={k} value={k}>{tl(`blockKind.${k}`)}</option>
           ))}
         </select>
       </Field>
-      <Field label="הטקסט">
+      <Field label={t("common.text")}>
         <textarea name="body" rows={10} required dir="auto" defaultValue={block?.body ?? ""} className={INPUT} />
       </Field>
-      <Field label="מה השתנה ולמה" hint="מופיע בגרסה החדשה של כל סוכן שמשתמש בקטע.">
+      <Field label={t("common.changeNote")} hint={t("shared.changeNoteHint")}>
         <input name="changeNote" dir="auto" className={INPUT} />
       </Field>
       <Err error={error} />
       <button type="submit" disabled={pending} className={PRIMARY}>
-        {pending ? "שומר..." : "לשלוח לאישור מנהל"}
+        {pending ? t("common.saving") : t("shared.submit")}
       </button>
     </form>
   );
 }
 
 export function EditShared({ block }: { block?: { key: string; title: string; kind: string; body: string } }) {
+  const t = useTranslations("agents.forms");
   return (
-    <Drawer triggerLabel={block ? "לערוך" : "קטע חדש"} title={block ? `ספרייה: ${block.title}` : "קטע חדש בספרייה"} variant={block ? "link" : "primary"}>
+    <Drawer triggerLabel={block ? t("common.edit") : t("common.newBlock")} title={block ? t("shared.title", { title: block.title }) : t("shared.newTitle")} variant={block ? "link" : "primary"}>
       <SharedForm block={block} />
     </Drawer>
   );
 }
 
 function RejectSharedForm({ id }: { id: string }) {
+  const t = useTranslations("agents.forms");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(rejectSharedAction, close);
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="id" value={id} />
-      <Field label="הערה למי שכתב (חובה)">
+      <Field label={t("common.rejectNote")}>
         <input name="reason" required dir="auto" className={INPUT} />
       </Field>
       <Err error={error} />
       <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : "לדחות"}
+        {pending ? t("common.saving") : t("common.reject")}
       </button>
     </form>
   );
 }
 
 export function DecideShared({ id, version, reach }: { id: string; version: number; reach: number }) {
+  const t = useTranslations("agents.forms");
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <ActionButton run={() => approveSharedAction(id)} label={`לאשר גרסה ${version}${reach ? `, ותעדכן ${reach} סוכנים` : ""}`} done="אושר, והסוכנים עודכנו" tone="primary" />
-      <Drawer triggerLabel="לדחות" title={`דחיית גרסה ${version}`} variant="link">
+      <ActionButton run={() => approveSharedAction(id)} label={reach ? t("shared.approveReach", { version, reach }) : t("shared.approve", { version })} done={t("shared.approved")} tone="primary" />
+      <Drawer triggerLabel={t("common.reject")} title={t("version.rejectTitle", { version })} variant="link">
         <RejectSharedForm id={id} />
       </Drawer>
     </div>
@@ -803,12 +853,13 @@ export function DecideShared({ id, version, reach }: { id: string; version: numb
 }
 
 function FromLibraryForm({ agentId, options }: { agentId: string; options: { key: string; title: string }[] }) {
+  const t = useTranslations("agents.forms");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(addFromLibraryAction, close);
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="agentId" value={agentId} />
-      <Field label="קטע מהספרייה" hint="הקטע נכנס לטיוטה כמו שהוא, ומתעדכן לבד כשגרסה חדשה שלו מאושרת בספרייה.">
+      <Field label={t("fromLibrary.field")} hint={t("fromLibrary.hint")}>
         <select name="key" required className={INPUT}>
           {options.map((o) => (
             <option key={o.key} value={o.key}>{o.title}</option>
@@ -817,26 +868,28 @@ function FromLibraryForm({ agentId, options }: { agentId: string; options: { key
       </Field>
       <Err error={error} />
       <button type="submit" disabled={pending} className={PRIMARY}>
-        {pending ? "שומר..." : "להוסיף לטיוטה"}
+        {pending ? t("common.saving") : t("fromLibrary.submit")}
       </button>
     </form>
   );
 }
 
 export function AddFromLibrary({ agentId, options }: { agentId: string; options: { key: string; title: string }[] }) {
+  const t = useTranslations("agents.forms");
   if (options.length === 0) return null;
   return (
-    <Drawer triggerLabel="להוסיף מהספרייה" title="קטע מהספרייה" variant="link">
+    <Drawer triggerLabel={t("fromLibrary.trigger")} title={t("fromLibrary.field")} variant="link">
       <FromLibraryForm agentId={agentId} options={options} />
     </Drawer>
   );
 }
 
 export function LessonButtons({ id }: { id: string }) {
+  const t = useTranslations("agents.forms");
   return (
     <div className="flex flex-wrap gap-2">
-      <ActionButton run={() => decideLessonAction(id, "USED")} label="נכנס לטיוטה" done="סומן כטופל" />
-      <ActionButton run={() => decideLessonAction(id, "DISMISSED")} label="לא רלוונטי" done="ההצעה נסגרה" />
+      <ActionButton run={() => decideLessonAction(id, "USED")} label={t("lessons.used")} done={t("lessons.usedDone")} />
+      <ActionButton run={() => decideLessonAction(id, "DISMISSED")} label={t("lessons.dismissed")} done={t("lessons.dismissedDone")} />
     </div>
   );
 }

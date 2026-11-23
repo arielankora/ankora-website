@@ -1,4 +1,6 @@
+import { getTranslations } from "next-intl/server";
 import { Forbidden } from "@/components/app/Forbidden";
+import { directionOf } from "@/lib/i18n/config";
 import { CopyValue } from "@/components/app/CopyValue";
 import { BLOCK_KINDS, canReplace, parseBlocks } from "@/lib/agents/model";
 import { diffBlocks } from "@/lib/agents/diff";
@@ -6,11 +8,10 @@ import { approvedAdditions, listClientAdditions } from "@/lib/app-domain/agent-c
 import { compileAgent } from "@/lib/agents/compile";
 import { changeNotePrompt } from "@/lib/agents/change-note-prompt";
 import { contentOf } from "@/lib/app-domain/agents";
-import { AgentHeader, loadAgent } from "../shared";
+import { AgentHeader, loadAgent, problemWords } from "../shared";
 import Link from "next/link";
 import { approvedLibrary, listSharedBlocks } from "@/lib/app-domain/agent-library";
 import { AddFromLibrary, AdditionDraftButtons, DecideVersion, DeleteAdditionBlock, DeleteBlock, EditAdditionBlock, EditAdditionNote, EditBlock, EditMeta } from "../../AgentForms";
-import { ACTION_LEVEL_LABEL, BLOCK_KIND_LABEL } from "../../labels";
 
 // Agents, phase 1: "הוראות". The blocks in the order Claude reads them, and
 // beside them exactly what Claude receives, for a chosen client.
@@ -32,10 +33,15 @@ export default async function InstructionsPage({ params, searchParams }: { param
   const data = await loadAgent(slug);
   if (!data) return <Forbidden />;
   const { agent, content, editing, clients } = data;
+  const t = await getTranslations("agents.instructions");
+  const tl = await getTranslations("agents.labels");
+  // The preview is compiled in the reader's language, as get_agent compiles it in the owner's.
+  const locale = data.user.locale;
+  const problemText = await problemWords();
   const order = (k: string) => BLOCK_KINDS.indexOf(k as (typeof BLOCK_KINDS)[number]);
   const general = content.blocks.filter((b) => !b.clientId).sort((a, b) => order(a.kind) - order(b.kind));
   const previewClients = client ? await data.resolve([client]) : [];
-  const preview = editing ? compileAgent({ agent, version: { version: editing.version, ...content }, installation: null, clients: previewClients, library: await approvedLibrary(), additions: await approvedAdditions(agent.id, previewClients.map((c) => c.id)) }) : null;
+  const preview = editing ? compileAgent({ agent, version: { version: editing.version, ...content }, installation: null, clients: previewClients, library: await approvedLibrary(), additions: await approvedAdditions(agent.id, previewClients.map((c) => c.id)), locale }) : null;
   // 24.11.2026: client additions are versioned on their own, apart from the agent's draft.
   const additions = await listClientAdditions(data.user, agent.id);
   const workable = (await data.resolve(clients.map((c) => c.id))).map((c) => ({ id: c.id, name: c.name }));
@@ -52,8 +58,8 @@ export default async function InstructionsPage({ params, searchParams }: { param
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-[13px] text-app-text-secondary">
         <span>
-          {general.length} קטעים, לפי הסדר שבו Claude קורא אותם · רמת פעולה: {ACTION_LEVEL_LABEL[content.actionLevel]}
-          {editing?.changeNote ? ` · שינוי: ${editing.changeNote}` : ""}
+          {t("summary", { count: general.length, level: tl(`actionLevel.${content.actionLevel}`) })}
+          {editing?.changeNote ? t("change", { note: editing.changeNote }) : ""}
         </span>
         {canEdit && <EditMeta agentId={agent.id} actionLevel={content.actionLevel} changeNote={data.draft?.changeNote ?? ""} requirements={content.requirements} notePrompt={notePrompt} />}
       </div>
@@ -64,8 +70,8 @@ export default async function InstructionsPage({ params, searchParams }: { param
             <section key={b.key} className={`rounded-xl border bg-white px-4 py-3 ${b.safety ? "border-app-error/40" : "border-app-border"}`}>
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2 text-xs text-app-text-secondary">
-                  {BLOCK_KIND_LABEL[b.kind]}{b.safety ? " · גבול בטיחות" : b.overridable ? " · ניתן להחלפה ללקוח" : ""}
-                  {b.sharedKey && <Link href="/app/agents/library" className="rounded-full bg-app-info-soft px-2 py-0.5 text-app-info">מספרייה, גרסה {b.sharedVersion}</Link>}
+                  {tl(`blockKind.${b.kind}`)}{b.safety ? t("safety") : b.overridable ? t("overridable") : ""}
+                  {b.sharedKey && <Link href="/app/agents/library" className="rounded-full bg-app-info-soft px-2 py-0.5 text-app-info">{t("fromLibrary", { version: b.sharedVersion ?? "" })}</Link>}
                 </span>
                 {canEdit && (
                   <span className="flex items-center gap-2">
@@ -76,16 +82,16 @@ export default async function InstructionsPage({ params, searchParams }: { param
               </div>
               <h2 className="mt-1 text-sm font-medium text-app-text-primary" dir="auto">{b.title}</h2>
               <Body text={b.body} />
-              {b.why && <p className="mt-1.5 text-xs text-app-text-tertiary" dir="auto">למה: {b.why}</p>}
+              {b.why && <p className="mt-1.5 text-xs text-app-text-tertiary" dir="auto">{t("why", { why: b.why })}</p>}
             </section>
           ))}
 
           <section className="rounded-xl border border-dashed border-app-accent px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-medium text-app-text-primary">תוספות ללקוח</h2>
+              <h2 className="text-sm font-medium text-app-text-primary">{t("additions")}</h2>
               {workable.length > 0 && <EditAdditionBlock agentId={agent.id} clients={workable} targets={targets} />}
             </div>
-            <p className="mt-1 text-[13px] text-app-text-secondary">קטעים שמגיעים רק כשהסוכן עובד על הלקוח. לכל לקוח גרסאות משלו, ושינוי בהן לא משנה את גרסת הסוכן.</p>
+            <p className="mt-1 text-[13px] text-app-text-secondary">{t("additionsIntro")}</p>
             {additions.map((a) => {
               const shown = a.open ?? a.approved!;
               const blocks = parseBlocks(shown.blocks);
@@ -96,10 +102,10 @@ export default async function InstructionsPage({ params, searchParams }: { param
                 <div key={a.clientId} className="mt-3 rounded-lg border border-app-border bg-white px-3 py-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="flex flex-wrap items-center gap-2 text-sm">
-                      <span className="rounded-full bg-app-accent-soft px-2 py-0.5 text-xs text-app-text-accent">{a.clientName}</span>
+                      <span className="rounded-full bg-app-accent-soft px-2 py-0.5 text-xs text-app-text-accent" dir="auto">{a.clientName}</span>
                       <span className="text-xs text-app-text-secondary">
-                        {a.approved ? `גרסה ${a.approved.version} בשימוש` : "אין גרסה מאושרת"}
-                        {a.open ? (a.open.state === "PENDING" ? ` · גרסה ${a.open.version} ממתינה לאישור מנהל` : ` · טיוטה לגרסה ${a.open.version}`) : ""}
+                        {a.approved ? t("additionInUse", { version: a.approved.version }) : t("additionNoApproved")}
+                        {a.open ? (a.open.state === "PENDING" ? t("additionPending", { version: a.open.version }) : t("additionDraft", { version: a.open.version })) : ""}
                       </span>
                     </span>
                     {editable && (
@@ -109,16 +115,16 @@ export default async function InstructionsPage({ params, searchParams }: { param
                       </span>
                     )}
                   </div>
-                  {a.open?.changeNote && <p className="mt-1 text-xs text-app-text-secondary" dir="auto">שינוי: {a.open.changeNote}</p>}
-                  {blocks.length === 0 && <p className="mt-1 text-[13px] text-app-text-secondary">אין קטעים בגרסה הזו.</p>}
+                  {a.open?.changeNote && <p className="mt-1 text-xs text-app-text-secondary" dir="auto">{t("additionChange", { note: a.open.changeNote })}</p>}
+                  {blocks.length === 0 && <p className="mt-1 text-[13px] text-app-text-secondary">{t("additionEmpty")}</p>}
                   {blocks.map((b) => (
                     <div key={b.key} className="mt-2 flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
                         <span className="text-sm font-medium" dir="auto">{b.title}</span>
                         <span className="ms-2 text-xs text-app-text-secondary">
-                          {BLOCK_KIND_LABEL[b.kind]}
-                          {b.replaces ? ` · במקום "${titleOf.get(b.replaces) ?? b.replaces}"` : ""}
-                          {status.get(b.key) === "added" ? " · נוסף" : status.get(b.key) === "changed" ? " · שונה" : ""}
+                          {tl(`blockKind.${b.kind}`)}
+                          {b.replaces ? t("replaces", { title: titleOf.get(b.replaces) ?? b.replaces }) : ""}
+                          {status.get(b.key) === "added" ? t("statusAdded") : status.get(b.key) === "changed" ? t("statusChanged") : ""}
                         </span>
                         <Body text={b.body} />
                       </div>
@@ -130,10 +136,10 @@ export default async function InstructionsPage({ params, searchParams }: { param
                       )}
                     </div>
                   ))}
-                  {removed.length > 0 && <p className="mt-2 text-xs text-app-error">הוסרו בטיוטה: {removed.map((r) => r.title).join(", ")}</p>}
+                  {removed.length > 0 && <p className="mt-2 text-xs text-app-error">{t("removedInDraft", { titles: removed.map((r) => r.title).join(", ") })}</p>}
                   {a.problems.length > 0 && (
                     <ul className="mt-2 space-y-0.5 text-xs text-app-error">
-                      {a.problems.map((p) => <li key={p}>! {p}</li>)}
+                      {a.problems.map((p) => <li key={p.code + p.text}>! {problemText(p)}</li>)}
                     </ul>
                   )}
                   {a.open?.state === "DRAFT" && <div className="mt-3"><AdditionDraftButtons id={a.open.id} canDiscard /></div>}
@@ -144,16 +150,16 @@ export default async function InstructionsPage({ params, searchParams }: { param
           </section>
 
           <section className="rounded-xl border border-app-border bg-white px-4 py-3">
-            <h2 className="text-sm font-medium text-app-text-primary">קבצים מצורפים</h2>
+            <h2 className="text-sm font-medium text-app-text-primary">{t("files")}</h2>
             {content.files.length === 0 ? (
-              <p className="mt-1 text-[13px] text-app-text-secondary">אין. קובץ שההוראות מפנות אליו (סקריפט, תבנית, מסמך רקע) נשמר כאן מ-Claude, ב-save_agent_draft.</p>
+              <p className="mt-1 text-[13px] text-app-text-secondary">{t("filesEmpty")}</p>
             ) : (
               <ul className="mt-1.5 flex flex-col gap-1.5">
                 {content.files.map((f) => (
                   <li key={f.path}>
                     <details>
                       <summary className="cursor-pointer text-[13.5px] text-app-text-primary" dir="ltr">
-                        {f.path} <span className="text-xs text-app-text-tertiary">({f.content.length.toLocaleString("en-US")} תווים)</span>
+                        {f.path} <span className="text-xs text-app-text-tertiary">({t("chars", { count: f.content.length })})</span>
                       </summary>
                       <pre dir="auto" className="mt-1.5 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-app-surface-page p-3 font-jbmono text-[12px] leading-relaxed text-app-text-primary">{f.content}</pre>
                     </details>
@@ -171,28 +177,28 @@ export default async function InstructionsPage({ params, searchParams }: { param
           )}
         </div>
 
-        <section aria-label="הקובץ ש-Claude מקבל" className="flex min-w-0 flex-[1_1_400px] flex-col rounded-xl border border-app-border bg-white">
+        <section aria-label={t("previewLabel")} className="flex min-w-0 flex-[1_1_400px] flex-col rounded-xl border border-app-border bg-white">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-app-border px-4 py-3">
-            <span className="text-[13.5px] font-medium">מה Claude מקבל</span>
+            <span className="text-[13.5px] font-medium">{t("preview")}</span>
             <form className="flex items-center gap-2 text-xs text-app-text-secondary">
-              <label htmlFor="preview-client">תצוגה עבור</label>
+              <label htmlFor="preview-client">{t("previewFor")}</label>
               <select id="preview-client" name="client" defaultValue={client ?? ""} className="rounded-lg border border-app-border bg-white px-2 py-1 text-xs">
-                <option value="">בלי לקוח</option>
+                <option value="">{t("noClient")}</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-              <button type="submit" className="rounded-full border border-app-border px-2.5 py-1">להציג</button>
+              <button type="submit" className="rounded-full border border-app-border px-2.5 py-1">{t("show")}</button>
             </form>
           </div>
           {preview ? (
             <div className="space-y-2 p-4">
-              <pre dir="rtl" className="max-h-[70vh] overflow-auto whitespace-pre-wrap rounded-lg bg-app-surface-page p-3 font-jbmono text-[12.5px] leading-relaxed text-app-text-primary">{preview.text}</pre>
-              <CopyValue value={preview.text} label="ההוראות המלאות" />
-              {data.approved && previewClients.length === 1 && <a href={`/api/agents/${agent.slug}/export?client=${previewClients[0].id}`} className="block text-xs text-app-text-accent">להוריד כסקיל ללקוח הזה (SKILL.md)</a>}
+              <pre dir={directionOf(locale)} className="max-h-[70vh] overflow-auto whitespace-pre-wrap rounded-lg bg-app-surface-page p-3 font-jbmono text-[12.5px] leading-relaxed text-app-text-primary">{preview.text}</pre>
+              <CopyValue value={preview.text} label={t("copy")} />
+              {data.approved && previewClients.length === 1 && <a href={`/api/agents/${agent.slug}/export?client=${previewClients[0].id}`} className="block text-xs text-app-text-accent">{t("exportForClient")}</a>}
             </div>
           ) : (
-            <p className="p-4 text-sm text-app-text-secondary">אין עדיין גרסה.</p>
+            <p className="p-4 text-sm text-app-text-secondary">{t("noVersion")}</p>
           )}
         </section>
       </div>

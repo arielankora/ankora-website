@@ -17,11 +17,13 @@ export async function skillGaps(actor: User, requirements: AgentRequirements): P
     if (!skill || skill.kind !== "SKILL" || skill.archivedAt) continue;
     const inst = await prisma.agentInstallation.findFirst({ where: { agentId: skill.id, userId: actor.id, status: "ACTIVE" }, select: { pinnedVersionId: true } });
     if (!inst) {
-      out.push(`- הסקיל ${slug} (גרסה ${minVersion} ומעלה) לא מותקן אצלך באנקורה.`);
+      out.push(actor.locale === "en" ? `- The skill ${slug} (version ${minVersion} or later) is not installed for you in Ankora.` : `- הסקיל ${slug} (גרסה ${minVersion} ומעלה) לא מותקן אצלך באנקורה.`);
       continue;
     }
     const pinned = await prisma.agentVersion.findUnique({ where: { id: inst.pinnedVersionId }, select: { version: true } });
-    if ((pinned?.version ?? 0) < minVersion) out.push(`- הסקיל ${slug} מותקן אצלך בגרסה ${pinned?.version ?? "?"}, וצריך לפחות גרסה ${minVersion}. מעדכנים אותו בהתקנות באנקורה.`);
+    const have = pinned?.version ?? "?";
+    // ADR 0006: worded in the language of the person running the agent, like the rest of get_agent.
+    if ((pinned?.version ?? 0) < minVersion) out.push(actor.locale === "en" ? `- The skill ${slug} is installed for you at version ${have}, and at least version ${minVersion} is needed. Update it in your installations in Ankora.` : `- הסקיל ${slug} מותקן אצלך בגרסה ${have}, וצריך לפחות גרסה ${minVersion}. מעדכנים אותו בהתקנות באנקורה.`);
   }
   return out;
 }

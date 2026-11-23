@@ -6,7 +6,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { findSecrets } from "@/lib/secret-scan";
 import { DomainError } from "@/lib/domain-error";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { LIMITS, additionProblems, blockSchema, parseBlocks, parseParams, type AgentBlock } from "@/lib/agents/model";
+import { LIMITS, additionProblems, blockSchema, parseBlocks, parseParams, type AgentBlock, type VersionProblem } from "@/lib/agents/model";
 import type { CompileAddition } from "@/lib/agents/compile";
 import { z } from "zod";
 
@@ -148,11 +148,11 @@ export async function listClientAdditions(actor: User, agentId: string) {
   const clients = await listAccessibleClients(actor);
   const name = new Map(clients.map((c) => [c.id, c.name]));
   const rows = await prisma.agentClientAddition.findMany({ where: { agentId, clientId: { in: clients.map((c) => c.id) }, state: { in: ["APPROVED", "DRAFT", "PENDING"] } }, orderBy: { version: "desc" } });
-  const out: { clientId: string; clientName: string; approved: AgentClientAddition | null; open: AgentClientAddition | null; problems: string[] }[] = [];
+  const out: { clientId: string; clientName: string; approved: AgentClientAddition | null; open: AgentClientAddition | null; problems: VersionProblem[] }[] = [];
   for (const id of [...new Set(rows.map((r) => r.clientId))]) {
     const approved = rows.find((r) => r.clientId === id && r.state === "APPROVED") ?? null;
     const open = rows.find((r) => r.clientId === id && (r.state === "DRAFT" || r.state === "PENDING")) ?? null;
-    const problems = open ? (await clientAdditionProblems(open)).map((p) => p.text) : [];
+    const problems = open ? await clientAdditionProblems(open) : [];
     out.push({ clientId: id, clientName: name.get(id) ?? "", approved, open, problems });
   }
   return out.sort((a, b) => a.clientName.localeCompare(b.clientName, "he"));
