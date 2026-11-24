@@ -297,6 +297,34 @@ describe("installing from Claude asks everything first (24.11.2026)", () => {
   });
 });
 
+describe("client values sent the old way (24.11.2026)", () => {
+  it("takes a client value from `values` when Claude holds the old definition, and says where each answer goes", async () => {
+    const { hadas, nux } = await setup();
+    const params = [
+      { key: "to", label: "נמען", level: "CLIENT", type: "EMAIL", required: true },
+      { key: "bank", label: "סוג בנק", level: "CLIENT", required: true },
+      { key: "owner_name", label: "שם השולח", level: "INSTALLATION", required: true },
+    ];
+    const agent = await prisma.agent.create({ data: { slug: "weekly", name: "Weekly", purpose: "בדיקה", kind: "SCHEDULED", versions: { create: { version: 1, state: "APPROVED", blocks: BLOCKS, params } } } });
+    const base = { agent: "weekly", surface: "SCHEDULED", clients: [nux.name], schedule: { cron: "12 7 * * 0", tz: "Asia/Jerusalem" } };
+
+    const preview = await call(hadas, "install_agent", { ...base, preview: true });
+    expect(preview.json.ask).toEqual([
+      expect.objectContaining({ key: "owner_name", answerAs: "values.owner_name" }),
+      expect.objectContaining({ key: "to", client: "NUX", answerAs: 'clientValues["NUX"].to' }),
+      expect.objectContaining({ key: "bank", client: "NUX", answerAs: 'clientValues["NUX"].bank' }),
+    ]);
+
+    // Everything in `values`, as a Claude with the old definition sends it.
+    const ok = await call(hadas, "install_agent", { ...base, values: { owner_name: "אריאל", to: "nadav@nux.ai", bank: "cycle" } });
+    expect(ok.json).toMatchObject({ installed: true, savedClientValues: true });
+    const inst = await prisma.agentInstallation.findUniqueOrThrow({ where: { id: ok.json.installation } });
+    expect(inst.values).toEqual({ owner_name: "אריאל" });
+    const saved = await prisma.agentClientValue.findMany({ where: { agentId: agent.id, clientId: nux.id }, orderBy: { key: "asc" } });
+    expect(saved.map((v) => [v.key, v.value])).toEqual([["bank", "cycle"], ["to", "nadav@nux.ai"]]);
+  });
+});
+
 describe("archiving an agent", () => {
   it("is a manager's call with a reason, waits for its installations, and takes it out of every list and the connector", async () => {
     const { hadas, ariel, nux } = await setup();
