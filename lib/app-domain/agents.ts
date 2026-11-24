@@ -504,11 +504,12 @@ export async function installQuestions(
   const shape = (p: AgentParam) => ({ key: p.key, label: p.label, type: p.type, ...(p.example ? { example: p.example } : {}) });
   const given = (key: string) => !!input.values?.[key]?.trim();
   const installParams = params.filter((p) => p.level === "INSTALLATION" && !p.default && !given(p.key));
-  const ask: { key: string; label: string; type: string; example?: string; client?: string }[] = [];
-  if (input.clientScope !== "ALL_MINE" && input.clientIds.length === 0) ask.push({ key: "clients", label: "Which clients it works on (or all of them)", type: "CLIENTS" });
-  if (input.surface === "SCHEDULED" && (input.schedules ?? []).length === 0) ask.push({ key: "schedule", label: "When it runs: a cron and a time zone, e.g. 0 8 * * 0-4 Asia/Jerusalem", type: "SCHEDULE" });
-  for (const p of installParams.filter((p) => p.required)) ask.push(shape(p));
-  const optional: { key: string; label: string; type: string; example?: string; client?: string }[] = installParams.filter((p) => !p.required).map(shape);
+  type Question = { key: string; label: string; type: string; example?: string; client?: string; answerAs: string };
+  const ask: Question[] = [];
+  if (input.clientScope !== "ALL_MINE" && input.clientIds.length === 0) ask.push({ key: "clients", label: "Which clients it works on (or all of them)", type: "CLIENTS", answerAs: "clients: [\"<client name>\"] or allClients: true" });
+  if (input.surface === "SCHEDULED" && (input.schedules ?? []).length === 0) ask.push({ key: "schedule", label: "When it runs: a cron and a time zone, e.g. 0 8 * * 0-4 Asia/Jerusalem", type: "SCHEDULE", answerAs: "schedule: { cron, tz }" });
+  for (const p of installParams.filter((p) => p.required)) ask.push({ ...shape(p), answerAs: `values.${p.key}` });
+  const optional: Question[] = installParams.filter((p) => !p.required).map((p) => ({ ...shape(p), answerAs: `values.${p.key}` }));
   const clients = input.clientScope !== "ALL_MINE" && input.clientIds.length === 0 ? [] : await resolveClients(actor, agentId, params, input);
   // Typed client values only: a value from the client's file is never asked.
   const clientParams = params.filter((p) => p.level === "CLIENT" && !p.default && !p.clientField);
@@ -516,7 +517,7 @@ export async function installQuestions(
     const givenNow = input.clientValues?.[c.id] ?? {};
     for (const p of clientParams) {
       if (c.values[p.key]?.trim() || givenNow[p.key]?.trim()) continue;
-      (p.required ? ask : optional).push({ ...shape(p), client: c.name });
+      (p.required ? ask : optional).push({ ...shape(p), client: c.name, answerAs: `clientValues["${c.name}"].${p.key}` });
     }
   }
   return {
@@ -524,6 +525,20 @@ export async function installQuestions(
     optional,
     requirements: { connectors: requirements.connectors, skills: requirements.skills.map((s) => skillOf(s).slug), repos: requirements.repos, localMcp: requirements.localMcp, externalRunners: requirements.externalRunners, notes: requirements.notes ?? null },
   };
+}
+
+/// A client value sent in `values` (24.11.2026): Claude may hold an older
+/// definition of install_agent with no clientValues, or simply put every
+/// answer in one place. A key that is a typed CLIENT parameter of the
+/// version in use goes to every chosen client; the rest stay installation
+/// values.
+export async function splitInstallValues(agentId: string, values: Record<string, string>, clientIds: string[]) {
+  const approved = await currentApproved(agentId);
+  const clientKeys = new Set(approved ? contentOf(approved).params.filter((p) => p.level === "CLIENT" && !p.clientField).map((p) => p.key) : []);
+  const install: Record<string, string> = {};
+  const perClient: Record<string, string> = {};
+  for (const [k, v] of Object.entries(values)) (clientKeys.has(k) && clientIds.length > 0 ? perClient : install)[k] = v;
+  return { install, clientValues: Object.keys(perClient).length ? Object.fromEntries(clientIds.map((id) => [id, perClient])) : {} };
 }
 
 /// Client values given with an install (24.11.2026), checked all before any

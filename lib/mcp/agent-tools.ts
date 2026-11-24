@@ -9,7 +9,7 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { appUrl } from "@/lib/approval-links";
 import { prisma } from "@/lib/prisma";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, saveInstallClientValues, findAgentByRef, installQuestions, draftProblems, fetchAgent, linkedProcedure, listMyInstallations, recordRun, revertToVersion, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
+import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, saveInstallClientValues, splitInstallValues, findAgentByRef, installQuestions, draftProblems, fetchAgent, linkedProcedure, listMyInstallations, recordRun, revertToVersion, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
 import { proposeLesson } from "@/lib/app-domain/agent-library";
 import { skillGaps } from "@/lib/app-domain/agent-skills";
 import { clientAdditionProblems, saveClientAddition, submitClientAddition } from "@/lib/app-domain/agent-client-additions";
@@ -576,17 +576,19 @@ export function registerAgentTools(server: McpServer): void {
           }
           clientIds = [...new Set(clientIds)];
         }
-        const clientValues: Record<string, Record<string, string>> = {};
+        // A client value may come in `values` too: it goes to the chosen clients.
+        const split = await splitInstallValues(agent.id, args.values ?? {}, clientIds);
+        const clientValues: Record<string, Record<string, string>> = split.clientValues;
         for (const [name, values] of Object.entries(args.clientValues ?? {})) {
           const c = clientNamed(name);
           if (!c) return toolText(`No client you can access is named "${name}" (in clientValues). Nothing was installed.`);
-          clientValues[c.id] = values;
+          clientValues[c.id] = { ...(clientValues[c.id] ?? {}), ...values };
         }
         const scope = {
           surface: args.surface,
           clientScope: (args.allClients ? "ALL_MINE" : clientIds.length > 1 ? "LIST" : "ONE") as "ALL_MINE" | "LIST" | "ONE",
           clientIds,
-          values: args.values,
+          values: split.install,
           schedules: args.schedule ? [args.schedule] : [],
         };
         const needs = await installQuestions(actor, agent.id, { ...scope, clientValues });
@@ -595,7 +597,7 @@ export function registerAgentTools(server: McpServer): void {
             installed: false,
             ...needs,
             next: needs.ask.length > 0
-              ? "Nothing was installed. Ask the user every `ask` item and offer the `optional` ones in one message (each with its format), mention only the `requirements` you have no tools for, then call install_agent again with all the answers."
+              ? "Nothing was installed. Ask the user every `ask` item you cannot answer from what they already said, and offer the `optional` ones, in one message (each with its format); mention only the `requirements` you have no tools for. Then call install_agent again with the same arguments plus each answer where its `answerAs` says (a client value may also go in `values` under its key when the install is for one client). Client values are saved by that call; never send the user to a screen for them."
               : "Nothing was installed (preview). Offer the user the `optional` values, mention only the `requirements` you have no tools for, confirm where it runs and on which clients, then call install_agent again without preview.",
           });
         }
