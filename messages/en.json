@@ -8309,6 +8309,10 @@
       "title": "An Aloha recording email was not recognized",
       "body": "An email with an audio file came from Aloha, but the numbers and time could not be read from it, so the recording was not stored. Aloha probably changed the email template. The parsing needs updating (lib/whatsapp-poc/recordings.ts). Email id: {emailId}"
     },
+    "channelBackfillFailed": {
+      "title": "The nightly WhatsApp backfill failed for {owner}'s number",
+      "body": "The nightly run could not load the WhatsApp chats of {owner}'s number. The other numbers, the recordings and the transcripts were handled as usual. The error: {error}. This usually means the number's WhatsApp was disconnected in Unipile and has to be linked again (QR scan). Until then, messages from this number are not stored."
+    },
     "taskNotice": {
       "assigned": "New task for you",
       "assignedUrgent": "Urgent task for you",

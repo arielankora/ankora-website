@@ -10,8 +10,7 @@ import { mp3DurationSeconds } from "./mp3-duration";
 import { loadCallBlockIndex } from "./call-blocks";
 import { storedCallLine } from "./call-lines";
 import { fetchVoiceNote } from "@/lib/whatsapp-poc/voice-notes";
-import { sendEmail } from "@/lib/email";
-import { outgoingOf } from "@/lib/i18n/recipients";
+import { alertAdmins } from "./admin-alert";
 
 // Communications storage, stage 2 (1.11.2026, spec "שמירת שיחות, הקלטות
 // ותמלולים", approved by Ariel). The Aloha line's recordings are kept here:
@@ -60,33 +59,16 @@ export async function isAiExcludedNumber(phone: string): Promise<boolean> {
 export const UNRECOGNIZED_RECORDING_NOTIFICATION_TYPE = "unrecognized_recording";
 
 /// An email from Aloha with audio that could not be read (24.11.2026: Aloha
-/// changed its template and the recordings were dropped in silence). Every
-/// admin gets a notification and an email, at most once a day each, so a
-/// day of calls is one alert and not one per call.
-export async function alertUnrecognizedRecording(emailId: string, now = new Date()): Promise<void> {
+/// changed its template and the recordings were dropped in silence). One
+/// alert a day for the template, however many calls it drops.
+export async function alertUnrecognizedRecording(emailId: string): Promise<void> {
   console.error("call-store: Aloha recording email not recognized", { emailId });
-  const admins = await prisma.user.findMany({
-    where: { role: { in: ["SUPER_ADMIN", "ANKORA_ADMIN"] }, status: "ACTIVE", deletedAt: null },
-    select: { id: true, email: true, locale: true, timezone: true },
+  await alertAdmins({
+    type: UNRECOGNIZED_RECORDING_NOTIFICATION_TYPE,
+    subjectId: "aloha-recording-template",
+    entityType: "Email",
+    render: (t) => ({ title: t("unrecognizedRecording.title"), body: t("unrecognizedRecording.body", { emailId }) }),
   });
-  const since = new Date(now.getTime() - DAY_MS);
-  const recent = new Set(
-    (
-      await prisma.notification.findMany({
-        where: { type: UNRECOGNIZED_RECORDING_NOTIFICATION_TYPE, createdAt: { gte: since } },
-        select: { userId: true },
-      })
-    ).map((n) => n.userId),
-  );
-  for (const admin of admins.filter((a) => !recent.has(a.id))) {
-    const { t } = outgoingOf(admin);
-    const title = t("unrecognizedRecording.title");
-    const body = t("unrecognizedRecording.body", { emailId });
-    await prisma.notification.create({
-      data: { userId: admin.id, type: UNRECOGNIZED_RECORDING_NOTIFICATION_TYPE, title, body, entityType: "Email", entityId: emailId },
-    });
-    if (admin.email) await sendEmail({ to: [admin.email], subject: `Ankora - ${title}`, text: body });
-  }
 }
 
 function driveName(rec: Recording, side: { other: string }): string {
