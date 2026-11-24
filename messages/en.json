@@ -9118,7 +9118,8 @@
         "none": "No category",
         "client": "Client",
         "allClients": "All clients",
-        "group": "Group by category"
+        "group": "Group by category",
+        "search": "Search by name, description or id"
       }
     },
     "library": {

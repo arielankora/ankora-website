@@ -6,11 +6,20 @@ export const NO_CATEGORY = "none";
 
 type Filterable = { categories: { id: string }[]; clientIds: string[]; allClients: boolean };
 
+const fold = (s: string) => s.toLowerCase().replace(/[״"'׳`]/g, "").replace(/\s+/g, " ").trim();
+
 /// Keeps an agent in any of the chosen categories (or in none, for
 /// NO_CATEGORY), and, when a client is chosen, one with an installation on
 /// it. An installation on all its owner's clients counts for every client.
-export function filterAgents<A extends Filterable>(agents: A[], filter: { categories: string[]; client: string | null }): A[] {
+/// A search (24.11.2026) keeps an agent whose name, description or id holds
+/// every word of it, in any order.
+export function filterAgents<A extends Filterable & { name?: string; purpose?: string; slug?: string }>(agents: A[], filter: { categories: string[]; client: string | null; query?: string | null }): A[] {
+  const words = fold(filter.query ?? "").split(" ").filter(Boolean);
   return agents.filter((a) => {
+    if (words.length > 0) {
+      const text = fold(`${a.name ?? ""} ${a.purpose ?? ""} ${a.slug ?? ""}`);
+      if (!words.every((w) => text.includes(w))) return false;
+    }
     if (filter.categories.length > 0) {
       const inChosen = a.categories.some((c) => filter.categories.includes(c.id));
       const inNone = filter.categories.includes(NO_CATEGORY) && a.categories.length === 0;

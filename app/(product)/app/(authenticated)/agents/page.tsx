@@ -33,7 +33,8 @@ export default async function AgentsPage({ searchParams }: { searchParams: Promi
   const clients = (await listAccessibleClients(user)).map((c) => ({ id: c.id, name: c.name }));
   const chosen = ([] as string[]).concat(sp.cat ?? []);
   const client = typeof sp.client === "string" && sp.client ? sp.client : null;
-  const agents = filterAgents(all, { categories: chosen, client });
+  const query = typeof sp.q === "string" ? sp.q : null;
+  const agents = filterAgents(all, { categories: chosen, client, query });
   const grouped = sp.group === "1" && categories.length > 0;
   const t = await getTranslations("agents.list");
   const pendingDrafts = all.filter((a) => a.draft?.state === "PENDING").length;
