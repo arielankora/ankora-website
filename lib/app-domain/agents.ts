@@ -480,41 +480,74 @@ export async function resolveClients(user: User, agentId: string, params: AgentP
 
 /// What an installation still needs before it is created (24.11.2026), so
 /// whoever installs asks the person everything at once instead of finding
-/// out on the first run. `ask` blocks the install: a required value with no
-/// default, and when on a schedule. `optional` are values the person may
-/// give now (or the agent finds itself). `clientGaps` are required client
-/// values no one has set: a manager fills them on the agent's parameters
-/// tab, and until then the run skips that client. `requirements` are what
-/// the Claude account it runs in must have connected.
+/// out on the first run. `ask` blocks the install: the clients, the schedule
+/// of a scheduled run, a required installation value with no default, and a
+/// required client value no one has set (given with the install, it is
+/// saved for that client). `optional` are values the person may give now.
+/// `requirements` are what the Claude account it runs in must have.
 export async function installQuestions(
   actor: User,
   agentId: string,
-  input: { surface: "PROJECT" | "SCHEDULED" | "PERSISTENT_SESSION" | "SKILL"; clientScope: "ONE" | "LIST" | "ALL_MINE"; clientIds: string[]; values?: Record<string, string>; schedules?: { cron: string; tz: string }[] }
+  input: {
+    surface: "PROJECT" | "SCHEDULED" | "PERSISTENT_SESSION" | "SKILL";
+    clientScope: "ONE" | "LIST" | "ALL_MINE";
+    clientIds: string[];
+    values?: Record<string, string>;
+    clientValues?: Record<string, Record<string, string>>;
+    schedules?: { cron: string; tz: string }[];
+  }
 ) {
   assertCan(actor.role, PROPOSE);
   const approved = await currentApproved(agentId);
   if (!approved) throw new DomainError("agents.noApprovedVersion", "לסוכן עוד אין גרסה מאושרת להתקין.");
   const { params, requirements } = contentOf(approved);
+  const shape = (p: AgentParam) => ({ key: p.key, label: p.label, type: p.type, ...(p.example ? { example: p.example } : {}) });
   const given = (key: string) => !!input.values?.[key]?.trim();
   const installParams = params.filter((p) => p.level === "INSTALLATION" && !p.default && !given(p.key));
-  const ask: { key: string; label: string; type: string }[] = [];
+  const ask: { key: string; label: string; type: string; example?: string; client?: string }[] = [];
   if (input.clientScope !== "ALL_MINE" && input.clientIds.length === 0) ask.push({ key: "clients", label: "Which clients it works on (or all of them)", type: "CLIENTS" });
   if (input.surface === "SCHEDULED" && (input.schedules ?? []).length === 0) ask.push({ key: "schedule", label: "When it runs: a cron and a time zone, e.g. 0 8 * * 0-4 Asia/Jerusalem", type: "SCHEDULE" });
-  for (const p of installParams.filter((p) => p.required)) ask.push({ key: p.key, label: p.label, type: p.type });
-  const optional = installParams.filter((p) => !p.required).map((p) => ({ key: p.key, label: p.label, type: p.type }));
+  for (const p of installParams.filter((p) => p.required)) ask.push(shape(p));
+  const optional: { key: string; label: string; type: string; example?: string; client?: string }[] = installParams.filter((p) => !p.required).map(shape);
   const clients = input.clientScope !== "ALL_MINE" && input.clientIds.length === 0 ? [] : await resolveClients(actor, agentId, params, input);
-  const clientParams = params.filter((p) => p.level === "CLIENT" && p.required && !p.default);
-  const clientGaps = clients
-    .map((c) => ({ client: c.name, missing: clientParams.filter((p) => !c.values[p.key]?.trim()).map((p) => p.label) }))
-    .filter((g) => g.missing.length > 0);
+  // Typed client values only: a value from the client's file is never asked.
+  const clientParams = params.filter((p) => p.level === "CLIENT" && !p.default && !p.clientField);
+  for (const c of clients) {
+    const givenNow = input.clientValues?.[c.id] ?? {};
+    for (const p of clientParams) {
+      if (c.values[p.key]?.trim() || givenNow[p.key]?.trim()) continue;
+      (p.required ? ask : optional).push({ ...shape(p), client: c.name });
+    }
+  }
   return {
     ask,
     optional,
-    clientGaps,
     requirements: { connectors: requirements.connectors, skills: requirements.skills.map((s) => skillOf(s).slug), repos: requirements.repos, localMcp: requirements.localMcp, externalRunners: requirements.externalRunners, notes: requirements.notes ?? null },
   };
 }
 
+/// Client values given with an install (24.11.2026), checked all before any
+/// is saved, so a typo in one leaves the others as they were. Only CLIENT
+/// parameters of the version in use, and never one that comes from the
+/// client's file.
+export async function saveInstallClientValues(actor: User, agentId: string, byClient: Record<string, Record<string, string>>) {
+  const approved = await currentApproved(agentId);
+  if (!approved) throw new DomainError("agents.noApprovedVersion", "לסוכן עוד אין גרסה מאושרת להתקין.");
+  const params = contentOf(approved).params;
+  const rows: { clientId: string; key: string; value: string }[] = [];
+  for (const [clientId, values] of Object.entries(byClient)) {
+    await assertClientAccess(actor, clientId);
+    for (const [key, raw] of Object.entries(values)) {
+      const p = params.find((x) => x.key === key && x.level === "CLIENT" && !x.clientField);
+      if (!p) throw new DomainError("agents.notClientParam", `"${key}" הוא לא ערך של לקוח בסוכן הזה.`, { key });
+      const value = raw.trim();
+      if (!value) continue;
+      checkValueFormat(p.type, value);
+      rows.push({ clientId, key, value });
+    }
+  }
+  for (const r of rows) await setClientValue(actor, { agentId, ...r });
+}
 
 const scheduleSchema = z.object({ cron: z.string().trim().min(9).max(120), tz: z.string().trim().min(3).max(60) });
 

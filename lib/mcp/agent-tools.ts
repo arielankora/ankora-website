@@ -9,7 +9,7 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { appUrl } from "@/lib/approval-links";
 import { prisma } from "@/lib/prisma";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, findAgentByRef, installQuestions, draftProblems, fetchAgent, linkedProcedure, listMyInstallations, recordRun, revertToVersion, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
+import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, saveInstallClientValues, findAgentByRef, installQuestions, draftProblems, fetchAgent, linkedProcedure, listMyInstallations, recordRun, revertToVersion, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
 import { proposeLesson } from "@/lib/app-domain/agent-library";
 import { skillGaps } from "@/lib/app-domain/agent-skills";
 import { clientAdditionProblems, saveClientAddition, submitClientAddition } from "@/lib/app-domain/agent-client-additions";
@@ -538,8 +538,9 @@ export function registerAgentTools(server: McpServer): void {
       description: [
         "Creates an installation of an Ankora agent for the signed-in person and returns its bootstrap text: the only lines to put in the Claude project's instructions, the scheduled task's prompt or the first message of a persistent conversation.",
         "Pass the agent (its name as the user calls it, or its id), where it will run, and its clients by name (or allClients). Installation-level values go in `values`, by parameter key.",
-        "Start with preview: true: it installs nothing and returns everything the install needs: `ask` (must be answered: clients, the schedule of a scheduled run, required values), `optional` (values the user may give now), `clientGaps` (client values a manager has not set) and `requirements` (what the Claude account must have connected).",
-        "Then ask the user every `ask` item and offer the `optional` ones in ONE message, together with where it runs. Tell them about `clientGaps` and `requirements`. Call again without preview only with all the answers. A call that still misses an `ask` item installs nothing and returns the same lists.",
+        "Start with preview: true: it installs nothing and returns `ask` (must be answered: the clients, the schedule of a scheduled run, required values, and required values per client, marked with `client`), `optional` (values the user may give now) and `requirements` (connectors, skills and the rest the run needs).",
+        "Before asking anything, look at the tools you have in this conversation: a connector in `requirements` you have tools for is connected, so say nothing about it; mention only the missing ones.",
+        "Then ask the user every `ask` item and offer the `optional` ones in ONE message, with each value's `example` as its format. Call again without preview with all the answers: installation values in `values`, client values in `clientValues` by client name. They are saved in Ankora by this call; never send the user to a screen to type them.",
       ].join(" "),
       inputSchema: z.object({
         agent: z.string().min(1).max(120).describe("The agent: its id (slug, from its url) or its name as Ankora shows it."),
@@ -549,13 +550,14 @@ export function registerAgentTools(server: McpServer): void {
         checkEvery: z.enum(["RUN", "DAILY", "WEEKLY"]).optional().describe("How often to look for a newer version. Default DAILY."),
         schedule: z.object({ cron: z.string().max(120), tz: z.string().max(60) }).optional().describe("For a scheduled run: its cron and time zone."),
         claudeAccount: z.string().max(120).optional().describe("The Claude account it runs in, when not the person's own."),
-        values: z.record(z.string().max(40), z.string().max(2000)).optional(),
+        values: z.record(z.string().max(40), z.string().max(2000)).optional().describe("Installation-level values, by parameter key."),
+        clientValues: z.record(z.string().max(120), z.record(z.string().max(40), z.string().max(2000))).optional().describe("Client-level values: { \"<client name>\": { \"<parameter key>\": \"<value>\" } }. Saved for that client in Ankora, for every installation of this agent."),
         preview: z.boolean().optional().describe("True: install nothing, only return what the install needs."),
       }),
       annotations: TOOL_ANNOTATIONS.install_agent,
     },
     async (
-      args: { agent: string; surface: "PROJECT" | "SCHEDULED" | "PERSISTENT_SESSION" | "SKILL"; clients?: string[]; allClients?: boolean; checkEvery?: "RUN" | "DAILY" | "WEEKLY"; schedule?: { cron: string; tz: string }; claudeAccount?: string; values?: Record<string, string>; preview?: boolean },
+      args: { agent: string; surface: "PROJECT" | "SCHEDULED" | "PERSISTENT_SESSION" | "SKILL"; clients?: string[]; allClients?: boolean; checkEvery?: "RUN" | "DAILY" | "WEEKLY"; schedule?: { cron: string; tz: string }; claudeAccount?: string; values?: Record<string, string>; clientValues?: Record<string, Record<string, string>>; preview?: boolean },
       ctx: ServerContext
     ) => {
       try {
@@ -563,15 +565,22 @@ export function registerAgentTools(server: McpServer): void {
         const ref = await agentRef(args.agent, "Nothing was installed.");
         if (!ref.agent) return toolText(ref.miss);
         const agent = ref.agent;
+        const mine = await listAccessibleClients(actor);
+        const clientNamed = (name: string) => mine.find((x) => x.name.toLowerCase() === name.trim().toLowerCase());
         let clientIds: string[] = [];
         if (!args.allClients) {
-          const mine = await listAccessibleClients(actor);
           for (const name of args.clients ?? []) {
-            const c = mine.find((x) => x.name.toLowerCase() === name.trim().toLowerCase());
+            const c = clientNamed(name);
             if (!c) return toolText(`No client you can access is named "${name}". Nothing was installed.`);
             clientIds.push(c.id);
           }
           clientIds = [...new Set(clientIds)];
+        }
+        const clientValues: Record<string, Record<string, string>> = {};
+        for (const [name, values] of Object.entries(args.clientValues ?? {})) {
+          const c = clientNamed(name);
+          if (!c) return toolText(`No client you can access is named "${name}" (in clientValues). Nothing was installed.`);
+          clientValues[c.id] = values;
         }
         const scope = {
           surface: args.surface,
@@ -580,25 +589,32 @@ export function registerAgentTools(server: McpServer): void {
           values: args.values,
           schedules: args.schedule ? [args.schedule] : [],
         };
-        const needs = await installQuestions(actor, agent.id, scope);
+        const needs = await installQuestions(actor, agent.id, { ...scope, clientValues });
         if (args.preview || needs.ask.length > 0) {
           return toolJson({
             installed: false,
             ...needs,
             next: needs.ask.length > 0
-              ? "Nothing was installed. Ask the user every `ask` item and offer the `optional` ones in one message, tell them about `clientGaps` and `requirements`, then call install_agent again with all the answers."
-              : "Nothing was installed (preview). Offer the user the `optional` values, tell them about `clientGaps` and `requirements`, confirm where it runs and on which clients, then call install_agent again without preview.",
+              ? "Nothing was installed. Ask the user every `ask` item and offer the `optional` ones in one message (each with its format), mention only the `requirements` you have no tools for, then call install_agent again with all the answers."
+              : "Nothing was installed (preview). Offer the user the `optional` values, mention only the `requirements` you have no tools for, confirm where it runs and on which clients, then call install_agent again without preview.",
           });
         }
+        await saveInstallClientValues(actor, agent.id, clientValues);
         const inst = await createInstallation(actor, { agentId: agent.id, ...scope, checkEvery: args.checkEvery ?? "DAILY", claudeAccount: args.claudeAccount ?? null });
+        const bootstrap = bootstrapText(agent, inst.id);
         return toolJson({
           installed: true,
           installation: inst.id,
-          bootstrap: bootstrapText(agent, inst.id),
+          bootstrap,
           url: agentUrl(agent.slug, "installations"),
-          clientGaps: needs.clientGaps,
+          savedClientValues: Object.keys(clientValues).length > 0,
           requirements: needs.requirements,
-          next: "Give the user the bootstrap text to paste in place of the old instructions. Tell them about any clientGaps (a manager sets those on the agent's parameters tab; until then the run skips that client) and to check every requirement is connected in that Claude account.",
+          next:
+            args.surface === "SCHEDULED"
+              ? `Now create the scheduled task yourself if you have a tool that creates scheduled tasks: name "${agent.name}", the schedule ${args.schedule ? `${args.schedule.cron} (${args.schedule.tz})` : ""}, and the bootstrap text as its whole prompt. Then tell the user in one line that it is installed and scheduled. Only if you have no such tool, give the user the bootstrap text and the schedule in one short message to create it. Mention only the requirements you have no tools for.`
+              : args.surface === "PROJECT"
+                ? "Put the bootstrap text in place of the project's instructions yourself if you have a tool for that; otherwise give it to the user in one short message to paste there. Mention only the requirements you have no tools for."
+                : "Use the bootstrap text where this runs (the first message of the persistent conversation, or the skill's instructions), yourself if you have a tool for it; otherwise give it to the user in one short message. Mention only the requirements you have no tools for.",
         });
       } catch (err) {
         console.error("[mcp] install_agent failed", err);
