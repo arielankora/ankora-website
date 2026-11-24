@@ -7,7 +7,7 @@ import { getTranslations } from "next-intl/server";
 import { listAgentCategories } from "@/lib/app-domain/agent-categories";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { filterAgents, groupAgents } from "@/lib/agents/categories";
-import { ManageCategories, NewAgent } from "./AgentForms";
+import { ManageCategories, NewAgent, PickCategories } from "./AgentForms";
 import { AgentFilters } from "./AgentFilters";
 
 // Agents, phase 1 (22.11.2026): "סוכנים". Every agent is written here once;
@@ -87,17 +87,19 @@ export default async function AgentsPage({ searchParams }: { searchParams: Promi
             <h2 className="text-sm font-medium text-app-text-primary" dir="auto">
               {g.name ?? t("filters.none")} <span className="font-normal text-app-text-tertiary">({g.agents.length})</span>
             </h2>
-            <AgentsTable agents={g.agents} />
+            <AgentsTable agents={g.agents} editCategories={isManager ? categories : null} />
           </section>
         ))
       ) : (
-        <AgentsTable agents={agents} />
+        <AgentsTable agents={agents} editCategories={isManager ? categories : null} />
       )}
     </div>
   );
 }
 
-async function AgentsTable({ agents }: { agents: Agent[] }) {
+/// `editCategories`: the active categories, for a manager to change a
+/// row's categories in place; null for everyone else.
+async function AgentsTable({ agents, editCategories }: { agents: Agent[]; editCategories: { id: string; name: string }[] | null }) {
   const t = await getTranslations("agents.list");
   const tl = await getTranslations("agents.labels");
   return (
@@ -122,10 +124,11 @@ async function AgentsTable({ agents }: { agents: Agent[] }) {
                 <div className="mt-0.5 text-[13px] text-app-text-secondary" dir="auto">{a.purpose}</div>
               </td>
               <td className="px-4 py-4">
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap items-center gap-1">
                   {a.categories.map((c) => (
                     <span key={c.id} className="rounded-full border border-app-border bg-app-surface-page px-2 py-0.5 text-xs text-app-text-secondary" dir="auto">{c.name}</span>
                   ))}
+                  {editCategories && <PickCategories agentId={a.id} current={a.categories.map((c) => c.id)} options={editCategories} agentName={a.name} />}
                 </div>
               </td>
               <td className="px-4 py-4 text-[13px]">{a.surfaces.length ? a.surfaces.map((s) => tl(`surface.${s}`)).join(", ") : tl(`kind.${a.kind}`)}</td>
