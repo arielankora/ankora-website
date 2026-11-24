@@ -9,6 +9,7 @@ import { PromiseList } from "./PromiseList";
 import { CategorySelect } from "./CategorySelect";
 import { portalHeadlineKey } from "@/lib/app-domain/portal-labels";
 import { bankFigures, packageFigures } from "@/lib/hours-format";
+import { ProgressBar } from "@/components/app/ProgressBar";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -38,7 +39,7 @@ export default async function PortalHomePage({ searchParams }: { searchParams: P
     throw err;
   }
 
-  const { client, waitingOnClient, inProgress, recentlyDone, cycle, openDecisions, contact } = home;
+  const { client, waitingOnClient, inProgress, recentlyDone, cycle, openDecisions, contact, greetingName } = home;
   const nothingYet =
     openDecisions === 0 && waitingOnClient.length === 0 && inProgress.length === 0 && recentlyDone.length === 0;
   const waHref = whatsappHref(contact.whatsappNumber);
@@ -46,6 +47,12 @@ export default async function PortalHomePage({ searchParams }: { searchParams: P
   const format = await getFormatter();
   const headline = portalHeadlineKey(openDecisions, waitingOnClient.length, inProgress.length);
   const figure = (chunks: React.ReactNode) => <bdi dir="ltr">{chunks}</bdi>;
+  // 24.11.2026 (Hadas): "129.4", not "129.40", on this one line. The hours
+  // screen keeps two decimals, where a column of figures has to line up.
+  const hours = (f: { consumed: string; total: string }) => ({
+    consumed: f.consumed.replace(/\.?0+$/, ""),
+    total: f.total.replace(/\.?0+$/, ""),
+  });
 
   // 24.11.2026 (Hadas): open work and what closed in the last 30 days in
   // one card, filtered by the task's category. Only categories that have
@@ -64,7 +71,7 @@ export default async function PortalHomePage({ searchParams }: { searchParams: P
           there; otherwise the headline is the whole message. */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[20px] border border-app-border bg-white p-6 sm:p-7">
         <div>
-          <p className="text-[13.5px] text-app-text-secondary">{t.rich("greeting", { name: client.name, who: (c) => <bdi>{c}</bdi> })}</p>
+          <p className="text-[13.5px] text-app-text-secondary">{t.rich("greeting", { name: greetingName ?? client.name, who: (c) => <bdi>{c}</bdi> })}</p>
           <p className="mt-1.5 text-xl font-medium text-app-text-primary">
             {t(`headline.${headline.kind}`, { count: headline.count })}
           </p>
@@ -143,7 +150,7 @@ export default async function PortalHomePage({ searchParams }: { searchParams: P
         {(contact.managerName || waHref) && (
           <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] border border-app-border bg-white px-[18px] py-3.5">
             <span className="text-[12.5px] text-app-text-secondary">
-              {contact.managerName ? t.rich("managerNamed", { name: contact.managerName, who: (c) => <bdi>{c}</bdi> }) : t("managerUnnamed")}
+              {contact.managerName ? t.rich("managerNamed", { name: contact.managerName, gender: contact.managerGender ?? "other", who: (c) => <bdi>{c}</bdi> }) : t("managerUnnamed")}
             </span>
             {waHref ? (
               <a
@@ -167,11 +174,7 @@ export default async function PortalHomePage({ searchParams }: { searchParams: P
                   figures the client sees on the hours screen one click away. */}
               {cycle.kind === "PREPAID" ? (
                 <>
-                  {t.rich("package", {
-                    consumed: packageFigures(cycle.purchasedMinutes, cycle.remainingMinutes).consumed,
-                    total: packageFigures(cycle.purchasedMinutes, cycle.remainingMinutes).total,
-                    n: figure,
-                  })}
+                  {t.rich("package", { ...hours(packageFigures(cycle.purchasedMinutes, cycle.remainingMinutes)), n: figure })}
                   {cycle.forecast?.status === "projected" &&
                     ` · ${t("packageLasts", {
                       date: format.dateTime(cycle.forecast.depletionDate, { dateStyle: "medium", timeZone: client.timezone }),
@@ -180,11 +183,7 @@ export default async function PortalHomePage({ searchParams }: { searchParams: P
                 </>
               ) : (
                 <>
-                  {t.rich("cycle", {
-                    consumed: bankFigures(cycle.totalMinutes, cycle.usedMinutes).consumed,
-                    total: bankFigures(cycle.totalMinutes, cycle.usedMinutes).total,
-                    n: figure,
-                  })}
+                  {t.rich("cycle", { ...hours(bankFigures(cycle.totalMinutes, cycle.usedMinutes)), n: figure })}
                 </>
               )}
               {cycle.daysLeft !== null && ` · ${t("daysLeft", { days: String(cycle.daysLeft) })}`}
@@ -192,6 +191,9 @@ export default async function PortalHomePage({ searchParams }: { searchParams: P
             <Link href="/app/portal/hours" className="tap-area text-xs text-app-text-accent hover:underline">
               {t("hoursDetail")}
             </Link>
+            {/* 24.11.2026 (Hadas): how much of the package is used, at a glance.
+                The same percentage and bar as the hours screen. */}
+            <ProgressBar className="w-full" percent={cycle.pct} dangerAt={100.01} />
           </div>
         )}
       </div>

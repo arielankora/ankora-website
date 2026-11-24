@@ -22,6 +22,7 @@ import { CURRENT_AGREEMENTS, agreementCode } from "@/lib/agreements";
 import { localDateKey } from "@/lib/timezone";
 import { PendingPdfReview, type PendingPdf } from "./PendingPdfReview";
 import { PersonalEmailForm } from "./PersonalEmailForm";
+import { PortalIdentityForm } from "./PortalIdentityForm";
 import { DeletionDeclarationForm } from "./DeletionDeclarationForm";
 
 // Display only; the reader's locale and time zone (ADR 0006). The
@@ -75,6 +76,8 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
         canApproveExceptions: true,
         commsAccessLevel: true,
         personalEmail: true,
+        portalName: true,
+        portalGender: true,
         createdAt: true,
         clientAccess: true,
       },
@@ -173,6 +176,15 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
                 lines={commsLines}
               />
             </div>
+          </div>
+        )}
+
+        {/* 24.11.2026 (Hadas): how a client reads this person on the portal
+            when they manage the account. */}
+        {targetUser.role !== "CLIENT_USER" && (
+          <div className="rounded-2xl border border-app-border bg-white p-6">
+            <h2 className="mb-4 text-sm font-medium text-app-text-primary">{t("portalIdentityTitle")}</h2>
+            <PortalIdentityForm userId={targetUser.id} name={targetUser.portalName} gender={targetUser.portalGender} />
           </div>
         )}
 

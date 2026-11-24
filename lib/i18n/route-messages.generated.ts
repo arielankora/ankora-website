@@ -169,6 +169,7 @@ export const AREA_MESSAGE_PATHS = {
     "users.invite",
     "users.pendingPdf",
     "users.personalEmail",
+    "users.portalIdentity",
     "users.resendInvite",
     "users.roleStatus",
   ],

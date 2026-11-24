@@ -135,6 +135,24 @@ describe("getPortalHome()", () => {
     expect(promises).toHaveLength(0);
   });
 
+  // 24.11.2026 (Hadas): "שלום נדב" and "מנהלת התיק שלך: אנה קוזלוב".
+  it("greets the reader by first name and names the manager as set for the portal", async () => {
+    const manager = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await prisma.user.update({
+      where: { id: manager.user.id },
+      data: { name: "Anna Kozlov", portalName: "אנה קוזלוב", portalGender: "FEMALE" },
+    });
+    const client = await createTestClient({ name: "Client Greeting" });
+    await prisma.client.update({ where: { id: client.id }, data: { accountManagerId: manager.user.id } });
+    const { user } = await createTestClientUser({ clientId: client.id });
+    const reader = await prisma.user.update({ where: { id: user.id }, data: { name: "Nadav Levi" } });
+
+    const home = await getPortalHome(reader);
+
+    expect(home.greetingName).toBe("Nadav");
+    expect(home.contact).toMatchObject({ managerName: "אנה קוזלוב", managerGender: "FEMALE" });
+  });
+
   it("reports the current cycle as a single line, or nothing when none exists", async () => {
     const client = await createTestClient({ name: "Client No Cycle" });
     const { user } = await createTestClientUser({ clientId: client.id });
