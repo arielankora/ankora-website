@@ -10,6 +10,7 @@ import {
   approveVersion,
   archiveAgent,
   setAgentPurpose,
+  setAgentSlug,
   contentOf,
   createAgent,
   createInstallation,
@@ -264,6 +265,14 @@ export async function moveAgentCategoryAction(id: string, direction: "up" | "dow
 export async function setAgentCategoryArchivedAction(id: string, archived: boolean): Promise<FormState> {
   const user = await requireUser();
   return run(() => setAgentCategoryArchived(user, id, archived));
+}
+
+export async function setAgentSlugAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  return run(async () => {
+    await setAgentSlug(user, str(f, "agentId"), str(f, "slug"));
+    return { slug: str(f, "slug").toLowerCase() };
+  });
 }
 
 export async function setAgentPurposeAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {

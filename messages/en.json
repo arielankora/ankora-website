@@ -1982,6 +1982,9 @@
       "categoryName": "A category needs a name, up to 40 characters.",
       "categoryExists": "There is already a category with this name.",
       "categoryNotFound": "The category was not found.",
+      "slugFormat": "An id is English letters, digits and hyphens, 3 to 50 characters, e.g. weekly-client-report.",
+      "slugTaken": "Another agent already uses this id.",
+      "slugRequired": "Another agent requires this skill by its id, so the id cannot change.",
       "valueEmail": "\"{value}\" is not an email address. Separate addresses with commas, e.g. nadav@grantor.ai, finance@grantor.ai.",
       "valueNumber": "Only a number goes here, e.g. 15."
     }
@@ -2265,6 +2268,7 @@
       "agentCategoryArchive": "Agent category archived",
       "agentCategoryRestore": "Agent category restored",
       "agentPurpose": "Agent description changed",
+      "agentSlug": "Agent id changed",
       "agentSubmit": "Agent version sent for approval",
       "agentApprove": "Agent version approved",
       "agentReject": "Agent version rejected",
@@ -9067,6 +9071,13 @@
         "archive": "Archive",
         "archived": "Archived",
         "restore": "Restore"
+      },
+      "slug": {
+        "trigger": "Change id",
+        "title": "The agent's id",
+        "field": "Id",
+        "text": "The id is in the agent's address, and Claude can use it to find the agent. It is not part of a version and no bootstrap text points to it, so changing it is safe and takes effect at once.",
+        "hint": "English letters, digits and hyphens, e.g. weekly-client-report."
       }
     },
     "list": {

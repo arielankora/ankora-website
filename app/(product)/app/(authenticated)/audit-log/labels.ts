@@ -238,6 +238,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "agent_category.archive": "העברת קטגוריה של סוכנים לארכיון",
   "agent_category.restore": "שחזור קטגוריה של סוכנים מהארכיון",
   "agent.purpose": "עדכון תיאור של סוכן",
+  "agent.slug": "שינוי המזהה של סוכן",
   "agent.submit": "שליחת גרסה של סוכן לאישור",
   "agent.approve": "אישור גרסה של סוכן",
   "agent.reject": "דחיית גרסה של סוכן",

@@ -8,7 +8,7 @@ import { DomainError } from "@/lib/domain-error";
 import { ViewTabs } from "@/components/app/ViewTabs";
 import { contentOf, getAgent, resolveClients } from "@/lib/app-domain/agents";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { ArchiveAgent, DraftButtons, EditPurpose } from "../AgentForms";
+import { ArchiveAgent, DraftButtons, EditPurpose, EditSlug } from "../AgentForms";
 
 // Agents, phase 1: what every tab of one agent reads, and the header and
 // tabs they share.
@@ -56,6 +56,8 @@ export async function AgentHeader({ data, active }: { data: LoadedAgent; active:
           {agent.ownerName && <span className="rounded-full border border-app-border bg-white px-2.5 py-0.5">{t("owner", { name: agent.ownerName })}</span>}
           <span className="rounded-full border border-app-border bg-white px-2.5 py-0.5">{approved ? t("approvedVersion", { version: approved.version }) : t("noApproved")}</span>
           {approved && <a href={`/api/agents/${agent.slug}/export`} className="rounded-full border border-app-border bg-white px-2.5 py-0.5 text-app-text-accent">{t("export")}</a>}
+          <span className="rounded-full border border-app-border bg-white px-2.5 py-0.5" dir="ltr">{agent.slug}</span>
+          {data.canDecide && <EditSlug agentId={agent.id} slug={agent.slug} />}
           {data.canDecide && <EditPurpose agentId={agent.id} purpose={agent.purpose} />}
           {data.canDecide && <ArchiveAgent agentId={agent.id} name={agent.name} />}
         </div>
