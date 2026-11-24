@@ -9,7 +9,7 @@ import { findSecrets } from "@/lib/secret-scan";
 import { DomainError } from "@/lib/domain-error";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { aiExcludedClientIds } from "@/lib/app-domain/ai-exclusion-db";
-import { LIMITS, fileSchema, parseBlocks, parseFiles, parseParams, parseRequirements, requirementsSchema, versionProblems, blockSchema, paramSchema, type AgentBlock, type AgentFile, type AgentParam, type AgentRequirements } from "@/lib/agents/model";
+import { LIMITS, fileSchema, skillOf, parseBlocks, parseFiles, parseParams, parseRequirements, requirementsSchema, versionProblems, blockSchema, paramSchema, type AgentBlock, type AgentFile, type AgentParam, type AgentRequirements } from "@/lib/agents/model";
 import { compileAgent, isCheckDue, type CompileClient } from "@/lib/agents/compile";
 import type { LinkedProcedure } from "@/lib/agents/procedure";
 import { mcpGetProcess } from "@/lib/app-domain/mcp-processes";
@@ -388,6 +388,44 @@ export async function resolveClients(user: User, agentId: string, params: AgentP
 }
 
 // --- Installations ----------------------------------------------------------
+
+/// What an installation still needs before it is created (24.11.2026), so
+/// whoever installs asks the person everything at once instead of finding
+/// out on the first run. `ask` blocks the install: a required value with no
+/// default, and when on a schedule. `optional` are values the person may
+/// give now (or the agent finds itself). `clientGaps` are required client
+/// values no one has set: a manager fills them on the agent's parameters
+/// tab, and until then the run skips that client. `requirements` are what
+/// the Claude account it runs in must have connected.
+export async function installQuestions(
+  actor: User,
+  agentId: string,
+  input: { surface: "PROJECT" | "SCHEDULED" | "PERSISTENT_SESSION" | "SKILL"; clientScope: "ONE" | "LIST" | "ALL_MINE"; clientIds: string[]; values?: Record<string, string>; schedules?: { cron: string; tz: string }[] }
+) {
+  assertCan(actor.role, PROPOSE);
+  const approved = await currentApproved(agentId);
+  if (!approved) throw new DomainError("agents.noApprovedVersion", "לסוכן עוד אין גרסה מאושרת להתקין.");
+  const { params, requirements } = contentOf(approved);
+  const given = (key: string) => !!input.values?.[key]?.trim();
+  const installParams = params.filter((p) => p.level === "INSTALLATION" && !p.default && !given(p.key));
+  const ask: { key: string; label: string; type: string }[] = [];
+  if (input.clientScope !== "ALL_MINE" && input.clientIds.length === 0) ask.push({ key: "clients", label: "Which clients it works on (or all of them)", type: "CLIENTS" });
+  if (input.surface === "SCHEDULED" && (input.schedules ?? []).length === 0) ask.push({ key: "schedule", label: "When it runs: a cron and a time zone, e.g. 0 8 * * 0-4 Asia/Jerusalem", type: "SCHEDULE" });
+  for (const p of installParams.filter((p) => p.required)) ask.push({ key: p.key, label: p.label, type: p.type });
+  const optional = installParams.filter((p) => !p.required).map((p) => ({ key: p.key, label: p.label, type: p.type }));
+  const clients = input.clientScope !== "ALL_MINE" && input.clientIds.length === 0 ? [] : await resolveClients(actor, agentId, params, input);
+  const clientParams = params.filter((p) => p.level === "CLIENT" && p.required && !p.default);
+  const clientGaps = clients
+    .map((c) => ({ client: c.name, missing: clientParams.filter((p) => !c.values[p.key]?.trim()).map((p) => p.label) }))
+    .filter((g) => g.missing.length > 0);
+  return {
+    ask,
+    optional,
+    clientGaps,
+    requirements: { connectors: requirements.connectors, skills: requirements.skills.map((s) => skillOf(s).slug), repos: requirements.repos, localMcp: requirements.localMcp, externalRunners: requirements.externalRunners, notes: requirements.notes ?? null },
+  };
+}
+
 
 const scheduleSchema = z.object({ cron: z.string().trim().min(9).max(120), tz: z.string().trim().min(3).max(60) });
 

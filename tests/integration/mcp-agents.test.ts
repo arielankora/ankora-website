@@ -228,6 +228,57 @@ describe("agents, phase 3", () => {
   });
 });
 
+describe("installing from Claude asks everything first (24.11.2026)", () => {
+  const params = [
+    { key: "signature", label: "חתימה", level: "INSTALLATION", required: true },
+    { key: "labels", label: "מזהי תוויות", level: "INSTALLATION" },
+    { key: "tone", label: "טון", level: "INSTALLATION", required: true, default: "קצר" },
+    { key: "contact", label: "איש קשר", level: "CLIENT", required: true },
+  ];
+  const requirements = { connectors: ["Gmail", "Ankora"], skills: [{ slug: "hebrew", minVersion: 2 }] };
+
+  it("a preview installs nothing and lists every question, the client gaps and what must be connected", async () => {
+    const { hadas, nux, rimed } = await setup();
+    const agent = await prisma.agent.create({ data: { slug: "asks", name: "Asks", purpose: "בדיקה", kind: "SCHEDULED", versions: { create: { version: 1, state: "APPROVED", blocks: BLOCKS, params, requirements } } } });
+    await prisma.agentClientValue.create({ data: { agentId: agent.id, clientId: rimed.id, key: "contact", value: "דנה" } });
+
+    const r = await call(hadas, "install_agent", { agent: "asks", surface: "SCHEDULED", clients: [nux.name, rimed.name], preview: true });
+    expect(r.isError).toBeFalsy();
+    expect(r.json).toMatchObject({
+      installed: false,
+      // The required value with a default is not asked.
+      ask: [
+        { key: "schedule", type: "SCHEDULE" },
+        { key: "signature", label: "חתימה" },
+      ],
+      optional: [{ key: "labels", label: "מזהי תוויות" }],
+      clientGaps: [{ client: "NUX", missing: ["איש קשר"] }],
+      requirements: { connectors: ["Gmail", "Ankora"], skills: ["hebrew"] },
+    });
+    expect(await prisma.agentInstallation.count({ where: { agentId: agent.id } })).toBe(0);
+
+    // Without the clients it asks for them too.
+    const noClients = await call(hadas, "install_agent", { agent: "asks", surface: "PROJECT", preview: true });
+    expect(noClients.json.ask.map((a: { key: string }) => a.key)).toEqual(["clients", "signature"]);
+  });
+
+  it("refuses an install that still misses an answer, and installs once everything is given", async () => {
+    const { hadas, nux } = await setup();
+    const agent = await prisma.agent.create({ data: { slug: "asks", name: "Asks", purpose: "בדיקה", kind: "SCHEDULED", versions: { create: { version: 1, state: "APPROVED", blocks: BLOCKS, params, requirements } } } });
+
+    const missing = await call(hadas, "install_agent", { agent: "asks", surface: "SCHEDULED", clients: [nux.name], values: { signature: "אריאל" } });
+    expect(missing.json).toMatchObject({ installed: false, ask: [{ key: "schedule" }] });
+    expect(missing.json.next).toContain("Nothing was installed");
+    expect(await prisma.agentInstallation.count({ where: { agentId: agent.id } })).toBe(0);
+
+    const ok = await call(hadas, "install_agent", { agent: "asks", surface: "SCHEDULED", clients: [nux.name], values: { signature: "אריאל" }, schedule: { cron: "0 8 * * 0-4", tz: "Asia/Jerusalem" } });
+    expect(ok.json).toMatchObject({ installed: true, clientGaps: [{ client: "NUX", missing: ["איש קשר"] }], requirements: { connectors: ["Gmail", "Ankora"] } });
+    const inst = await prisma.agentInstallation.findUniqueOrThrow({ where: { id: ok.json.installation } });
+    expect(inst.values).toEqual({ signature: "אריאל" });
+    expect(inst.schedules).toEqual([{ cron: "0 8 * * 0-4", tz: "Asia/Jerusalem" }]);
+  });
+});
+
 describe("archiving an agent", () => {
   it("is a manager's call with a reason, waits for its installations, and takes it out of every list and the connector", async () => {
     const { hadas, ariel, nux } = await setup();
