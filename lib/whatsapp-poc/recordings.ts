@@ -36,13 +36,20 @@ function e164(digits: string): string | null {
 
 /// The numbers and the time of the call, from the email's plain body (or,
 /// for the numbers, its subject). Null when it is not a recording email.
+///
+/// 24.11.2026: Aloha moved to a Hebrew template. The body now reads
+/// "ממספר 972... / למספר 972... / תאריך ושעה 24/11/2026 09:48:24" and the
+/// subject "הקלטת שיחה חדשה מ ALOHA <line> → <other>". Both templates are
+/// read. The Hebrew text carries invisible direction marks, which are
+/// dropped before matching.
 export function parseRecordingEmail(subject: string, bodyPlain: string): ParsedRecording | null {
-  const fromBody = /From:\s*(\d{8,15})/i.exec(bodyPlain)?.[1];
-  const toBody = /To:\s*(\d{8,15})/i.exec(bodyPlain)?.[1];
+  const text = bodyPlain.replace(/[‎‏‪-‮⁦-⁩]/g, "").replace(/ /g, " ");
+  const fromBody = /(?:From:|ממספר:?)\s*(\d{8,15})/i.exec(text)?.[1];
+  const toBody = /(?:To:|למספר:?)\s*(\d{8,15})/i.exec(text)?.[1];
   const subjectMatch = /\[(\d{8,15})\s*=>\s*(\d{8,15})\]/.exec(subject);
   const from = e164(fromBody ?? subjectMatch?.[1] ?? "");
   const to = e164(toBody ?? subjectMatch?.[2] ?? "");
-  const date = /Date:\s*(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/.exec(bodyPlain);
+  const date = /(?:Date:|תאריך ושעה:?)\s*(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/.exec(text);
   if (!from || !to || !date) return null;
   const [, dd, mm, yyyy, hh, mi, ss] = date;
   const utc = localDateTimeToUtc(`${yyyy}-${mm}-${dd}`, `${hh}:${mi}`);
@@ -74,15 +81,22 @@ type RawEmail = {
   id?: unknown;
   subject?: unknown;
   body_plain?: unknown;
+  body?: unknown;
   attachments?: Array<{ id?: unknown; mimetype?: unknown; is_inline?: unknown; file_size?: unknown }> | null;
 };
 
+/// The HTML body as text, for an email whose plain part is missing or does
+/// not carry the details (the 24.11.2026 template is HTML first).
+function htmlText(html: string): string {
+  return html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ");
+}
+
 export function toRecording(raw: RawEmail): Recording | null {
   if (typeof raw.id !== "string" || !raw.id) return null;
-  const parsed = parseRecordingEmail(
-    typeof raw.subject === "string" ? raw.subject : "",
-    typeof raw.body_plain === "string" ? raw.body_plain : "",
-  );
+  const subject = typeof raw.subject === "string" ? raw.subject : "";
+  const parsed =
+    parseRecordingEmail(subject, typeof raw.body_plain === "string" ? raw.body_plain : "") ??
+    (typeof raw.body === "string" ? parseRecordingEmail(subject, htmlText(raw.body)) : null);
   if (!parsed) return null;
   const audio = (raw.attachments ?? []).find(
     (a) => typeof a.id === "string" && typeof a.mimetype === "string" && a.mimetype.startsWith("audio/") && a.is_inline !== true,

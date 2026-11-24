@@ -43,6 +43,45 @@ describe("WhatsApp POC: reading Aloha's recording emails", () => {
     expect(parseRecordingEmail(SUBJECT, "From: 972541111111\nTo: 972552222222")).toBeNull();
   });
 
+  // 24.11.2026: Aloha's Hebrew template, with the direction marks Gmail
+  // leaves in it and made-up numbers.
+  const HE_SUBJECT = "הקלטת שיחה חדשה מ ALOHA 972552222222 → 97231111111";
+  const HE_BODY = [
+    "הקלטת השיחה שלכם מוכנה ומצורפת למייל זה כקובץ שמע.",
+    "הקלטת שיחה",
+    "התקבלה הקלטת שיחה חדשה",
+    "‪ממספר 97231111111‬",
+    "למספר 972552222222",
+    "תאריך ושעה 24/11/2026 09:48:24",
+    "*איפה ההקלטה?*",
+  ].join("\n");
+
+  it("reads the Hebrew template of 24.11.2026", () => {
+    // 24.11.2026 is winter time, so Israel is UTC+2.
+    expect(parseRecordingEmail(HE_SUBJECT, HE_BODY)).toEqual({
+      from: "+97231111111",
+      to: "+972552222222",
+      callAt: "2026-11-24T07:48:24.000Z",
+    });
+  });
+
+  it("reads the Hebrew template from the HTML body when the plain one is empty", () => {
+    const html = HE_BODY.split("\n")
+      .map((line) => {
+        const [label, ...rest] = line.split(/[  ](?=\d)/);
+        return `<tr><td>${label}</td><td>${rest.join(" ")}</td></tr>`;
+      })
+      .join("");
+    const rec = toRecording({
+      id: "1a20c9fc8718717a",
+      subject: HE_SUBJECT,
+      body_plain: "",
+      body: `<table>${html}</table>`,
+      attachments: [{ id: "audio-1", mimetype: "audio/mpeg", is_inline: false, file_size: 100 }],
+    });
+    expect(rec).toMatchObject({ from: "+97231111111", to: "+972552222222", callAt: "2026-11-24T07:48:24.000Z" });
+  });
+
   it("keeps only the audio attachment, never the inline logo", () => {
     const rec = toRecording({
       id: "1a187c2b2cbfd250",
