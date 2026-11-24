@@ -3,7 +3,8 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { AgentHeader, loadAgent } from "./shared";
 import { listLessons } from "@/lib/app-domain/agent-library";
 import { linkableProcesses } from "@/lib/app-domain/agents";
-import { LessonButtons, LinkProcess } from "../AgentForms";
+import { listAgentCategories } from "@/lib/app-domain/agent-categories";
+import { LessonButtons, LinkProcess, PickCategories } from "../AgentForms";
 import { skillOf, type AgentBlock } from "@/lib/agents/model";
 
 // Agents, phase 1: "סקירה". How the agent works, built from its blocks:
@@ -45,6 +46,7 @@ export default async function AgentOverviewPage({ params }: { params: Promise<{ 
   const req = shown.requirements;
   const lessons = await listLessons(data.user, data.agent.id);
   const processOptions = data.canDecide ? await linkableProcesses(data.user) : [];
+  const categoryOptions = data.canDecide ? (await listAgentCategories(data.user)).map((c) => ({ id: c.id, name: c.name })) : [];
   const t = await getTranslations("agents.overview");
   const tl = await getTranslations("agents.labels");
   const notWritten = t("notWritten");
@@ -112,6 +114,21 @@ export default async function AgentOverviewPage({ params }: { params: Promise<{ 
               <a href={`/app/agents/${data.agent.slug}/instructions`} className="mt-2 inline-block text-xs text-app-text-accent">{t("editInDraft")}</a>
             </section>
           )}
+          <section className="rounded-xl border border-app-border bg-white p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-medium">{t("categories")}</h2>
+              {data.canDecide && <PickCategories agentId={data.agent.id} current={data.categories.map((c) => c.id)} options={categoryOptions} />}
+            </div>
+            {data.categories.length > 0 ? (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {data.categories.map((c) => (
+                  <span key={c.id} className="rounded-full border border-app-border bg-app-surface-page px-2 py-0.5 text-xs text-app-text-secondary" dir="auto">{c.name}</span>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1 text-[13px] text-app-text-tertiary">{t("noCategories")}</p>
+            )}
+          </section>
           <section className="rounded-xl border border-app-border bg-white p-4">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-medium">{t("process")}</h2>

@@ -34,6 +34,11 @@ import {
   saveMetaAction,
   saveParamAction,
   setAgentProcessAction,
+  setAgentCategoriesAction,
+  createAgentCategoryAction,
+  renameAgentCategoryAction,
+  moveAgentCategoryAction,
+  setAgentCategoryArchivedAction,
   setClientValueAction,
   submitDraftAction,
 } from "./actions";
@@ -891,5 +896,141 @@ export function LessonButtons({ id }: { id: string }) {
       <ActionButton run={() => decideLessonAction(id, "USED")} label={t("lessons.used")} done={t("lessons.usedDone")} />
       <ActionButton run={() => decideLessonAction(id, "DISMISSED")} label={t("lessons.dismissed")} done={t("lessons.dismissedDone")} />
     </div>
+  );
+}
+
+// --- Categories (24.11.2026) -------------------------------------------------
+
+type Category = { id: string; name: string };
+
+function CategoriesForm({ agentId, current, options }: { agentId: string; current: string[]; options: Category[] }) {
+  const t = useTranslations("agents.forms");
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(setAgentCategoriesAction, close);
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="agentId" value={agentId} />
+      <p className="text-[13px] text-app-text-secondary">{t("categories.hint")}</p>
+      {options.length === 0 ? (
+        <p className="text-[13px] text-app-text-tertiary">{t("categories.noneYet")}</p>
+      ) : (
+        <fieldset className="flex flex-col gap-2">
+          <legend className={LABEL}>{t("categories.field")}</legend>
+          {options.map((c) => (
+            <label key={c.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="categoryId" value={c.id} defaultChecked={current.includes(c.id)} />
+              <span dir="auto">{c.name}</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
+      <Err error={error} />
+      <button type="submit" disabled={pending} className={PRIMARY}>
+        {pending ? t("common.saving") : t("common.save")}
+      </button>
+    </form>
+  );
+}
+
+export function PickCategories({ agentId, current, options }: { agentId: string; current: string[]; options: Category[] }) {
+  const t = useTranslations("agents.forms");
+  return (
+    <Drawer triggerLabel={current.length ? t("common.change") : t("categories.pick")} title={t("categories.field")} variant="link">
+      <CategoriesForm agentId={agentId} current={current} options={options} />
+    </Drawer>
+  );
+}
+
+/// A small one-click write in the management list, with the screen re-read after it.
+function CategoryButton({ run, label, disabled }: { run: () => Promise<{ error?: string }>; label: string; disabled?: boolean }) {
+  const t = useTranslations("agents.forms.common");
+  const { showToast } = useToast();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function click() {
+    setBusy(true);
+    const r = await run();
+    setBusy(false);
+    if (r.error) showToast({ tone: "error", title: t("notDone"), description: r.error });
+    else router.refresh();
+  }
+  return (
+    <button type="button" onClick={click} disabled={busy || disabled} className="tap-area rounded-full border border-app-border bg-white px-2.5 py-1 text-xs text-app-text-primary disabled:opacity-40">
+      {label}
+    </button>
+  );
+}
+
+function RenameCategory({ category }: { category: Category }) {
+  const t = useTranslations("agents.forms");
+  const { onSubmit, pending, error } = useActionForm(renameAgentCategoryAction);
+  return (
+    <form onSubmit={onSubmit} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+      <input type="hidden" name="id" value={category.id} />
+      <input name="name" required maxLength={40} defaultValue={category.name} dir="auto" aria-label={t("categories.name")} className={`${INPUT} mt-0 min-w-0 flex-1`} />
+      <button type="submit" disabled={pending} className="tap-area shrink-0 rounded-full border border-app-border bg-white px-2.5 py-1 text-xs disabled:opacity-50">
+        {pending ? t("common.saving") : t("common.save")}
+      </button>
+      <Err error={error} />
+    </form>
+  );
+}
+
+function AddCategory() {
+  const t = useTranslations("agents.forms");
+  const [key, setKey] = useState(0);
+  const { onSubmit, pending, error } = useActionForm(createAgentCategoryAction, () => setKey((k) => k + 1));
+  return (
+    <form key={key} onSubmit={onSubmit} className="flex flex-col gap-2">
+      <Field label={t("categories.add")}>
+        <input name="name" required maxLength={40} dir="auto" className={INPUT} />
+      </Field>
+      <Err error={error} />
+      <button type="submit" disabled={pending} className={PRIMARY}>
+        {pending ? t("common.saving") : t("categories.addSubmit")}
+      </button>
+    </form>
+  );
+}
+
+export function ManageCategories({ categories }: { categories: (Category & { archived: boolean; agents: number })[] }) {
+  const t = useTranslations("agents.forms");
+  const active = categories.filter((c) => !c.archived);
+  const archived = categories.filter((c) => c.archived);
+  return (
+    <Drawer triggerLabel={t("categories.manage")} title={t("categories.manage")} variant="link">
+      <div className="flex flex-col gap-5">
+        <p className="text-[13px] text-app-text-secondary">{t("categories.manageHint")}</p>
+        {active.length > 0 && (
+          <ul className="flex flex-col gap-3">
+            {active.map((c, i) => (
+              <li key={c.id} className="flex flex-col gap-1.5 rounded-lg border border-app-border p-2.5">
+                <RenameCategory category={c} />
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-app-text-tertiary">{t("categories.agents", { count: c.agents })}</span>
+                  <CategoryButton run={() => moveAgentCategoryAction(c.id, "up")} label={t("categories.up")} disabled={i === 0} />
+                  <CategoryButton run={() => moveAgentCategoryAction(c.id, "down")} label={t("categories.down")} disabled={i === active.length - 1} />
+                  <CategoryButton run={() => setAgentCategoryArchivedAction(c.id, true)} label={t("categories.archive")} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <AddCategory />
+        {archived.length > 0 && (
+          <div>
+            <h3 className={LABEL}>{t("categories.archived")}</h3>
+            <ul className="mt-2 flex flex-col gap-2">
+              {archived.map((c) => (
+                <li key={c.id} className="flex items-center justify-between gap-2 text-sm">
+                  <span dir="auto" className="text-app-text-secondary">{c.name}</span>
+                  <CategoryButton run={() => setAgentCategoryArchivedAction(c.id, false)} label={t("categories.restore")} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Drawer>
   );
 }

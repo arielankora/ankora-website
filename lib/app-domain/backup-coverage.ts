@@ -163,6 +163,7 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   ClientNarrative: { decision: "DUMP", table: "client_narratives", reason: "The client file's free text and every earlier version of it." },
   ExtractionGuide: { decision: "DUMP", table: "extraction_guides", reason: "Every version of the extraction guidance, and who proposed and approved it." },
   Agent: { decision: "DUMP", table: "agents", reason: "Every agent the team runs on Claude: what it is for and who owns it." },
+  AgentCategory: { decision: "DUMP", table: "agent_categories", reason: "The categories the agents screen filters and groups by, as a manager set them; the agents point at these ids." },
   AgentVersion: { decision: "DUMP", table: "agent_versions", reason: "Every version of every agent's instructions, and who wrote and approved it." },
   AgentClientAddition: { decision: "DUMP", table: "agent_client_additions", reason: "Every version of every client's addition to an agent, and who wrote and approved it." },
   AgentClientValue: { decision: "DUMP", table: "agent_client_values", reason: "Per-client values agents run with (signatures, recipients): typed once, nowhere else." },

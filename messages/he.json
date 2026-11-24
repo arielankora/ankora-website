@@ -1978,7 +1978,10 @@
       "libraryPending": "יש לקטע הזה גרסה שממתינה לאישור. צריך לאשר או לדחות אותה קודם.",
       "libraryNotApproved": "לקטע הזה עוד אין גרסה מאושרת בספרייה.",
       "lessonEmpty": "צריך לכתוב מה כדאי לשנות.",
-      "lessonNotOpen": "ההצעה כבר טופלה."
+      "lessonNotOpen": "ההצעה כבר טופלה.",
+      "categoryName": "צריך שם לקטגוריה, עד 40 תווים.",
+      "categoryExists": "כבר יש קטגוריה בשם הזה.",
+      "categoryNotFound": "הקטגוריה לא נמצאה."
     }
   },
   "auditLog": {
@@ -2254,6 +2257,11 @@
       "agentDraftDiscard": "ביטול טיוטה של סוכן",
       "agentArchive": "העברת סוכן לארכיון",
       "agentProcess": "קישור סוכן לתהליך",
+      "agentCategories": "שינוי הקטגוריות של סוכן",
+      "agentCategoryCreate": "יצירת קטגוריה לסוכנים",
+      "agentCategoryRename": "שינוי שם של קטגוריה לסוכנים",
+      "agentCategoryArchive": "העברת קטגוריה של סוכנים לארכיון",
+      "agentCategoryRestore": "שחזור קטגוריה של סוכנים מהארכיון",
       "agentPurpose": "עדכון תיאור של סוכן",
       "agentSubmit": "שליחת גרסה של סוכן לאישור",
       "agentApprove": "אישור גרסה של סוכן",
@@ -9019,6 +9027,23 @@
         "discarded": "הטיוטה בוטלה",
         "submit": "לשלוח לאישור",
         "submitted": "נשלח לאישור מנהל"
+      },
+      "categories": {
+        "field": "קטגוריות",
+        "pick": "לבחור קטגוריות",
+        "hint": "אפשר לבחור כמה. הקטגוריות לא נכנסות לגרסה של הסוכן, ולכן שינוי שלהן לא צריך אישור.",
+        "noneYet": "עוד אין קטגוריות. מוסיפים אותן מ\"ניהול קטגוריות\" במסך הסוכנים.",
+        "manage": "ניהול קטגוריות",
+        "manageHint": "הקטגוריות שלפיהן מסננים ומקבצים במסך הסוכנים. קטגוריה בארכיון יורדת מהמסננים, והסוכנים שבה חוזרים אליה אם משחזרים אותה.",
+        "name": "שם הקטגוריה",
+        "add": "קטגוריה חדשה",
+        "addSubmit": "להוסיף",
+        "agents": "{count, plural, =0 {אין סוכנים} one {סוכן אחד} other {# סוכנים}}",
+        "up": "למעלה",
+        "down": "למטה",
+        "archive": "לארכיון",
+        "archived": "בארכיון",
+        "restore": "לשחזר"
       }
     },
     "list": {
@@ -9037,7 +9062,8 @@
         "owner": "אחראי",
         "version": "גרסה",
         "installs": "התקנות",
-        "state": "מצב"
+        "state": "מצב",
+        "categories": "קטגוריות"
       },
       "version": "גרסה {version}",
       "noApproved": "אין מאושרת",
@@ -9045,7 +9071,16 @@
       "pendingVersion": "גרסה {version} לאישור",
       "draftVersion": "טיוטה לגרסה {version}",
       "lastRunFailed": "הריצה האחרונה נכשלה",
-      "ok": "תקין"
+      "ok": "תקין",
+      "noMatch": "אין סוכנים שמתאימים לסינון.",
+      "filters": {
+        "label": "סינון סוכנים",
+        "all": "הכל",
+        "none": "בלי קטגוריה",
+        "client": "לקוח",
+        "allClients": "כל הלקוחות",
+        "group": "קיבוץ לפי קטגוריה"
+      }
     },
     "library": {
       "crumb": "סוכנים",
@@ -9108,7 +9143,9 @@
       "noInstalls": "אין התקנות.",
       "install": "{user}, {surface}, גרסה {version}",
       "updateWaiting": ", עדכון ממתין",
-      "allInstalls": "לכל ההתקנות"
+      "allInstalls": "לכל ההתקנות",
+      "categories": "קטגוריות",
+      "noCategories": "הסוכן לא בקטגוריה."
     },
     "instructions": {
       "summary": "{count, plural, one {קטע אחד} other {# קטעים}}, לפי הסדר שבו Claude קורא אותם · רמת פעולה: {level}",

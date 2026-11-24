@@ -1978,7 +1978,10 @@
       "libraryPending": "This block has a version waiting for approval. Approve or reject it first.",
       "libraryNotApproved": "This block has no approved version in the library yet.",
       "lessonEmpty": "Write what should change.",
-      "lessonNotOpen": "The proposal was already handled."
+      "lessonNotOpen": "The proposal was already handled.",
+      "categoryName": "A category needs a name, up to 40 characters.",
+      "categoryExists": "There is already a category with this name.",
+      "categoryNotFound": "The category was not found."
     }
   },
   "auditLog": {
@@ -2254,6 +2257,11 @@
       "agentDraftDiscard": "Agent draft discarded",
       "agentArchive": "Agent archived",
       "agentProcess": "Agent linked to a process",
+      "agentCategories": "Agent categories changed",
+      "agentCategoryCreate": "Agent category created",
+      "agentCategoryRename": "Agent category renamed",
+      "agentCategoryArchive": "Agent category archived",
+      "agentCategoryRestore": "Agent category restored",
       "agentPurpose": "Agent description changed",
       "agentSubmit": "Agent version sent for approval",
       "agentApprove": "Agent version approved",
@@ -9019,6 +9027,23 @@
         "discarded": "The draft was discarded",
         "submit": "Send for approval",
         "submitted": "Sent for a manager's approval"
+      },
+      "categories": {
+        "field": "Categories",
+        "pick": "Choose categories",
+        "hint": "You can choose several. Categories are not part of the agent's version, so changing them needs no approval.",
+        "noneYet": "No categories yet. Add them from \"Manage categories\" on the agents screen.",
+        "manage": "Manage categories",
+        "manageHint": "The categories the agents screen filters and groups by. An archived category leaves the filters, and its agents come back to it if you restore it.",
+        "name": "Category name",
+        "add": "New category",
+        "addSubmit": "Add",
+        "agents": "{count, plural, =0 {No agents} one {One agent} other {# agents}}",
+        "up": "Up",
+        "down": "Down",
+        "archive": "Archive",
+        "archived": "Archived",
+        "restore": "Restore"
       }
     },
     "list": {
@@ -9037,7 +9062,8 @@
         "owner": "Owner",
         "version": "Version",
         "installs": "Installations",
-        "state": "Status"
+        "state": "Status",
+        "categories": "Categories"
       },
       "version": "Version {version}",
       "noApproved": "None approved",
@@ -9045,7 +9071,16 @@
       "pendingVersion": "Version {version} awaiting approval",
       "draftVersion": "Draft of version {version}",
       "lastRunFailed": "Last run failed",
-      "ok": "OK"
+      "ok": "OK",
+      "noMatch": "No agents match the filter.",
+      "filters": {
+        "label": "Filter agents",
+        "all": "All",
+        "none": "No category",
+        "client": "Client",
+        "allClients": "All clients",
+        "group": "Group by category"
+      }
     },
     "library": {
       "crumb": "Agents",
@@ -9108,7 +9143,9 @@
       "noInstalls": "No installations.",
       "install": "{user}, {surface}, version {version}",
       "updateWaiting": ", update waiting",
-      "allInstalls": "All installations"
+      "allInstalls": "All installations",
+      "categories": "Categories",
+      "noCategories": "The agent is in no category."
     },
     "instructions": {
       "summary": "{count, plural, one {One block} other {# blocks}}, in the order Claude reads them · Action level: {level}",
