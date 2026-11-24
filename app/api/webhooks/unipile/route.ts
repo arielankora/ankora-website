@@ -6,6 +6,7 @@ import { RECORDING_SENDER } from "@/lib/whatsapp-poc/recordings";
 import { readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { prisma } from "@/lib/prisma";
 import { deleteStoredMessage, readMessageEvent, storeMessage, updateStoredMessage } from "@/lib/comms/whatsapp-store";
+import { alertChannelDisconnected } from "@/lib/comms/disconnect-alert";
 
 // Unipile's webhook (communications storage, 1.11.2026):
 //   - email.new in the aloha@ mailbox from Aloha: a call recording (stage 2);
@@ -51,6 +52,15 @@ export async function POST(request: Request) {
       if ((await storeRecording(emailId)) !== "stored") return;
       const rec = await prisma.callRecording.findUnique({ where: { emailId }, select: { transcript: { select: { id: true, status: true } } } });
       if (rec?.transcript?.status === "PENDING") await transcribeRecording(rec.transcript.id);
+    });
+  }
+
+  // 24.11.2026: a connected number that Unipile disconnected; its owner is
+  // told by email, with Ariel and Hadas on copy (lib/comms/disconnect-alert.ts).
+  if (event.type === "account.status.disconnected" && typeof event.account_id === "string") {
+    const accountId = event.account_id;
+    await afterResponse("unipile webhook: account disconnected", async () => {
+      await alertChannelDisconnected(accountId);
     });
   }
 

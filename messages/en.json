@@ -8355,6 +8355,10 @@
       "title": "The nightly WhatsApp backfill failed for {owner}'s number",
       "body": "The nightly run could not load the WhatsApp chats of {owner}'s number. The other numbers, the recordings and the transcripts were handled as usual. The error: {error}. This usually means the number's WhatsApp was disconnected in Unipile and has to be linked again (QR scan). Until then, messages from this number are not stored."
     },
+    "channelDisconnected": {
+      "title": "{owner}'s WhatsApp was disconnected from Ankora",
+      "body": "Hi {owner},\n\nYour WhatsApp was disconnected from Ankora, so messages from your number are not coming in right now.\n\nTo reconnect (takes a minute):\n1. Open on a computer: {link}\n2. Press \"Reconnect\".\n3. On your phone: WhatsApp → Settings → Linked devices → Link a device, and scan the code.\n\nWhatsApp on your phone keeps working as usual. Messages that arrived while disconnected load after you reconnect.\n\nThanks,\nAnkora"
+    },
     "selfConnected": {
       "title": "{owner} connected their WhatsApp",
       "body": "{owner} connected their WhatsApp to Ankora themselves. The number was added to the webhook automatically. Chats are stored once they press \"Turn on storing\". The settings are on the \"WhatsApp storage\" screen."
