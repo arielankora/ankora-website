@@ -7910,9 +7910,9 @@
         "firstItem": "Your first item will appear here within one working day. Until then, send any request to your account manager on WhatsApp, as usual."
       },
       "waitingTitle": "Waiting for you",
-      "inProgressTitle": "In progress",
-      "inProgressEmpty": "Nothing is open right now.",
-      "recentlyDoneTitle": "Recently done",
+      "inProgressTitle": "What we are doing for you",
+      "allCategories": "All",
+      "inProgressEmpty": "Nothing open or closed in the last month.",
       "allActivity": "All activity",
       "managerNamed": "Your account manager: <who>{name}</who>",
       "managerUnnamed": "Your account manager at Ankora",
