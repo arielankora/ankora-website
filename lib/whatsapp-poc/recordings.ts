@@ -91,6 +91,13 @@ function htmlText(html: string): string {
   return html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ");
 }
 
+/// Whether the email carries an audio file (not inline), parsed or not.
+export function hasAudio(raw: RawEmail): boolean {
+  return (raw.attachments ?? []).some(
+    (a) => typeof a.mimetype === "string" && a.mimetype.startsWith("audio/") && a.is_inline !== true,
+  );
+}
+
 export function toRecording(raw: RawEmail): Recording | null {
   if (typeof raw.id !== "string" || !raw.id) return null;
   const subject = typeof raw.subject === "string" ? raw.subject : "";
@@ -168,6 +175,7 @@ export async function fetchRecordingAudio(
 export async function fetchRecording(
   config: { apiKey: string; mailAccountId: string },
   emailId: string,
+  options: { onUnrecognized?: (emailId: string) => Promise<void> } = {},
 ): Promise<{ recording: Recording; audio: { bytes: ArrayBuffer; contentType: string } } | null> {
   if (!isSafeId(emailId)) return null;
   const emailUrl = new URL(`${BASE_URL}/${config.mailAccountId}/emails/${emailId}`);
@@ -176,6 +184,10 @@ export async function fetchRecording(
   };
   const sender = email.from?.[0]?.email;
   const rec = toRecording(email);
+  // 24.11.2026: Aloha changed its template and every recording was dropped
+  // in silence. An email from Aloha that carries audio but cannot be read
+  // is a recording we are losing, so it is reported, not just skipped.
+  if (sender === RECORDING_SENDER && !rec && hasAudio(email)) await options.onUnrecognized?.(emailId);
   if (sender !== RECORDING_SENDER || !rec || !isSafeId(rec.attachmentId)) return null;
   const fileUrl = new URL(`${BASE_URL}/${config.mailAccountId}/emails/${emailId}/attachments/${rec.attachmentId}`);
   const file = await unipileFetch(config.apiKey, fileUrl, "*/*");

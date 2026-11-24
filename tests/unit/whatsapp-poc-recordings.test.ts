@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { callSide, isSafeId, parseRecordingEmail, toRecording } from "@/lib/whatsapp-poc/recordings";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { callSide, fetchRecording, isSafeId, parseRecordingEmail, toRecording } from "@/lib/whatsapp-poc/recordings";
 import { inlineKind, isSafeChatId, isSafeMessageId } from "@/lib/whatsapp-poc/voice-notes";
 import { toPocMessage } from "@/lib/whatsapp-poc/unipile";
 
@@ -94,6 +94,41 @@ describe("WhatsApp POC: reading Aloha's recording emails", () => {
     });
     expect(rec).toMatchObject({ emailId: "1a187c2b2cbfd250", attachmentId: "audio-1", sizeBytes: 2540492 });
     expect(toRecording({ id: "x", subject: SUBJECT, body_plain: BODY, attachments: [] })).toBeNull();
+  });
+});
+
+describe("WhatsApp POC: an Aloha email that cannot be read is reported", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const config = { apiKey: "k", mailAccountId: "acc_test" };
+  const audio = { id: "audio-1", mimetype: "audio/mpeg", is_inline: false, file_size: 100 };
+  function serve(email: Record<string, unknown>) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: URL) =>
+        String(url).includes("/attachments/")
+          ? new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "audio/mpeg" } })
+          : new Response(JSON.stringify({ id: "1a20c9fc8718717a", ...email }), { headers: { "content-type": "application/json" } }),
+      ),
+    );
+  }
+
+  it("reports audio from Aloha in a template it does not know", async () => {
+    serve({ from: [{ email: "donotreply@aloha.global" }], subject: "Nuevo formato", body_plain: "Llamada 123", attachments: [audio] });
+    const onUnrecognized = vi.fn(async () => {});
+    expect(await fetchRecording(config, "1a20c9fc8718717a", { onUnrecognized })).toBeNull();
+    expect(onUnrecognized).toHaveBeenCalledWith("1a20c9fc8718717a");
+  });
+
+  it("stays quiet for a recording it reads, and for mail that is not a recording", async () => {
+    const onUnrecognized = vi.fn(async () => {});
+    serve({ from: [{ email: "donotreply@aloha.global" }], subject: SUBJECT, body_plain: BODY, attachments: [audio] });
+    expect(await fetchRecording(config, "1a20c9fc8718717a", { onUnrecognized })).not.toBeNull();
+    serve({ from: [{ email: "donotreply@aloha.global" }], subject: "חשבונית חדשה מ-Aloha", body_plain: "החשבון שלך כבר כאן!", attachments: [] });
+    expect(await fetchRecording(config, "1a20c9fc8718717a", { onUnrecognized })).toBeNull();
+    serve({ from: [{ email: "someone@example.com" }], subject: "x", body_plain: "y", attachments: [audio] });
+    expect(await fetchRecording(config, "1a20c9fc8718717a", { onUnrecognized })).toBeNull();
+    expect(onUnrecognized).not.toHaveBeenCalled();
   });
 });
 

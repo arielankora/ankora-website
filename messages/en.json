@@ -8301,6 +8301,10 @@
       "title": "Timer running for a long time",
       "body": "The timer for {client} has been running for {hours} hours straight. Check whether it should be stopped."
     },
+    "unrecognizedRecording": {
+      "title": "An Aloha recording email was not recognized",
+      "body": "An email with an audio file came from Aloha, but the numbers and time could not be read from it, so the recording was not stored. Aloha probably changed the email template. The parsing needs updating (lib/whatsapp-poc/recordings.ts). Email id: {emailId}"
+    },
     "taskNotice": {
       "assigned": "New task for you",
       "assignedUrgent": "Urgent task for you",
