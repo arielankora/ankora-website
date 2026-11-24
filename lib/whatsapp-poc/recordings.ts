@@ -43,7 +43,7 @@ function e164(digits: string): string | null {
 /// read. The Hebrew text carries invisible direction marks, which are
 /// dropped before matching.
 export function parseRecordingEmail(subject: string, bodyPlain: string): ParsedRecording | null {
-  const text = bodyPlain.replace(/[‎‏‪-‮⁦-⁩]/g, "").replace(/ /g, " ");
+  const text = bodyPlain.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "").replace(/\u00a0/g, " ");
   const fromBody = /(?:From:|ממספר:?)\s*(\d{8,15})/i.exec(text)?.[1];
   const toBody = /(?:To:|למספר:?)\s*(\d{8,15})/i.exec(text)?.[1];
   const subjectMatch = /\[(\d{8,15})\s*=>\s*(\d{8,15})\]/.exec(subject);

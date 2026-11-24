@@ -50,8 +50,8 @@ describe("WhatsApp POC: reading Aloha's recording emails", () => {
     "הקלטת השיחה שלכם מוכנה ומצורפת למייל זה כקובץ שמע.",
     "הקלטת שיחה",
     "התקבלה הקלטת שיחה חדשה",
-    "‪ממספר 97231111111‬",
-    "למספר 972552222222",
+    "\u202aממספר 97231111111\u202c",
+    "למספר\u00a0972552222222",
     "תאריך ושעה 24/11/2026 09:48:24",
     "*איפה ההקלטה?*",
   ].join("\n");
@@ -68,7 +68,7 @@ describe("WhatsApp POC: reading Aloha's recording emails", () => {
   it("reads the Hebrew template from the HTML body when the plain one is empty", () => {
     const html = HE_BODY.split("\n")
       .map((line) => {
-        const [label, ...rest] = line.split(/[  ](?=\d)/);
+        const [label, ...rest] = line.split(/[ \u00a0](?=\d)/);
         return `<tr><td>${label}</td><td>${rest.join(" ")}</td></tr>`;
       })
       .join("");
