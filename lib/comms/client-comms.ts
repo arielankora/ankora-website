@@ -3,7 +3,8 @@ import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { commsAccess, type CommsAccess } from "./access";
 import { fullViewerEmails } from "./grants";
-import { canSeeConversation } from "./visibility";
+import { canSeeConversation, isTeamConversation } from "./visibility";
+import { teamPhones } from "./team-phones";
 import { loadCallBlockIndex } from "./call-blocks";
 import type { CallBlockIndex } from "./call-block-rules";
 import { storedCallLine } from "./call-lines";
@@ -33,6 +34,8 @@ type Scope = {
   actor: User;
   access: CommsAccess;
   fullViewers: string[];
+  /// The team's own numbers (lib/comms/team-phones.ts).
+  teamPhones: ReadonlySet<string>;
   client: { id: string; name: string; accountManagerId: string | null };
   phones: string[];
   blocks: CallBlockIndex;
@@ -63,14 +66,19 @@ async function scopeFor(actor: User, clientId: string): Promise<Scope | CommsDen
         ).flatMap((p) => p.phones),
       )
     : new Set<string>();
-  const [fullViewers, blocks] = await Promise.all([fullViewerEmails(), loadCallBlockIndex()]);
-  return { actor, access, fullViewers, client, phones: all.filter((p) => !marked.has(p)), blocks };
+  const [fullViewers, blocks, team] = await Promise.all([fullViewerEmails(), loadCallBlockIndex(), teamPhones()]);
+  return { actor, access, fullViewers, teamPhones: team, client, phones: all.filter((p) => !marked.has(p)), blocks };
 }
 
 function seesConversation(
   s: Scope,
   channel: { ownerUserId: string; excludedViewerIds: string[]; excludeAllViewers: boolean; extractionAllowed: boolean },
+  conversation: { otherPhone: string | null; isGroup: boolean },
 ) {
+  const otherPhone = conversation.isGroup ? null : conversation.otherPhone;
+  // A chat with a team member's number is its owner's alone (24.11.2026),
+  // so the extraction account does not read it either.
+  if (s.actor.id !== channel.ownerUserId && isTeamConversation(otherPhone, s.teamPhones)) return false;
   // The extraction account reads every number that allows it (lib/comms/extraction-account.ts).
   if (channel.extractionAllowed && isExtractionAccount(s.actor.email)) return true;
   return canSeeConversation({
@@ -78,6 +86,8 @@ function seesConversation(
     channel,
     clients: [{ id: s.client.id, accountManagerId: s.client.accountManagerId }],
     fullViewers: s.fullViewers,
+    otherPhone,
+    teamPhones: s.teamPhones,
   });
 }
 
@@ -130,7 +140,7 @@ export async function listClientComms(actor: User, clientId: string, since: Date
     take: 200,
     include: { channel: { select: { ownerUserId: true, excludedViewerIds: true, excludeAllViewers: true, extractionAllowed: true, owner: { select: { name: true } } } } },
   });
-  const visible = conversations.filter((c) => seesConversation(s, c.channel));
+  const visible = conversations.filter((c) => seesConversation(s, c.channel, c));
   const stats = visible.length
     ? await prisma.commsMessage.groupBy({
         by: ["conversationId"],
@@ -216,7 +226,7 @@ export async function readClientConversation(
     where: { id: conversationId, ...conversationWhere(s) },
     include: { channel: { select: { ownerUserId: true, excludedViewerIds: true, excludeAllViewers: true, extractionAllowed: true, owner: { select: { name: true } } } } },
   });
-  if (!c || !seesConversation(s, c.channel)) return { denied: "not_found" };
+  if (!c || !seesConversation(s, c.channel, c)) return { denied: "not_found" };
 
   const at = { ...(opts.since ? { gte: opts.since } : {}), ...(opts.before ? { lt: opts.before } : {}) };
   const where = { conversationId: c.id, held: false, ...(opts.since || opts.before ? { at } : {}) };

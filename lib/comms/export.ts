@@ -5,6 +5,8 @@ import { engagementDeletesOn } from "./engagement";
 import { loadCallBlockIndex } from "./call-blocks";
 import { storedCallLine } from "./call-lines";
 import type { CommsExport, ExportMessage } from "./export-render";
+import { isTeamConversation } from "./visibility";
+import { teamPhones } from "./team-phones";
 
 const EVENT_LABEL: Record<number, string> = {
   1: "שם הקבוצה שונה",
@@ -41,7 +43,8 @@ export async function gatherCommsExport(
   const people = await prisma.clientContact.findMany({ where: { clientId }, select: { person: { select: { phones: true } } } });
   const phones = [...new Set(people.flatMap((p) => p.person.phones))];
 
-  const conversations = await prisma.commsConversation.findMany({
+  const team = await teamPhones();
+  const found = await prisma.commsConversation.findMany({
     where: {
       OR: [...(phones.length ? [{ otherPhone: { in: phones } }] : []), { groupClientId: clientId }],
       // Not from a number this person is kept out of (lib/comms/visibility.ts:
@@ -60,8 +63,14 @@ export async function gatherCommsExport(
         orderBy: { at: "asc" },
         include: { attachments: { select: { type: true, voiceNote: true, transcript: { select: { status: true, text: true } } } } },
       },
+      channel: { select: { ownerUserId: true } },
     },
   });
+  // A chat with a team member's number is its owner's alone (24.11.2026,
+  // lib/comms/team-phones.ts), even when that number is in the client's file.
+  const conversations = found.filter(
+    (c) => c.isGroup || c.channel.ownerUserId === requester.id || !isTeamConversation(c.otherPhone, team),
+  );
 
   const callBlocks = await loadCallBlockIndex();
   const calls = (

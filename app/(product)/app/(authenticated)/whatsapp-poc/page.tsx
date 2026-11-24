@@ -871,7 +871,7 @@ export default async function CommunicationsPage(props: {
     if (!chat && accounts.length > 0 && (phoneFromBox || searchParams.wa === "1")) {
       lookedUp = true;
       try {
-        found = await findChat(accounts, { phone: selectedPhone });
+        found = await findChat(accounts, { phone: selectedPhone }, user.id);
         chat = found?.chat ?? null;
       } catch (err) {
         if (!(err instanceof UnipileError)) throw err;
@@ -885,7 +885,7 @@ export default async function CommunicationsPage(props: {
     chat = openChats[0] ?? null;
     if (!chat && accounts.length > 0) {
       try {
-        found = await findChat(accounts, { chatId: id });
+        found = await findChat(accounts, { chatId: id }, user.id);
         chat = found?.chat ?? null;
       } catch (err) {
         if (!(err instanceof UnipileError)) throw err;

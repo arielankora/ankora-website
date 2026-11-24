@@ -17,7 +17,8 @@ import {
   type PocMessage,
 } from "@/lib/whatsapp-poc/unipile";
 import type { CommsAccess } from "./access";
-import { isExcludedViewer } from "./visibility";
+import { isExcludedViewer, isTeamConversation } from "./visibility";
+import { teamPhones } from "./team-phones";
 import { enrichStoredMessage } from "./whatsapp-store";
 import { fetchMessageAttachment, isSafeChatId, isSafeMessageId } from "@/lib/whatsapp-poc/voice-notes";
 import { listStoredChats, listStoredMessages, withLiveChats, type StoredTranscript } from "./stored-chats";
@@ -152,9 +153,13 @@ export function lookupAccounts(sources: WhatsappSources, user: Pick<User, "id">,
 
 /// A chat found by number or id in one of those accounts, when it is not in
 /// the lists (an older chat). Each lookup costs Unipile requests.
+///
+/// 24.11.2026: on someone else's number, a chat with a team member's number
+/// is not found (lib/comms/team-phones.ts): it is its owner's alone.
 export async function findChat(
   accounts: ChannelInfo[],
   target: { phone: string } | { chatId: string },
+  viewerId: string,
 ): Promise<{ chat: PocChat; info: ChannelInfo } | null> {
   for (const info of accounts) {
     const live = unipile(info.accountId);
@@ -163,7 +168,9 @@ export async function findChat(
       if (err instanceof UnipileError && err.status === 404) return null;
       throw err;
     });
-    if (chat && !isHiddenChat(chat)) return { chat, info };
+    if (!chat || isHiddenChat(chat)) continue;
+    if (info.ownerUserId !== viewerId && isTeamConversation(chatPhone(chat), await teamPhones())) continue;
+    return { chat, info };
   }
   return null;
 }

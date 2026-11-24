@@ -89,14 +89,16 @@ async function unipile<T>(path: string, init?: { method?: string; body?: unknown
   return (await response.json()) as T;
 }
 
-export type AccountState = { provider: string; status: string; createdAt: string | null };
+export type AccountState = { provider: string; status: string; createdAt: string | null; userId: string | null };
 
 export async function readAccount(accountId: string): Promise<AccountState> {
-  const a = await unipile<{ provider?: unknown; status?: unknown; created_at?: unknown }>(`/accounts/${accountId}`);
+  const a = await unipile<{ provider?: unknown; status?: unknown; created_at?: unknown; user_id?: unknown }>(`/accounts/${accountId}`);
   return {
     provider: typeof a.provider === "string" ? a.provider : "",
     status: typeof a.status === "string" ? a.status : "",
     createdAt: typeof a.created_at === "string" ? a.created_at : null,
+    /// For WhatsApp, the number itself ("972553311522").
+    userId: typeof a.user_id === "string" ? a.user_id : null,
   };
 }
 

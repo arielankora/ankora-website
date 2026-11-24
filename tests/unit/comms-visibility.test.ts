@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { blockStateFor, canSeeConversation, isExcludedViewer, nextExcludeAll, nextExcludedViewers, parseViewerEmails } from "@/lib/comms/visibility";
+import { blockStateFor, canSeeConversation, isExcludedViewer, isTeamConversation, nextExcludeAll, nextExcludedViewers, parseViewerEmails } from "@/lib/comms/visibility";
 
 // Who sees which stored WhatsApp conversation (spec decisions, 1.11.2026).
 const ariel = { id: "ariel", email: "ariel@ankora.co.il" };
@@ -27,6 +27,47 @@ describe("canSeeConversation", () => {
     const clients = [{ id: "c1", accountManagerId: "anna" }];
     expect(canSeeConversation({ viewer: anna, channel: hadasNumber, clients, fullViewers })).toBe(true);
     expect(canSeeConversation({ viewer: anna, channel: hadasNumber, clients: [{ id: "c2", accountManagerId: "x" }], fullViewers })).toBe(false);
+  });
+});
+
+// 24.11.2026 (Ariel): a chat between two team numbers is seen only by the
+// two people in it, each on their own number.
+describe("canSeeConversation: chats between team members", () => {
+  const maor = { id: "maor", email: "maor@ankora.co.il" };
+  const maorsNumber = { ownerUserId: "maor", excludedViewerIds: [] };
+  const team = new Set(["+972528549835", "+972553302266"]); // Ariel's and Hadas's numbers
+  const withAriel = { otherPhone: "+972528549835", teamPhones: team };
+
+  it("hides Maor's chat with Ariel from the full viewers and from an account manager", () => {
+    const clients = [{ id: "internal", accountManagerId: "anna" }];
+    expect(canSeeConversation({ viewer: hadas, channel: maorsNumber, clients, fullViewers, ...withAriel })).toBe(false);
+    expect(canSeeConversation({ viewer: ariel, channel: maorsNumber, clients, fullViewers, ...withAriel })).toBe(false);
+    expect(canSeeConversation({ viewer: anna, channel: maorsNumber, clients, fullViewers, ...withAriel })).toBe(false);
+  });
+
+  it("still shows it to the number's owner", () => {
+    expect(canSeeConversation({ viewer: maor, channel: maorsNumber, clients: [], fullViewers, ...withAriel })).toBe(true);
+  });
+
+  it("leaves a chat with a client as it was", () => {
+    const clients = [{ id: "grantor", accountManagerId: "anna" }];
+    const withClient = { otherPhone: "+972501234567", teamPhones: team };
+    expect(canSeeConversation({ viewer: anna, channel: maorsNumber, clients, fullViewers, ...withClient })).toBe(true);
+    expect(canSeeConversation({ viewer: hadas, channel: maorsNumber, clients, fullViewers, ...withClient })).toBe(true);
+  });
+
+  it("reads a group (no other phone) by the old rules", () => {
+    expect(canSeeConversation({ viewer: hadas, channel: maorsNumber, clients: [], fullViewers, otherPhone: null, teamPhones: team })).toBe(true);
+  });
+});
+
+describe("isTeamConversation", () => {
+  it("is a one-to-one chat with a team number, and nothing else", () => {
+    const team = new Set(["+972553302266"]);
+    expect(isTeamConversation("+972553302266", team)).toBe(true);
+    expect(isTeamConversation("+972501234567", team)).toBe(false);
+    expect(isTeamConversation(null, team)).toBe(false);
+    expect(isTeamConversation("+972553302266", undefined)).toBe(false);
   });
 });
 

@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { matchPhones } from "@/lib/whatsapp-poc/clients-by-phone";
 import { CALL_EVENTS, CONTACT_ID_PREFIX, type PocChat, type PocMention, type PocMessage } from "@/lib/whatsapp-poc/unipile";
 import { readReactions } from "./whatsapp-store";
-import { blockStateFor, canSeeConversation, isExcludedViewer } from "./visibility";
+import { blockStateFor, canSeeConversation, isExcludedViewer, isTeamConversation } from "./visibility";
+import { teamPhones } from "./team-phones";
 import { fullViewerEmails } from "./grants";
 import { chatPhone } from "@/lib/whatsapp-poc/inbox";
 
@@ -50,7 +51,7 @@ export async function listStoredChats(channel: CommsChannel, viewer: { id: strin
       c.accountManagerId,
     ]),
   );
-  const fullViewers = await fullViewerEmails();
+  const [fullViewers, team] = await Promise.all([fullViewerEmails(), teamPhones()]);
 
   return conversations
     .filter((c) => {
@@ -60,6 +61,8 @@ export async function listStoredChats(channel: CommsChannel, viewer: { id: strin
         channel,
         clients: ids.map((id) => ({ id, accountManagerId: managers.get(id) ?? null })),
         fullViewers,
+        otherPhone: c.isGroup ? null : c.otherPhone,
+        teamPhones: team,
       });
     })
     .map((c) => {
@@ -173,7 +176,15 @@ export async function withLiveChats(
   stored = stored.map((c) => ({ ...c, unreadCount: unread.get(c.id) ?? c.unreadCount }));
   const blocks = await prisma.commsBlock.findMany({ where: { channelId: channel.id }, select: { kind: true, value: true, status: true } });
   const have = new Set(stored.map((c) => c.id));
-  const extra = live.filter((c) => !have.has(c.id) && blockStateFor(blocks, { phone: phoneOf(c), chatId: c.id }) === "none");
+  // A full viewer on someone else's number never gets its chats with the
+  // team (24.11.2026, lib/comms/team-phones.ts).
+  const team = channel.ownerUserId === viewer.id ? null : await teamPhones();
+  const extra = live.filter(
+    (c) =>
+      !have.has(c.id) &&
+      blockStateFor(blocks, { phone: phoneOf(c), chatId: c.id }) === "none" &&
+      !(team && c.type !== "group" && isTeamConversation(phoneOf(c), team)),
+  );
   const time = (c: PocChat) => (c.lastMessageAt ? Date.parse(c.lastMessageAt) : 0);
   return [...stored, ...extra].sort((a, b) => time(b) - time(a));
 }
