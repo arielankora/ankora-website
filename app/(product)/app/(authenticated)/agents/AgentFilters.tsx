@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { NO_CATEGORY } from "@/lib/agents/categories";
@@ -20,6 +21,7 @@ export function AgentFilters({ categories, clients }: { categories: { id: string
   const selected = params.getAll("cat");
   const grouped = params.get("group") === "1";
   const client = params.get("client") ?? "";
+  const [query, setQuery] = useState(params.get("q") ?? "");
 
   function go(next: URLSearchParams) {
     const q = next.toString();
@@ -38,7 +40,25 @@ export function AgentFilters({ categories, clients }: { categories: { id: string
     go(next);
   }
 
+  // The search reaches the address a moment after typing stops.
+  useEffect(() => {
+    if (query === (params.get("q") ?? "")) return;
+    const id = setTimeout(() => set("q", query.trim()), 250);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
   return (
+    <div className="flex flex-col gap-2">
+    <input
+      type="search"
+      value={query}
+      onChange={(e) => setQuery(e.target.value)}
+      placeholder={t("search")}
+      aria-label={t("search")}
+      dir="auto"
+      className="w-full max-w-md rounded-full border border-app-border bg-white px-4 py-1.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+    />
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("label")}>
       <button type="button" onClick={() => set("cat", "")} aria-pressed={selected.length === 0} className={`${CHIP} ${selected.length === 0 ? ON : OFF}`}>
         {t("all")}
@@ -66,6 +86,7 @@ export function AgentFilters({ categories, clients }: { categories: { id: string
           {t("group")}
         </label>
       )}
+    </div>
     </div>
   );
 }
