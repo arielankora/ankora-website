@@ -2239,6 +2239,7 @@
       "callRecordingRetentionSweep": "Call recordings deleted by retention period",
       "callRecordingManualImport": "Recordings Aloha sent manually imported",
       "commsChannelConnected": "WhatsApp number connected for saving",
+      "commsChannelReconnected": "Reconnected a WhatsApp number",
       "commsChannelExcludedViewersUpdated": "Changed who does not see conversations from a WhatsApp number",
       "commsChannelStoreStarted": "Started saving WhatsApp conversations",
       "commsChannelOwnerChanged": "WhatsApp number owner changed",
@@ -7396,6 +7397,7 @@
       "title": "Client communications",
       "subtitle": "WhatsApp and phone calls in one place. You reply from your own number.",
       "setupLink": "Storing WhatsApp conversations: numbers and block list",
+      "connectLink": "Connect my WhatsApp",
       "toReview": "{count, plural, one {1 new conversation to review} other {# new conversations to review}}",
       "openByNumber": "Open by number",
       "open": "Open",
@@ -7885,6 +7887,45 @@
       },
       "extractionOn": "The automatic extraction for client files reads this number's conversations.",
       "extractionOff": "The automatic extraction does not read this number's conversations."
+    },
+    "connect": {
+      "back": "Back to communications",
+      "title": "Connect my WhatsApp",
+      "settingsLink": "Number settings: what not to store and who cannot see it",
+      "step1": {
+        "title": "Step 1: connect the number",
+        "why": "With your WhatsApp connected, conversations with clients are kept in one place in Ankora and nothing gets lost.",
+        "a": "Press the button. A screen with a QR code opens (best done on a computer).",
+        "b": "On your phone: WhatsApp → Settings → Linked devices → Link a device, and scan the code.",
+        "c": "You come back here automatically, and the number is connected.",
+        "privacy": "Nothing is stored before step 2. WhatsApp on your phone keeps working as usual.",
+        "button": "Connect my WhatsApp"
+      },
+      "reconnect": {
+        "title": "Your WhatsApp was disconnected",
+        "why": "Messages from your number are not coming in right now. Scan the QR code again, as on the first connection.",
+        "button": "Reconnect"
+      },
+      "step2": {
+        "connected": "The number is connected ✓",
+        "why": "Step 2: one press turns storing on. The chat history starts loading right away.",
+        "button": "Turn on storing",
+        "later": "At any time you can mark personal chats as \"do not store\" and choose who cannot see your chats:"
+      },
+      "done": {
+        "title": "The number is connected and chats are stored ✓",
+        "body": "Nothing else to do. If WhatsApp disconnects you will be told, and a reconnect button will appear here."
+      },
+      "result": {
+        "connected": "The number is connected. All that is left is turning storing on.",
+        "reconnected": "The number is reconnected, and messages come in again.",
+        "active": "Storing is on. The chat history is loading now.",
+        "expired": "The connection expired or was started by another user. Press the button again.",
+        "failed": "The connection did not complete. Press the button again, and if it keeps happening, contact Ariel.",
+        "wrong-provider": "The account connected is not WhatsApp. Press again and choose WhatsApp.",
+        "taken": "This number is already connected to another employee. Contact Ariel.",
+        "link-failed": "The connection screen could not be opened. Try again in a minute."
+      }
     }
   },
   "portal": {
@@ -8313,6 +8354,18 @@
     "channelBackfillFailed": {
       "title": "The nightly WhatsApp backfill failed for {owner}'s number",
       "body": "The nightly run could not load the WhatsApp chats of {owner}'s number. The other numbers, the recordings and the transcripts were handled as usual. The error: {error}. This usually means the number's WhatsApp was disconnected in Unipile and has to be linked again (QR scan). Until then, messages from this number are not stored."
+    },
+    "channelDisconnected": {
+      "title": "{owner}'s WhatsApp was disconnected from Ankora",
+      "body": "Hi {owner},\n\nYour WhatsApp was disconnected from Ankora, so messages from your number are not coming in right now.\n\nTo reconnect (takes a minute):\n1. Open on a computer: {link}\n2. Press \"Reconnect\".\n3. On your phone: WhatsApp → Settings → Linked devices → Link a device, and scan the code.\n\nWhatsApp on your phone keeps working as usual. Messages that arrived while disconnected load after you reconnect.\n\nThanks,\nAnkora"
+    },
+    "selfConnected": {
+      "title": "{owner} connected their WhatsApp",
+      "body": "{owner} connected their WhatsApp to Ankora themselves. The number was added to the webhook automatically. Chats are stored once they press \"Turn on storing\". The settings are on the \"WhatsApp storage\" screen."
+    },
+    "webhookAccountFailed": {
+      "title": "{owner}'s number was not added to the webhook",
+      "body": "{owner} connected WhatsApp, but the number could not be added to the Unipile webhook, so its messages arrive only with the nightly run. The error: {error}. Add the account by hand in Unipile (Webhooks → Modify → Account filter)."
     },
     "taskNotice": {
       "assigned": "New task for you",

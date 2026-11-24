@@ -25,6 +25,9 @@ export interface SendEmailAttachment {
 
 export interface SendEmailInput {
   to: string[];
+  /// Copied on the message (24.11.2026: a disconnected WhatsApp goes to its
+  /// owner with Ariel and Hadas on copy).
+  cc?: string[];
   subject: string;
   text: string;
   html?: string;
@@ -89,6 +92,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       body: JSON.stringify({
         from: FROM_ADDRESS,
         to: input.to,
+        cc: input.cc?.length ? input.cc : undefined,
         reply_to: input.replyTo,
         subject: input.subject,
         text: input.text,

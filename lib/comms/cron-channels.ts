@@ -1,5 +1,7 @@
 import "server-only";
+import { UnipileError } from "@/lib/whatsapp-poc/unipile";
 import { alertAdmins } from "./admin-alert";
+import { alertChannelDisconnected } from "./disconnect-alert";
 
 export const CHANNEL_BACKFILL_FAILED_NOTIFICATION_TYPE = "channel_backfill_failed";
 
@@ -32,9 +34,15 @@ export async function runPerChannel<C extends { id: string }, R>(
   return out;
 }
 
-/// The alert for one number whose nightly step failed.
-export async function alertChannelFailure(channel: { id: string; owner: { name: string | null } }, err: unknown): Promise<void> {
+/// The alert for one number whose nightly step failed. A 401 is a number
+/// Unipile disconnected, so its owner is told too, in case Unipile's
+/// disconnect event was missed (lib/comms/disconnect-alert.ts).
+export async function alertChannelFailure(
+  channel: { id: string; accountId: string; owner: { name: string | null } },
+  err: unknown,
+): Promise<void> {
   const error = err instanceof Error ? err.message : String(err);
+  if (err instanceof UnipileError && err.status === 401) await alertChannelDisconnected(channel.accountId);
   await alertAdmins({
     type: CHANNEL_BACKFILL_FAILED_NOTIFICATION_TYPE,
     subjectId: channel.id,
