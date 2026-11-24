@@ -239,6 +239,7 @@ export function registerAgentTools(server: McpServer): void {
               required: z.boolean().optional(),
               default: z.string().max(2000).optional(),
               clientField: z.enum(CLIENT_FIELDS).optional().describe("CLIENT level only: take the value from the client's file instead of typing it."),
+              example: z.string().max(200).optional().describe("What a value looks like, shown to whoever types it, e.g. \"prepaid / cycle / none\"."),
             })
           )
           .max(LIMITS.params)

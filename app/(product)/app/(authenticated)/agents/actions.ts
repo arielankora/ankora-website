@@ -120,6 +120,7 @@ export async function saveParamAction(_prev: FormState | undefined, f: FormData)
       required: f.get("required") === "on",
       default: str(f, "default") || null,
       clientField: CLIENT_FIELDS.includes(clientField) ? clientField : null,
+      example: str(f, "example") || null,
     };
     const { params } = await editable(agentId);
     const next = original ? params.map((p) => (p.key === original ? param : p)) : [...params, param];

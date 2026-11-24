@@ -4454,6 +4454,11 @@
                 "maxLength": 2000,
                 "type": "string"
               },
+              "example": {
+                "description": "What a value looks like, shown to whoever types it, e.g. \"prepaid / cycle / none\".",
+                "maxLength": 200,
+                "type": "string"
+              },
               "key": {
                 "maxLength": 40,
                 "minLength": 1,

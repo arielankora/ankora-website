@@ -355,6 +355,9 @@ function ParamForm({ agentId, param }: { agentId: string; param?: AgentParam }) 
       <Field label={t("param.default")}>
         <input name="default" maxLength={2000} dir="auto" defaultValue={param?.default ?? ""} className={INPUT} />
       </Field>
+      <Field label={t("param.example")} hint={t("param.exampleHint")}>
+        <input name="example" maxLength={200} dir="auto" defaultValue={param?.example ?? ""} className={INPUT} />
+      </Field>
       <Field label={t("param.clientField")} hint={t("param.clientFieldHint")}>
         <select name="clientField" defaultValue={param?.clientField ?? ""} className={INPUT}>
           <option value="">{t("param.clientFieldNone")}</option>
@@ -388,18 +391,45 @@ export function DeleteParam({ agentId, paramKey }: { agentId: string; paramKey: 
   return <ActionButton run={() => deleteParamAction(agentId, paramKey)} label={t("common.remove")} done={t("param.removed")} />;
 }
 
-function ClientValueForm({ agentId, clientId, paramKey, value }: { agentId: string; clientId: string; paramKey: string; value: string }) {
+type ClientValueProps = { agentId: string; clientId: string; paramKey: string; value: string; example: string; contacts?: { name: string; email: string }[] };
+
+const splitEmails = (v: string) => v.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
+
+function ClientValueForm({ agentId, clientId, paramKey, value, example, contacts }: ClientValueProps) {
   const t = useTranslations("agents.forms");
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(setClientValueAction, close);
+  const [text, setText] = useState(value);
+  const chosen = new Set(splitEmails(text).map((e) => e.toLowerCase()));
+  // A contact from the client's file goes in or out of the list, the rest as typed.
+  function toggle(email: string) {
+    const list = splitEmails(text);
+    const next = chosen.has(email.toLowerCase()) ? list.filter((e) => e.toLowerCase() !== email.toLowerCase()) : [...list, email];
+    setText(next.join(", "));
+  }
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="agentId" value={agentId} />
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="key" value={paramKey} />
       <Field label={t("clientValue.value")} hint={t("clientValue.hint")}>
-        <textarea name="value" rows={3} dir="auto" defaultValue={value} className={INPUT} />
+        <textarea name="value" rows={3} dir="auto" value={text} onChange={(e) => setText(e.target.value)} placeholder={example} className={INPUT} />
       </Field>
+      <p className="-mt-2 text-xs text-app-text-secondary">
+        {t("clientValue.format")} <span dir="auto" className="text-app-text-primary">{example}</span>
+      </p>
+      {contacts && contacts.length > 0 && (
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className={LABEL}>{t("clientValue.fromFile")}</legend>
+          {contacts.map((c) => (
+            <label key={c.email} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={chosen.has(c.email.toLowerCase())} onChange={() => toggle(c.email)} />
+              <span dir="auto">{c.name}</span>
+              <span dir="ltr" className="text-xs text-app-text-tertiary">{c.email}</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
       <Err error={error} />
       <button type="submit" disabled={pending} className={PRIMARY}>
         {pending ? t("common.saving") : t("common.save")}
@@ -408,7 +438,7 @@ function ClientValueForm({ agentId, clientId, paramKey, value }: { agentId: stri
   );
 }
 
-export function EditClientValue(props: { agentId: string; clientId: string; clientName: string; paramKey: string; paramLabel: string; value: string }) {
+export function EditClientValue(props: ClientValueProps & { clientName: string; paramLabel: string }) {
   const t = useTranslations("agents.forms");
   return (
     <Drawer triggerLabel={props.value ? t("common.change") : t("clientValue.set")} title={`${props.paramLabel}: ${props.clientName}`} variant="link">

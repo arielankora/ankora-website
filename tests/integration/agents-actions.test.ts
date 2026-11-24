@@ -199,8 +199,8 @@ describe("the parameter form", () => {
     expect(await saveParamAction(undefined, form({ agentId: agent.id, key: "tone", label: "טון", level: "GLOBAL", type: "COLOR", default: "רשמי", clientField: "phone" }))).toEqual({ ok: true });
     const draft = await prisma.agentVersion.findFirstOrThrow({ where: { agentId: agent.id, state: "DRAFT" } });
     expect(parseParams(draft.params)).toEqual([
-      { key: "חתימה", label: "חתימה", level: "CLIENT", type: "LONG_TEXT", required: true, default: null, clientField: null },
-      { key: "tone", label: "טון", level: "AGENT", type: "TEXT", required: false, default: "רשמי", clientField: null },
+      { key: "חתימה", label: "חתימה", level: "CLIENT", type: "LONG_TEXT", required: true, default: null, clientField: null, example: null },
+      { key: "tone", label: "טון", level: "AGENT", type: "TEXT", required: false, default: "רשמי", clientField: null, example: null },
     ]);
   });
 
@@ -210,7 +210,7 @@ describe("the parameter form", () => {
     await saveParamAction(undefined, form({ agentId: agent.id, key: "domains", label: "דומיינים", level: "CLIENT", type: "LIST", clientField: "domains" }));
     await saveParamAction(undefined, form({ agentId: agent.id, originalKey: "domains", key: "domains", label: "דומיינים של הלקוח", level: "CLIENT", type: "LIST", clientField: "domains", required: "on" }));
     const draft = await prisma.agentVersion.findFirstOrThrow({ where: { agentId: agent.id, state: "DRAFT" } });
-    expect(parseParams(draft.params)).toEqual([{ key: "domains", label: "דומיינים של הלקוח", level: "CLIENT", type: "LIST", required: true, default: null, clientField: "domains" }]);
+    expect(parseParams(draft.params)).toEqual([{ key: "domains", label: "דומיינים של הלקוח", level: "CLIENT", type: "LIST", required: true, default: null, clientField: "domains", example: null }]);
   });
 
   it("refuses a parameter without a key or a label, or with a key that cannot sit between braces", async () => {

@@ -7,6 +7,7 @@ import { assertCan, canManageClients, ForbiddenError } from "@/lib/app-auth/perm
 import { recordAudit } from "@/lib/app-auth/audit";
 import { findSecrets } from "@/lib/secret-scan";
 import { DomainError } from "@/lib/domain-error";
+import { canSeeKnowledgeItem, canSendToAi } from "@/lib/knowledge";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { aiExcludedClientIds } from "@/lib/app-domain/ai-exclusion-db";
 import { LIMITS, fileSchema, skillOf, parseBlocks, parseFiles, parseParams, parseRequirements, requirementsSchema, versionProblems, blockSchema, paramSchema, type AgentBlock, type AgentFile, type AgentParam, type AgentRequirements } from "@/lib/agents/model";
@@ -393,12 +394,55 @@ async function assertClientAccess(actor: User, clientId: string) {
   if (!clients.some((c) => c.id === clientId)) throw new DomainError("agents.clientForbidden", "אין לך גישה ללקוח הזה.");
 }
 
+const EMAIL = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
+
+/// A value's format by its parameter's type (24.11.2026): an EMAIL is one
+/// address or several, separated by commas; a NUMBER is a number. Other
+/// types are free text. Returns the value as it is saved.
+export function checkValueFormat(type: AgentParam["type"], value: string): string {
+  if (!value) return value;
+  if (type === "EMAIL") {
+    const list = value.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
+    const bad = list.filter((e) => !EMAIL.test(e));
+    if (bad.length) throw new DomainError("agents.valueEmail", `"${bad[0]}" היא לא כתובת מייל. כותבים כתובות מופרדות בפסיק, למשל nadav@grantor.ai, finance@grantor.ai.`, { value: bad[0] });
+    return list.join(", ");
+  }
+  if (type === "NUMBER" && !/^-?\d+(\.\d+)?$/.test(value)) throw new DomainError("agents.valueNumber", "כאן כותבים מספר בלבד, למשל 15.");
+  return value;
+}
+
+/// The client's contacts that have an email, for choosing recipients from
+/// the client's file (24.11.2026). Current contacts this person may see
+/// and that may go to Claude, since the value ends up in an agent.
+export async function clientEmailContacts(actor: User, clientIds: string[]) {
+  const accessible = new Map((await listAccessibleClients(actor)).map((c) => [c.id, c]));
+  const ids = clientIds.filter((id) => accessible.has(id) && !accessible.get(id)!.aiExcluded);
+  const rows = ids.length
+    ? await prisma.clientContact.findMany({ where: { clientId: { in: ids }, deletedAt: null, endedAt: null, supersededAt: null }, select: { clientId: true, role: true, audience: true, audienceUserIds: true, sensitivity: true, client: { select: { accountManagerId: true } }, person: { select: { name: true, emails: true } } }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] })
+    : [];
+  const viewer = { id: actor.id, isManager: canManageClients(actor.role) };
+  const out = new Map<string, { name: string; email: string }[]>();
+  for (const r of rows) {
+    if (!canSeeKnowledgeItem(r, viewer, r.client.accountManagerId) || !canSendToAi(r, actor.id)) continue;
+    for (const email of r.person.emails) {
+      const list = out.get(r.clientId) ?? [];
+      if (!list.some((x) => x.email.toLowerCase() === email.toLowerCase())) list.push({ name: r.person.name || r.role || email, email });
+      out.set(r.clientId, list);
+    }
+  }
+  return out;
+}
+
 export async function setClientValue(actor: User, input: { agentId: string; clientId: string; key: string; value: string }) {
   assertCan(actor.role, PROPOSE);
   await assertClientAccess(actor, input.clientId);
-  const value = input.value.trim();
+  let value = input.value.trim();
   if (value.length > 2000) throw new DomainError("agents.valueTooLong", "הערך ארוך מדי.");
   if (findSecrets(value).length > 0) throw new DomainError("agents.hasSecret", "בערך יש סיסמה, מפתח או טוקן. סודות לא נכתבים בסוכן.");
+  // The parameter as the screens show it: the open draft's, else the version in use.
+  const shown = (await prisma.agentVersion.findFirst({ where: { agentId: input.agentId, state: { in: ["DRAFT", "PENDING"] } }, orderBy: { version: "desc" } })) ?? (await currentApproved(input.agentId));
+  const param = shown ? contentOf(shown).params.find((p) => p.key === input.key) : undefined;
+  if (param) value = checkValueFormat(param.type, value);
   const where = { agentId_clientId_key: { agentId: input.agentId, clientId: input.clientId, key: input.key } };
   if (!value) {
     await prisma.agentClientValue.deleteMany({ where: { agentId: input.agentId, clientId: input.clientId, key: input.key } });
