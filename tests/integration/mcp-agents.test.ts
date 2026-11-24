@@ -297,7 +297,7 @@ describe("archiving an agent", () => {
     expect((await listAgents(hadas)).some((a) => a.id === agent.id)).toBe(false);
     expect((await collectApprovals(ariel)).some((row) => row.kind === "agent" && row.id === pending.id)).toBe(false);
     const draft = await call(hadas, "save_agent_draft", { agent: "old-report", changeNote: "עוד שינוי" });
-    expect(draft.text).toContain("No agent with the slug");
+    expect(draft.text).toContain("No agent named or with the id");
     await expect(archiveAgent(ariel, agent.id, "שוב")).rejects.toMatchObject({ code: "agents.notFound" });
   });
 });

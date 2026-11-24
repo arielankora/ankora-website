@@ -9,7 +9,7 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { appUrl } from "@/lib/approval-links";
 import { prisma } from "@/lib/prisma";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, installQuestions, draftProblems, fetchAgent, linkedProcedure, listMyInstallations, recordRun, revertToVersion, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
+import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, findAgentByRef, installQuestions, draftProblems, fetchAgent, linkedProcedure, listMyInstallations, recordRun, revertToVersion, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
 import { proposeLesson } from "@/lib/app-domain/agent-library";
 import { skillGaps } from "@/lib/app-domain/agent-skills";
 import { clientAdditionProblems, saveClientAddition, submitClientAddition } from "@/lib/app-domain/agent-client-additions";
@@ -24,6 +24,14 @@ import { BLOCK_KINDS, CLIENT_FIELDS, LIMITS, PARAM_LEVELS, PARAM_TYPES, parseReq
 // values, whether an update is due) is decided here, so the behaviour can
 // change without touching any installation. Approving a version stays on
 // the screen: what every installation runs is a manager's decision.
+
+/// "No agent ..." with the closest ones, so Claude can ask which was meant.
+async function agentRef(ref: string, nothing: string) {
+  const { agent, candidates } = await findAgentByRef(ref);
+  if (agent) return { agent };
+  const list = candidates.map((c) => `- ${c.name} (agent: "${c.slug}")`).join("\n");
+  return { miss: `No agent named or with the id "${ref}". ${nothing}${list ? `\nThe closest agents; ask the user which one they meant, then call again with its id:\n${list}` : ""}` };
+}
 
 const agentUrl = (slug: string, tab = "") => appUrl(appBaseUrl(), `/app/agents/${slug}${tab ? `/${tab}` : ""}`);
 
@@ -198,7 +206,7 @@ export function registerAgentTools(server: McpServer): void {
         "This tool never approves. With `submit: true` the draft is sent to a manager, who approves it in Ankora; nothing reaches any installation before that. Before calling, show the user the blocks you will save and call only after they said so. Returns the draft's `url`, its `version` and `problems` still to fix.",
       ].join(" "),
       inputSchema: z.object({
-        agent: z.string().min(1).max(60).optional().describe("The slug of an existing agent. Use this or create."),
+        agent: z.string().min(1).max(120).optional().describe("An existing agent: its id (slug) or its name as Ankora shows it. Use this or create."),
         create: z
           .object({
             name: z.string().min(1).max(80),
@@ -285,8 +293,9 @@ export function registerAgentTools(server: McpServer): void {
           agentId = created.id;
           slug = created.slug;
         } else {
-          const found = await prisma.agent.findUnique({ where: { slug: args.agent!.trim() }, select: { id: true, slug: true, archivedAt: true } });
-          if (!found || found.archivedAt) return toolText(`No agent with the slug "${args.agent}". Nothing was saved.`);
+          const ref = await agentRef(args.agent!, "Nothing was saved.");
+          if (!ref.agent) return toolText(ref.miss);
+          const found = ref.agent;
           agentId = found.id;
           slug = found.slug;
         }
@@ -325,7 +334,7 @@ export function registerAgentTools(server: McpServer): void {
         "This tool never approves. With `submit: true` the draft is sent to a manager, who approves it in Ankora. Returns the draft's `url` and its `version`.",
       ].join(" "),
       inputSchema: z.object({
-        agent: z.string().min(1).max(60).describe("The agent's slug, from its url."),
+        agent: z.string().min(1).max(120).describe("The agent: its id (slug, from its url) or its name as Ankora shows it."),
         version: z.number().int().min(1).describe("The earlier approved version to copy."),
         submit: z.boolean().optional().describe("Send the draft for a manager's approval now."),
       }),
@@ -334,8 +343,9 @@ export function registerAgentTools(server: McpServer): void {
     async (args: { agent: string; version: number; submit?: boolean }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
-        const found = await prisma.agent.findUnique({ where: { slug: args.agent.trim() }, select: { id: true, slug: true, archivedAt: true } });
-        if (!found || found.archivedAt) return toolText(`No agent with the slug "${args.agent}". Nothing was saved.`);
+        const ref = await agentRef(args.agent, "Nothing was saved.");
+        if (!ref.agent) return toolText(ref.miss);
+        const found = ref.agent;
         const v = await revertToVersion(actor, found.id, args.version);
         let state = "draft: not sent for approval";
         if (args.submit) {
@@ -360,7 +370,7 @@ export function registerAgentTools(server: McpServer): void {
         "This tool never approves. With `submit: true` the draft goes to a manager, who approves it in Ankora. Before calling, show the user the blocks you will save and call only after they said so. Returns the addition's `version`, `url` and `problems` still to fix.",
       ].join(" "),
       inputSchema: z.object({
-        agent: z.string().min(1).max(60).describe("The agent's slug, from its url."),
+        agent: z.string().min(1).max(120).describe("The agent: its id (slug, from its url) or its name as Ankora shows it."),
         client: z.string().min(1).max(120).describe("The client's name, as the user has it in Ankora."),
         blocks: z
           .array(
@@ -386,8 +396,9 @@ export function registerAgentTools(server: McpServer): void {
     ) => {
       try {
         const actor = actorOf(ctx);
-        const agent = await prisma.agent.findUnique({ where: { slug: args.agent.trim() }, select: { id: true, slug: true, archivedAt: true } });
-        if (!agent || agent.archivedAt) return toolText(`No agent with the slug "${args.agent}". Nothing was saved.`);
+        const ref = await agentRef(args.agent, "Nothing was saved.");
+        if (!ref.agent) return toolText(ref.miss);
+        const agent = ref.agent;
         const name = args.client.trim().toLowerCase();
         const client = (await listAccessibleClients(actor)).find((c) => c.name.toLowerCase() === name);
         if (!client) return toolText(`No client you can access is named "${args.client}". Nothing was saved.`);
@@ -525,12 +536,12 @@ export function registerAgentTools(server: McpServer): void {
       title: "Install an Ankora agent for this person",
       description: [
         "Creates an installation of an Ankora agent for the signed-in person and returns its bootstrap text: the only lines to put in the Claude project's instructions, the scheduled task's prompt or the first message of a persistent conversation.",
-        "Pass the agent's slug, where it will run, and its clients by name (or allClients). Installation-level values go in `values`, by parameter key.",
+        "Pass the agent (its name as the user calls it, or its id), where it will run, and its clients by name (or allClients). Installation-level values go in `values`, by parameter key.",
         "Start with preview: true: it installs nothing and returns everything the install needs: `ask` (must be answered: clients, the schedule of a scheduled run, required values), `optional` (values the user may give now), `clientGaps` (client values a manager has not set) and `requirements` (what the Claude account must have connected).",
         "Then ask the user every `ask` item and offer the `optional` ones in ONE message, together with where it runs. Tell them about `clientGaps` and `requirements`. Call again without preview only with all the answers. A call that still misses an `ask` item installs nothing and returns the same lists.",
       ].join(" "),
       inputSchema: z.object({
-        agent: z.string().min(1).max(60).describe("The agent's slug, from its url."),
+        agent: z.string().min(1).max(120).describe("The agent: its id (slug, from its url) or its name as Ankora shows it."),
         surface: z.enum(["PROJECT", "SCHEDULED", "PERSISTENT_SESSION", "SKILL"]),
         clients: z.array(z.string().max(120)).max(50).optional().describe("Client names, as the user has them in Ankora."),
         allClients: z.boolean().optional().describe("Every client this person has access to."),
@@ -548,8 +559,9 @@ export function registerAgentTools(server: McpServer): void {
     ) => {
       try {
         const actor = actorOf(ctx);
-        const agent = await prisma.agent.findUnique({ where: { slug: args.agent.trim() }, select: { id: true, slug: true, name: true, archivedAt: true } });
-        if (!agent || agent.archivedAt) return toolText(`No agent with the slug "${args.agent}". Nothing was installed.`);
+        const ref = await agentRef(args.agent, "Nothing was installed.");
+        if (!ref.agent) return toolText(ref.miss);
+        const agent = ref.agent;
         let clientIds: string[] = [];
         if (!args.allClients) {
           const mine = await listAccessibleClients(actor);

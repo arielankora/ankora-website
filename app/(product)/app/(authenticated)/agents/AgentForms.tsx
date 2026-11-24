@@ -16,6 +16,7 @@ import {
   approveVersionAction,
   archiveAgentAction,
   setAgentPurposeAction,
+  setAgentSlugAction,
   createAgentAction,
   deleteAdditionBlockAction,
   deleteBlockAction,
@@ -597,6 +598,38 @@ function PurposeForm({ agentId, purpose }: { agentId: string; purpose: string })
         {pending ? t("common.saving") : t("common.save")}
       </button>
     </form>
+  );
+}
+
+function SlugForm({ agentId, slug }: { agentId: string; slug: string }) {
+  const t = useTranslations("agents.forms");
+  const router = useRouter();
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(setAgentSlugAction, (r) => {
+    close();
+    if (r.slug) router.push(`/app/agents/${r.slug}`);
+  });
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="agentId" value={agentId} />
+      <p className="text-[13px] text-app-text-secondary">{t("slug.text")}</p>
+      <Field label={t("slug.field")} hint={t("slug.hint")}>
+        <input name="slug" required maxLength={50} dir="ltr" defaultValue={slug} className={INPUT} />
+      </Field>
+      <Err error={error} />
+      <button type="submit" disabled={pending} className={PRIMARY}>
+        {pending ? t("common.saving") : t("common.save")}
+      </button>
+    </form>
+  );
+}
+
+export function EditSlug({ agentId, slug }: { agentId: string; slug: string }) {
+  const t = useTranslations("agents.forms");
+  return (
+    <Drawer triggerLabel={t("slug.trigger")} title={t("slug.title")} variant="link">
+      <SlugForm agentId={agentId} slug={slug} />
+    </Drawer>
   );
 }
 

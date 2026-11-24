@@ -1396,13 +1396,13 @@
       "openWorldHint": false,
       "readOnlyHint": false
     },
-    "description": "Creates an installation of an Ankora agent for the signed-in person and returns its bootstrap text: the only lines to put in the Claude project's instructions, the scheduled task's prompt or the first message of a persistent conversation. Pass the agent's slug, where it will run, and its clients by name (or allClients). Installation-level values go in `values`, by parameter key. Start with preview: true: it installs nothing and returns everything the install needs: `ask` (must be answered: clients, the schedule of a scheduled run, required values), `optional` (values the user may give now), `clientGaps` (client values a manager has not set) and `requirements` (what the Claude account must have connected). Then ask the user every `ask` item and offer the `optional` ones in ONE message, together with where it runs. Tell them about `clientGaps` and `requirements`. Call again without preview only with all the answers. A call that still misses an `ask` item installs nothing and returns the same lists.",
+    "description": "Creates an installation of an Ankora agent for the signed-in person and returns its bootstrap text: the only lines to put in the Claude project's instructions, the scheduled task's prompt or the first message of a persistent conversation. Pass the agent (its name as the user calls it, or its id), where it will run, and its clients by name (or allClients). Installation-level values go in `values`, by parameter key. Start with preview: true: it installs nothing and returns everything the install needs: `ask` (must be answered: clients, the schedule of a scheduled run, required values), `optional` (values the user may give now), `clientGaps` (client values a manager has not set) and `requirements` (what the Claude account must have connected). Then ask the user every `ask` item and offer the `optional` ones in ONE message, together with where it runs. Tell them about `clientGaps` and `requirements`. Call again without preview only with all the answers. A call that still misses an `ask` item installs nothing and returns the same lists.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "agent": {
-          "description": "The agent's slug, from its url.",
-          "maxLength": 60,
+          "description": "The agent: its id (slug, from its url) or its name as Ankora shows it.",
+          "maxLength": 120,
           "minLength": 1,
           "type": "string"
         },
@@ -4174,8 +4174,8 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "agent": {
-          "description": "The agent's slug, from its url.",
-          "maxLength": 60,
+          "description": "The agent: its id (slug, from its url) or its name as Ankora shows it.",
+          "maxLength": 120,
           "minLength": 1,
           "type": "string"
         },
@@ -4211,8 +4211,8 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "agent": {
-          "description": "The agent's slug, from its url.",
-          "maxLength": 60,
+          "description": "The agent: its id (slug, from its url) or its name as Ankora shows it.",
+          "maxLength": 120,
           "minLength": 1,
           "type": "string"
         },
@@ -4317,8 +4317,8 @@
           "type": "string"
         },
         "agent": {
-          "description": "The slug of an existing agent. Use this or create.",
-          "maxLength": 60,
+          "description": "An existing agent: its id (slug) or its name as Ankora shows it. Use this or create.",
+          "maxLength": 120,
           "minLength": 1,
           "type": "string"
         },

@@ -341,6 +341,51 @@ export async function setAgentPurpose(actor: User, agentId: string, purpose: str
   await recordAudit({ actorId: actor.id, action: "agent.purpose", entityType: "Agent", entityId: agentId, before: { purpose: agent.purpose }, after: { purpose: text } });
 }
 
+/// The agent's id in urls and in tools, made readable (24.11.2026). Not in
+/// a version and not in any bootstrap text (that names the installation),
+/// so a manager changes it in place. A skill another agent requires keeps
+/// its id: the requirement names it.
+export async function setAgentSlug(actor: User, agentId: string, slug: string) {
+  assertApprover(actor);
+  const next = slug.trim().toLowerCase();
+  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(next) || next.length < 3 || next.length > 50 || next === "library") throw new DomainError("agents.slugFormat", "מזהה הוא אותיות באנגלית, ספרות ומקפים, 3 עד 50 תווים, למשל weekly-client-report.");
+  const agent = await prisma.agent.findUnique({ where: { id: agentId }, select: { id: true, slug: true, kind: true, archivedAt: true } });
+  if (!agent || agent.archivedAt) throw new DomainError("agents.notFound", "הסוכן לא נמצא.");
+  if (agent.slug === next) return;
+  if (await prisma.agent.findUnique({ where: { slug: next }, select: { id: true } })) throw new DomainError("agents.slugTaken", "המזהה הזה כבר בשימוש אצל סוכן אחר.");
+  if (agent.kind === "SKILL") {
+    const versions = await prisma.agentVersion.findMany({ where: { agentId: { not: agentId }, state: { in: ["DRAFT", "PENDING", "APPROVED"] } }, select: { requirements: true } });
+    if (versions.some((v) => parseRequirements(v.requirements).skills.some((s) => skillOf(s).slug === agent.slug))) throw new DomainError("agents.slugRequired", "סוכן אחר דורש את הסקיל הזה לפי המזהה שלו, ולכן אי אפשר לשנות אותו.");
+  }
+  await prisma.agent.update({ where: { id: agentId }, data: { slug: next } });
+  await recordAudit({ actorId: actor.id, action: "agent.slug", entityType: "Agent", entityId: agentId, before: { slug: agent.slug }, after: { slug: next } });
+}
+
+const normalize = (s: string) => s.toLowerCase().replace(/[״"'׳`()]/g, "").replace(/[\s_:-]+/g, " ").trim();
+
+/// An agent by what a person calls it (24.11.2026): its id, or its name as
+/// the screens show it. When nothing matches exactly, the closest agents by
+/// shared words, so the tool can ask "did you mean" instead of stopping.
+export async function findAgentByRef(ref: string) {
+  const agents = await prisma.agent.findMany({ where: { archivedAt: null }, select: { id: true, slug: true, name: true } });
+  const raw = ref.trim();
+  const bySlug = agents.find((a) => a.slug === raw.toLowerCase());
+  if (bySlug) return { agent: bySlug, candidates: [] };
+  const q = normalize(raw);
+  const byName = agents.filter((a) => normalize(a.name) === q);
+  if (byName.length === 1) return { agent: byName[0], candidates: [] };
+  const words = q.split(" ").filter((w) => w.length > 1);
+  const scored = agents
+    .map((a) => {
+      const name = normalize(`${a.name} ${a.slug}`);
+      return { a, score: (name.includes(q) ? 10 : 0) + words.filter((w) => name.includes(w)).length };
+    })
+    .filter((x) => x.score > 0)
+    .sort((x, y) => y.score - x.score)
+    .slice(0, 8);
+  return { agent: null, candidates: scored.map((x) => ({ slug: x.a.slug, name: x.a.name })) };
+}
+
 // --- Client values ----------------------------------------------------------
 
 async function assertClientAccess(actor: User, clientId: string) {
