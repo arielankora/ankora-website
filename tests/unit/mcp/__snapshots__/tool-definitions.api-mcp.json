@@ -1396,7 +1396,7 @@
       "openWorldHint": false,
       "readOnlyHint": false
     },
-    "description": "Creates an installation of an Ankora agent for the signed-in person and returns its bootstrap text: the only lines to put in the Claude project's instructions, the scheduled task's prompt or the first message of a persistent conversation. Pass the agent (its name as the user calls it, or its id), where it will run, and its clients by name (or allClients). Installation-level values go in `values`, by parameter key. Start with preview: true: it installs nothing and returns everything the install needs: `ask` (must be answered: clients, the schedule of a scheduled run, required values), `optional` (values the user may give now), `clientGaps` (client values a manager has not set) and `requirements` (what the Claude account must have connected). Then ask the user every `ask` item and offer the `optional` ones in ONE message, together with where it runs. Tell them about `clientGaps` and `requirements`. Call again without preview only with all the answers. A call that still misses an `ask` item installs nothing and returns the same lists.",
+    "description": "Creates an installation of an Ankora agent for the signed-in person and returns its bootstrap text: the only lines to put in the Claude project's instructions, the scheduled task's prompt or the first message of a persistent conversation. Pass the agent (its name as the user calls it, or its id), where it will run, and its clients by name (or allClients). Installation-level values go in `values`, by parameter key. Start with preview: true: it installs nothing and returns `ask` (must be answered: the clients, the schedule of a scheduled run, required values, and required values per client, marked with `client`), `optional` (values the user may give now) and `requirements` (connectors, skills and the rest the run needs). Before asking anything, look at the tools you have in this conversation: a connector in `requirements` you have tools for is connected, so say nothing about it; mention only the missing ones. Then ask the user every `ask` item and offer the `optional` ones in ONE message, with each value's `example` as its format. Call again without preview with all the answers: installation values in `values`, client values in `clientValues` by client name. They are saved in Ankora by this call; never send the user to a screen to type them.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -1423,6 +1423,25 @@
           "description": "The Claude account it runs in, when not the person's own.",
           "maxLength": 120,
           "type": "string"
+        },
+        "clientValues": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            "propertyNames": {
+              "maxLength": 40,
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "description": "Client-level values: { \"<client name>\": { \"<parameter key>\": \"<value>\" } }. Saved for that client in Ankora, for every installation of this agent.",
+          "propertyNames": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "type": "object"
         },
         "clients": {
           "description": "Client names, as the user has them in Ankora.",
@@ -1469,6 +1488,7 @@
             "maxLength": 2000,
             "type": "string"
           },
+          "description": "Installation-level values, by parameter key.",
           "propertyNames": {
             "maxLength": 40,
             "type": "string"

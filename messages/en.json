@@ -1986,7 +1986,8 @@
       "slugTaken": "Another agent already uses this id.",
       "slugRequired": "Another agent requires this skill by its id, so the id cannot change.",
       "valueEmail": "\"{value}\" is not an email address. Separate addresses with commas, e.g. nadav@grantor.ai, finance@grantor.ai.",
-      "valueNumber": "Only a number goes here, e.g. 15."
+      "valueNumber": "Only a number goes here, e.g. 15.",
+      "notClientParam": "\"{key}\" is not a client value of this agent."
     }
   },
   "auditLog": {
