@@ -1139,6 +1139,9 @@ export default async function CommunicationsPage(props: {
             <Link prefetch={false} href="/app/whatsapp-poc/setup" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
               {t("page.setupLink")}
             </Link>
+            <Link prefetch={false} href="/app/whatsapp-poc/connect" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
+              {t("page.connectLink")}
+            </Link>
             {toReview > 0 ? (
               <Link
                 prefetch={false}
