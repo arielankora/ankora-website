@@ -27,6 +27,7 @@ import { BLOCK_KINDS, CLIENT_FIELDS, PARAM_LEVELS, PARAM_TYPES, parseSkillText, 
 import { bootstrapText } from "@/lib/agents/compile";
 import { approveClientAddition, discardClientAddition, isClientAddition, rejectClientAddition, saveClientAddition, submitClientAddition } from "@/lib/app-domain/agent-client-additions";
 import { parseBlocks } from "@/lib/agents/model";
+import { createAgentCategory, moveAgentCategory, renameAgentCategory, setAgentCategories, setAgentCategoryArchived } from "@/lib/app-domain/agent-categories";
 import { approveSharedVersion, decideLesson, proposeSharedBlock, rejectSharedVersion, sharedBlockForAgent } from "@/lib/app-domain/agent-library";
 
 // Agents, phase 1: the screens' writes. Every one goes through
@@ -233,6 +234,35 @@ export async function archiveAgentAction(_prev: FormState | undefined, f: FormDa
 export async function setAgentProcessAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
   const user = await requireUser();
   return run(() => setAgentProcess(user, str(f, "agentId"), str(f, "processId") || null));
+}
+
+// Agent categories (24.11.2026).
+
+export async function setAgentCategoriesAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => setAgentCategories(user, str(f, "agentId"), f.getAll("categoryId").map(String).filter(Boolean)));
+}
+
+export async function createAgentCategoryAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  return run(async () => {
+    await createAgentCategory(user, str(f, "name"));
+  });
+}
+
+export async function renameAgentCategoryAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => renameAgentCategory(user, str(f, "id"), str(f, "name")));
+}
+
+export async function moveAgentCategoryAction(id: string, direction: "up" | "down"): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => moveAgentCategory(user, id, direction));
+}
+
+export async function setAgentCategoryArchivedAction(id: string, archived: boolean): Promise<FormState> {
+  const user = await requireUser();
+  return run(() => setAgentCategoryArchived(user, id, archived));
 }
 
 export async function setAgentPurposeAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {

@@ -72,6 +72,8 @@ const TABLES = [
   "agent_installations",
   "agent_versions",
   "agents",
+  // Agent categories (24.11.2026). No foreign keys.
+  "agent_categories",
   // Auto-apply (3.11.2026): its pauses and the switch. No foreign keys;
   // left alone, a pause from one test would hold the next.
   "auto_apply_pauses",

@@ -5059,15 +5059,35 @@ model Agent {
   updatedAt   DateTime  @updatedAt
   archivedAt  DateTime?
 
-  process       Process?            @relation(fields: [processId], references: [id], onDelete: SetNull)
+  process       Process?              @relation(fields: [processId], references: [id], onDelete: SetNull)
   versions      AgentVersion[]
   clientValues  AgentClientValue[]
   additions     AgentClientAddition[]
   installations AgentInstallation[]
   lessons       AgentLesson[]
+  /// AgentCategory ids, for the agents screen (24.11.2026). Live, not
+  /// versioned; a manager sets them. A list on the row rather than a join
+  /// table, so the agents table's backup carries it; categories are only
+  /// archived, never deleted, so an id here always finds its category.
+  categoryIds   String[]              @default([])
 
   @@index([processId])
   @@map("agents")
+}
+
+/// A category on the agents screen, to filter and group by (24.11.2026).
+/// A manager edits the list; an agent can be in several. Archived, never
+/// deleted: an archived one leaves the filters and the agents, and comes
+/// back with them when restored.
+model AgentCategory {
+  id         String    @id @default(cuid())
+  name       String
+  sortOrder  Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  @@map("agent_categories")
 }
 
 /// The whole agent as one version: never edited after it leaves DRAFT.

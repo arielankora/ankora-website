@@ -25,6 +25,7 @@ export const AREA_MESSAGE_PATHS = {
   "agents": [
     "agents.forms",
     "agents.labels",
+    "agents.list.filters",
   ],
   "alerts": [
     "alerts.form",

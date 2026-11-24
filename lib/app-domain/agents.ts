@@ -15,6 +15,7 @@ import type { LinkedProcedure } from "@/lib/agents/procedure";
 import { mcpGetProcess } from "@/lib/app-domain/mcp-processes";
 import { approvedLibrary } from "@/lib/app-domain/agent-library";
 import { approvedAdditions } from "@/lib/app-domain/agent-client-additions";
+import { activeAgentCategories, categoriesOf } from "@/lib/app-domain/agent-categories";
 import { z } from "zod";
 
 // Agents, phase 1 (22.11.2026, "סוכנים באנקורה: אפיון").
@@ -58,9 +59,10 @@ export async function listAgents(actor: User) {
     orderBy: { name: "asc" },
     include: {
       versions: { select: { id: true, version: true, state: true, faultyAt: true }, orderBy: { version: "desc" } },
-      installations: { where: { status: "ACTIVE" }, select: { id: true, userId: true, surface: true, pinnedVersionId: true, runs: { orderBy: { createdAt: "desc" }, take: 1, select: { outcome: true } } } },
+      installations: { where: { status: "ACTIVE" }, select: { id: true, userId: true, surface: true, pinnedVersionId: true, clientScope: true, clientIds: true, runs: { orderBy: { createdAt: "desc" }, take: 1, select: { outcome: true } } } },
     },
   });
+  const active = await activeAgentCategories();
   const names = await namesOf([...agents.map((a) => a.ownerId), ...agents.flatMap((a) => a.installations.map((i) => i.userId))]);
   return agents.map((a) => {
     const approved = a.versions.find((v) => v.state === "APPROVED" && !v.faultyAt) ?? null;
@@ -79,6 +81,11 @@ export async function listAgents(actor: User) {
       updatesWaiting: approved ? a.installations.filter((i) => (a.versions.find((v) => v.id === i.pinnedVersionId)?.version ?? 0) < approved.version).length : 0,
       surfaces: [...new Set(a.installations.map((i) => i.surface))],
       lastRunFailed: a.installations.some((i) => i.runs[0]?.outcome === "FAILED"),
+      categories: categoriesOf(a.categoryIds, active),
+      // The agents screen's client filter (24.11.2026): the clients its
+      // installations run on, and whether one of them runs on every client.
+      clientIds: [...new Set(a.installations.flatMap((i) => i.clientIds))],
+      allClients: a.installations.some((i) => i.clientScope === "ALL_MINE"),
     };
   });
 }
@@ -107,6 +114,7 @@ export async function getAgent(actor: User, slug: string) {
     versions: agent.versions.map((v) => ({ ...v, createdByName: v.createdById ? names.get(v.createdById) ?? null : null, decidedByName: v.decidedById ? names.get(v.decidedById) ?? null : null })),
     installations: agent.installations.map((i) => ({ ...i, userName: names.get(i.userId) ?? "", pinnedVersion: versionNo.get(i.pinnedVersionId) ?? null })),
     clientValues: agent.clientValues,
+    categories: categoriesOf(agent.categoryIds, await activeAgentCategories()),
     canDecide: canManageClients(actor.role),
   };
 }
