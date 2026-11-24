@@ -9,7 +9,7 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { appUrl } from "@/lib/approval-links";
 import { prisma } from "@/lib/prisma";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, draftProblems, fetchAgent, linkedProcedure, listMyInstallations, recordRun, revertToVersion, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
+import { acceptUpdate, agentFile, clientContext, createAgent, createInstallation, installQuestions, draftProblems, fetchAgent, linkedProcedure, listMyInstallations, recordRun, revertToVersion, saveDraft, setInstallationValue, submitDraft } from "@/lib/app-domain/agents";
 import { proposeLesson } from "@/lib/app-domain/agent-library";
 import { skillGaps } from "@/lib/app-domain/agent-skills";
 import { clientAdditionProblems, saveClientAddition, submitClientAddition } from "@/lib/app-domain/agent-client-additions";
@@ -525,7 +525,9 @@ export function registerAgentTools(server: McpServer): void {
       title: "Install an Ankora agent for this person",
       description: [
         "Creates an installation of an Ankora agent for the signed-in person and returns its bootstrap text: the only lines to put in the Claude project's instructions, the scheduled task's prompt or the first message of a persistent conversation.",
-        "Pass the agent's slug, where it will run, and its clients by name (or allClients). Installation-level values go in `values`, by parameter key. Before calling, confirm with the user where it runs and on which clients.",
+        "Pass the agent's slug, where it will run, and its clients by name (or allClients). Installation-level values go in `values`, by parameter key.",
+        "Start with preview: true: it installs nothing and returns everything the install needs: `ask` (must be answered: clients, the schedule of a scheduled run, required values), `optional` (values the user may give now), `clientGaps` (client values a manager has not set) and `requirements` (what the Claude account must have connected).",
+        "Then ask the user every `ask` item and offer the `optional` ones in ONE message, together with where it runs. Tell them about `clientGaps` and `requirements`. Call again without preview only with all the answers. A call that still misses an `ask` item installs nothing and returns the same lists.",
       ].join(" "),
       inputSchema: z.object({
         agent: z.string().min(1).max(60).describe("The agent's slug, from its url."),
@@ -536,11 +538,12 @@ export function registerAgentTools(server: McpServer): void {
         schedule: z.object({ cron: z.string().max(120), tz: z.string().max(60) }).optional().describe("For a scheduled run: its cron and time zone."),
         claudeAccount: z.string().max(120).optional().describe("The Claude account it runs in, when not the person's own."),
         values: z.record(z.string().max(40), z.string().max(2000)).optional(),
+        preview: z.boolean().optional().describe("True: install nothing, only return what the install needs."),
       }),
       annotations: TOOL_ANNOTATIONS.install_agent,
     },
     async (
-      args: { agent: string; surface: "PROJECT" | "SCHEDULED" | "PERSISTENT_SESSION" | "SKILL"; clients?: string[]; allClients?: boolean; checkEvery?: "RUN" | "DAILY" | "WEEKLY"; schedule?: { cron: string; tz: string }; claudeAccount?: string; values?: Record<string, string> },
+      args: { agent: string; surface: "PROJECT" | "SCHEDULED" | "PERSISTENT_SESSION" | "SKILL"; clients?: string[]; allClients?: boolean; checkEvery?: "RUN" | "DAILY" | "WEEKLY"; schedule?: { cron: string; tz: string }; claudeAccount?: string; values?: Record<string, string>; preview?: boolean },
       ctx: ServerContext
     ) => {
       try {
@@ -557,17 +560,33 @@ export function registerAgentTools(server: McpServer): void {
           }
           clientIds = [...new Set(clientIds)];
         }
-        const inst = await createInstallation(actor, {
-          agentId: agent.id,
+        const scope = {
           surface: args.surface,
-          clientScope: args.allClients ? "ALL_MINE" : clientIds.length > 1 ? "LIST" : "ONE",
+          clientScope: (args.allClients ? "ALL_MINE" : clientIds.length > 1 ? "LIST" : "ONE") as "ALL_MINE" | "LIST" | "ONE",
           clientIds,
-          checkEvery: args.checkEvery ?? "DAILY",
-          claudeAccount: args.claudeAccount ?? null,
           values: args.values,
           schedules: args.schedule ? [args.schedule] : [],
+        };
+        const needs = await installQuestions(actor, agent.id, scope);
+        if (args.preview || needs.ask.length > 0) {
+          return toolJson({
+            installed: false,
+            ...needs,
+            next: needs.ask.length > 0
+              ? "Nothing was installed. Ask the user every `ask` item and offer the `optional` ones in one message, tell them about `clientGaps` and `requirements`, then call install_agent again with all the answers."
+              : "Nothing was installed (preview). Offer the user the `optional` values, tell them about `clientGaps` and `requirements`, confirm where it runs and on which clients, then call install_agent again without preview.",
+          });
+        }
+        const inst = await createInstallation(actor, { agentId: agent.id, ...scope, checkEvery: args.checkEvery ?? "DAILY", claudeAccount: args.claudeAccount ?? null });
+        return toolJson({
+          installed: true,
+          installation: inst.id,
+          bootstrap: bootstrapText(agent, inst.id),
+          url: agentUrl(agent.slug, "installations"),
+          clientGaps: needs.clientGaps,
+          requirements: needs.requirements,
+          next: "Give the user the bootstrap text to paste in place of the old instructions. Tell them about any clientGaps (a manager sets those on the agent's parameters tab; until then the run skips that client) and to check every requirement is connected in that Claude account.",
         });
-        return toolJson({ installed: true, installation: inst.id, bootstrap: bootstrapText(agent, inst.id), url: agentUrl(agent.slug, "installations") });
       } catch (err) {
         console.error("[mcp] install_agent failed", err);
         return toolFailure(err);
