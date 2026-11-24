@@ -4,6 +4,7 @@ import { reconcileRecordings, sweepCallRetention, transcribePending } from "@/li
 import { backfillChannel, sweepWhatsappRetention } from "@/lib/comms/whatsapp-store";
 import { completeDriveCopies, repairCallLines, sweepEndedEngagements } from "@/lib/comms/maintenance";
 import { COMMS_CRON_STEPS, perChannelShare, stepBudget } from "@/lib/comms/cron-budget";
+import { alertChannelFailure, runPerChannel } from "@/lib/comms/cron-channels";
 import { prisma } from "@/lib/prisma";
 
 // Nightly (communications storage, 1.11.2026): store the call recordings
@@ -39,13 +40,13 @@ export async function GET(request: Request) {
     const lines = await timed("lines", () => repairCallLines());
     // Stage 3: the WhatsApp history of each stored number, a little each
     // night until every chat has been read once.
-    const channels = await prisma.commsChannel.findMany({ where: { storeEnabled: true } });
+    // 24.11.2026: one number failing no longer stops the run; it is skipped
+    // and the admins get an alert (lib/comms/cron-channels.ts).
+    const channels = await prisma.commsChannel.findMany({ where: { storeEnabled: true }, include: { owner: { select: { name: true } } } });
     const share = perChannelShare(channels.length);
-    const whatsapp = await timed("whatsapp", async () => {
-      const out = [];
-      for (const channel of channels) out.push(await backfillChannel(channel, { budgetMs: budget(share) }));
-      return out;
-    });
+    const whatsapp = await timed("whatsapp", () =>
+      runPerChannel(channels, (channel) => backfillChannel(channel, { budgetMs: budget(share) }), alertChannelFailure),
+    );
     const transcribe = await timed("transcribe", () => transcribePending({ budgetMs: budget(COMMS_CRON_STEPS.transcribe) }));
     const driveCopies = await timed("driveCopies", () => completeDriveCopies({ budgetMs: budget(COMMS_CRON_STEPS.driveCopies) }));
     const retention = await timed("retention", async () => ({
