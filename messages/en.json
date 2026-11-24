@@ -2123,6 +2123,7 @@
       "userClientAccessChange": "Client access changed",
       "userLogoutAllSessions": "Signed out of all sessions",
       "userPersonalEmailChange": "Personal email changed",
+      "userPortalIdentityChange": "Client portal name changed",
       "agreementSign": "Team member document signed",
       "agreementLinkIssued": "Signing link for a deletion declaration sent",
       "agreementPdfRecorded": "PDF signature recorded",
@@ -3305,7 +3306,8 @@
       "passkeysNone": "This user has no registered passkey. At their next sign-in they will be asked to register a device, if two-step sign-in applies to them.",
       "passkeysReset": "Reset passkeys",
       "exposureTitle": "Client access details viewed",
-      "exposureIntro": "The client access details this user viewed in the last 90 days, by client, with a ready message for each client. When an internal provider leaves, send each client its message so it can change those passwords."
+      "exposureIntro": "The client access details this user viewed in the last 90 days, by client, with a ready message for each client. When an internal provider leaves, send each client its message so it can change those passwords.",
+      "portalIdentityTitle": "On the client portal"
     },
     "roleStatus": {
       "saving": "Saving...",
@@ -3403,6 +3405,17 @@
       "lines": "Their phone lines in Aloha",
       "lineOwner": "Currently {name}'s",
       "linesHint": "Whoever owns a line sees every conversation on it, including clients they do not manage.",
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Saved."
+    },
+    "portalIdentity": {
+      "nameLabel": "Name the client sees",
+      "genderLabel": "Grammatical gender",
+      "genderUnset": "Not set",
+      "FEMALE": "Female",
+      "MALE": "Male",
+      "hint": "Shown to clients whose account this person manages. Empty: the regular name and wording.",
       "save": "Save",
       "saving": "Saving...",
       "saved": "Saved."
@@ -7956,7 +7969,7 @@
       "categoryFilter": "Filter by category",
       "inProgressEmpty": "Nothing open or closed in the last month.",
       "allActivity": "All activity",
-      "managerNamed": "Your account manager: <who>{name}</who>",
+      "managerNamed": "{gender, select, other {Your account manager}}: <who>{name}</who>",
       "managerUnnamed": "Your account manager at Ankora",
       "whatsapp": "WhatsApp",
       "whatsappSoon": "WhatsApp: coming soon",
@@ -7976,9 +7989,11 @@
       },
       "whatIsNeeded": "What we need from you: {what}",
       "answerDecisions": "{count, plural, =1 {Answer the decision} other {Answer # decisions}}",
-      "waitingToday": "since today",
-      "waitingYesterday": "since yesterday",
-      "waitingDays": "for {days} days"
+      "waitingSince": "Waiting since {date}",
+      "dueOn": "Due: {date}",
+      "doneOn": "Completed: {date}",
+      "more": "More",
+      "less": "Less"
     },
     "activity": {
       "title": "Your activity",

@@ -2123,6 +2123,7 @@
       "userClientAccessChange": "שינוי גישה ללקוחות",
       "userLogoutAllSessions": "ניתוק כל ההתחברויות",
       "userPersonalEmailChange": "שינוי מייל פרטי",
+      "userPortalIdentityChange": "שינוי השם בפורטל הלקוח",
       "agreementSign": "חתימה על מסמך של איש צוות",
       "agreementLinkIssued": "שליחת קישור לחתימה על הצהרת מחיקה",
       "agreementPdfRecorded": "רישום חתימה ב-PDF",
@@ -3305,7 +3306,8 @@
       "passkeysNone": "למשתמש אין passkey רשום. בכניסה הבאה הוא יתבקש לרשום מכשיר, אם האימות הדו-שלבי חל עליו.",
       "passkeysReset": "איפוס passkeys",
       "exposureTitle": "גישות של לקוחות שנצפו",
-      "exposureIntro": "פרטי הגישה של לקוחות שהמשתמש צפה בהם ב-90 הימים האחרונים, לפי לקוח, עם הודעה מוכנה לכל לקוח. בעזיבת ספק פנימי, שולחים לכל לקוח את ההודעה שלו כדי שיחליף את הסיסמאות האלה."
+      "exposureIntro": "פרטי הגישה של לקוחות שהמשתמש צפה בהם ב-90 הימים האחרונים, לפי לקוח, עם הודעה מוכנה לכל לקוח. בעזיבת ספק פנימי, שולחים לכל לקוח את ההודעה שלו כדי שיחליף את הסיסמאות האלה.",
+      "portalIdentityTitle": "בפורטל הלקוח"
     },
     "roleStatus": {
       "saving": "נשמר...",
@@ -3403,6 +3405,17 @@
       "lines": "קווי הטלפון שלו באלוהה",
       "lineOwner": "כרגע של {name}",
       "linesHint": "מי שהקו שלו רואה כל שיחה בקו, גם של לקוחות שהוא לא מנהל.",
+      "save": "שמירה",
+      "saving": "נשמר...",
+      "saved": "נשמר."
+    },
+    "portalIdentity": {
+      "nameLabel": "השם שהלקוח רואה (בעברית)",
+      "genderLabel": "לשון פנייה",
+      "genderUnset": "לא נקבע",
+      "FEMALE": "נקבה",
+      "MALE": "זכר",
+      "hint": "מוצג ללקוחות שהאדם הזה מנהל את התיק שלהם. ריק: השם הרגיל והנוסח הרגיל.",
       "save": "שמירה",
       "saving": "נשמר...",
       "saved": "נשמר."
@@ -7935,7 +7948,7 @@
       "shownFile": "התיק המוצג"
     },
     "home": {
-      "greeting": "שלום, <who>{name}</who>",
+      "greeting": "שלום <who>{name}</who>",
       "headline": {
         "decisions": "{count, plural, =1 {החלטה אחת מחכה לך.} other {# החלטות מחכות לך.}}",
         "needsYou": "{count, plural, =1 {דבר אחד מחכה לך.} other {# דברים מחכים לך.}}",
@@ -7956,7 +7969,7 @@
       "categoryFilter": "סינון לפי קטגוריה",
       "inProgressEmpty": "אין כרגע משימות פתוחות או משימות שנסגרו בחודש האחרון.",
       "allActivity": "כל הפעילות",
-      "managerNamed": "מנהל התיק שלך: <who>{name}</who>",
+      "managerNamed": "{gender, select, FEMALE {מנהלת התיק שלך} other {מנהל התיק שלך}}: <who>{name}</who>",
       "managerUnnamed": "מנהל התיק שלך ב-Ankora",
       "whatsapp": "וואטסאפ",
       "whatsappSoon": "וואטסאפ: זמין בקרוב",
@@ -7972,13 +7985,15 @@
         "RECEIVED": "התקבל",
         "IN_PROGRESS": "בטיפול",
         "WAITING_ON_CLIENT": "מחכה לך",
-        "DONE": "נסגר"
+        "DONE": "הושלם"
       },
       "whatIsNeeded": "מה צריך ממך: {what}",
       "answerDecisions": "{count, plural, =1 {לענות על ההחלטה} other {לענות על # החלטות}}",
-      "waitingToday": "מהיום",
-      "waitingYesterday": "מאתמול",
-      "waitingDays": "כבר {days} ימים"
+      "waitingSince": "ממתין מ-{date}",
+      "dueOn": "יעד: {date}",
+      "doneOn": "הושלם: {date}",
+      "more": "עוד",
+      "less": "פחות"
     },
     "activity": {
       "title": "הפעילות שלך",

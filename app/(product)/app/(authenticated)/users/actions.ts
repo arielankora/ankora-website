@@ -12,6 +12,7 @@ import {
   setUserClientAccess,
   logoutAllSessions,
   setUserPersonalEmail,
+  setUserPortalIdentity,
 } from "@/lib/app-domain/users";
 import {
   dismissPdfUpload,
@@ -304,6 +305,19 @@ export async function setPersonalEmailAction(_prev: FormState | undefined, formD
   if (!userId) return { error: await errorText("userNotFound") };
   try {
     await setUserPersonalEmail(actor, userId, String(formData.get("personalEmail") || ""));
+  } catch (err) {
+    return { error: await friendlyError(err) };
+  }
+  revalidatePath(`/app/users/${userId}`);
+  return { ok: true };
+}
+
+export async function setPortalIdentityAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const actor = await requireUser();
+  const userId = String(formData.get("userId") || "");
+  if (!userId) return { error: await errorText("userNotFound") };
+  try {
+    await setUserPortalIdentity(actor, userId, String(formData.get("portalName") || ""), String(formData.get("portalGender") || ""));
   } catch (err) {
     return { error: await friendlyError(err) };
   }

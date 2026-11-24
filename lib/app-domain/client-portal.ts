@@ -7,7 +7,7 @@ import { getCurrentHourBank, getPrepaidForecast, listHourBanksForClient, type Pr
 import { getClient } from "@/lib/app-domain/clients";
 import { normalizeEmails } from "@/lib/app-domain/report-schedules";
 import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
-import type { User, Client, ClientUserRole } from "@prisma/client";
+import type { User, Client, ClientUserRole, PortalGender } from "@prisma/client";
 
 // Phase 6 domain service: spec section 13 ("Client Portal"). Every function
 // here is deliberately client-isolated by construction rather than by
@@ -733,7 +733,13 @@ export interface PortalHome {
   /// Who at Ankora owns this account, and the line the client already
   /// talks to us on. Either may be null - the screen then says so rather
   /// than rendering a name or a button that goes nowhere.
-  contact: { managerName: string | null; whatsappNumber: string | null };
+  /// 24.11.2026 (Hadas): the manager as the client reads them, with the
+  /// gender the line is conjugated by (null: the old wording).
+  contact: { managerName: string | null; managerGender: PortalGender | null; whatsappNumber: string | null };
+  /// 24.11.2026 (Hadas): "שלום נדב". The first name of the person reading;
+  /// in a staff preview, of the client's first portal user. Null falls back
+  /// to the client's name.
+  greetingName: string | null;
   waitingOnClient: PortalPromise[];
   inProgress: PortalPromise[];
   recentlyDone: PortalPromise[];
@@ -769,7 +775,7 @@ function byStageThenDue(a: PortalPromise, b: PortalPromise): number {
 /// waiting for me" before it answers anything else.
 export async function getPortalHome(actor: User): Promise<PortalHome> {
   const { client, isStaffPreview } = await resolvePortalClient(actor);
-  const [tasks, snapshot, openDecisions, manager] = await Promise.all([
+  const [tasks, snapshot, openDecisions, manager, reader] = await Promise.all([
     listVisibleTasks(client.id),
     getCurrentHourBank(client.id),
     // Queried here rather than through lib/app-domain/decisions.ts on
@@ -777,8 +783,16 @@ export async function getPortalHome(actor: User): Promise<PortalHome> {
     // resolvePortalClient), and importing it back would close a cycle.
     prisma.decision.count({ where: { clientId: client.id, status: "OPEN" } }),
     client.accountManagerId
-      ? prisma.user.findFirst({ where: { id: client.accountManagerId, deletedAt: null }, select: { name: true } })
+      ? prisma.user.findFirst({
+          where: { id: client.accountManagerId, deletedAt: null },
+          select: { name: true, portalName: true, portalGender: true },
+        })
       : null,
+    isStaffPreview
+      ? prisma.clientUser
+          .findFirst({ where: { clientId: client.id, user: { deletedAt: null } }, orderBy: { createdAt: "asc" }, select: { user: { select: { name: true } } } })
+          .then((m) => m?.user ?? null)
+      : actor,
   ]);
 
   const promises = tasks.map(toPromise);
@@ -794,7 +808,12 @@ export async function getPortalHome(actor: User): Promise<PortalHome> {
     client,
     isStaffPreview,
     openDecisions,
-    contact: { managerName: manager?.name ?? null, whatsappNumber: client.whatsappNumber },
+    contact: {
+      managerName: manager ? manager.portalName || manager.name : null,
+      managerGender: manager?.portalGender ?? null,
+      whatsappNumber: client.whatsappNumber,
+    },
+    greetingName: reader?.name.trim().split(/\s+/)[0] || null,
     waitingOnClient: promises.filter((p) => p.stage === "WAITING_ON_CLIENT"),
     // "In progress" for a client means "you are not holding it": both
     // RECEIVED and IN_PROGRESS are us, and splitting them on the home

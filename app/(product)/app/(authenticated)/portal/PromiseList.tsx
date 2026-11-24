@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 import type { PortalPromise } from "@/lib/app-domain/client-portal";
 import { TIMEZONE } from "@/lib/timezone";
+import { ClampedText } from "./ClampedText";
 
 // Portal phase 1. One row shape for a promise, used by the home screen
 // and by the activity stream, so the client learns to read it once.
@@ -20,13 +21,6 @@ const STAGE_TONE: Record<PortalPromise["stage"], string> = {
   DONE: "border-transparent bg-app-success-soft text-app-success",
 };
 
-/// Whole days, floored, in the client's own timezone sense of "a day".
-/// Zero reads as "today" rather than "0 days", because "מחכה לך 0 ימים"
-/// is the kind of sentence that makes a product feel unattended.
-function daysSince(date: Date): number {
-  return Math.max(0, Math.floor((Date.now() - date.getTime()) / (24 * 60 * 60 * 1000)));
-}
-
 export async function PromiseRow({ promise, showStage = true }: { promise: PortalPromise; showStage?: boolean }) {
   const t = await getTranslations("portal.promises");
   const format = await getFormatter();
@@ -34,17 +28,18 @@ export async function PromiseRow({ promise, showStage = true }: { promise: Porta
   // is written in Israel time; when the work moved is an instant, written
   // in the reader's own time zone.
   const formatDay = (date: Date, timeZone?: string) => format.dateTime(date, { day: "numeric", month: "short", timeZone });
-  const waitingLabel = (since: Date) => {
-    const days = daysSince(since);
-    if (days === 0) return t("waitingToday");
-    if (days === 1) return t("waitingYesterday");
-    return t("waitingDays", { days: String(days) });
-  };
+  // 24.11.2026 (Hadas): every date says what it is ("יעד: 20 בדצמ'"), and
+  // a waiting row says since when rather than counting days at the client.
+  const dateLine = (label: string) => (
+    <span dir="auto" className="text-[11.5px] text-app-text-tertiary">
+      {label}
+    </span>
+  );
 
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 px-[18px] py-3.5">
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 px-[18px] py-4">
       <span className="min-w-0 flex-1 text-sm text-app-text-primary">
-        <bdi dir="auto">{promise.title}</bdi>
+        <bdi dir="auto" className="font-semibold">{promise.title}</bdi>
         {/* Team adoption: what came of it.
 
             A finished promise used to be its own title with a green pill
@@ -52,11 +47,7 @@ export async function PromiseRow({ promise, showStage = true }: { promise: Porta
             for, dated, and learned nothing about what happened. This
             line is the answer, and it is why closing a visible promise
             without one is refused upstream rather than nudged. */}
-        {promise.outcome && (
-          <span dir="auto" className="mt-1 block text-[12.5px] leading-relaxed text-app-text-secondary">
-            {promise.outcome}
-          </span>
-        )}
+        {promise.outcome && <ClampedText text={promise.outcome} moreLabel={t("more")} lessLabel={t("less")} />}
         {/* What is being asked of the client, and the shortest way to do
             it. The title says what the task is called; this says what to
             do, so the row can be acted on in ten seconds. */}
@@ -86,19 +77,11 @@ export async function PromiseRow({ promise, showStage = true }: { promise: Porta
         )}
       </span>
       <span className="flex items-center gap-2.5">
-        {promise.stage === "WAITING_ON_CLIENT" && promise.waitingSince && (
-          <span className="text-[11.5px] text-app-text-secondary">{waitingLabel(promise.waitingSince)}</span>
-        )}
-        {promise.stage === "DONE" && (
-          <span dir="auto" className="font-jbmono text-[11.5px] text-app-text-tertiary">
-            {formatDay(promise.movedAt)}
-          </span>
-        )}
-        {promise.stage !== "DONE" && promise.dueDate && (
-          <span dir="auto" className="font-jbmono text-[11.5px] text-app-text-tertiary">
-            {formatDay(promise.dueDate, TIMEZONE)}
-          </span>
-        )}
+        {promise.stage === "WAITING_ON_CLIENT" &&
+          promise.waitingSince &&
+          dateLine(t("waitingSince", { date: formatDay(promise.waitingSince) }))}
+        {promise.stage === "DONE" && dateLine(t("doneOn", { date: formatDay(promise.movedAt) }))}
+        {promise.stage !== "DONE" && promise.dueDate && dateLine(t("dueOn", { date: formatDay(promise.dueDate, TIMEZONE) }))}
         {showStage && (
           <span className={`rounded-full border px-2.5 py-1 text-[11px] ${STAGE_TONE[promise.stage]}`}>
             {t(`stages.${promise.stage}`)}
@@ -126,7 +109,7 @@ export function PromiseList({
   /// makes it mean anything.
   tone?: "plain" | "attention";
   action?: React.ReactNode;
-  /// Shown under the title, above the rows (the home screen's category chips).
+  /// Shown under the title, above the rows (the home screen's category filter).
   filter?: React.ReactNode;
   showStage?: boolean;
 }) {
@@ -146,9 +129,16 @@ export function PromiseList({
       {promises.length === 0 ? (
         <p className="px-[18px] py-8 text-center text-sm text-app-text-tertiary">{emptyText}</p>
       ) : (
-        <div className={`divide-y ${tone === "attention" ? "divide-app-warning/25" : "divide-app-border"}`}>
+        // 24.11.2026 (Hadas): each task its own small card with space
+        // between, so a row reads as one unit rather than a line in a table.
+        <div className="space-y-2.5 p-3">
           {promises.map((p) => (
-            <PromiseRow key={p.id} promise={p} showStage={showStage} />
+            <div
+              key={p.id}
+              className={`rounded-xl border bg-white ${tone === "attention" ? "border-app-warning/25" : "border-app-border"}`}
+            >
+              <PromiseRow promise={p} showStage={showStage} />
+            </div>
           ))}
         </div>
       )}

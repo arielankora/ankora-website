@@ -155,6 +155,30 @@ export async function setUserPersonalEmail(actor: User, userId: string, raw: str
   return user;
 }
 
+/// 24.11.2026 (Hadas): the Hebrew name and the gender the client portal
+/// shows for a staff member who manages an account. Empty name and an
+/// empty gender clear them, and the portal falls back to `name`.
+export async function setUserPortalIdentity(actor: User, userId: string, rawName: string, rawGender: string) {
+  assertCan(actor.role, "user.manage");
+  const before = await prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
+  if (!before) throw new DomainError("users.notFound", "משתמש לא נמצא.");
+
+  const portalName = rawName.trim() || null;
+  const portalGender = rawGender === "MALE" || rawGender === "FEMALE" ? rawGender : null;
+  if (portalName === before.portalName && portalGender === before.portalGender) return before;
+
+  const user = await prisma.user.update({ where: { id: userId }, data: { portalName, portalGender } });
+  await recordAudit({
+    actorId: actor.id,
+    action: "user.portal_identity_change",
+    entityType: "User",
+    entityId: userId,
+    before: { portalName: before.portalName, portalGender: before.portalGender },
+    after: { portalName: user.portalName, portalGender: user.portalGender },
+  });
+  return user;
+}
+
 /// Mints a fresh set-password link for a user and mails it.
 ///
 /// Extracted from inviteUser on 22.9.2026 so that resendInvite below can

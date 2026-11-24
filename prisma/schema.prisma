@@ -75,6 +75,12 @@ enum AppLocale {
   en
 }
 
+/// The grammatical gender the client portal addresses a staff member in.
+enum PortalGender {
+  MALE
+  FEMALE
+}
+
 /// Who opens the communications screen, and how much of it (12.11.2026).
 /// Until today it lived in Vercel's environment (COMMS_FULL_VIEWERS,
 /// COMMS_CALL_VIEWERS), so every new person meant an edit and a redeploy.
@@ -186,6 +192,14 @@ model User {
   /// WhatsApp chat with. Self-service on the profile screen, stored as
   /// typed; lib/whatsapp.ts normalizes it when a link is built.
   whatsappNumber String?
+
+  /// 24.11.2026 (Hadas): how a client reads this person's name on the
+  /// portal ("מנהלת התיק שלך: אנה קוזלוב"). The name above is the one staff
+  /// screens use, often in English; this one is the client's Hebrew
+  /// spelling, and the gender is what the line is conjugated by. Both
+  /// optional: without them the portal uses `name` and the old wording.
+  portalName   String?
+  portalGender PortalGender?
 
   /// App redesign, Profile screen (screen 18, docs/adr/0001 section 23):
   /// the one real per-user notification preference backing that screen's

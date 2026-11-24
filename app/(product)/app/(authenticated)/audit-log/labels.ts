@@ -275,6 +275,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "user.client_access_change": "שינוי גישה ללקוחות",
   "user.logout_all_sessions": "ניתוק כל ההתחברויות",
   "user.personal_email_change": "שינוי מייל פרטי",
+  "user.portal_identity_change": "שינוי השם בפורטל הלקוח",
   // Employee agreements.
   "agreement.sign": "חתימה על מסמך של איש צוות",
   "agreement.link_issued": "שליחת קישור לחתימה על הצהרת מחיקה",
