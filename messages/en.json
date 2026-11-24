@@ -9031,6 +9031,7 @@
       "categories": {
         "field": "Categories",
         "pick": "Choose categories",
+        "titleFor": "Categories of {name}",
         "hint": "You can choose several. Categories are not part of the agent's version, so changing them needs no approval.",
         "noneYet": "No categories yet. Add them from \"Manage categories\" on the agents screen.",
         "manage": "Manage categories",

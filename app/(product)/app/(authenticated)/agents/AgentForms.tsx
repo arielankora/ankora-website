@@ -932,10 +932,10 @@ function CategoriesForm({ agentId, current, options }: { agentId: string; curren
   );
 }
 
-export function PickCategories({ agentId, current, options }: { agentId: string; current: string[]; options: Category[] }) {
+export function PickCategories({ agentId, current, options, agentName }: { agentId: string; current: string[]; options: Category[]; agentName?: string }) {
   const t = useTranslations("agents.forms");
   return (
-    <Drawer triggerLabel={current.length ? t("common.change") : t("categories.pick")} title={t("categories.field")} variant="link">
+    <Drawer triggerLabel={current.length ? t("common.change") : t("categories.pick")} title={agentName ? t("categories.titleFor", { name: agentName }) : t("categories.field")} variant="link">
       <CategoriesForm agentId={agentId} current={current} options={options} />
     </Drawer>
   );
