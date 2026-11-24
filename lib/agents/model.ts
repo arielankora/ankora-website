@@ -55,6 +55,9 @@ export const paramSchema = z.object({
   required: z.boolean().default(false),
   default: z.string().max(2000).nullish(),
   clientField: z.enum(CLIENT_FIELDS).nullish(),
+  /// What a value looks like, shown beside the field where it is typed
+  /// (24.11.2026). Without it the screens show the type's own example.
+  example: z.string().trim().max(200).nullish(),
 });
 export type AgentParam = z.infer<typeof paramSchema>;
 

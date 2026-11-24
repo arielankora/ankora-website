@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { Forbidden } from "@/components/app/Forbidden";
 import { AgentHeader, loadAgent } from "../shared";
+import { clientEmailContacts } from "@/lib/app-domain/agents";
 import { DeleteParam, EditClientValue, EditParam } from "../../AgentForms";
 
 // Agents, phase 1: "פרמטרים". What each parameter is, its value per client
@@ -21,6 +22,9 @@ export default async function ParamsPage({ params }: { params: Promise<{ slug: s
   const t = await getTranslations("agents.params");
   const tl = await getTranslations("agents.labels");
   const typed = new Map(data.clientValues.map((v) => [`${v.clientId}:${v.key}`, v.value]));
+  // What a value looks like: the parameter's own example, else its type's.
+  const exampleOf = (p: (typeof content.params)[number]) => p.example || tl(`paramFormat.${p.type}`);
+  const contacts = clientParams.some((p) => p.type === "EMAIL" && !p.clientField) ? await clientEmailContacts(data.user, resolved.map((c) => c.id)) : new Map<string, { name: string; email: string }[]>();
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
@@ -46,6 +50,7 @@ export default async function ParamsPage({ params }: { params: Promise<{ slug: s
                     {p.required ? t("required") : ""}
                     {p.clientField ? t("fromFile") : ""}
                     {p.default ? t("default", { value: p.default }) : ""}
+                    {p.example ? t("example", { value: p.example }) : ""}
                   </div>
                 </div>
                 {canEdit && (
@@ -96,7 +101,7 @@ export default async function ParamsPage({ params }: { params: Promise<{ slug: s
                             <div className="text-xs text-app-info">{t("clientFile")}</div>
                           ) : (
                             <div className="text-xs">
-                              <EditClientValue agentId={agent.id} clientId={c.id} clientName={c.name} paramKey={p.key} paramLabel={p.label} value={own ?? ""} />
+                              <EditClientValue agentId={agent.id} clientId={c.id} clientName={c.name} paramKey={p.key} paramLabel={p.label} value={own ?? ""} example={exampleOf(p)} contacts={p.type === "EMAIL" ? contacts.get(c.id) : undefined} />
                             </div>
                           )}
                         </td>

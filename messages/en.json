@@ -1981,7 +1981,9 @@
       "lessonNotOpen": "The proposal was already handled.",
       "categoryName": "A category needs a name, up to 40 characters.",
       "categoryExists": "There is already a category with this name.",
-      "categoryNotFound": "The category was not found."
+      "categoryNotFound": "The category was not found.",
+      "valueEmail": "\"{value}\" is not an email address. Separate addresses with commas, e.g. nadav@grantor.ai, finance@grantor.ai.",
+      "valueNumber": "Only a number goes here, e.g. 15."
     }
   },
   "auditLog": {
@@ -8832,6 +8834,18 @@
         "RUN": "Every run",
         "DAILY": "Daily",
         "WEEKLY": "Weekly"
+      },
+      "paramFormat": {
+        "TEXT": "Free text, one line",
+        "LONG_TEXT": "Free text, several lines are fine",
+        "NUMBER": "A number only, e.g. 15",
+        "LIST": "One item per line, e.g.:\nNUX\nRIMED",
+        "EMAIL": "One address or several, separated by commas, e.g. nadav@grantor.ai, finance@grantor.ai",
+        "FILE_LOCATION": "A link to a Drive folder or file, e.g. https://drive.google.com/drive/folders/...",
+        "PAGE": "A link to a page, e.g. https://claude.ai/artifact/...",
+        "LIBRARY_BLOCK": "The key of a library block, e.g. hebrew-writing",
+        "CONNECTOR": "The connector's name as Claude shows it, e.g. Gmail",
+        "VAULT_REF": "Only the vault item's name, never the password itself, e.g. Grantor Gmail"
       }
     },
     "errors": {
@@ -8894,12 +8908,16 @@
         "required": "Required. Without a value, the agent does not work on the client or the installation",
         "newTrigger": "New parameter",
         "editTitle": "Parameter: {label}",
-        "removed": "The parameter was removed from the draft"
+        "removed": "The parameter was removed from the draft",
+        "example": "Format example",
+        "exampleHint": "Shown beside the field to whoever types a value. Empty: the type's own example."
       },
       "clientValue": {
         "value": "Value",
         "hint": "Empty: back to the default. The value applies from the next run, with no new version.",
-        "set": "Set"
+        "set": "Set",
+        "format": "Format:",
+        "fromFile": "From the client's file"
       },
       "meta": {
         "copied": "Copied",
@@ -9276,7 +9294,8 @@
       "perInstallation": "Per installation",
       "perInstallationIntro": "Values that belong to the account of whoever runs the agent, not to the client. They are set when an installation is created.",
       "installation": "Installation",
-      "exampleKey": "name"
+      "exampleKey": "name",
+      "example": " · Example: {value}"
     }
   }
 }
