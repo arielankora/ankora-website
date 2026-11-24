@@ -11,6 +11,8 @@ import { normalizeEmail } from "@/lib/contact-normalize";
 //   - A client's account manager sees that client's conversations.
 //   - Nobody sees a message held by a block waiting for a manager; that is
 //     filtered where messages are read, not here.
+//   - A conversation with a team member's number is seen by its owner only
+//     (24.11.2026, isTeamConversation), whatever the rules above say.
 
 export type ViewerLike = { id: string; email: string };
 export type ChannelLike = { ownerUserId: string; excludedViewerIds: string[]; excludeAllViewers?: boolean };
@@ -31,15 +33,27 @@ export function parseViewerEmails(raw: string | undefined | null): string[] {
     .filter((e): e is string => Boolean(e));
 }
 
+/// A conversation with one of the team's own numbers (24.11.2026, Ariel):
+/// seen only by the two people in it, each on their own number. Nobody else,
+/// not the full viewers and not an account manager.
+export function isTeamConversation(otherPhone: string | null | undefined, teamPhones: ReadonlySet<string> | undefined): boolean {
+  return Boolean(otherPhone && teamPhones?.has(otherPhone));
+}
+
 export function canSeeConversation(input: {
   viewer: ViewerLike;
   channel: ChannelLike;
   clients: ConversationClient[];
   fullViewers: string[];
+  /// The other side of a one-to-one conversation, and the team's numbers
+  /// (lib/comms/team-phones.ts). Both are needed for the team rule.
+  otherPhone?: string | null;
+  teamPhones?: ReadonlySet<string>;
 }): boolean {
   const { viewer, channel } = input;
   if (isExcludedViewer(channel, viewer.id)) return false;
   if (channel.ownerUserId === viewer.id) return true;
+  if (isTeamConversation(input.otherPhone, input.teamPhones)) return false;
   const email = normalizeEmail(viewer.email);
   if (email && input.fullViewers.includes(email)) return true;
   return input.clients.some((c) => c.accountManagerId === viewer.id);

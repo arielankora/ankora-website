@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { matchPhones } from "@/lib/whatsapp-poc/clients-by-phone";
 import { readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { commsAccess } from "./access";
-import { canSeeConversation, isExcludedViewer } from "./visibility";
+import { canSeeConversation, isExcludedViewer, isTeamConversation } from "./visibility";
+import { teamPhones } from "./team-phones";
 import { fullViewerEmails } from "./grants";
 
 // The audio and file routes (1.11.2026, several numbers): which Unipile
@@ -32,12 +33,16 @@ export async function accountForChatFile(
 
   const channel = await prisma.commsChannel.findUnique({ where: { id: numberParam } });
   if (!channel || isExcludedViewer(channel, user.id)) return null;
-  if (channel.ownerUserId === user.id || access.full) return { apiKey, accountId: channel.accountId };
+  if (channel.ownerUserId === user.id) return { apiKey, accountId: channel.accountId };
 
-  // Anyone else: only a stored conversation of a client they manage.
   const conversation = await prisma.commsConversation.findUnique({
     where: { channelId_externalChatId: { channelId: channel.id, externalChatId: chatId } },
   });
+  // A chat with a team member's number is its owner's alone (24.11.2026).
+  if (conversation && !conversation.isGroup && isTeamConversation(conversation.otherPhone, await teamPhones())) return null;
+  if (access.full) return { apiKey, accountId: channel.accountId };
+
+  // Anyone else: only a stored conversation of a client they manage.
   if (!conversation) return null;
   const clientIds = [
     ...(conversation.otherPhone ? ((await matchPhones([conversation.otherPhone])).get(conversation.otherPhone)?.clients ?? []).map((c) => c.id) : []),
