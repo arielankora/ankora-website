@@ -1981,7 +1981,9 @@
       "lessonNotOpen": "ההצעה כבר טופלה.",
       "categoryName": "צריך שם לקטגוריה, עד 40 תווים.",
       "categoryExists": "כבר יש קטגוריה בשם הזה.",
-      "categoryNotFound": "הקטגוריה לא נמצאה."
+      "categoryNotFound": "הקטגוריה לא נמצאה.",
+      "valueEmail": "\"{value}\" היא לא כתובת מייל. כותבים כתובות מופרדות בפסיק, למשל nadav@grantor.ai, finance@grantor.ai.",
+      "valueNumber": "כאן כותבים מספר בלבד, למשל 15."
     }
   },
   "auditLog": {
@@ -8832,6 +8834,18 @@
         "RUN": "בכל ריצה",
         "DAILY": "יומית",
         "WEEKLY": "שבועית"
+      },
+      "paramFormat": {
+        "TEXT": "טקסט חופשי, שורה אחת",
+        "LONG_TEXT": "טקסט חופשי, אפשר כמה שורות",
+        "NUMBER": "מספר בלבד, למשל 15",
+        "LIST": "פריט בכל שורה, למשל:\nNUX\nRIMED",
+        "EMAIL": "כתובת אחת או כמה, מופרדות בפסיק, למשל nadav@grantor.ai, finance@grantor.ai",
+        "FILE_LOCATION": "קישור לתיקייה או לקובץ ב-Drive, למשל https://drive.google.com/drive/folders/...",
+        "PAGE": "קישור לדף, למשל https://claude.ai/artifact/...",
+        "LIBRARY_BLOCK": "המפתח של קטע בספרייה, למשל hebrew-writing",
+        "CONNECTOR": "שם החיבור כמו שהוא מופיע ב-Claude, למשל Gmail",
+        "VAULT_REF": "שם הפריט בכספת בלבד, בלי הסיסמה עצמה, למשל Grantor Gmail"
       }
     },
     "errors": {
@@ -8894,12 +8908,16 @@
         "required": "חובה. בלי ערך, הסוכן לא עובד על הלקוח או על ההתקנה",
         "newTrigger": "פרמטר חדש",
         "editTitle": "פרמטר: {label}",
-        "removed": "הפרמטר הוסר מהטיוטה"
+        "removed": "הפרמטר הוסר מהטיוטה",
+        "example": "דוגמה לפורמט",
+        "exampleHint": "מופיעה ליד השדה למי שממלא ערך. ריק: הדוגמה של הסוג."
       },
       "clientValue": {
         "value": "ערך",
         "hint": "ריק: חוזרים לברירת המחדל. הערך חל מהריצה הבאה, בלי גרסה חדשה.",
-        "set": "לקבוע"
+        "set": "לקבוע",
+        "format": "פורמט:",
+        "fromFile": "מתיק הלקוח"
       },
       "meta": {
         "copied": "הועתק",
@@ -9275,7 +9293,8 @@
       "perInstallation": "לפי התקנה",
       "perInstallationIntro": "ערכים ששייכים לחשבון של מי שמריץ, לא ללקוח. נקבעים כשיוצרים התקנה.",
       "installation": "התקנה",
-      "exampleKey": "שם"
+      "exampleKey": "שם",
+      "example": " · דוגמה: {value}"
     }
   }
 }
