@@ -16,7 +16,7 @@ export function ClampedText({ text, moreLabel, lessLabel }: { text: string; more
 
   return (
     <span className="mt-1 block text-[12.5px] leading-relaxed text-app-text-secondary">
-      <span ref={ref} dir="auto" className={`block whitespace-pre-line ${open ? "" : "line-clamp-2"}`}>
+      <span ref={ref} dir="auto" className={`whitespace-pre-line ${open ? "block" : "line-clamp-2"}`}>
         {text}
       </span>
       {(cut || open) && (

@@ -38,7 +38,9 @@ export async function PromiseRow({ promise, showStage = true }: { promise: Porta
 
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 px-[18px] py-4">
-      <span className="min-w-0 flex-1 text-sm text-app-text-primary">
+      {/* basis-full on a phone: the title takes the whole width and the dates
+          and stage wrap under it, instead of squeezing it into a column. */}
+      <span className="min-w-0 flex-1 basis-full text-sm text-app-text-primary sm:basis-0">
         <bdi dir="auto" className="font-semibold">{promise.title}</bdi>
         {/* Team adoption: what came of it.
 
