@@ -7953,6 +7953,7 @@
       "waitingTitle": "מחכה לך",
       "inProgressTitle": "מה אנחנו עושים בשבילך",
       "allCategories": "הכל",
+      "categoryFilter": "סינון לפי קטגוריה",
       "inProgressEmpty": "אין כרגע משימות פתוחות או משימות שנסגרו בחודש האחרון.",
       "allActivity": "כל הפעילות",
       "managerNamed": "מנהל התיק שלך: <who>{name}</who>",

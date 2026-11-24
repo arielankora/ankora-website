@@ -7953,6 +7953,7 @@
       "waitingTitle": "Waiting for you",
       "inProgressTitle": "What we are doing for you",
       "allCategories": "All",
+      "categoryFilter": "Filter by category",
       "inProgressEmpty": "Nothing open or closed in the last month.",
       "allActivity": "All activity",
       "managerNamed": "Your account manager: <who>{name}</who>",

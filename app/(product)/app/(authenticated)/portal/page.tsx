@@ -6,6 +6,7 @@ import { getPortalHome } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { whatsappHref } from "@/lib/whatsapp";
 import { PromiseList } from "./PromiseList";
+import { CategorySelect } from "./CategorySelect";
 import { portalHeadlineKey } from "@/lib/app-domain/portal-labels";
 import { bankFigures, packageFigures } from "@/lib/hours-format";
 
@@ -55,10 +56,6 @@ export default async function PortalHomePage({ searchParams }: { searchParams: P
     .sort((a, b) => a.name.localeCompare(b.name, "he"));
   const activeCategory = categories.some((c) => c.id === categoryParam) ? categoryParam : undefined;
   const shownWork = activeCategory ? ourWork.filter((p) => p.category?.id === activeCategory) : ourWork;
-  const chip = (active: boolean) =>
-    `tap-area rounded-full border px-3 py-1 text-xs ${
-      active ? "border-app-accent bg-app-accent text-app-text-primary" : "border-app-border-strong text-app-text-secondary hover:border-app-accent"
-    }`;
 
   return (
     <div className="space-y-4">
@@ -124,21 +121,12 @@ export default async function PortalHomePage({ searchParams }: { searchParams: P
             }
             filter={
               categories.length > 1 && (
-                <div className="flex flex-wrap gap-2" data-testid="portal-home-category-filter">
-                  <Link href="/app/portal" scroll={false} className={chip(!activeCategory)}>
-                    {t("allCategories")}
-                  </Link>
-                  {categories.map((c) => (
-                    <Link
-                      key={c.id}
-                      href={`/app/portal?category=${encodeURIComponent(c.id)}`}
-                      scroll={false}
-                      className={chip(c.id === activeCategory)}
-                    >
-                      <bdi>{c.name}</bdi>
-                    </Link>
-                  ))}
-                </div>
+                <CategorySelect
+                  categories={categories}
+                  active={activeCategory}
+                  allLabel={t("allCategories")}
+                  label={t("categoryFilter")}
+                />
               )
             }
           />

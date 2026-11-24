@@ -1000,7 +1000,7 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "The title the client sees is the task's \"Title for the client\", if one was set. Otherwise the internal task name is shown, so there is never an empty row.",
           "When a decision is waiting for the client, the heading at the top of the screen says so, and a single button leads to the decisions screen. When there is none, the heading is just a status sentence.",
           "\"Waiting for you\" is shown in a warning colour, with how long it has been waiting. In the \"What we are doing for you\" list, each row shows its stage: in progress, received or closed, in that order. In progress and received are sorted by due date, nearest first, and closed by the date it closed, newest first. Closed tasks are shown for 30 days, and everything else is in \"All activity\".",
-          "When there are tasks in more than one category, filter buttons by category sit at the top of the list. The default is \"All\".",
+          "When there are tasks in more than one category, a dropdown at the top of the list filters by category, offering only the categories that have tasks. The default is \"All\".",
           "At the bottom of the screen are two cards side by side: the file manager, with a WhatsApp button, and the state of the hour bank, with a link to the full hours screen.",
           "The portal screens are also open to the Super admin and the Ankora manager, through \"Client view\" on the client's card on the \"Clients\" screen. This view is exactly what the client sees, it is read only, and every visit is recorded in the activity log.",
         ],
