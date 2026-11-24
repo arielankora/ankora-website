@@ -95,6 +95,31 @@ describe("getPortalHome()", () => {
     expect(home.inProgress.map((p) => p.title).sort()).toEqual(["Received", "Working"]);
   });
 
+  // 24.11.2026 (Hadas): open work is בטיפול then התקבל, each by due date
+  // with undated last; closed work is the last 30 days, newest first.
+  it("orders open work by stage and due date and keeps 30 days of closed work", async () => {
+    const client = await createTestClient({ name: "Client Order" });
+    const { user } = await createTestClientUser({ clientId: client.id });
+    const category = await createTestCategory({ clientId: client.id, name: "Legal" });
+    const day = 24 * 60 * 60 * 1000;
+    const task = (title: string, status: "OPEN" | "IN_PROGRESS" | "DONE", extra: { dueDate?: Date; completedAt?: Date } = {}) =>
+      prisma.task.create({ data: { clientId: client.id, title, status, clientVisible: true, categoryId: category.id, ...extra } });
+
+    await task("Received undated", "OPEN");
+    await task("Received soon", "OPEN", { dueDate: new Date(Date.now() + 2 * day) });
+    await task("Working later", "IN_PROGRESS", { dueDate: new Date(Date.now() + 9 * day) });
+    await task("Working soon", "IN_PROGRESS", { dueDate: new Date(Date.now() + 1 * day) });
+    await task("Closed old", "DONE", { completedAt: new Date(Date.now() - 31 * day) });
+    await task("Closed earlier", "DONE", { completedAt: new Date(Date.now() - 10 * day) });
+    await task("Closed yesterday", "DONE", { completedAt: new Date(Date.now() - 1 * day) });
+
+    const home = await getPortalHome(user);
+
+    expect(home.inProgress.map((p) => p.title)).toEqual(["Working soon", "Working later", "Received soon", "Received undated"]);
+    expect(home.recentlyDone.map((p) => p.title)).toEqual(["Closed yesterday", "Closed earlier"]);
+    expect(home.inProgress[0].category).toEqual({ id: category.id, name: "Legal" });
+  });
+
   // ARCHIVED is Ankora's "this stopped being relevant". A client reading
   // it about their own request would hear "we dropped it".
   it("never shows an archived task, even when it is opted in", async () => {

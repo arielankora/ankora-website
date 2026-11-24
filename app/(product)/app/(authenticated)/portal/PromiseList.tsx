@@ -115,6 +115,7 @@ export function PromiseList({
   emptyText,
   tone = "plain",
   action,
+  filter,
   showStage = true,
 }: {
   title: string;
@@ -125,6 +126,8 @@ export function PromiseList({
   /// makes it mean anything.
   tone?: "plain" | "attention";
   action?: React.ReactNode;
+  /// Shown under the title, above the rows (the home screen's category chips).
+  filter?: React.ReactNode;
   showStage?: boolean;
 }) {
   if (promises.length === 0 && !emptyText) return null;
@@ -139,6 +142,7 @@ export function PromiseList({
         <span className={`text-[13.5px] font-medium ${tone === "attention" ? "text-app-warning" : "text-app-text-primary"}`}>{title}</span>
         {action}
       </div>
+      {filter && <div className="border-b border-app-border px-[18px] py-3">{filter}</div>}
       {promises.length === 0 ? (
         <p className="px-[18px] py-8 text-center text-sm text-app-text-tertiary">{emptyText}</p>
       ) : (

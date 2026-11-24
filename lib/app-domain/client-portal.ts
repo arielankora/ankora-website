@@ -621,6 +621,9 @@ export interface PortalPromise {
   /// 4.11.2026), oldest first: for example who was booked and when in a
   /// "תיאום פגישות" task. Written by hand, never the messages themselves.
   notes: string[];
+  /// The task's category, only to filter the home screen by (24.11.2026).
+  /// The row itself still never shows it.
+  category: { id: string; name: string } | null;
 }
 
 /// Waiting on the client wins over the internal status: a task can be
@@ -659,6 +662,7 @@ function toPromise(task: {
   clientRequest?: string | null;
   _count?: { decisions: number };
   portalNotes?: Array<{ body: string }>;
+  category?: { id: string; name: string } | null;
 }): PortalPromise {
   return {
     id: task.id,
@@ -673,6 +677,7 @@ function toPromise(task: {
     waitingFor: task.blockedOn === "CLIENT" ? task.clientRequest?.trim() || null : null,
     openDecisions: task._count?.decisions ?? 0,
     notes: task.portalNotes?.map((n) => n.body) ?? [],
+    category: task.category ?? null,
   };
 }
 
@@ -711,6 +716,7 @@ async function listVisibleTasks(clientId: string, opts: { take?: number } = {}) 
       _count: { select: { decisions: { where: { status: "OPEN" } } } },
       // Capped: a month of coordination is tens of lines, not hundreds.
       portalNotes: { where: { deletedAt: null }, select: { body: true }, orderBy: { createdAt: "asc" }, take: 100 },
+      category: { select: { id: true, name: true } },
     },
     orderBy: { updatedAt: "desc" },
     take: opts.take,
@@ -746,7 +752,18 @@ export interface PortalHome {
   } | null;
 }
 
-const RECENTLY_DONE_TAKE = 5;
+/// 24.11.2026 (Hadas): the home screen lists what closed in the last 30
+/// days, inside the same card as the open work.
+const RECENTLY_DONE_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/// Open work: בטיפול before התקבל, then by due date, nearest first, and
+/// undated last.
+function byStageThenDue(a: PortalPromise, b: PortalPromise): number {
+  const stageRank = (p: PortalPromise) => (p.stage === "IN_PROGRESS" ? 0 : 1);
+  if (stageRank(a) !== stageRank(b)) return stageRank(a) - stageRank(b);
+  return (a.dueDate?.getTime() ?? Infinity) - (b.dueDate?.getTime() ?? Infinity);
+}
 
 /// The home screen. Answers "is everything handled, or is something
 /// waiting for me" before it answers anything else.
@@ -765,7 +782,10 @@ export async function getPortalHome(actor: User): Promise<PortalHome> {
   ]);
 
   const promises = tasks.map(toPromise);
-  const done = promises.filter((p) => p.stage === "DONE");
+  const doneSince = new Date(Date.now() - RECENTLY_DONE_DAYS * DAY_MS);
+  const done = promises
+    .filter((p) => p.stage === "DONE" && p.movedAt >= doneSince)
+    .sort((a, b) => b.movedAt.getTime() - a.movedAt.getTime());
 
   const daysUntilCycleEnd = daysLeftToShow(snapshot);
   const forecast = await getPrepaidForecast(snapshot);
@@ -779,8 +799,8 @@ export async function getPortalHome(actor: User): Promise<PortalHome> {
     // "In progress" for a client means "you are not holding it": both
     // RECEIVED and IN_PROGRESS are us, and splitting them on the home
     // screen would ask the client to care about our internal handover.
-    inProgress: promises.filter((p) => p.stage === "RECEIVED" || p.stage === "IN_PROGRESS"),
-    recentlyDone: done.slice(0, RECENTLY_DONE_TAKE),
+    inProgress: promises.filter((p) => p.stage === "RECEIVED" || p.stage === "IN_PROGRESS").sort(byStageThenDue),
+    recentlyDone: done,
     cycle: snapshot
       ? {
           usedMinutes: snapshot.utilization.consumedMinutes,

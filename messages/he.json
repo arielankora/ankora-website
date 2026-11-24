@@ -7910,9 +7910,9 @@
         "firstItem": "הפריט הראשון שלך יופיע כאן תוך יום עבודה. בינתיים, כל בקשה נשלחת כרגיל בוואטסאפ למנהל התיק."
       },
       "waitingTitle": "מחכה לך",
-      "inProgressTitle": "בטיפול עכשיו",
-      "inProgressEmpty": "אין כרגע הבטחות פתוחות.",
-      "recentlyDoneTitle": "נסגר לאחרונה",
+      "inProgressTitle": "מה אנחנו עושים בשבילך",
+      "allCategories": "הכל",
+      "inProgressEmpty": "אין כרגע משימות פתוחות או משימות שנסגרו בחודש האחרון.",
       "allActivity": "כל הפעילות",
       "managerNamed": "מנהל התיק שלך: <who>{name}</who>",
       "managerUnnamed": "מנהל התיק שלך ב-Ankora",
@@ -7930,7 +7930,7 @@
         "RECEIVED": "התקבל",
         "IN_PROGRESS": "בטיפול",
         "WAITING_ON_CLIENT": "מחכה לך",
-        "DONE": "הושלם"
+        "DONE": "נסגר"
       },
       "whatIsNeeded": "מה צריך ממך: {what}",
       "answerDecisions": "{count, plural, =1 {לענות על ההחלטה} other {לענות על # החלטות}}",

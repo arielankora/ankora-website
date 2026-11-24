@@ -25,8 +25,9 @@ export const metadata = { robots: { index: false, follow: false } };
 // Client model has no owner field, so every version of that card would
 // have had to invent a name. It arrives with phase 2, which needs the
 // same relationship for decisions.
-export default async function PortalHomePage() {
+export default async function PortalHomePage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
   const user = await requireUser();
+  const { category: categoryParam } = await searchParams;
 
   let home;
   try {
@@ -44,6 +45,20 @@ export default async function PortalHomePage() {
   const format = await getFormatter();
   const headline = portalHeadlineKey(openDecisions, waitingOnClient.length, inProgress.length);
   const figure = (chunks: React.ReactNode) => <bdi dir="ltr">{chunks}</bdi>;
+
+  // 24.11.2026 (Hadas): open work and what closed in the last 30 days in
+  // one card, filtered by the task's category. Only categories that have
+  // a task here are offered, and the filter shows only when there are two.
+  const ourWork = [...inProgress, ...recentlyDone];
+  const categories = [...new Map(ourWork.flatMap((p) => (p.category ? [[p.category.id, p.category.name] as const] : []))).entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name, "he"));
+  const activeCategory = categories.some((c) => c.id === categoryParam) ? categoryParam : undefined;
+  const shownWork = activeCategory ? ourWork.filter((p) => p.category?.id === activeCategory) : ourWork;
+  const chip = (active: boolean) =>
+    `tap-area rounded-full border px-3 py-1 text-xs ${
+      active ? "border-app-accent bg-app-accent text-app-text-primary" : "border-app-border-strong text-app-text-secondary hover:border-app-accent"
+    }`;
 
   return (
     <div className="space-y-4">
@@ -100,19 +115,32 @@ export default async function PortalHomePage() {
 
           <PromiseList
             title={t("inProgressTitle")}
-            promises={inProgress}
+            promises={shownWork}
             emptyText={t("inProgressEmpty")}
-          />
-
-          <PromiseList
-            title={t("recentlyDoneTitle")}
-            promises={recentlyDone}
             action={
               <Link href="/app/portal/activity" className="tap-area text-xs text-app-text-accent hover:underline">
                 {t("allActivity")}
               </Link>
             }
-            showStage={false}
+            filter={
+              categories.length > 1 && (
+                <div className="flex flex-wrap gap-2" data-testid="portal-home-category-filter">
+                  <Link href="/app/portal" scroll={false} className={chip(!activeCategory)}>
+                    {t("allCategories")}
+                  </Link>
+                  {categories.map((c) => (
+                    <Link
+                      key={c.id}
+                      href={`/app/portal?category=${encodeURIComponent(c.id)}`}
+                      scroll={false}
+                      className={chip(c.id === activeCategory)}
+                    >
+                      <bdi>{c.name}</bdi>
+                    </Link>
+                  ))}
+                </div>
+              )
+            }
           />
         </>
       )}

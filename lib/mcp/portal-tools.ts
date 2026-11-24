@@ -138,7 +138,7 @@ export function registerPortalTools(server: McpServer): void {
     {
       title: "Where things stand",
       description:
-        "The client's own overview, as their Ankora portal shows it: how many of the tasks Ankora is handling for them are done, in progress or waiting for them; what is waiting for them right now; what was finished recently, with what came of it; how many decisions are waiting for their answer; and the current hour bank. Start here for any 'what's the status' question.",
+        "The client's own overview, as their Ankora portal shows it: how many of the tasks Ankora is handling for them are done, in progress or waiting for them; what is waiting for them right now; what was finished in the last 30 days, with what came of it; how many decisions are waiting for their answer; and the current hour bank. Start here for any 'what's the status' question.",
       inputSchema: z.object({}),
       annotations: PORTAL_READ_ONLY,
     },
