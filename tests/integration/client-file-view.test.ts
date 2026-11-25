@@ -45,7 +45,12 @@ describe("client file document", () => {
     expect(ai).not.toContain("shani@nextage.co.il");
     expect(ai).not.toContain("+972541234567");
     expect(ai).not.toContain("פרט רפואי");
-    expect(ai).not.toContain("4242");
+    // The card's last four digits, not any "4242": the update log names the
+    // test user, whose address carries Date.now(), and an item's id is
+    // random, so either can hold those digits by chance (25.11.2026, a CI
+    // run whose timestamp did).
+    const scrubbed = ai.replace(/user-\d+-\d+@test\.ankora\.local/g, "").replace(/\(id: [^)]+\)/g, "");
+    expect(scrubbed).not.toContain("4242");
   });
 
   it("a restricted item is missing from the file of whoever is not named", async () => {
