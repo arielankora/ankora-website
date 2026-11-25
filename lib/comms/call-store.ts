@@ -199,6 +199,13 @@ export async function transcribeRecording(transcriptId: string): Promise<Transcr
     return "skipped";
   }
 
+  // 25.11.2026: what was tried, and why it failed, goes to the log (ids,
+  // sizes and codes only: no number, no audio, no text). A start line with
+  // no end line means the function was cut off mid-way.
+  const source = t.recording ? "recording" : "voice";
+  const durationSec = t.recording?.durationSec ?? t.attachment?.durationSec ?? null;
+  const inDrive = Boolean(t.recording?.driveFileId ?? t.attachment?.driveFileId);
+  console.log("transcribe: start", { transcriptId: t.id, source, attempts: t.attempts, durationSec, inDrive });
   try {
     const audio = t.recording ? await storedRecordingAudio(t.recording) : await storedVoiceAudio(t.attachment!);
     if (!audio) throw new TranscriptionError("קובץ השמע לא נמצא.", null, "comms.transcription.audioNotFound");
@@ -209,6 +216,15 @@ export async function transcribeRecording(transcriptId: string): Promise<Transcr
     });
     return "done";
   } catch (err) {
+    console.error("transcribe: failed", {
+      transcriptId: t.id,
+      source,
+      durationSec,
+      inDrive,
+      attempt: t.attempts + 1,
+      error: err instanceof Error ? err.name : typeof err,
+      ...(err instanceof TranscriptionError || err instanceof UnipileError ? { code: err.code, status: err.status, detail: err.message } : {}),
+    });
     if (err instanceof TranscriptionError && err.status === 429) {
       await prisma.transcript.update({ where: { id: t.id }, data: { status: "PENDING", lastError: err.message } });
       return "capped";

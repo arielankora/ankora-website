@@ -84,7 +84,9 @@ export async function listStoredChats(channel: CommsChannel, viewer: { id: strin
     });
 }
 
-export type StoredTranscript = { status: TranscriptStatus; text: string | null };
+/// attempts and lastError (25.11.2026): a voice message whose transcription
+/// failed shows why, and a retry button, from the first failure on.
+export type StoredTranscript = { status: TranscriptStatus; text: string | null; attempts?: number; lastError?: string | null };
 
 /// The latest messages of one stored conversation, oldest first, with each
 /// voice message's transcript by message id.
@@ -103,7 +105,7 @@ export async function listStoredMessages(
     where: { conversationId: conversation.id, held: false, ...(before ? { at: { lt: before } } : {}) },
     orderBy: { at: "desc" },
     take: take + 1,
-    include: { attachments: { include: { transcript: { select: { status: true, text: true } } } } },
+    include: { attachments: { include: { transcript: { select: { status: true, text: true, attempts: true, lastError: true } } } } },
   });
   const hasOlder = fetched.length > take;
   const rows = fetched.slice(0, take);

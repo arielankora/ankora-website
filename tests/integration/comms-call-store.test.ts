@@ -91,6 +91,29 @@ describe("call recordings store", () => {
     ]);
   });
 
+  // 25.11.2026: a refused transcription leaves its reason in lastError and
+  // one line in the log (ids and codes, never the number), and stays in the
+  // queue for the next try.
+  it("records a refusal in lastError and the log, without the number", async () => {
+    recordingFor.set("e1", { from: CALLER, to: LINE, callAt: "2026-11-01T08:00:00.000Z" });
+    await storeRecording("e1");
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logs = vi.spyOn(console, "log").mockImplementation(() => {});
+    transcribe.mockRejectedValueOnce(new TranscriptionError("OpenAI החזיר שגיאה 400. gpt-transcribe 400 unsupported_parameter language", 400));
+
+    expect(await transcribePending({ budgetMs: 60_000 })).toMatchObject({ retry: 1 });
+    const tr = await prisma.transcript.findFirstOrThrow();
+    expect(tr).toMatchObject({ status: "PENDING", attempts: 1 });
+    expect(tr.lastError).toContain("gpt-transcribe 400 unsupported_parameter language");
+
+    const failed = errors.mock.calls.find((c) => c[0] === "transcribe: failed");
+    expect(failed?.[1]).toMatchObject({ transcriptId: tr.id, source: "recording", attempt: 1, status: 400, code: "comms.transcription.failed", inDrive: true });
+    expect(logs.mock.calls.some((c) => c[0] === "transcribe: start")).toBe(true);
+    expect(JSON.stringify([...errors.mock.calls, ...logs.mock.calls])).not.toContain(CALLER);
+    errors.mockRestore();
+    logs.mockRestore();
+  });
+
   it("never sends the number of a client marked בלי AI", async () => {
     const client = await createTestClient({ name: "חסוי" });
     await prisma.client.update({ where: { id: client.id }, data: { aiExcluded: true } });

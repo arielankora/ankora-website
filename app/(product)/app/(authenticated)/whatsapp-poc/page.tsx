@@ -440,8 +440,22 @@ function MessageBubble({
               <RecordingPlayer src={`/api/whatsapp-poc/voice/${encodeURIComponent(m.chatId)}/${encodeURIComponent(m.id)}?n=${encodeURIComponent(m.numberKey)}`} />
               {transcript?.status === "DONE" && transcript.text ? (
                 <TranscriptText text={transcript.text} />
-              ) : transcript?.status === "PENDING" ? (
+              ) : transcript?.status === "PENDING" && !transcript.attempts ? (
                 <p className="text-xs text-app-text-secondary">{t("calls.pendingShort")}</p>
+              ) : transcript?.status === "PENDING" || transcript?.status === "FAILED" ? (
+                // 25.11.2026: a failed attempt says so, with OpenAI's reason
+                // and a retry, from the first failure (not after the third).
+                <div className="space-y-1">
+                  <p className="text-xs text-app-error">
+                    {transcript.status === "FAILED" ? t("calls.failed") : t("calls.attemptFailed", { attempts: transcript.attempts ?? 1 })}
+                  </p>
+                  {transcript.lastError ? (
+                    <p dir="auto" className="break-words text-xs text-app-text-secondary">
+                      {transcript.lastError}
+                    </p>
+                  ) : null}
+                  <TranscribeButton kind="voice" chatId={m.chatId} messageId={m.id} numberKey={m.numberKey} label={t("calls.retry")} />
+                </div>
               ) : transcript?.status === "SKIPPED" ? (
                 <p className="text-xs text-app-text-secondary">{t("calls.skipped")}</p>
               ) : (

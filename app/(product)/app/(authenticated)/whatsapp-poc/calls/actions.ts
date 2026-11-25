@@ -96,10 +96,30 @@ export async function transcribeVoiceNoteAction(
       entityId: chatId,
       after: { messageId, sizeBytes: audio.bytes.byteLength, models: TRANSCRIBE_MODELS },
     });
-    const { text } = await transcribeHebrew(audio);
+    const { text, model } = await transcribeHebrew(audio);
     // The same words a stored transcript has for no speech: shown as the
     // transcript, so it reads the same as one that was stored.
-    return { text: text || NO_SPEECH_TRANSCRIPT };
+    const shown = text || NO_SPEECH_TRANSCRIPT;
+    // 25.11.2026: the retry on a stored voice message whose transcription
+    // failed saves its result there, as the recording button does. A voice
+    // message of a number marked "בלי AI" never has a PENDING transcript.
+    const stored = await prisma.transcript.findFirst({
+      where: {
+        status: { in: ["PENDING", "FAILED"] },
+        attachment: {
+          type: "audio",
+          message: { externalId: messageId, conversation: { externalChatId: chatId, channel: { accountId: unipile.accountId } } },
+        },
+      },
+      select: { id: true },
+    });
+    if (stored) {
+      await prisma.transcript.update({
+        where: { id: stored.id },
+        data: { status: "DONE", text: shown, model, doneAt: new Date(), lastError: null },
+      });
+    }
+    return { text: shown };
   } catch (err) {
     if (err instanceof UnipileError || err instanceof TranscriptionError) return { error: (await domainErrorText(err)) ?? err.message };
     throw err;
