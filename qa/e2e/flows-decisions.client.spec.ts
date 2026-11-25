@@ -163,7 +163,9 @@ test("the home screen stops asking once it is answered", async ({ page }) => {
 
   // Wait for the screen to actually be there before asserting something
   // is absent from it: on an unpainted page every absence is true.
-  await expect(page.getByText("שלום,").first()).toBeVisible();
+  // The greeting lost its comma on 24.11.2026 (#626: "שלום נדב"), and the
+  // locator with the comma found nothing; either form is the painted screen.
+  await expect(page.getByText(/^שלום[\s,]/).first()).toBeVisible();
   await expect(page.getByText(WAITING_BANNER)).toHaveCount(0);
   await expect(page.locator(HOME_ACTION)).toHaveCount(0);
 });
