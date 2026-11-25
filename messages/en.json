@@ -7554,6 +7554,7 @@
       "skipped": "Not transcribed: the client is marked \"no AI\".",
       "pendingLong": "Transcription is queued and will appear here when it's done.",
       "pendingShort": "Transcription is queued.",
+      "attemptFailed": "Transcription failed ({attempts} of 3). The next try runs tonight, or now with the button.",
       "failed": "Transcription failed three times.",
       "retry": "Try again",
       "transcribe": "Transcribe",

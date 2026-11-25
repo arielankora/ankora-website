@@ -56,6 +56,7 @@ export async function transcribeHebrew(audio: {
   const name = audio.contentType.includes("ogg") ? "voice.ogg" : "recording.mp3";
 
   let lastStatus = 0;
+  const refused: string[] = [];
   for (const model of TRANSCRIBE_MODELS) {
     const form = new FormData();
     form.set("file", new Blob([audio.bytes], { type: audio.contentType }), name);
@@ -63,6 +64,12 @@ export async function transcribeHebrew(audio: {
     form.set("language", "he");
     form.set("response_format", "text");
 
+    // 25.11.2026: a line per attempt (sizes and codes only, never the audio
+    // or the text), so a failure can be read in the log without the
+    // database. A voice message stuck "in the queue" since 24.11 failed
+    // with nothing written anywhere but the transcript's lastError.
+    const started = Date.now();
+    const meta = { model, bytes: audio.bytes.byteLength, contentType: audio.contentType };
     let response: Response;
     try {
       response = await fetch(ENDPOINT, {
@@ -72,16 +79,52 @@ export async function transcribeHebrew(audio: {
         cache: "no-store",
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
-    } catch {
-      throw new TranscriptionError("OpenAI לא ענה.", null, "comms.transcription.noAnswer");
+    } catch (err) {
+      const timedOut = err instanceof Error && err.name === "TimeoutError";
+      console.error("transcribe: no answer", { ...meta, timedOut, seconds: secondsSince(started) });
+      throw new TranscriptionError(timedOut ? `OpenAI לא ענה תוך ${TIMEOUT_MS / 1000} שניות (${model}).` : `OpenAI לא ענה (${model}).`, null, "comms.transcription.noAnswer");
     }
-    if (response.ok) return { text: (await response.text()).trim(), model };
+    if (response.ok) {
+      if (refused.length) console.warn("transcribe: fell back", { ...meta, refused });
+      console.log("transcribe: done", { ...meta, seconds: secondsSince(started) });
+      return { text: (await response.text()).trim(), model };
+    }
     lastStatus = response.status;
+    const error = await readOpenAiError(response);
+    refused.push(describeRefusal(model, response.status, error));
+    console.error("transcribe: refused", { ...meta, status: response.status, ...error, seconds: secondsSince(started) });
     // Only an unknown or refused model moves on to the next one. A spending
     // cap, a bad key or an overload is the same for every model.
     if (response.status !== 400 && response.status !== 404) break;
   }
   if (lastStatus === 429) throw new TranscriptionError("OpenAI מגביל את הבקשות, או שהגענו לתקרת ההוצאה החודשית.", 429, "comms.transcription.rateLimited");
   if (lastStatus === 401 || lastStatus === 403) throw new TranscriptionError("OpenAI דחה את המפתח.", lastStatus, "comms.transcription.keyRejected");
-  throw new TranscriptionError(`OpenAI החזיר שגיאה ${lastStatus}.`, lastStatus, "comms.transcription.status", { status: String(lastStatus) });
+  // The refusals ride along in the message, which is what lastError keeps.
+  throw new TranscriptionError(`OpenAI החזיר שגיאה ${lastStatus}. ${refused.join("; ")}`.trim(), lastStatus, "comms.transcription.status", { status: String(lastStatus) });
+}
+
+function secondsSince(start: number): number {
+  return Math.round((Date.now() - start) / 100) / 10;
+}
+
+/// What OpenAI says when it refuses: its error type, code, the parameter it
+/// names, and the first words of its message. OpenAI's error messages name
+/// parameters and limits, not what was said in the recording.
+export type OpenAiRefusal = { type: string | null; code: string | null; param: string | null; message: string | null };
+
+export async function readOpenAiError(response: Response): Promise<OpenAiRefusal> {
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    // Not JSON (a proxy page, an empty body): nothing more to say.
+  }
+  const e = (body as { error?: Record<string, unknown> } | null)?.error ?? {};
+  const str = (v: unknown, max: number) => (typeof v === "string" && v ? v.slice(0, max) : null);
+  return { type: str(e.type, 60), code: str(e.code, 60), param: str(e.param, 60), message: str(e.message, 200) };
+}
+
+/// One refusal, short, for lastError: "gpt-transcribe 400 invalid_value language".
+export function describeRefusal(model: string, status: number, e: OpenAiRefusal): string {
+  return [model, String(status), e.code ?? e.type, e.param, e.message ? `"${e.message}"` : null].filter(Boolean).join(" ");
 }
