@@ -200,9 +200,11 @@ export function registerCommsTools(server: McpServer): void {
               : c.transcript.status === "SKIPPED"
                 ? "not made: the number belongs to a client marked בלי AI"
                 : c.transcript.status === "PENDING"
-                  ? "waiting for the nightly run"
+                  ? c.transcript.attempts > 0 && c.transcript.lastError
+                    ? `waiting for the nightly run; the last try failed: ${c.transcript.lastError}`
+                    : "waiting for the nightly run"
                   : c.transcript.status === "FAILED"
-                    ? "failed; can be retried from the communications screen"
+                    ? `failed${c.transcript.lastError ? `: ${c.transcript.lastError}` : ""}; can be retried from the communications screen`
                     : "none",
         });
       } catch (err) {

@@ -209,7 +209,7 @@ export async function transcribeRecording(transcriptId: string): Promise<Transcr
   try {
     const audio = t.recording ? await storedRecordingAudio(t.recording) : await storedVoiceAudio(t.attachment!);
     if (!audio) throw new TranscriptionError("קובץ השמע לא נמצא.", null, "comms.transcription.audioNotFound");
-    const { text, model } = await transcribeHebrew(audio);
+    const { text, model } = await transcribeHebrew(audio, { durationSec });
     await prisma.transcript.update({
       where: { id: t.id },
       data: { status: "DONE", text: text || NO_SPEECH_TRANSCRIPT, model, doneAt: new Date(), lastError: null },

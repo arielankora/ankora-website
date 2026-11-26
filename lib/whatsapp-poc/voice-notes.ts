@@ -12,8 +12,15 @@ import { UnipileError, rateLimitError, toPocMessage } from "./unipile";
 
 const BASE_URL = "https://api.unipile.com/v2";
 const TIMEOUT_MS = 20_000;
-/// Voice messages are small; this keeps a mislabelled large file out.
-const MAX_BYTES = 25 * 1024 * 1024;
+/// 26.11.2026: was 25MB ("voice messages are small"), and a 35:52 voice
+/// message (audio/mp4) over it came back as "no audio" with nothing said:
+/// no Drive copy, no transcript, no player. Long audio is now split before
+/// it goes to OpenAI (audio-split.ts); this only keeps a runaway file out.
+export const MAX_VOICE_BYTES = 200 * 1024 * 1024;
+/// Other files a message carries keep the old ceiling.
+const ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
+/// The 20 seconds that read a message are not enough to download tens of MB.
+const DOWNLOAD_TIMEOUT_MS = 90_000;
 
 /// WhatsApp chat ids ("236739352334449@lid", "1203...@g.us") and message
 /// ids (hex) as Unipile hands them out. Nothing that could change the path.
@@ -25,13 +32,13 @@ export function isSafeMessageId(id: string): boolean {
   return id.length > 0 && id.length <= 200 && /^[A-Za-z0-9_-]+$/.test(id);
 }
 
-async function get(apiKey: string, url: string, accept: string): Promise<Response> {
+async function get(apiKey: string, url: string, accept: string, timeoutMs = TIMEOUT_MS): Promise<Response> {
   let response: Response;
   try {
     response = await fetch(url, {
       headers: { "X-API-KEY": apiKey, accept },
       cache: "no-store",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
     throw new UnipileError("Unipile לא ענה.", null);
@@ -46,14 +53,22 @@ export async function fetchVoiceNote(
   chatId: string,
   messageId: string,
 ): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
-  if (!isSafeChatId(chatId) || !isSafeMessageId(messageId)) return null;
+  // 26.11.2026: each way of finding no audio says which, in the log (ids
+  // and sizes only), so "קובץ השמע לא נמצא" can be traced.
+  const none = (reason: string, extra: Record<string, unknown> = {}) => {
+    console.warn("voice-note: no audio", { reason, messageId, ...extra });
+    return null;
+  };
+  if (!isSafeChatId(chatId) || !isSafeMessageId(messageId)) return none("unsafe-id");
   const messageUrl = `${BASE_URL}/${config.accountId}/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}`;
   const message = toPocMessage(await (await get(config.apiKey, messageUrl, "application/json")).json());
-  const audio = message?.attachments.find((a) => a.id && a.type === "audio");
-  if (!message || !audio?.id || !isSafeMessageId(audio.id)) return null;
-  const file = await get(config.apiKey, `${messageUrl}/attachments/${encodeURIComponent(audio.id)}`, "*/*");
+  if (!message) return none("message-unreadable");
+  const audio = message.attachments.find((a) => a.id && a.type === "audio");
+  if (!audio?.id || !isSafeMessageId(audio.id)) return none("no-audio-attachment", { attachments: message.attachments.length });
+  if (audio.unavailable) return none("attachment-unavailable");
+  const file = await get(config.apiKey, `${messageUrl}/attachments/${encodeURIComponent(audio.id)}`, "*/*", DOWNLOAD_TIMEOUT_MS);
   const bytes = await file.arrayBuffer();
-  if (bytes.byteLength > MAX_BYTES) return null;
+  if (bytes.byteLength > MAX_VOICE_BYTES) return none("too-large", { bytes: bytes.byteLength });
   const header = file.headers.get("content-type") ?? "";
   const contentType = header.startsWith("audio/") ? header : (audio.mimetype ?? "audio/ogg");
   return { bytes, contentType };
@@ -87,7 +102,7 @@ export async function fetchMessageAttachment(
   if (!message || !attachment) return null;
   const file = await get(config.apiKey, `${messageUrl}/attachments/${encodeURIComponent(attachmentId)}`, "*/*");
   const bytes = await file.arrayBuffer();
-  if (bytes.byteLength > MAX_BYTES) return null;
+  if (bytes.byteLength > ATTACHMENT_MAX_BYTES) return null;
   const contentType = file.headers.get("content-type") || attachment.mimetype || "application/octet-stream";
   // 13.11.2026: the file's own name, so a document downloads as itself.
   return { bytes, contentType, fileName: attachment.fileName ?? null };

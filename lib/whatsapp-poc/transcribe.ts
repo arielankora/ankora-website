@@ -1,5 +1,6 @@
 import "server-only";
 import { DomainError, type DomainErrorValues } from "@/lib/domain-error";
+import { AudioSplitError, OPENAI_MAX_BYTES, needsSplit, splitAudio } from "./audio-split";
 
 // WhatsApp POC, stage 2: Hebrew transcription of a call recording with
 // OpenAI (Ariel's choice, 31.10.2026; model per TRANSCRIBE_MODELS below).
@@ -10,8 +11,8 @@ import { DomainError, type DomainErrorValues } from "@/lib/domain-error";
 // is returned to the screen and not stored.
 
 const ENDPOINT = "https://api.openai.com/v1/audio/transcriptions";
-/// OpenAI's own limit for one upload.
-export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+/// OpenAI's own limit for one upload (longer audio is split, audio-split.ts).
+export const MAX_AUDIO_BYTES = OPENAI_MAX_BYTES;
 const TIMEOUT_MS = 120_000;
 
 /// What a transcript says when OpenAI heard no speech. It is stored as the
@@ -43,17 +44,57 @@ export class TranscriptionError extends DomainError {
 /// goes to whisper-1 rather than the button failing.
 export const TRANSCRIBE_MODELS = ["gpt-transcribe", "whisper-1"] as const;
 
-export async function transcribeHebrew(audio: {
-  bytes: ArrayBuffer;
-  contentType: string;
-}): Promise<{ text: string; model: string }> {
+/// The language hint each model takes (OpenAI's speech-to-text guide, read
+/// 25.11.2026): "For gpt-transcribe, languages replaces the singular
+/// language field. Don't send both fields." The older models take language.
+export function languageFields(model: string): Array<[string, string]> {
+  return model === "gpt-transcribe" ? [["languages[]", "he"]] : [["language", "he"]];
+}
+
+/// OpenAI reads the format from the file name. 26.11.2026: a long WhatsApp
+/// voice message came as audio/mp4, which was named .mp3.
+export function fileNameFor(contentType: string): string {
+  const t = contentType.toLowerCase();
+  if (t.includes("ogg") || t.includes("opus")) return "voice.ogg";
+  if (t.includes("mp4") || t.includes("m4a") || t.includes("aac")) return "audio.m4a";
+  if (t.includes("webm")) return "audio.webm";
+  if (t.includes("wav")) return "audio.wav";
+  return "recording.mp3";
+}
+
+/// Transcribe in Hebrew. Audio over OpenAI's 25MB, or longer than
+/// SPLIT_ABOVE_SECONDS when its length is known, is cut into parts that are
+/// transcribed in order and joined (audio-split.ts).
+export async function transcribeHebrew(
+  audio: { bytes: ArrayBuffer; contentType: string },
+  options: { durationSec?: number | null } = {},
+): Promise<{ text: string; model: string }> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) throw new TranscriptionError("התמלול לא מוגדר בסביבה הזו.", null, "comms.transcription.notConfigured");
-  if (audio.bytes.byteLength > MAX_AUDIO_BYTES) throw new TranscriptionError("ההקלטה גדולה מ-25MB, מעל המגבלה של OpenAI.", null, "comms.transcription.tooLarge");
+  if (!needsSplit(audio, options.durationSec)) return transcribeOne(apiKey, audio);
 
-  // OpenAI reads the format from the file name: WhatsApp voice messages
-  // are Ogg Opus, Aloha's recordings are MP3.
-  const name = audio.contentType.includes("ogg") ? "voice.ogg" : "recording.mp3";
+  let parts: Awaited<ReturnType<typeof splitAudio>>;
+  try {
+    parts = await splitAudio(audio);
+  } catch (err) {
+    const why = err instanceof AudioSplitError ? err.message : String(err);
+    console.error("transcribe: split failed", { bytes: audio.bytes.byteLength, contentType: audio.contentType, why });
+    throw new TranscriptionError(`לא הצלחנו לחלק את ההקלטה הארוכה למקטעים (${why}).`, null, "comms.transcription.splitFailed");
+  }
+  console.log("transcribe: split", { bytes: audio.bytes.byteLength, contentType: audio.contentType, parts: parts.length });
+  const texts: string[] = [];
+  const models = new Set<string>();
+  for (const part of parts) {
+    const { text, model } = await transcribeOne(apiKey, part);
+    if (text) texts.push(text);
+    models.add(model);
+  }
+  return { text: texts.join("\n\n"), model: [...models].join(",") };
+}
+
+async function transcribeOne(apiKey: string, audio: { bytes: ArrayBuffer; contentType: string }): Promise<{ text: string; model: string }> {
+  if (audio.bytes.byteLength > MAX_AUDIO_BYTES) throw new TranscriptionError("ההקלטה גדולה מ-25MB, מעל המגבלה של OpenAI.", null, "comms.transcription.tooLarge");
+  const name = fileNameFor(audio.contentType);
 
   let lastStatus = 0;
   const refused: string[] = [];
@@ -61,7 +102,7 @@ export async function transcribeHebrew(audio: {
     const form = new FormData();
     form.set("file", new Blob([audio.bytes], { type: audio.contentType }), name);
     form.set("model", model);
-    form.set("language", "he");
+    for (const [key, value] of languageFields(model)) form.append(key, value);
     form.set("response_format", "text");
 
     // 25.11.2026: a line per attempt (sizes and codes only, never the audio

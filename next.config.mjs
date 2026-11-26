@@ -34,7 +34,11 @@ const nextConfig = {
   // published, not re-bundled by webpack: pdf.js is the kind of package
   // whose dynamic internals a bundler gets wrong, and the unit test runs it
   // exactly this way.
-  serverExternalPackages: ['unpdf'],
+  // 26.11.2026: long voice messages and recordings are cut into parts with
+  // the ffmpeg-static binary (lib/whatsapp-poc/audio-split.ts). Loaded from
+  // node_modules as published, and traced into the functions that
+  // transcribe (outputFileTracingIncludes below).
+  serverExternalPackages: ['unpdf', 'ffmpeg-static'],
 
   // Security review (information disclosure). Next.js sends
   // `X-Powered-By: Next.js` on every response by default, handing a
@@ -79,6 +83,11 @@ const nextConfig = {
   // Hebrew PDF export throwing at runtime in production because the font
   // files were never traced into the bundle. Moved to the top level.
   outputFileTracingIncludes: {
+    // The ffmpeg binary for splitting long audio, in every function that
+    // transcribes: the nightly run, the webhook, and the screen's buttons.
+    '/api/cron/comms-recordings': ['./node_modules/ffmpeg-static/ffmpeg'],
+    '/api/webhooks/unipile': ['./node_modules/ffmpeg-static/ffmpeg'],
+    '/app/whatsapp-poc': ['./node_modules/ffmpeg-static/ffmpeg'],
     '/api/reports/export': ['./node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff'],
     '/api/portal/export': ['./node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff'],
     // Employee agreements: both sign pages read the versioned text at

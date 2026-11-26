@@ -18,6 +18,11 @@ import { alertChannelDisconnected } from "@/lib/comms/disconnect-alert";
 // without a valid signature. Unipile wants a 2xx within five seconds, so
 // the answer goes out first and the work runs after it; a delivery whose
 // work fails is caught by the nightly reconcile.
+// 26.11.2026: a long voice message is split and transcribed after the
+// answer (afterResponse), which can take minutes; the default would cut it
+// off with no attempt recorded.
+export const maxDuration = 300;
+
 export async function POST(request: Request) {
   const secret = process.env.UNIPILE_WEBHOOK_SECRET?.trim();
   if (!secret) return NextResponse.json({ error: "Not configured" }, { status: 503 });

@@ -207,7 +207,15 @@ export type ClientConversationPage = {
     /// Who wrote the quoted message (15.11.2026), never WhatsApp's hidden
     /// number: see lib/comms/quote-sender.ts.
     quotedFrom: QuoteSender | null;
-    attachments: Array<{ kind: string; voiceTranscript: string | null; fileName: string | null }>;
+    /// 26.11.2026: a voice message without a transcript says why
+    /// (voiceTranscriptState), and the last failure's reason when a try failed.
+    attachments: Array<{
+      kind: string;
+      voiceTranscript: string | null;
+      fileName: string | null;
+      voiceTranscriptState?: "waiting" | "failed" | "not made (בלי AI)";
+      voiceTranscriptError?: string;
+    }>;
   }>;
   /// Messages before the first one returned, for paging back.
   hasEarlier: boolean;
@@ -236,7 +244,7 @@ export async function readClientConversation(
     orderBy: { at: "desc" },
     take: opts.limit + 1,
     include: {
-      attachments: { select: { type: true, voiceNote: true, fileName: true, transcript: { select: { status: true, text: true } } } },
+      attachments: { select: { type: true, voiceNote: true, fileName: true, transcript: { select: { status: true, text: true, attempts: true, lastError: true } } } },
     },
   });
   const hasEarlier = rows.length > opts.limit;
@@ -277,10 +285,21 @@ export async function readClientConversation(
         kind: a.voiceNote ? "voice" : a.type,
         voiceTranscript: a.voiceNote && a.transcript?.status === "DONE" ? a.transcript.text : null,
         fileName: a.fileName,
+        ...voiceTranscriptState(a.voiceNote ? a.transcript : null),
       })),
     })),
     hasEarlier,
   };
+}
+
+/// Why a voice message has no transcript yet, for Claude (26.11.2026).
+function voiceTranscriptState(
+  tr: { status: string; attempts: number; lastError: string | null } | null,
+): { voiceTranscriptState?: "waiting" | "failed" | "not made (בלי AI)"; voiceTranscriptError?: string } {
+  if (!tr || tr.status === "DONE") return {};
+  if (tr.status === "SKIPPED") return { voiceTranscriptState: "not made (בלי AI)" };
+  const state = tr.status === "FAILED" ? "failed" : "waiting";
+  return tr.attempts > 0 && tr.lastError ? { voiceTranscriptState: state, voiceTranscriptError: tr.lastError } : { voiceTranscriptState: state };
 }
 
 export type ClientCall = {
@@ -291,7 +310,7 @@ export type ClientCall = {
     direction: "IN" | "OUT" | "UNKNOWN";
     phone: string;
     durationSec: number | null;
-    transcript: { status: "DONE" | "PENDING" | "FAILED" | "SKIPPED" | "NONE"; text: string | null };
+    transcript: { status: "DONE" | "PENDING" | "FAILED" | "SKIPPED" | "NONE"; text: string | null; attempts: number; lastError: string | null };
     audioRemoved: boolean;
   };
 };
@@ -300,7 +319,7 @@ export type ClientCall = {
 export async function readClientCall(actor: User, clientId: string, recordingId: string): Promise<ClientCall | CommsDenied> {
   const s = await scopeFor(actor, clientId);
   if ("denied" in s) return s;
-  const r = await prisma.callRecording.findUnique({ where: { id: recordingId }, include: { transcript: { select: { status: true, text: true } } } });
+  const r = await prisma.callRecording.findUnique({ where: { id: recordingId }, include: { transcript: { select: { status: true, text: true, attempts: true, lastError: true } } } });
   if (!r || !s.phones.includes(r.otherPhone) || !hearsCall(s, r)) return { denied: "not_found" };
   const status = r.transcript?.status ?? "NONE";
   return {
@@ -311,7 +330,12 @@ export async function readClientCall(actor: User, clientId: string, recordingId:
       direction: r.direction,
       phone: r.otherPhone,
       durationSec: r.durationSec,
-      transcript: { status, text: status === "DONE" ? (r.transcript?.text ?? null) : null },
+      transcript: {
+        status,
+        text: status === "DONE" ? (r.transcript?.text ?? null) : null,
+        attempts: r.transcript?.attempts ?? 0,
+        lastError: status === "DONE" ? null : (r.transcript?.lastError ?? null),
+      },
       audioRemoved: r.audioDeletedAt !== null,
     },
   };
