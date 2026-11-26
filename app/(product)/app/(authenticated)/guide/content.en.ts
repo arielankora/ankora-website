@@ -338,7 +338,8 @@ export const GUIDE_GROUPS: GuideGroup[] = [
           "A client is never deleted permanently, only moved to the archive (a soft delete), to keep all of their history and audit trail. At the bottom of the screen an \"Archived (N)\" area opens with the clients that were moved there.",
         ],
         steps: [
-          "To add a client: click \"+ New client\" at the top of the screen. A side panel opens with a short form (the name is required; the legal name, contact person and time zone are optional). Saving closes the panel automatically and refreshes the grid.",
+          "To add a client: click \"New client\" at the top of the screen. A four-step wizard opens: identity and the AI decision, recognition (domains, partners and preferred channel), contacts (each with an email or a mobile), and information and team (information rules, account manager and backup). The client is created at the end of the first step as \"being set up\", and every save is kept at once, so you can leave and come back.",
+          "A client being set up appears in the \"Being set up\" section above the active clients, with what it still needs. The extraction, the agents, WhatsApp and call matching and the timer do not see it until it is activated on the wizard's summary screen. The setup can also be continued from Claude, through the connector.",
           "To search: type in the \"Search clients\" field. Filtering is instant and ignores upper and lower case: g and G find the same client.",
           "To edit: click the client's name on the card.",
           "To archive: the three-dot button at the bottom of the card, then \"Move to archive\". Right after the move, a message lets you undo it.",

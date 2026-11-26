@@ -283,6 +283,8 @@ export const DYNAMIC_NOT_SWEPT: Record<string, string> = {
     "public, reached only with a signing token the product mails out. flows-agreements.super.spec.ts opens it with a real token and is the right place for it.",
   "/agreements/upload/[token]":
     "same token, same spec. Neither screen is behind the session this sweep signs in with.",
+  "/app/clients/[clientId]/setup":
+    "the new-client wizard: it redirects to the client's own screen unless the client is being set up, and the seed has none. flows-admin.app.spec.ts drives every step of it, through activation.",
 };
 
 /** `/app/clients/[clientId]/procedures` as a matcher for a real address. */
