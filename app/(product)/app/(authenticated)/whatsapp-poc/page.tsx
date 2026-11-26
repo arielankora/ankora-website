@@ -99,6 +99,9 @@ import type { TranscriptStatus } from "@prisma/client";
 
 export const metadata = { robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
+// 26.11.2026: the transcribe buttons (server actions of this page) split a
+// long recording and transcribe it part by part, which takes minutes.
+export const maxDuration = 300;
 
 const BASE = "/app/whatsapp-poc";
 const DAY_MS = 24 * 60 * 60 * 1000;

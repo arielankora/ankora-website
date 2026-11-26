@@ -54,7 +54,7 @@ export async function transcribeRecordingAction(
       entityId: emailId,
       after: { sizeBytes: audio.bytes.byteLength, models: TRANSCRIBE_MODELS },
     });
-    const { text, model } = await transcribeHebrew(audio);
+    const { text, model } = await transcribeHebrew(audio, { durationSec: stored?.durationSec ?? null });
     // Stored as the transcript's text: content, in Hebrew.
     const shown = text || NO_SPEECH_TRANSCRIPT;
     if (stored?.transcript) {
@@ -96,13 +96,10 @@ export async function transcribeVoiceNoteAction(
       entityId: chatId,
       after: { messageId, sizeBytes: audio.bytes.byteLength, models: TRANSCRIBE_MODELS },
     });
-    const { text, model } = await transcribeHebrew(audio);
-    // The same words a stored transcript has for no speech: shown as the
-    // transcript, so it reads the same as one that was stored.
-    const shown = text || NO_SPEECH_TRANSCRIPT;
     // 25.11.2026: the retry on a stored voice message whose transcription
     // failed saves its result there, as the recording button does. A voice
     // message of a number marked "בלי AI" never has a PENDING transcript.
+    // 26.11.2026: its stored length decides whether the audio is split.
     const stored = await prisma.transcript.findFirst({
       where: {
         status: { in: ["PENDING", "FAILED"] },
@@ -111,8 +108,12 @@ export async function transcribeVoiceNoteAction(
           message: { externalId: messageId, conversation: { externalChatId: chatId, channel: { accountId: unipile.accountId } } },
         },
       },
-      select: { id: true },
+      select: { id: true, attachment: { select: { durationSec: true } } },
     });
+    const { text, model } = await transcribeHebrew(audio, { durationSec: stored?.attachment?.durationSec ?? null });
+    // The same words a stored transcript has for no speech: shown as the
+    // transcript, so it reads the same as one that was stored.
+    const shown = text || NO_SPEECH_TRANSCRIPT;
     if (stored) {
       await prisma.transcript.update({
         where: { id: stored.id },

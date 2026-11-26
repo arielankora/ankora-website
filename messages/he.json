@@ -1864,7 +1864,8 @@
         "rateLimited": "OpenAI מגביל את הבקשות, או שהגענו לתקרת ההוצאה החודשית.",
         "keyRejected": "OpenAI דחה את המפתח.",
         "status": "OpenAI החזיר שגיאה {status}.",
-        "audioNotFound": "קובץ השמע לא נמצא."
+        "audioNotFound": "קובץ השמע לא נמצא.",
+        "splitFailed": "לא הצלחנו לחלק את ההקלטה הארוכה למקטעים."
       },
       "block": {
         "channelNotFound": "המספר המחובר לא נמצא.",

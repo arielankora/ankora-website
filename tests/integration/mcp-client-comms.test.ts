@@ -117,6 +117,32 @@ describe("client communications through the connector", () => {
     expect((await call(hadas, "get_client_communication", { client: "לוי", id: sharedChat.id })).text).toContain("No such conversation");
   });
 
+  // 26.11.2026: a voice message or a call without a transcript tells Claude
+  // why: still waiting, or failed and the reason the last try gave.
+  it("says why a voice message or a call has no transcript", async () => {
+    const { hadas, chat, rec } = await world();
+    const voice = await prisma.commsMessage.create({
+      data: {
+        conversationId: chat.id,
+        externalId: "v1",
+        at: new Date("2026-11-10T09:00:00Z"),
+        attachments: { create: { externalId: "v1", type: "audio", voiceNote: true, durationSec: 2152 } },
+      },
+      include: { attachments: true },
+    });
+    await prisma.transcript.create({
+      data: { attachmentId: voice.attachments[0].id, status: "FAILED", attempts: 3, lastError: "קובץ השמע לא נמצא." },
+    });
+    await prisma.transcript.update({ where: { recordingId: rec.id }, data: { status: "PENDING", attempts: 1, text: null, lastError: "OpenAI החזיר שגיאה 400." } });
+
+    const read = await call(hadas, "get_client_communication", { client: "לוי", id: chat.id });
+    const v = read.json.messages.find((m: { attachments?: unknown[] }) => m.attachments?.length);
+    expect(v.attachments[0]).toMatchObject({ kind: "voice", voiceTranscript: null, voiceTranscriptState: "failed", voiceTranscriptError: "קובץ השמע לא נמצא." });
+
+    const heard = await call(hadas, "get_client_communication", { client: "לוי", id: rec.id });
+    expect(heard.json.transcriptStatus).toBe("waiting for the nightly run; the last try failed: OpenAI החזיר שגיאה 400.");
+  });
+
   it("says who wrote a quoted message, never WhatsApp's hidden number", async () => {
     const { hadas, chat } = await world();
     await prisma.commsMessage.createMany({

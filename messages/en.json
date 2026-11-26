@@ -1864,7 +1864,8 @@
         "rateLimited": "OpenAI is limiting requests, or the monthly spending cap was reached.",
         "keyRejected": "OpenAI rejected the key.",
         "status": "OpenAI returned error {status}.",
-        "audioNotFound": "The audio file wasn't found."
+        "audioNotFound": "The audio file wasn't found.",
+        "splitFailed": "The long recording could not be split into parts."
       },
       "block": {
         "channelNotFound": "The connected number wasn't found.",
