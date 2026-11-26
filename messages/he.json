@@ -1654,7 +1654,22 @@
         "badDate": "התאריך {value} לא תקין. כותבים YYYY-MM-DD.",
         "idRequired": "מעבירים מזהה של מייל או של שרשור.",
         "attachmentNotFound": "אין במייל הזה קובץ מצורף עם המזהה הזה. המזהים מופיעים ב-attachments של המייל.",
-        "attachmentGone": "הקובץ המצורף כבר לא זמין אצל ספק הדואר."
+        "attachmentGone": "הקובץ המצורף כבר לא זמין אצל ספק הדואר.",
+        "badAddress": "הכתובת \"{address}\" ב-{field} לא תקינה.",
+        "replyOrForward": "מייל הוא תשובה או העברה, לא שניהם.",
+        "forwardTooLarge": "הקבצים במייל המקורי גדולים מדי להעברה בהודעה אחת (מעל 18MB). אפשר להוריד חלק מהם עם dropAttachmentIds.",
+        "noRecipient": "אין נמען. כותבים למי לשלוח ב-to.",
+        "noText": "אין תוכן למייל. כותבים את הטקסט ב-text.",
+        "draftIdRequired": "כדי למחוק טיוטה מעבירים את המזהה שלה ב-draftId.",
+        "sendNotAsked": "שליחה ישירה רק כשהמשתמש ביקש במפורש לשלוח. בלי בקשה כזו מכינים טיוטה (save_client_email_draft) ומראים אותה למשתמש.",
+        "outlookOnly": "קטגוריות קיימות רק בתיבות של Outlook. ב-Gmail משתמשים בתוויות (folderIds).",
+        "foldersRequired": "מעבירים את מזהי התיקיות או התוויות ב-folderIds (מ-list_client_mail_folders).",
+        "nameRequired": "מעבירים שם ב-name.",
+        "folderIdRequired": "מעבירים את מזהה התיקייה ב-folderId (מ-list_client_mail_folders).",
+        "noCalendar": "לתיבה {account} אין יומן דרך החיבור (תיבה בפרוטוקול IMAP). יומן יש רק בחשבון Google או Microsoft.",
+        "noCalendarFound": "לא נמצא יומן בחשבון הזה.",
+        "eventFieldsRequired": "לאירוע חדש צריך כותרת (title), התחלה (start) וסוף (end).",
+        "calendarIdRequired": "מעבירים את מזהה היומן ב-calendarId (מ-list_client_calendar_events עם calendarsOnly)."
       }
     },
     "requestTypes": {
@@ -2316,7 +2331,10 @@
       "agentLessonPropose": "הצעת שינוי לסוכן מתוך ריצה",
       "agentLessonDecide": "טיפול בהצעת שינוי לסוכן",
       "connectionReconnect": "חיבור מחדש של מערכת של לקוח",
-      "connectionMailRead": "קריאה מתיבת הדואר של לקוח"
+      "connectionMailRead": "קריאה מתיבת הדואר של לקוח",
+      "connectionMailWrite": "כתיבה בתיבת הדואר של לקוח",
+      "connectionCalendarRead": "קריאה מהיומן של לקוח",
+      "connectionCalendarWrite": "כתיבה ביומן של לקוח"
     },
     "kinds": {
       "failure": "כשלון",
@@ -5377,7 +5395,7 @@
         "driveRead": "דרייב: רואה קבצים בתיקייה",
         "driveWrite": "דרייב: כותב קבצים שהנוהל יוצר",
         "viaUnipile": "דרך Unipile",
-        "mailRead": "מייל: קריאה",
+        "mailRead": "מייל: קריאה, טיוטות ושליחה",
         "calendar": "יומן",
         "claudeReads": "קלוד קורא, לפי ההרשאות באנקורה"
       },

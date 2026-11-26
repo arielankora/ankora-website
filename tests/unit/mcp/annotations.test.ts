@@ -45,11 +45,22 @@ describe("the read/write split", () => {
     // replace_task_steps, and apply_task_plan_steps ("קדם עם קלוד",
     // 10.10.2026), which does the same replacement from a plan's steps.
     // delete_time_entry (19.11.2026) takes an entry out of a client's hours.
+    // The client mailbox tools (26.11.2026) send mail, trash it, delete
+    // folders, cancel or delete events and delete calendars.
     const destructive = Object.entries(TOOL_ANNOTATIONS)
       .filter(([, ann]) => ann.destructiveHint)
       .map(([name]) => name)
       .sort();
-    expect(destructive).toEqual(["apply_task_plan_steps", "delete_time_entry", "replace_task_steps"]);
+    expect(destructive).toEqual([
+      "apply_task_plan_steps",
+      "delete_time_entry",
+      "manage_client_calendars",
+      "manage_client_mail_folders",
+      "organize_client_email",
+      "replace_task_steps",
+      "respond_client_calendar_event",
+      "send_client_email",
+    ]);
   });
 
   it("does not claim create_time_entry is idempotent", () => {

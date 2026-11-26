@@ -5,7 +5,8 @@
 // Unipile's raw email carries every header and the HTML body; Claude needs
 // who, when, what and which files, in Israel time, and the text once.
 
-import type { RawAttachment, RawContact, RawEmail, RawFolder, RawPerson, RawSender, RawCategory } from "./unipile-mail";
+import type { RawAttachment, RawCalendar, RawContact, RawEmail, RawEvent, RawEventTime, RawFolder, RawPerson, RawSender, RawCategory } from "./unipile-mail";
+import { textDirection } from "@/lib/rtl-mail";
 
 /// One email's text in a read. A long thread is cut at THREAD_TEXT_CHARS
 /// overall, so one call cannot cost more than a long document.
@@ -208,4 +209,126 @@ export function contactOf(c: RawContact) {
 export function categoryOf(c: RawCategory) {
   const name = str(c.name) ?? str(c.display_name);
   return name ? { name, ...(str(c.color) ? { color: str(c.color) } : {}) } : null;
+}
+
+// ---------------------------------------------------------------- outgoing (stage 2)
+
+const escapeHtml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/// The HTML part of a mail Claude writes: the text as is, in the direction
+/// of its language (lib/rtl-mail.ts), so Hebrew does not show left to
+/// right in Gmail.
+export function htmlFromText(text: string): string {
+  const dir = textDirection(text);
+  const lang = dir === "rtl" ? "he" : "en";
+  const body = escapeHtml(text.replace(/\r\n/g, "\n")).replace(/\n/g, "<br>");
+  return `<div dir="${dir}" lang="${lang}" style="text-align:${dir === "rtl" ? "right" : "left"}">${body}</div>`;
+}
+
+/// The quoted original under a forward, as mail programs write it.
+export function forwardedText(note: string, original: RawEmail): string {
+  const head = [
+    "---------- Forwarded message ---------",
+    `From: ${people(original.from).join(", ")}`,
+    `Date: ${israelTimeOf(original.date) ?? ""}`,
+    `Subject: ${str(original.subject) ?? ""}`,
+    `To: ${people(original.to).join(", ")}`,
+    ...(people(original.cc).length ? [`Cc: ${people(original.cc).join(", ")}`] : []),
+  ].join("\n");
+  return [note.trim(), head, bodyTextOf(original)].filter(Boolean).join("\n\n");
+}
+
+/// "Re: x" or "Fwd: x", without stacking the prefix.
+export function prefixedSubject(prefix: "Re" | "Fwd", subject: unknown): string {
+  const s = str(subject) ?? "";
+  const re = prefix === "Re" ? /^re:/i : /^(fwd?|fw):/i;
+  return re.test(s) ? s : `${prefix}: ${s}`.trim();
+}
+
+/// "Dana <dana@x.co>" or "dana@x.co" as Unipile wants it.
+export function addressOf(value: string): { email: string; display_name?: string } | null {
+  const v = value.trim();
+  const m = v.match(/^(.*?)\s*<([^<>\s]+@[^<>\s]+)>$/);
+  if (m) return { email: m[2], ...(m[1].trim() ? { display_name: m[1].trim().replace(/^"|"$/g, "") } : {}) };
+  return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(v) ? { email: v } : null;
+}
+
+export function rawAddresses(v: unknown): { email: string; display_name?: string }[] {
+  return Array.isArray(v)
+    ? (v as RawPerson[]).flatMap((p) => {
+        const email = str(p?.email);
+        const name = str(p?.display_name);
+        return email ? [{ email, ...(name ? { display_name: name } : {}) }] : [];
+      })
+    : [];
+}
+
+// ---------------------------------------------------------------- calendar (stage 2)
+
+export function calendarOf(c: RawCalendar) {
+  const id = str(c.id);
+  if (!id) return null;
+  return {
+    id,
+    name: str(c.name) ?? id,
+    ...(c.is_default === true ? { default: true } : {}),
+    ...(c.is_read_only === true ? { readOnly: true } : {}),
+    ...(c.is_owned_by_user === false ? { notOwned: true } : {}),
+    ...(str(c.timezone) ? { timezone: str(c.timezone) } : {}),
+    ...(str(c.description) ? { description: str(c.description) } : {}),
+  };
+}
+
+/// An event time in Israel time ("2026-11-30 14:00"), or the day of an
+/// all-day event.
+export function eventTimeOf(t: unknown): string | null {
+  const v = t as RawEventTime | null;
+  if (!v || typeof v !== "object") return null;
+  if (str(v.date)) return str(v.date);
+  const dt = str(v.date_time);
+  if (!dt) return null;
+  // A local time without an offset is in the event's own zone; shown as is.
+  return /[zZ]|[+-]\d{2}:?\d{2}$/.test(dt) ? israelTimeOf(dt) : dt.replace("T", " ").slice(0, 16);
+}
+
+type RawAttendee = { email?: unknown; display_name?: unknown; is_organizer?: unknown; is_self?: unknown; is_optional?: unknown; response_status?: unknown };
+
+export function eventOf(e: RawEvent, opts: { withBody?: boolean } = {}) {
+  const id = str(e.id);
+  if (!id) return null;
+  const attendees = Array.isArray(e.attendees)
+    ? (e.attendees as RawAttendee[]).flatMap((a) => {
+        const who = personOf({ email: a.email, display_name: a.display_name });
+        if (!who) return [];
+        return [
+          {
+            who,
+            response: str(a.response_status),
+            ...(a.is_organizer === true ? { organizer: true } : {}),
+            ...(a.is_self === true ? { mailboxOwner: true } : {}),
+            ...(a.is_optional === true ? { optional: true } : {}),
+          },
+        ];
+      })
+    : [];
+  const organizer = personOf((e.organizer ?? {}) as RawPerson);
+  const conference = (e.conference ?? null) as { provider?: unknown; url?: unknown } | null;
+  const body = str(e.body);
+  return {
+    id,
+    calendarId: str(e.calendar_id),
+    ...(str(e.master_event_id) ? { seriesId: str(e.master_event_id) } : {}),
+    title: str(e.title) ?? "",
+    start: eventTimeOf(e.start),
+    end: eventTimeOf(e.end),
+    ...(e.is_all_day === true ? { allDay: true } : {}),
+    ...(e.is_cancelled === true ? { cancelled: true } : {}),
+    ...(str(e.location) ? { location: str(e.location) } : {}),
+    ...(organizer ? { organizer } : {}),
+    attendees,
+    ...(conference && str(conference.url) ? { conference: { provider: str(conference.provider), url: str(conference.url) } } : {}),
+    ...(Array.isArray(e.recurrence) && e.recurrence.length ? { recurrence: e.recurrence.filter((x) => typeof x === "string") } : {}),
+    ...(e.transparency === "opaque" ? { busy: true } : {}),
+    ...(opts.withBody && body ? { description: body.length > 5000 ? `${htmlToText(body).slice(0, 5000)}` : htmlToText(body) } : {}),
+  };
 }
