@@ -14,3 +14,7 @@ CREATE INDEX "clients_backupManagerId_idx" ON "clients"("backupManagerId");
 
 -- AddForeignKey
 ALTER TABLE "clients" ADD CONSTRAINT "clients_backupManagerId_fkey" FOREIGN KEY ("backupManagerId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- A client being set up in the new-client wizard: created, not yet
+-- activated (see ClientStatus.ONBOARDING).
+ALTER TYPE "ClientStatus" ADD VALUE 'ONBOARDING';

@@ -1602,7 +1602,11 @@
     "clients": {
       "contractNotFound": "The selected contract is not in this client's file.",
       "managerNotActive": "The selected account manager is not an active Ankora user.",
-      "subprocessorSourceRequired": "To mark a commitment as present or absent, write the source: the contract and the clause."
+      "subprocessorSourceRequired": "To mark a commitment as present or absent, write the source: the contract and the clause.",
+      "onboardingStatusLocked": "This client is being set up. It leaves setup only when it is activated, on the setup's summary screen.",
+      "cannotReturnToOnboarding": "A client that was activated does not go back to setup.",
+      "notFound": "The client was not found.",
+      "notOnboarding": "Only a client being set up is deleted this way. An active client is archived."
     },
     "clientEntities": {
       "notFoundForClient": "This entity was not found for the client.",
@@ -2144,6 +2148,7 @@
       "clientSubprocessorNotice": "Commitment to proactive sub-processor notices updated",
       "clientArchive": "Client archived",
       "clientRestore": "Client restored from the archive",
+      "clientOnboardingDiscard": "Client being set up deleted",
       "categoryCreate": "Category created",
       "categoryUpdate": "Category updated",
       "categoryArchive": "Category archived",
@@ -4818,7 +4823,9 @@
         "paused": "Paused",
         "archived": "Archived",
         "pausedBody": "This client is paused, so its tasks, file and documents are not shown here, and it does not appear in work lists. Nothing was deleted: everything comes back when the client is active again.",
-        "archivedBody": "This client is archived. Nothing was deleted: tasks, the file and hours come back when the client is active again."
+        "archivedBody": "This client is archived. Nothing was deleted: tasks, the file and hours come back when the client is active again.",
+        "onboarding": "Being set up",
+        "onboardingBody": "This client is being set up. The extraction, the agents, WhatsApp and call matching and the timer do not see it until it is activated."
       },
       "header": {
         "approvals": "{count, plural, =1 {One item waiting for your approval} other {# waiting for your approval}}",

@@ -113,6 +113,12 @@ enum ClientStatus {
   ACTIVE
   PAUSED
   ARCHIVED
+  /// 26.11.2026 (new-client wizard): created and being filled, not yet
+  /// activated. listAccessibleClients returns ACTIVE only, so the timer,
+  /// the extraction, the agents and the existing MCP tools never see it.
+  /// It leaves this status only through the activation, never through the
+  /// settings form (updateClient refuses it).
+  ONBOARDING
 }
 
 /// Client Admin vs Client Viewer, spec section 4 role table.

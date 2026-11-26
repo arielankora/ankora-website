@@ -23,7 +23,9 @@ export async function matchPhones(phones: string[]): Promise<Map<string, PhoneMa
     select: {
       name: true,
       phones: true,
-      contacts: { where: { deletedAt: null }, select: { id: true, client: { select: { id: true, name: true } } } },
+      // 26.11.2026: a client being set up (ONBOARDING) is not matched to
+      // conversations and calls until it is activated.
+      contacts: { where: { deletedAt: null, client: { status: { not: "ONBOARDING" } } }, select: { id: true, client: { select: { id: true, name: true } } } },
     },
   });
   for (const person of people) {

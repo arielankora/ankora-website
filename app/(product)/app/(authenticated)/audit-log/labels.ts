@@ -298,6 +298,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "client.communication_locale": "שינוי שפת התקשורת עם הלקוח",
   "client.archive": "העברת לקוח לארכיון",
   "client.restore": "שחזור לקוח מהארכיון",
+  "client.onboarding_discard": "מחיקת לקוח בהקמה",
   "category.create": "יצירת קטגוריה",
   "category.update": "עדכון קטגוריה",
   "category.archive": "העברת קטגוריה לארכיון",

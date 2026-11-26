@@ -187,6 +187,26 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   // screen used to fail (18.10.2026, a client set to "בארכיון" from the
   // form below). What such a client needs is its settings and the way
   // back, so that is all this screen shows until it is active again.
+  // 26.11.2026: a client being set up has no settings form and no way
+  // back here: it leaves setup only through its activation (updateClient
+  // refuses the status), so the screen says where it stands and no more.
+  if (client.status === "ONBOARDING") {
+    return (
+      <div className="space-y-6">
+        <div>
+          <PageBack href={backHref} label={backLabel} testId="client-back" />
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <h1 dir="auto" className="text-xl font-medium text-app-text-primary">{client.name}</h1>
+            <StatusBadge label={t("inactive.onboarding")} tone="amber" />
+          </div>
+        </div>
+        <div className="rounded-2xl border border-app-border bg-white p-6">
+          <p className="text-sm text-app-text-secondary">{t("inactive.onboardingBody")}</p>
+        </div>
+      </div>
+    );
+  }
+
   if (client.status !== "ACTIVE") {
     const staff = await listStaffForAssignment();
     const paused = client.status === "PAUSED";
