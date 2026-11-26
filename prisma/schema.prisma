@@ -304,6 +304,7 @@ model User {
 
   // Portal phase 2.
   managedClients    Client[]           @relation("ClientAccountManager")
+  backupForClients  Client[]           @relation("ClientBackupManager")
   decisionsOpened   Decision[]         @relation("DecisionAuthor")
   decisionResponses DecisionResponse[] @relation("DecisionResponder")
 
@@ -595,6 +596,16 @@ model Client {
   /// had their mental load removed, only moved.
   accountManagerId String?
 
+  /// 26.11.2026 (new-client wizard): who stands in for the account
+  /// manager when they are away. Set in the wizard's fourth step, edited
+  /// with the client's settings. Null: no backup named yet.
+  backupManagerId String?
+
+  /// 26.11.2026 (new-client wizard): the channel this client prefers to be
+  /// reached on. Null on clients created before the wizard, until someone
+  /// sets it. Each contact's own order stays on ClientContact.channelOrder.
+  preferredChannel ClientChannel?
+
   /// Org brain, phase 3 (spec decision 5): who approves exceptions to this
   /// client's rules and sensitive information for its file, when the
   /// client said who ("medical information only with Ariel's prior
@@ -673,6 +684,7 @@ model Client {
 
   // Portal phase 2.
   accountManager User?      @relation("ClientAccountManager", fields: [accountManagerId], references: [id], onDelete: SetNull)
+  backupManager  User?      @relation("ClientBackupManager", fields: [backupManagerId], references: [id], onDelete: SetNull)
   decisions      Decision[]
 
   // Portal phase 3.
@@ -705,6 +717,7 @@ model Client {
 
   @@index([status])
   @@index([accountManagerId])
+  @@index([backupManagerId])
   @@map("clients")
 }
 
@@ -2514,6 +2527,13 @@ enum SupplierExperience {
   GOOD
   OK
   AVOID
+}
+
+/// Client.preferredChannel (26.11.2026, new-client wizard).
+enum ClientChannel {
+  WHATSAPP
+  EMAIL
+  PHONE
 }
 
 /// How often a client wants the portal to reach them. Set by the client,
