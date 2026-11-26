@@ -612,6 +612,18 @@ model Client {
   /// sets it. Each contact's own order stays on ClientContact.channelOrder.
   preferredChannel ClientChannel?
 
+  /// 26.11.2026 (new-client wizard), while the client is ONBOARDING: the
+  /// furthest step of the four that was saved, for "שלב 3 מתוך 4" on the
+  /// client list. Null once the client is activated.
+  onboardingStep Int?
+  /// When someone confirmed, in the wizard's fourth step, that this client
+  /// has no rules of its own about information. Null: not confirmed, and
+  /// a client with no rule then cannot be activated.
+  noSpecialRulesAt DateTime?
+  /// When the client left setup (the wizard's activation). Null for a
+  /// client created before the wizard, and while it is being set up.
+  activatedAt DateTime?
+
   /// Org brain, phase 3 (spec decision 5): who approves exceptions to this
   /// client's rules and sensitive information for its file, when the
   /// client said who ("medical information only with Ariel's prior

@@ -3,7 +3,7 @@ import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
-import type { User, ClientStatus, ClientKind, AppLocale } from "@prisma/client";
+import type { User, ClientStatus, ClientKind, AppLocale, ClientChannel } from "@prisma/client";
 import { ensureDefaultAlertRules } from "@/lib/app-domain/alerts";
 import {
   normalizeSubprocessorNotice,
@@ -170,6 +170,10 @@ export async function updateClient(
     // which is why they are typed separately from the strings above -
     // "no account manager" and "unchanged" must not be the same value.
     accountManagerId?: string | null;
+    /// 26.11.2026 (new-client wizard): who stands in for the account
+    /// manager, and the channel the client prefers. `null` clears them.
+    backupManagerId?: string | null;
+    preferredChannel?: ClientChannel | null;
     whatsappNumber?: string | null;
     approvalCeilingMinor?: number | null;
     // Portal phase 3. The same three preferences the client edits on
@@ -220,6 +224,18 @@ export async function updateClient(
     (input.preferenceMatters !== undefined && (input.preferenceMatters?.trim() || null) !== before.preferenceMatters) ||
     (input.preferenceNever !== undefined && (input.preferenceNever?.trim() || null) !== before.preferenceNever);
 
+  if (input.backupManagerId) {
+    const backup = await prisma.user.findFirst({
+      where: { id: input.backupManagerId, deletedAt: null, role: { not: "CLIENT_USER" } },
+    });
+    if (!backup) throw new DomainError("clients.backupNotActive", "המחליף שנבחר אינו משתמש פעיל של Ankora.");
+  }
+  const managerAfter = input.accountManagerId !== undefined ? input.accountManagerId : before.accountManagerId;
+  const backupAfter = input.backupManagerId !== undefined ? input.backupManagerId : before.backupManagerId;
+  if (managerAfter && backupAfter && managerAfter === backupAfter && (input.accountManagerId !== undefined || input.backupManagerId !== undefined)) {
+    throw new DomainError("clients.backupSameAsManager", "המחליף צריך להיות אדם אחר מהאחראי.");
+  }
+
   if (input.accountManagerId) {
     // A client user must never be set as an account manager: they would
     // then appear on their own portal as the person to talk to, and the
@@ -248,6 +264,8 @@ export async function updateClient(
       timezone: input.timezone,
       primaryContact: input.primaryContact?.trim(),
       accountManagerId: input.accountManagerId,
+      backupManagerId: input.backupManagerId,
+      preferredChannel: input.preferredChannel,
       whatsappNumber: input.whatsappNumber === null ? null : input.whatsappNumber?.trim() || undefined,
       approvalCeilingMinor: input.approvalCeilingMinor,
       preferenceContact: input.preferenceContact === null ? null : input.preferenceContact?.trim() || undefined,

@@ -1205,6 +1205,27 @@
     "name": "get_client_mailbox",
     "title": "Get a client's connected mailbox"
   },
+  "get_client_onboarding": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Where the setup of a new client stands: what was filled in each of its four steps, what is still missing before it can be activated, and the link to the setup screen. Without `client`, lists every client being set up. A client being set up is in no other tool until a person activates it. For managers only. Its result explains the fields it carries in `fieldNotes`: read them before answering.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "client": {
+          "description": "The client's name. Leave out to list every setup.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "get_client_onboarding",
+    "title": "Where a new client's setup stands"
+  },
   "get_employee_status": {
     "annotations": {
       "destructiveHint": false,
@@ -4993,7 +5014,12 @@
                 "description": "CLIENT level only: take the value from the client's file instead of typing it.",
                 "enum": [
                   "name",
-                  "domains"
+                  "domains",
+                  "kind",
+                  "language",
+                  "preferredChannel",
+                  "accountManager",
+                  "backupManager"
                 ],
                 "type": "string"
               },
@@ -6637,6 +6663,54 @@
     "name": "set_task_step",
     "title": "Tick or untick a step"
   },
+  "start_client_onboarding": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Opens a new client in Ankora, in setup (\"בהקמה\"): created, but not seen by the extraction, the agents, WhatsApp and call matching or the timer until a person activates it on the setup's summary screen. Pass its name, whether it is a business or a private person, and `aiExcluded`: whether nothing of this client may pass through AI. Ask the user for aiExcluded every time and pass their answer; never assume it. Then fill the setup with update_client_onboarding. For managers only. Its result explains the fields it carries in `fieldNotes`: read them before answering.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "aiExcluded": {
+          "type": "boolean"
+        },
+        "communicationLocale": {
+          "description": "The language Ankora writes to them in. Hebrew when not said.",
+          "enum": [
+            "he",
+            "en"
+          ],
+          "type": "string"
+        },
+        "industry": {
+          "description": "In a few words what they do.",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "BUSINESS",
+            "PRIVATE"
+          ],
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "aiExcluded"
+      ],
+      "type": "object"
+    },
+    "name": "start_client_onboarding",
+    "title": "Open a new client, in setup"
+  },
   "start_document_upload": {
     "annotations": {
       "destructiveHint": false,
@@ -6800,6 +6874,171 @@
     },
     "name": "stop_timer",
     "title": "Stop the running timer"
+  },
+  "update_client_onboarding": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Adds to the setup of a client being set up (get_client_onboarding): its domains, partners with their domain, contacts with email and mobile, rules about information, the preferred channel, the account manager and backup, or that it has no rules of its own. Cite where it came from with `source`; without it, the setup itself is cited. Only what the user gave you or a source says, never a guess. Each item is saved or refused on its own. It does not activate the client: a person does, on the setup's summary screen. Its result explains the fields it carries in `fieldNotes`: read them before answering.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "accountManager": {
+          "description": "The Ankora person responsible, by name.",
+          "type": "string"
+        },
+        "backupManager": {
+          "description": "Who stands in for them, by name. Someone else.",
+          "type": "string"
+        },
+        "client": {
+          "description": "The client's name, as get_client_onboarding gives it.",
+          "type": "string"
+        },
+        "contacts": {
+          "items": {
+            "properties": {
+              "email": {
+                "type": "string"
+              },
+              "isDecisionMaker": {
+                "type": "boolean"
+              },
+              "isPrimary": {
+                "type": "boolean"
+              },
+              "name": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "domains": {
+          "description": "The client's own email domains (example.co.il). Never a public mail service.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "noSpecialRules": {
+          "description": "true only when the user said the client has no rules of its own.",
+          "type": "boolean"
+        },
+        "partners": {
+          "description": "Firms that work with the client: accountant, lawyer, suppliers.",
+          "items": {
+            "properties": {
+              "domain": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "preferredChannel": {
+          "enum": [
+            "WHATSAPP",
+            "EMAIL",
+            "PHONE"
+          ],
+          "type": "string"
+        },
+        "rules": {
+          "description": "DATA_HANDLING: what may not enter the file. DISCLOSURE: what is not told to whom. Saved as proposed, for a manager to approve.",
+          "items": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "DATA_HANDLING",
+                  "DISCLOSURE"
+                ],
+                "type": "string"
+              },
+              "statement": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "title",
+              "statement"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "source": {
+          "properties": {
+            "newSource": {
+              "description": "Where what you add came from, when it is not in the register yet.",
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "EMAIL",
+                    "TRANSCRIPT",
+                    "CLIENT_DOCUMENT",
+                    "PERSON"
+                  ],
+                  "type": "string"
+                },
+                "occurredAt": {
+                  "description": "YYYY-MM-DD",
+                  "type": "string"
+                },
+                "title": {
+                  "description": "What it is, as a person would find it again: the email's subject and date, the meeting's title.",
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "title"
+              ],
+              "type": "object"
+            },
+            "sourceCode": {
+              "description": "A source already in the client's register (\"S2\"), from get_client_onboarding's `sources`.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "whatsappNumber": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "client"
+      ],
+      "type": "object"
+    },
+    "name": "update_client_onboarding",
+    "title": "Fill in a new client's setup"
   },
   "update_date": {
     "annotations": {

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { normalizeDomain, normalizeEmail, normalizePhone } from "@/lib/contact-normalize";
+import { isPublicEmailDomain, normalizeDomain, normalizeEmail, normalizePhone } from "@/lib/contact-normalize";
 import { canSeeKnowledgeItem, canSendToAi } from "@/lib/knowledge";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { assertEntityBelongs } from "@/lib/app-domain/client-entities";
@@ -146,7 +146,27 @@ export async function addClientOrganization(actor: User, input: ClientOrganizati
     clientId: input.clientId,
     after: link,
   });
+  await ensurePartnerDomains(actor, input.clientId, organization);
   return link;
+}
+
+/// 26.11.2026: an organization's domains, as partner domains of this
+/// client. The extraction matches meetings by the client's domain list
+/// (ClientDomain) only, so an organization added with its domain was
+/// invisible to it until someone also typed the domain on the sources
+/// screen. A domain the client already lists, as its own or as a
+/// partner's, is left as it is; a public mail service is never one.
+async function ensurePartnerDomains(actor: User, clientId: string, organization: { id: string; domains: string[] }) {
+  for (const domain of organization.domains) {
+    if (isPublicEmailDomain(domain)) continue;
+    const existing = await prisma.clientDomain.findUnique({ where: { clientId_domain: { clientId, domain } } });
+    if (existing && !existing.deletedAt) continue;
+    const data = { kind: "PARTNER" as const, organizationId: organization.id, notes: null };
+    const row = existing
+      ? await prisma.clientDomain.update({ where: { id: existing.id }, data: { ...data, deletedAt: null } })
+      : await prisma.clientDomain.create({ data: { ...data, clientId, domain, createdById: actor.id } });
+    await recordAudit({ actorId: actor.id, action: "client_domain.add", entityType: "ClientDomain", entityId: row.id, clientId, after: row });
+  }
 }
 
 /// Spec 3.1: what the file says about an organization changes like any
@@ -171,6 +191,7 @@ export async function updateClientOrganization(actor: User, id: string, input: P
       : null;
     if (clash) throw new DomainError("clientContacts.domainTaken", `הדומיין כבר שייך ל-${clash.name}.`, { name: clash.name });
     await prisma.organization.update({ where: { id: before.organizationId }, data: { domains } });
+    await ensurePartnerDomains(actor, before.clientId, { id: before.organizationId, domains });
   }
 
   const updated = await prisma.clientOrganization.update({

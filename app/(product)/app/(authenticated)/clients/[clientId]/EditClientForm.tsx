@@ -277,6 +277,38 @@ export function EditClientForm({
             <span className="mt-1 block text-[11px] text-app-text-tertiary">{t("portal.managerHint")}</span>
           </label>
 
+          {/* 26.11.2026 (new-client wizard): the account manager's backup,
+              and the channel the client prefers. */}
+          <label className="block">
+            <span className="block text-xs font-medium text-app-text-secondary">{t("backupManager")}</span>
+            <select
+              name="backupManagerId"
+              defaultValue={client.backupManagerId ?? ""}
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            >
+              <option value="">{t("backupNone")}</option>
+              {staff.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="block text-xs font-medium text-app-text-secondary">{t("preferredChannel")}</span>
+            <select
+              name="preferredChannel"
+              defaultValue={client.preferredChannel ?? ""}
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            >
+              <option value="">{t("channelNone")}</option>
+              <option value="WHATSAPP">{t("channelWHATSAPP")}</option>
+              <option value="EMAIL">{t("channelEMAIL")}</option>
+              <option value="PHONE">{t("channelPHONE")}</option>
+            </select>
+          </label>
+
           <label className="block">
             <span className="block text-xs font-medium text-app-text-secondary">{t("portal.whatsapp")}</span>
             <input

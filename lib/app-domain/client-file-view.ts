@@ -34,6 +34,9 @@ import { ACTION_LABEL } from "@/app/(product)/app/(authenticated)/audit-log/labe
 import { refLabel, teamRefs } from "@/lib/external-refs";
 import type { User, ClientFact, KnowledgeSensitivity } from "@prisma/client";
 
+/// 26.11.2026: Client.preferredChannel, as the file says it.
+const CHANNEL_LABEL = { WHATSAPP: "וואטסאפ", EMAIL: "דוא\"ל", PHONE: "טלפון" } as const;
+
 // Org brain, phase 2: the client file as one document
 // (claude/org-brain-spec-2026-10-12.md, 6.1 and 6.3).
 //
@@ -91,7 +94,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const shown = (r: { sensitivity: KnowledgeSensitivity; audience: KnowledgeAudienceLike; audienceUserIds: string[] }) => !ai || canSendToAi(r, actor.id);
 
   const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions, processes, warnings, daysSinceBatch, supplierTasks, openLessons, batches] = await Promise.all([
-    prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true, kind: true, industry: true, aiExcluded: true, isInternal: true, subprocessorNotice: true, subprocessorNoticeSource: true, subprocessorNoticeCheckedAt: true } }),
+    prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true, kind: true, industry: true, aiExcluded: true, isInternal: true, subprocessorNotice: true, subprocessorNoticeSource: true, subprocessorNoticeCheckedAt: true, preferredChannel: true, accountManager: { select: { name: true } }, backupManager: { select: { name: true } } } }),
     listClientEntities(actor, clientId),
     listClientPeople(actor, clientId),
     listClientFacts(actor, clientId),
@@ -217,6 +220,12 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       items: [
         { text: client.legalName ? `${client.name} (${client.legalName})` : client.name, details: [client.kind === "PRIVATE" ? "לקוח פרטי" : "לקוח עסקי", client.industry] },
         ...(primary ? [{ text: `איש קשר ראשי: ${primary.person.name ?? primary.role}`, details: [primary.role] }] : []),
+        // 26.11.2026 (new-client wizard): who is responsible at Ankora, who
+        // stands in, and the channel the client prefers.
+        ...(client.accountManager || client.backupManager
+          ? [{ text: `אחראי באנקורה: ${client.accountManager?.name ?? "לא נקבע"}`, details: [client.backupManager ? `מחליף: ${client.backupManager.name}` : null] }]
+          : []),
+        ...(client.preferredChannel ? [{ text: `ערוץ מועדף: ${CHANNEL_LABEL[client.preferredChannel]}` }] : []),
         // P8 step 8 (3.11.2026): does the contract commit Ankora to tell
         // this client by email about a new sub-processor. Internal: the
         // file is staff and Claude only, never the portal.

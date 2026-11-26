@@ -299,6 +299,8 @@ export const ACTION_LABEL: Record<string, string> = {
   "client.archive": "העברת לקוח לארכיון",
   "client.restore": "שחזור לקוח מהארכיון",
   "client.onboarding_discard": "מחיקת לקוח בהקמה",
+  "client.activate": "הפעלת לקוח בסוף ההקמה",
+  "client.no_special_rules": "אישור שאין ללקוח כללים מיוחדים",
   "category.create": "יצירת קטגוריה",
   "category.update": "עדכון קטגוריה",
   "category.archive": "העברת קטגוריה לארכיון",

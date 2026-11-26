@@ -45,7 +45,10 @@ export const PARAM_LEVELS = ["AGENT", "CLIENT", "INSTALLATION"] as const;
 /// instructions; VAULT_REF compiles to a reference the agent reads itself.
 export const PARAM_TYPES = ["TEXT", "LONG_TEXT", "NUMBER", "LIST", "EMAIL", "FILE_LOCATION", "PAGE", "LIBRARY_BLOCK", "CONNECTOR", "VAULT_REF"] as const;
 /// Client-level values that come from the client's file instead of being typed twice.
-export const CLIENT_FIELDS = ["name", "domains"] as const;
+/// 26.11.2026 (new-client wizard, Ariel): the type, the language, the
+/// preferred channel, the account manager and the backup as well, so an
+/// agent stops asking for them per client.
+export const CLIENT_FIELDS = ["name", "domains", "kind", "language", "preferredChannel", "accountManager", "backupManager"] as const;
 
 export const paramSchema = z.object({
   key: z.string().regex(KEY),

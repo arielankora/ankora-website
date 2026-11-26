@@ -2415,6 +2415,38 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-19",
       "riskReason": "Undoes an approved proposal in a client file: removes the item it added or puts back the fields it changed (a replaced fact is current again). Refused when the item changed after; a wrong undo erases what the team approved"
+    },
+    "action:(product)/app/(authenticated)/clients/onboarding-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-26",
+      "riskReason": "Creates clients and decides what the automation may see: the AI decision, the domains and numbers that match meetings and calls, and the activation"
+    },
+    "domain:client-onboarding": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-26",
+      "riskReason": "A client being set up must reach nothing that runs on its own until activated; activation checks what the extraction and the comms matching need"
+    },
+    "screen:/app/clients/new": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-26",
+      "riskReason": "The new-client wizard's first step, where the client is created"
+    },
+    "screen:/app/clients/[clientId]/setup": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-26",
+      "riskReason": "The new-client wizard: setup steps, summary and activation"
     }
   },
   "waivers": {},

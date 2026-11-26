@@ -123,7 +123,11 @@ const TRANSLATED_FILES = [
   // guide/content.ts is the Hebrew guide itself; content.en.ts is its English twin
   // (tests/unit/guide-content-parity.test.ts keeps the two in step).
   "app/(product)/app/(authenticated)/clients/ClientsGrid.tsx",
-  "app/(product)/app/(authenticated)/clients/CreateClientForm.tsx",
+  "app/(product)/app/(authenticated)/clients/OnboardingSection.tsx",
+  "app/(product)/app/(authenticated)/clients/new/page.tsx",
+  "app/(product)/app/(authenticated)/clients/[clientId]/setup/page.tsx",
+  "app/(product)/app/(authenticated)/clients/setup/SetupLayout.tsx",
+  "app/(product)/app/(authenticated)/clients/setup/SetupSteps.tsx",
   "app/(product)/app/(authenticated)/clients/HolidayCalendarsPanel.tsx",
   "app/(product)/app/(authenticated)/clients/RestoreClientButton.tsx",
   "app/(product)/app/(authenticated)/clients/SubprocessorRecipientsPanel.tsx",
