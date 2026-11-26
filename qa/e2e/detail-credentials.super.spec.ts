@@ -60,7 +60,11 @@ async function harvest(page: import("@playwright/test").Page): Promise<string[]>
         return "";
       }
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    // A creation screen ("/app/clients/new", 26.11.2026) sits where an id
+    // would, and is no record: taking it for one opened
+    // "/app/clients/new/handover" and friends.
+    .filter((p) => !p.endsWith("/new"));
 }
 
 /**

@@ -36,12 +36,18 @@ async function openFirstDetail(
 
   await page.goto(listRoute, { waitUntil: "domcontentloaded" });
 
-  const link = page.locator(`a[href^="${detailPrefix}"]`).first();
-  if ((await link.count()) === 0) return { skipped: true as const, errors };
+  // The first link to one record: "/app/clients/<id>", not a creation
+  // screen beside it ("/app/clients/new", 26.11.2026) and not a deeper
+  // page of a record (a setup's "/app/clients/<id>/setup").
+  const hrefs = await page.locator(`a[href^="${detailPrefix}"]`).evaluateAll((els) => els.map((el) => el.getAttribute("href") ?? ""));
+  const href = hrefs.find((h) => {
+    const rest = h.slice(detailPrefix.length).split(/[?#]/)[0];
+    return rest.length > 0 && !rest.includes("/") && rest !== "new";
+  });
+  if (!href) return { skipped: true as const, errors };
 
-  const href = await link.getAttribute("href");
-  const response = await page.goto(href!, { waitUntil: "domcontentloaded" });
-  return { skipped: false as const, errors, response, href: href! };
+  const response = await page.goto(href, { waitUntil: "domcontentloaded" });
+  return { skipped: false as const, errors, response, href };
 }
 
 async function assertDetailRenders(
