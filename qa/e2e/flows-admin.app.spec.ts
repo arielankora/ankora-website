@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures";
+import { createActiveClient, startClientSetup } from "./new-client";
 
 // The write paths behind the admin screens, signed in as the seeded
 // ANKORA_ADMIN. Same reasoning as flows-time.app.spec.ts: rendering a screen
@@ -63,40 +64,28 @@ function windowEarlierToday(lengthMinutes = 25, gapMinutes = 320): { start: stri
   return { start: fmt(start), end: fmt(end) };
 }
 
-test.describe("clients/actions", () => {
-  test("a client created from the drawer appears in the list", async ({ page }) => {
+// @covers action:(product)/app/(authenticated)/clients/onboarding-actions
+// @covers domain:client-onboarding
+// @covers screen:/app/clients/new
+// @covers screen:/app/clients/[clientId]/setup
+test.describe("clients/onboarding-actions", () => {
+  // 26.11.2026: the new-client wizard replaced the drawer. A client is
+  // created in setup at the end of step 1, and is listed as an active
+  // client only after its activation.
+  test("a client set up through the wizard is listed in setup, then as active", async ({ page }) => {
+    test.setTimeout(120_000);
     const name = tag("[E2E] לקוח");
 
+    await startClientSetup(page, name);
     await page.goto("/app/clients");
-    await page.getByRole("button", { name: "לקוח חדש", exact: true }).click();
+    const setups = page.getByRole("region", { name: "בהקמה" });
+    await expect(setups.getByText(name, { exact: false }), "the client being set up is not in its section").toBeVisible({ timeout: 15_000 });
 
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await dialog.locator('input[name="name"]').fill(name);
-    // Wait for the server to acknowledge the write before reloading, the same
-    // way the categories test below does. 10.10.2026: creating a client now
-    // also writes its two default alert rules, the write takes longer, and a
-    // reload issued while the POST is open aborted it before the row was
-    // committed ("POST /app/clients net::ERR_ABORTED (WHILE NAVIGATING)",
-    // reported as minor on every run for weeks; reproduced locally as a
-    // failure of this test).
-    const written = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-    await dialog.getByRole("button", { name: "הוספת לקוח" }).click();
-    await written;
-
-    // The drawer closes itself on success, so its disappearance is the first
-    // signal, and the row is the one that matters.
-    // NOT asserting that the drawer closes. It usually does, and intermittently
-    // does not: the form's close-on-ok effect races the router refresh that
-    // `revalidatePath` triggers, and when the refresh wins, the effect fires
-    // against a subtree that has already been replaced. That is a real race
-    // worth fixing in the Drawer, but it is a cosmetic one - the record is
-    // written either way - and it is not what these specs are here to prove.
-    // The row is.
-    await page.reload();
-    await expect(page.getByText(name, { exact: false }).first(), "the client was not created").toBeVisible({
-      timeout: 15_000,
-    });
+    const active = tag("[E2E] לקוח פעיל");
+    await createActiveClient(page, active);
+    await page.goto("/app/clients");
+    await expect(page.getByText(active, { exact: false }).first(), "the activated client is not listed").toBeVisible({ timeout: 15_000 });
+    await expect(setups.getByText(active, { exact: false })).toHaveCount(0);
   });
 });
 

@@ -363,6 +363,11 @@ function ParamForm({ agentId, param }: { agentId: string; param?: AgentParam }) 
           <option value="">{t("param.clientFieldNone")}</option>
           <option value="name">{t("param.clientFieldName")}</option>
           <option value="domains">{t("param.clientFieldDomains")}</option>
+          <option value="kind">{t("param.clientFieldKind")}</option>
+          <option value="language">{t("param.clientFieldLanguage")}</option>
+          <option value="preferredChannel">{t("param.clientFieldPreferredChannel")}</option>
+          <option value="accountManager">{t("param.clientFieldAccountManager")}</option>
+          <option value="backupManager">{t("param.clientFieldBackupManager")}</option>
         </select>
       </Field>
       <label className="flex items-center gap-2 text-sm text-app-text-primary">

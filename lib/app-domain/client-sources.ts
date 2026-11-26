@@ -2,7 +2,7 @@ import "server-only";
 import { DomainError } from "@/lib/domain-error";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { ForbiddenError, assertCan } from "@/lib/app-auth/permissions";
+import { ForbiddenError, assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { isInternalClient } from "@/lib/app-domain/internal-client-id";
@@ -36,9 +36,15 @@ import type {
 
 export async function assertClientAccess(actor: User, clientId: string) {
   const accessible = await listAccessibleClients(actor);
-  if (!accessible.some((c) => c.id === clientId)) {
-    throw new ForbiddenError("You are not assigned to this client.");
-  }
+  if (accessible.some((c) => c.id === clientId)) return;
+  // 26.11.2026 (new-client wizard): a client being set up is in nobody's
+  // working set, so nothing that runs on its own reaches it. The people
+  // who set clients up (client.manage) still write its file: the wizard
+  // and the onboarding tools come here with its id. Every path that finds
+  // a client by itself (names, domains, numbers) goes through
+  // listAccessibleClients and never gets that id.
+  if (canManageClients(actor.role) && (await prisma.client.count({ where: { id: clientId, status: "ONBOARDING", deletedAt: null } })) > 0) return;
+  throw new ForbiddenError("You are not assigned to this client.");
 }
 
 // ---------------------------------------------------------------------------

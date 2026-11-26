@@ -103,3 +103,17 @@ export const CLAUDE_USAGE_NOTES: FieldNotes = {
   aliases: "In `settings`: userId to the other addresses that person signs in to Claude with. Cowork's telemetry and the browser extension under those addresses count as that person's.",
   summary: "The managers' summary: a verdict, the leading indicators against their targets, and at most three things to do.",
 };
+
+/// New-client wizard (26.11.2026): start_client_onboarding,
+/// get_client_onboarding and update_client_onboarding.
+export const CLIENT_ONBOARDING_NOTES: FieldNotes = {
+  step: "The furthest of the setup's four steps saved: 1 identity and the AI decision, 2 domains, partners and channel, 3 contacts, 4 rules and team.",
+  missing: "What the client still needs before a person can activate it, each with the step it is filled in. Ask the user for these; never fill one with a guess.",
+  ready: "true when nothing is missing. Tell the user the client is ready and give them `url`: activation happens on the setup's summary screen, by a person, and no tool does it.",
+  url: "The setup screen of this client. Give it to the user as it is.",
+  contacts: "`hasEmail` and `hasPhone` say whether the contact can be matched to emails, WhatsApp and calls; the addresses themselves are not sent. A contact with neither blocks activation.",
+  source: "Where an item came from when it is not the setup itself: the title of the source it cites.",
+  sources: "The client's source register: cite one by its `code` in update_client_onboarding's `sourceCode`.",
+  errors: "Items that were not saved, each with why, in the domain's own words. The rest were saved.",
+  setups: "Every client being set up, with what each still needs.",
+};

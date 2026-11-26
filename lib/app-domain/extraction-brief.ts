@@ -25,6 +25,15 @@ import { processedComms } from "@/lib/comms/extraction-refs";
 
 const PROCESSED_WINDOW_DAYS = 30;
 
+// 26.11.2026 (new-client wizard, Ariel approved): "domains, never
+// addresses" still holds for this brief. A participant whose address is
+// on a public mail service is looked up one address at a time, with the
+// tool that answers for the user's own clients only.
+const PUBLIC_ADDRESS_INSTRUCTION =
+  "A participant whose address is on a public mail service (gmail.com, outlook.com and the like) matches no client by domain. Look the address up with lookup_contact: a client whose file has that person is a match, as a client domain is. A person in more than one client's file decides nothing alone: decide from the title and content, as for a shared partner domain.";
+const PRIVATE_CLIENT_INSTRUCTION =
+  "A private person: their meetings come from personal addresses, often with no domain of the client's own. Recognise them through lookup_contact on each participant's address.";
+
 export async function extractionBrief(actor: User, now = new Date()) {
   assertCan(actor.role, "time_entry.create_self");
   const clients = await listAccessibleClients(actor);
@@ -81,6 +90,10 @@ export async function extractionBrief(actor: User, now = new Date()) {
           .map((d) => ({ domain: d.domain, kind: d.kind, organization: d.organization?.name ?? null })),
       } : {
         name: c.name,
+        // 26.11.2026 (new-client wizard): a private client often has no
+        // domain of its own, and is recognised by its people's addresses.
+        kind: c.kind === "PRIVATE" ? ("PRIVATE" as const) : undefined,
+        instruction: c.kind === "PRIVATE" ? PRIVATE_CLIENT_INSTRUCTION : undefined,
         domains: domains
           .filter((d) => d.clientId === c.id)
           .map((d) => ({ domain: d.domain, kind: d.kind, organization: d.organization?.name ?? null })),
@@ -89,6 +102,10 @@ export async function extractionBrief(actor: User, now = new Date()) {
           .map(ruleLine)
           .filter((l): l is string => !!l),
       }),
+    // 26.11.2026: a participant from a public mail service is not matched
+    // by domain. lookup_contact says whose file has that one address,
+    // without this brief carrying anyone's address.
+    publicAddresses: { instruction: PUBLIC_ADDRESS_INSTRUCTION },
     // 28.10.2026: a meeting where a "בלי AI" subject came up is marked in
     // its title by whoever ran it, and a run leaves it unopened.
     noAiMeetings: {

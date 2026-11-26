@@ -9,8 +9,9 @@ import { countOpenTasksByClient } from "@/lib/app-domain/tasks";
 import { assessClient, attentionRank, bankDisplay, LOW_REMAINING_SHARE, PACE_MIN_DAYS, PACKAGE_ENDING_DAYS, type ReasonCode } from "@/lib/client-attention";
 import { formatDecimalHours } from "@/lib/hours-format";
 import { Forbidden } from "@/components/app/Forbidden";
-import { Drawer } from "@/components/app/Drawer";
-import { CreateClientForm } from "./CreateClientForm";
+import Link from "next/link";
+import { OnboardingSection } from "./OnboardingSection";
+import { listOnboarding } from "@/lib/app-domain/client-onboarding";
 import { ClientsGrid, type ClientCard, type HistoryBar } from "./ClientsGrid";
 import { RestoreClientButton } from "./RestoreClientButton";
 import { SubprocessorRecipientsPanel } from "./SubprocessorRecipientsPanel";
@@ -43,11 +44,13 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
 
   const canManageBanks = can(user.role, "hour_bank.manage");
   const canViewReports = can(user.role, "report.internal.view");
-  const [clients, archived, noticeGroups] = await Promise.all([
+  const [clients, archived, noticeGroups, onboarding] = await Promise.all([
     listClients(),
     listArchivedClients(user),
     // P8 step 8 (3.11.2026). The screen is client.manage only, as is this.
     listSubprocessorRecipients(user),
+    // 26.11.2026: the clients being set up, in their own section.
+    listOnboarding(user),
   ]);
   // 2.11.2026: an archived client's conversations and recordings are kept
   // 30 days for the export, then deleted. Managers export them from here.
@@ -209,10 +212,24 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
             <h1 className="text-xl font-medium text-app-text-primary">{t("title")}</h1>
             <p className="mt-1 text-sm text-app-text-secondary">{t("subtitle")}</p>
           </div>
-          <Drawer triggerLabel={t("newClient")} title={t("newClient")}>
-            <CreateClientForm />
-          </Drawer>
+          {/* 26.11.2026: the new-client wizard, a page of its own. */}
+          <Link href="/app/clients/new" className="tap-area rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary">
+            {t("newClient")}
+          </Link>
         </div>
+
+        <OnboardingSection
+          now={new Date()}
+          rows={onboarding.map((o) => ({
+            id: o.id,
+            name: o.name,
+            kind: o.kind,
+            step: o.step,
+            missing: o.missing.map((m) => m.code),
+            lastEditedAt: o.lastEditedAt,
+            lastEditedBy: o.lastEditedBy,
+          }))}
+        />
 
         {/* Keyed on the roster, so a client restored below appears in the
             grid (which keeps its own copy of the list for the archive

@@ -5,7 +5,7 @@ import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { parseSubprocessorNotice } from "@/lib/subprocessor-notice";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
-import { createClient, updateClient, archiveClient, restoreClient } from "@/lib/app-domain/clients";
+import { updateClient, archiveClient, restoreClient } from "@/lib/app-domain/clients";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { shekelsToMinor } from "@/lib/money";
 import { createDecision, cancelDecision } from "@/lib/app-domain/decisions";
@@ -45,26 +45,6 @@ function parseCommunicationLocale(value: FormDataEntryValue | null): "he" | "en"
   return value === "he" || value === "en" ? value : undefined;
 }
 
-export async function createClientAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
-  const user = await requireUser();
-  const name = String(formData.get("name") || "").trim();
-  if (!name) return { error: (await errorText())("nameRequired") };
-
-  try {
-    await createClient(user, {
-      name,
-      legalName: String(formData.get("legalName") || ""),
-      timezone: String(formData.get("timezone") || "Asia/Jerusalem"),
-      primaryContact: String(formData.get("primaryContact") || ""),
-    });
-  } catch (err) {
-    return { error: await friendlyError(err) };
-  }
-
-  revalidatePath("/app/clients");
-  return { ok: true };
-}
-
 export async function updateClientAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") || "");
@@ -82,6 +62,8 @@ export async function updateClientAction(_prev: FormState | undefined, formData:
       // deliberate blank. shekelsToMinor already returns null for an
       // empty string.
       accountManagerId: String(formData.get("accountManagerId") || "") || null,
+      backupManagerId: String(formData.get("backupManagerId") || "") || null,
+      preferredChannel: (["WHATSAPP", "EMAIL", "PHONE"].includes(String(formData.get("preferredChannel"))) ? String(formData.get("preferredChannel")) : null) as "WHATSAPP" | "EMAIL" | "PHONE" | null,
       whatsappNumber: String(formData.get("whatsappNumber") || "") || null,
       approvalCeilingMinor: shekelsToMinor(String(formData.get("approvalCeiling") || "")),
       // Portal phase 3. Same rule as the three above: always on the form,

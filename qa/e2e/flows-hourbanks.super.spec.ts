@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures";
+import { createActiveClient } from "./new-client";
 
 // The hour-bank write paths, under the Super-Admin session.
 //
@@ -38,28 +39,9 @@ function isoDay(offsetDays: number) {
  * so two tests sharing a client would make each other look broken.
  */
 async function createClient(page: import("@playwright/test").Page, name: string): Promise<void> {
+  // 26.11.2026: through the new-client wizard, to an active client.
+  await createActiveClient(page, name);
   await page.goto("/app/clients");
-  await page.getByRole("button", { name: "לקוח חדש", exact: true }).click();
-
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await dialog.locator('input[name="name"]').fill(name);
-  await dialog.getByRole("button", { name: "הוספת לקוח" }).click();
-
-  // Wait for the write before reloading.
-  //
-  // Reloading straight after the click out-races the Server Action, and
-  // the reloaded page then honestly does not have the row yet - which
-  // reports as "the client was not created" and passes on the retry.
-  // This action is slower than it looks: creating a client revalidates
-  // the dashboard, and the dashboard issues one hour-bank query per
-  // active client, so every client this suite creates makes the next
-  // creation a little slower.
-  await page.waitForLoadState("networkidle");
-  await page.reload();
-  await expect(page.getByText(name, { exact: false }).first(), "the client was not created").toBeVisible({
-    timeout: 30_000,
-  });
 }
 
 /**

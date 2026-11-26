@@ -454,6 +454,10 @@ export async function setClientValue(actor: User, input: { agentId: string; clie
 
 /// The clients a set of ids or a scope resolves to, with this agent's
 /// client-level values. "בלי AI" clients never reach an agent.
+const CLIENT_KIND_TEXT = { BUSINESS: "עסק", PRIVATE: "לקוח פרטי" } as const;
+const LANGUAGE_TEXT = { he: "עברית", en: "אנגלית" } as const;
+const CHANNEL_TEXT = { WHATSAPP: "וואטסאפ", EMAIL: "דוא\"ל", PHONE: "טלפון" } as const;
+
 export async function resolveClients(user: User, agentId: string, params: AgentParam[], scope: { clientScope: "ONE" | "LIST" | "ALL_MINE"; clientIds: string[] }): Promise<CompileClient[]> {
   const accessible = await listAccessibleClients(user);
   const allowed = scope.clientScope === "ALL_MINE" ? accessible : accessible.filter((c) => scope.clientIds.includes(c.id));
@@ -461,16 +465,28 @@ export async function resolveClients(user: User, agentId: string, params: AgentP
   const clients = allowed.filter((c) => !excluded.has(c.id));
   if (clients.length === 0) return [];
   const ids = clients.map((c) => c.id);
-  const [values, domains] = await Promise.all([
+  const staffIds = [...new Set(clients.flatMap((c) => [c.accountManagerId, c.backupManagerId]).filter((x): x is string => !!x))];
+  const [values, domains, staff] = await Promise.all([
     prisma.agentClientValue.findMany({ where: { agentId, clientId: { in: ids } } }),
     params.some((p) => p.clientField === "domains") ? prisma.clientDomain.findMany({ where: { clientId: { in: ids }, deletedAt: null }, select: { clientId: true, domain: true } }) : Promise.resolve([]),
+    params.some((p) => p.clientField === "accountManager" || p.clientField === "backupManager") && staffIds.length
+      ? prisma.user.findMany({ where: { id: { in: staffIds } }, select: { id: true, name: true } })
+      : Promise.resolve([]),
   ]);
+  const staffName = new Map(staff.map((u) => [u.id, u.name]));
   return clients.map((c) => {
     const own: Record<string, string> = {};
     for (const v of values) if (v.clientId === c.id) own[v.key] = v.value;
     for (const p of params) {
       if (p.clientField === "name") own[p.key] = c.name;
       if (p.clientField === "domains") own[p.key] = domains.filter((d) => d.clientId === c.id).map((d) => d.domain).join(", ");
+      // 26.11.2026: what the file says, in the words the agent writes in.
+      // A field the file has no answer for stays empty.
+      if (p.clientField === "kind") own[p.key] = CLIENT_KIND_TEXT[c.kind];
+      if (p.clientField === "language") own[p.key] = LANGUAGE_TEXT[c.communicationLocale];
+      if (p.clientField === "preferredChannel") own[p.key] = c.preferredChannel ? CHANNEL_TEXT[c.preferredChannel] : "";
+      if (p.clientField === "accountManager") own[p.key] = (c.accountManagerId && staffName.get(c.accountManagerId)) || "";
+      if (p.clientField === "backupManager") own[p.key] = (c.backupManagerId && staffName.get(c.backupManagerId)) || "";
     }
     return { id: c.id, name: c.name, values: own };
   });

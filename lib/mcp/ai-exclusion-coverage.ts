@@ -69,6 +69,10 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   set_contact_ended: "lookupClient",
   update_date: "lookupClient; a sensitive date is not a candidate",
   set_client_audit_requirements: "lookupClient",
+  // lib/mcp/onboarding-tools.ts (26.11.2026)
+  start_client_onboarding: "the user's own aiExcluded answer is required; a client opened with it on gets only its name and link back, and the other onboarding tools refuse it",
+  get_client_onboarding: "findSetup: a marked client being set up is no candidate and gets the \"בלי AI\" answer; the list leaves it out",
+  update_client_onboarding: "findSetup, as get_client_onboarding",
   confirm_procedure_still_right: "lookupClient",
   save_procedure_audit_draft: "lookupClient",
   list_policies: "lookupClient",

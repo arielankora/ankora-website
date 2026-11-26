@@ -62,6 +62,7 @@ import { registerTaskExtraTools } from "@/lib/mcp/task-extra-tools";
 import { registerDocumentTools } from "@/lib/mcp/document-tools";
 import { registerClientFileTools } from "@/lib/mcp/client-file-tools";
 import { registerProcessTools } from "@/lib/mcp/process-tools";
+import { registerOnboardingTools } from "@/lib/mcp/onboarding-tools";
 import { registerDateTools } from "@/lib/mcp/date-tools";
 import { registerEmployeeTools } from "@/lib/mcp/employee-tools";
 import { registerHourBankTools } from "@/lib/mcp/hour-bank-tools";
@@ -1777,6 +1778,8 @@ export function registerAnkoraTools(server: McpServer): void {
   registerCommsTools(server);
   registerUsageTools(server);
   registerAgentTools(server);
+  // New-client wizard (26.11.2026).
+  registerOnboardingTools(server);
 }
 
 export { TOOL_ANNOTATIONS, TEAM_TOOLS, WRITE_TOOLS } from "@/lib/mcp/annotations";
