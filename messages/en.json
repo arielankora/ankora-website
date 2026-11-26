@@ -1638,7 +1638,24 @@
       "sendFailed": "Sending failed. The permission may have been revoked in Google.",
       "noMailAccess": "No access to the mailbox. The permission may have been revoked in Google.",
       "invalidFolderId": "The folder ID is not valid.",
-      "noDriveAccess": "No access to the Drive folder."
+      "noDriveAccess": "No access to the Drive folder.",
+      "mailbox": {
+        "notConfigured": "Connecting through Unipile is not set up in this environment.",
+        "noAnswer": "Unipile did not answer. Try again in a moment.",
+        "rateLimited": "Unipile is limiting requests to this mailbox right now. Try again in a few minutes.",
+        "itemNotFound": "The item was not found in the mailbox. It may have been deleted, or the id is wrong.",
+        "status": "Unipile returned error {status}.",
+        "attachmentTooLarge": "The attachment is larger than 15MB, and Ankora does not read it from here.",
+        "aiExcluded": "This client is marked \"No AI\", so its mailbox is not read through Claude.",
+        "none": "This client has no connected mailbox. The account manager connects one on the client's connections screen in Ankora.",
+        "unknown": "That mailbox is not connected for this client. Connected mailboxes: {addresses}.",
+        "which": "This client has more than one connected mailbox. Say which one to read: {addresses}.",
+        "disconnected": "The connection to the mailbox {account} dropped. The account manager reconnects it on the client's connections screen.",
+        "badDate": "The date {value} is not valid. Write YYYY-MM-DD.",
+        "idRequired": "Pass the id of an email or of a thread.",
+        "attachmentNotFound": "This email has no attachment with that id. The ids are in the email's attachments.",
+        "attachmentGone": "The attachment is no longer available at the mail provider."
+      }
     },
     "requestTypes": {
       "processNotFound": "The selected process was not found for this client.",
@@ -2297,7 +2314,9 @@
       "agentLibraryApprove": "Agent library block version approved",
       "agentLibraryReject": "Agent library block version rejected",
       "agentLessonPropose": "Agent change proposed from a run",
-      "agentLessonDecide": "Agent change proposal handled"
+      "agentLessonDecide": "Agent change proposal handled",
+      "connectionReconnect": "Reconnecting a client system",
+      "connectionMailRead": "Reading a client mailbox"
     },
     "kinds": {
       "failure": "Failure",
@@ -5322,7 +5341,12 @@
         "notConfigured": "Connecting to Google is not set up in this environment yet (OAuth client details are missing).",
         "denied": "The connection was cancelled on Google's screen.",
         "noToken": "Google did not return a lasting permission. Remove the app in the Google account settings and try again.",
-        "failed": "The connection failed. Please try again."
+        "failed": "The connection failed. Please try again.",
+        "mailboxConnected": "The mailbox is connected. Everyone who sees this client can now read it through Claude.",
+        "mailboxReconnected": "The mailbox is reconnected.",
+        "mailboxExpired": "The mailbox link has expired or is not valid. Create a new one.",
+        "mailboxWrongProvider": "The account connected is not a mailbox.",
+        "mailboxTaken": "This mailbox is already connected, or the link was an old one. Create a new one."
       },
       "result": {
         "generic": "Something went wrong. Please try again.",
@@ -5333,12 +5357,16 @@
         "mailConnected": "Mail: connected ({threads} threads, no content read)",
         "driveFiles": "Drive: {count} files in the folder",
         "mailOnly": "{mail}.",
-        "mailAndDrive": "{mail}. {drive}."
+        "mailAndDrive": "{mail}. {drive}.",
+        "mailboxRunning": "The mailbox is connected and working.",
+        "mailboxNeedsReconnect": "The connection to the mailbox dropped. Press \"Reconnect\".",
+        "mailboxStatus": "Connection state at Unipile: {status}."
       },
       "kinds": {
         "GOOGLE_OAUTH": "Client's Google",
         "MAIL_APP_PASSWORD": "Client's mail",
-        "MANAGER_SEND": "Sending from the account manager's mailbox"
+        "MANAGER_SEND": "Sending from the account manager's mailbox",
+        "UNIPILE_MAIL": "Client mailbox and calendar"
       },
       "scopes": {
         "appPassword": "App password",
@@ -5347,7 +5375,11 @@
         "sendOnly": "Send only",
         "mailReplies": "Mail: only whether a reply arrived",
         "driveRead": "Drive: sees files in the folder",
-        "driveWrite": "Drive: writes files the procedure creates"
+        "driveWrite": "Drive: writes files the procedure creates",
+        "viaUnipile": "Via Unipile",
+        "mailRead": "Mail: read",
+        "calendar": "Calendar",
+        "claudeReads": "Claude reads, by Ankora permissions"
       },
       "confirmLabel": "Confirm disconnect",
       "confirmYes": "Yes, disconnect",
@@ -5386,7 +5418,18 @@
         "connect": "Connect my mailbox for sending",
         "notConnected": "Your mailbox is not connected."
       },
-      "aiExcluded": "This client is marked \"No AI\": simple checks (a reply arrived, a file exists) still run, but Claude does not read through the connections."
+      "aiExcluded": "This client is marked \"No AI\": simple checks (a reply arrived, a file exists) still run, but Claude does not read through the connections.",
+      "mailbox": {
+        "title": "Mailbox and calendar, to work on through Claude",
+        "hint": "Whoever holds the mailbox signs in on Google's or Microsoft's screen. Ankora gets no password. Then everyone who sees the client can ask Claude to search and read it.",
+        "open": "Connect now",
+        "copy": "Copy a link for the client",
+        "copied": "Link copied. Send it to whoever holds the mailbox. It is valid for 24 hours.",
+        "copyFailed": "Could not copy. This is the link, valid for 24 hours: {link}",
+        "reconnect": "Reconnect",
+        "confirm": "Disconnect the mailbox? It will be removed from Unipile, and Claude will no longer be able to read it.",
+        "notReady": "Connecting a mailbox through Unipile is not set up in this environment yet."
+      }
     },
     "knowledge": {
       "status": {

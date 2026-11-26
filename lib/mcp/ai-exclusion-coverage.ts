@@ -115,6 +115,13 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   list_client_communications: "lookupClient; a number that also belongs to a marked client is left out (lib/comms/client-comms.ts scopeFor)",
   get_client_communication: "lookupClient; the conversation or call must be one list_client_communications would list, so a marked client's number is never read",
 
+  // lib/mcp/mailbox-tools.ts
+  get_client_mailbox: "lookupClient; only the connections of the client named, no mail is read",
+  search_client_emails: "lookupClient, and resolveMailbox refuses a marked client again (lib/client-mailbox/mailbox.ts)",
+  get_client_email: "lookupClient, and resolveMailbox refuses a marked client again",
+  read_client_email_attachment: "lookupClient, and resolveMailbox refuses a marked client again",
+  list_client_mail_folders: "lookupClient, and resolveMailbox refuses a marked client again",
+
   // lib/mcp/approval-tools.ts
   list_approvals: "lookupClient; rows of a marked client, and tasks and plans of a marked task, are left out (listApprovalsForAi); auto-applied items of a marked client are left out (listAutoReview forAi)",
   decide_approval: "only a row list_approvals would show (findApprovalForAi)",
