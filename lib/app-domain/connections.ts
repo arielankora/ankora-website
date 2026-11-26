@@ -9,6 +9,7 @@ import { createCredential, deleteCredential, openConnectionSecret } from "@/lib/
 import { accessTokenFrom, revokeToken, type OAuthPurpose } from "@/lib/google-oauth";
 import { rtlMimeMessage } from "@/lib/rtl-mail";
 import { outgoingOf } from "@/lib/i18n/recipients";
+import { mailboxNeedsReconnect, readMailAccount, removeMailAccount } from "@/lib/client-mailbox/unipile-mail";
 
 // Client connections (ADR 0001 section 24, task cmvtivumj000pjs08q9qj4t67,
 // Ariel 4.11.2026): a client's mailbox and Drive that its procedures read
@@ -37,9 +38,10 @@ export const CONNECTION_KIND_LABELS: Record<ConnectionKind, string> = {
   GOOGLE_OAUTH: "Google של הלקוח",
   MAIL_APP_PASSWORD: "מייל של הלקוח, בסיסמת אפליקציה",
   MANAGER_SEND: "שליחה מהתיבה של מנהל התיק",
+  UNIPILE_MAIL: "תיבת דואר ויומן של הלקוח",
 };
 
-async function assertManagesConnections(actor: User, clientId: string) {
+export async function assertManagesConnections(actor: User, clientId: string) {
   await assertClientAccess(actor, clientId);
   const client = await prisma.client.findUnique({ where: { id: clientId }, select: { accountManagerId: true } });
   if (!canManageClients(actor.role) && client?.accountManagerId !== actor.id) {
@@ -132,6 +134,9 @@ export async function disconnect(actor: User, id: string): Promise<void> {
   const row = await prisma.clientConnection.findUnique({ where: { id } });
   if (!row || row.revokedAt) throw new DomainError("connections.notFound", "החיבור לא נמצא.");
   await assertManagesConnections(actor, row.clientId);
+  // A Unipile mailbox: removed at Unipile first, so its tokens are dropped
+  // and it stops being billed even if closing the row fails after.
+  if (row.kind === "UNIPILE_MAIL" && row.unipileAccountId) await removeMailAccount(row.unipileAccountId);
   if (row.credentialId) {
     if (row.kind !== "MAIL_APP_PASSWORD") {
       const token = await openConnectionSecret({ credentialId: row.credentialId, connectionId: row.id, actorId: actor.id, purpose: "ביטול ההרשאה ב-Google" }).catch(() => null);
@@ -152,14 +157,22 @@ export async function disconnect(actor: User, id: string): Promise<void> {
 /// this used to return.
 export type ConnectionTestResult =
   | { kind: "appPassword" }
+  | { kind: "mailbox"; running: boolean; status: string }
   | { kind: "sent"; account: string }
   | { kind: "mail"; threads: number | null; driveFiles: number | null };
 
 export async function testConnection(actor: User, id: string, opts: { folderId?: string | null } = {}): Promise<ConnectionTestResult> {
   const row = await prisma.clientConnection.findUnique({ where: { id } });
-  if (!row || row.revokedAt || !row.credentialId) throw new DomainError("connections.notFound", "החיבור לא נמצא.");
+  if (!row || row.revokedAt || !(row.credentialId || row.unipileAccountId)) throw new DomainError("connections.notFound", "החיבור לא נמצא.");
   await assertManagesConnections(actor, row.clientId);
   if (row.kind === "MAIL_APP_PASSWORD") return { kind: "appPassword" };
+  // A Unipile mailbox: the account's state at Unipile, without reading mail.
+  if (row.kind === "UNIPILE_MAIL" && row.unipileAccountId) {
+    const account = await readMailAccount(row.unipileAccountId);
+    await recordAudit({ actorId: actor.id, action: "connection.test", entityType: "ClientConnection", entityId: id, clientId: row.clientId, after: { kind: row.kind, status: account.status } });
+    return { kind: "mailbox", running: account.status === "running", status: mailboxNeedsReconnect(account.status) ? "reconnect" : account.status };
+  }
+  if (!row.credentialId) throw new DomainError("connections.notFound", "החיבור לא נמצא.");
   const refresh = await openConnectionSecret({ credentialId: row.credentialId, connectionId: row.id, actorId: actor.id, purpose: "בדיקת חיבור" });
   const token = await accessTokenFrom(refresh);
   const auth = { authorization: `Bearer ${token}` };

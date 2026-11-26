@@ -4,6 +4,8 @@ import { getTranslations } from "next-intl/server";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { addAppPasswordConnection, disconnect, testConnection } from "@/lib/app-domain/connections";
+import { appBaseUrl } from "@/lib/email-templates";
+import { createMailboxConnectLink } from "@/lib/client-mailbox/connect";
 
 // Client connections (ADR 0001 section 24, task cmvtivumj000pjs08q9qj4t67).
 // The Google round trip goes through /api/connections/google; these are
@@ -54,9 +56,30 @@ export async function testConnectionAction(id: string, folderId: string | null):
     const r = await testConnection(user, id, { folderId });
     const t = await getTranslations("clients.connections.result");
     if (r.kind === "appPassword") return { ok: t("appPasswordNotTestable") };
+    if (r.kind === "mailbox") {
+      if (r.running) return { ok: t("mailboxRunning") };
+      return r.status === "reconnect" ? { error: t("mailboxNeedsReconnect") } : { error: t("mailboxStatus", { status: r.status }) };
+    }
     if (r.kind === "sent") return { ok: t("testSent", { account: r.account }) };
     const mail = t("mailConnected", { threads: r.threads === null ? "?" : String(r.threads) });
     return { ok: r.driveFiles === null ? t("mailOnly", { mail }) : t("mailAndDrive", { mail, drive: t("driveFiles", { count: String(r.driveFiles) }) }) };
+  } catch (err) {
+    return await fail(err);
+  }
+}
+
+/// A client mailbox through Unipile (26.11.2026): the Hosted Auth link, to
+/// open here or to send to whoever holds the mailbox. With a connection id,
+/// the link reconnects that mailbox.
+export async function mailboxLinkAction(clientId: string, connectionId: string | null): Promise<Result & { link?: string }> {
+  const user = await requireUser();
+  try {
+    const { link } = await createMailboxConnectLink(user, {
+      clientId,
+      connectionId,
+      redirectUri: `${appBaseUrl()}/api/connections/mailbox/callback`,
+    });
+    return { link };
   } catch (err) {
     return await fail(err);
   }

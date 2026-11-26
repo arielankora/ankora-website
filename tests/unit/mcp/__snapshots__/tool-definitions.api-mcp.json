@@ -1118,6 +1118,44 @@
     "name": "get_client_communication",
     "title": "Read a client's WhatsApp conversation or recorded call"
   },
+  "get_client_email": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Reads one email, or a whole thread oldest first, from the client's connected mailbox: who, when, the text, and the attachments with their ids. Pass `emailId` or `threadId` from search_client_emails. A long thread is cut so one read stays reasonable; read a single email by its id for its full text. Read-only.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "client": {
+          "description": "Client name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "emailId": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "mailbox": {
+          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "threadId": {
+          "maxLength": 500,
+          "type": "string"
+        }
+      },
+      "required": [
+        "client"
+      ],
+      "type": "object"
+    },
+    "name": "get_client_email",
+    "title": "Read an email or a thread in a client's mailbox"
+  },
   "get_client_file": {
     "annotations": {
       "destructiveHint": false,
@@ -1141,6 +1179,31 @@
     },
     "name": "get_client_file",
     "title": "Get client file"
+  },
+  "get_client_mailbox": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The client's own mailboxes connected to Ankora (through Unipile), whether each is working, what it can do, and the addresses it can send from. Call it before working in a client's mailbox, or when another mailbox tool says the connection dropped. An empty list means none is connected: the account manager connects one on the client's connections screen in Ankora. Read-only.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "client": {
+          "description": "Client name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        }
+      },
+      "required": [
+        "client"
+      ],
+      "type": "object"
+    },
+    "name": "get_client_mailbox",
+    "title": "Get a client's connected mailbox"
   },
   "get_client_onboarding": {
     "annotations": {
@@ -1679,6 +1742,53 @@
     },
     "name": "list_client_communications",
     "title": "List a client's WhatsApp conversations and recorded calls"
+  },
+  "list_client_mail_folders": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The folders (in Gmail, the labels) of the client's connected mailbox with their ids and unread counts, to search inside one with search_client_emails. `include` adds the mailbox's contacts (paged with `contactsCursor`) and, for Outlook, its categories. Read-only.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "client": {
+          "description": "Client name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "contactsCursor": {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        "include": {
+          "description": "What to list. Default [\"folders\"].",
+          "items": {
+            "enum": [
+              "folders",
+              "contacts",
+              "categories"
+            ],
+            "type": "string"
+          },
+          "maxItems": 3,
+          "type": "array"
+        },
+        "mailbox": {
+          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "maxLength": 320,
+          "type": "string"
+        }
+      },
+      "required": [
+        "client"
+      ],
+      "type": "object"
+    },
+    "name": "list_client_mail_folders",
+    "title": "List a client mailbox's folders, labels, contacts and categories"
   },
   "list_decisions": {
     "annotations": {
@@ -3813,6 +3923,46 @@
     "name": "propose_knowledge",
     "title": "Propose knowledge for a client file"
   },
+  "read_client_email_attachment": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The text of a file attached to an email in the client's connected mailbox: PDF, Word, Excel, PowerPoint or a text file (a CV, an invoice, a form). Pass the email's id and the attachment's id from search_client_emails or get_client_email. Images and scanned PDFs have no text to return; the answer says so. Files over 15MB are not read. Read-only.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "attachmentId": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "client": {
+          "description": "Client name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "emailId": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "mailbox": {
+          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "maxLength": 320,
+          "type": "string"
+        }
+      },
+      "required": [
+        "client",
+        "emailId",
+        "attachmentId"
+      ],
+      "type": "object"
+    },
+    "name": "read_client_email_attachment",
+    "title": "Read an attachment in a client's mailbox"
+  },
   "read_document": {
     "annotations": {
       "destructiveHint": false,
@@ -5187,6 +5337,104 @@
     },
     "name": "save_task_plan",
     "title": "Save a task's work plan"
+  },
+  "search_client_emails": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Searches the client's own connected mailbox, newest first: free text in subject and body, sender, recipient, any participant, dates, unread, starred, with attachments, inside a folder or label, or outside some folders. With no filter it lists the latest emails. Each email comes with its id, thread id and its attachments' ids. Read one with get_client_email, a file with read_client_email_attachment. Folder ids come from list_client_mail_folders. `after` and `before` take YYYY-MM-DD (Israel time) or an ISO time. Pass `cursor` from the previous answer for the next page. Text search is the provider's own and may be approximate. Read-only.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "after": {
+          "description": "From this day or time on.",
+          "maxLength": 40,
+          "type": "string"
+        },
+        "before": {
+          "description": "Up to this day or time.",
+          "maxLength": 40,
+          "type": "string"
+        },
+        "client": {
+          "description": "Client name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "cursor": {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        "excludeFolderIds": {
+          "description": "Leave out these folders or labels.",
+          "items": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "maxItems": 20,
+          "type": "array"
+        },
+        "folderId": {
+          "description": "Only this folder or label (id from list_client_mail_folders).",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "from": {
+          "description": "Sender address.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "hasAttachment": {
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "How many emails, up to 100. Default 25.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "mailbox": {
+          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "outlookCategory": {
+          "description": "Outlook mailboxes only: only emails in this category.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "participant": {
+          "description": "One or more addresses, comma separated, in any of from, to, cc or bcc.",
+          "maxLength": 1000,
+          "type": "string"
+        },
+        "starred": {
+          "type": "boolean"
+        },
+        "text": {
+          "description": "Words to find in the subject or body.",
+          "maxLength": 500,
+          "type": "string"
+        },
+        "to": {
+          "description": "Recipient address.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "unread": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "client"
+      ],
+      "type": "object"
+    },
+    "name": "search_client_emails",
+    "title": "Search a client's mailbox"
   },
   "set_agent_installation_value": {
     "annotations": {

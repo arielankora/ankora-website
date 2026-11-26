@@ -68,6 +68,7 @@ import { registerEmployeeTools } from "@/lib/mcp/employee-tools";
 import { registerHourBankTools } from "@/lib/mcp/hour-bank-tools";
 import { registerApprovalTools } from "@/lib/mcp/approval-tools";
 import { registerCommsTools } from "@/lib/mcp/comms-tools";
+import { registerMailboxTools } from "@/lib/mcp/mailbox-tools";
 import { registerUsageTools } from "@/lib/mcp/usage-tools";
 import { registerAgentTools } from "@/lib/mcp/agent-tools";
 import { appBaseUrl } from "@/lib/email-templates";
@@ -1776,6 +1777,7 @@ export function registerAnkoraTools(server: McpServer): void {
   registerHourBankTools(server);
   registerApprovalTools(server);
   registerCommsTools(server);
+  registerMailboxTools(server);
   registerUsageTools(server);
   registerAgentTools(server);
   // New-client wizard (26.11.2026).

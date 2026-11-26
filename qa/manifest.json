@@ -2244,6 +2244,13 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-05"
     },
+    "api:/api/connections/mailbox/callback": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-26"
+    },
     "domain:connections": {
       "kind": "domain",
       "area": "app",

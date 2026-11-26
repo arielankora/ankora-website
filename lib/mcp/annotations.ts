@@ -156,6 +156,13 @@ export const TOOL_ANNOTATIONS = {
   // 14.11.2026: a client's WhatsApp conversations and recorded calls.
   list_client_communications: READ_ONLY,
   get_client_communication: READ_ONLY,
+  // 26.11.2026: a client's own mailbox through Unipile, read only in this
+  // stage. Every read is audited on the connection.
+  get_client_mailbox: READ_ONLY,
+  search_client_emails: READ_ONLY,
+  get_client_email: READ_ONLY,
+  read_client_email_attachment: READ_ONLY,
+  list_client_mail_folders: READ_ONLY,
   // The procedure as a document (23.10.2026): the Hebrew to translate, and
   // the English saved as a draft a manager approves on the screen. Saving
   // again replaces the draft, so a retry does no harm.
