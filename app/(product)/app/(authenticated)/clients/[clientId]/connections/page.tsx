@@ -6,6 +6,7 @@ import { canManageClients, ForbiddenError } from "@/lib/app-auth/permissions";
 import { getClient } from "@/lib/app-domain/clients";
 import { listConnections, type ConnectionView } from "@/lib/app-domain/connections";
 import { googleOAuthConfig } from "@/lib/google-oauth";
+import { unipileConfigured } from "@/lib/client-mailbox/unipile-mail";
 import { ConnectionsScreen } from "./ConnectionsScreen";
 
 // The client's connections (ADR 0001 section 24, task
@@ -23,6 +24,13 @@ const NOTICES = {
   "error=denied": { key: "denied", error: true },
   "error=no_token": { key: "noToken", error: true },
   "error=failed": { key: "failed", error: true },
+  // A client mailbox through Unipile (lib/client-mailbox/connect.ts).
+  "mailbox=connected": { key: "mailboxConnected", error: false },
+  "mailbox=reconnected": { key: "mailboxReconnected", error: false },
+  "mailbox=expired": { key: "mailboxExpired", error: true },
+  "mailbox=failed": { key: "failed", error: true },
+  "mailbox=wrongProvider": { key: "mailboxWrongProvider", error: true },
+  "mailbox=taken": { key: "mailboxTaken", error: true },
 } as const;
 
 export default async function ConnectionsPage(props: { params: Promise<{ clientId: string }>; searchParams: Promise<Record<string, string>> }) {
@@ -53,6 +61,7 @@ export default async function ConnectionsPage(props: { params: Promise<{ clientI
         connections={rows.map((r) => ({ ...r, connectedAt: r.connectedAt.toISOString(), lastUsedAt: r.lastUsedAt?.toISOString() ?? null }))}
         mayManage={canManageClients(user.role) || client.accountManagerId === user.id}
         googleReady={!!googleOAuthConfig()}
+        mailboxReady={unipileConfigured()}
         userId={user.id}
         notice={notice}
       />

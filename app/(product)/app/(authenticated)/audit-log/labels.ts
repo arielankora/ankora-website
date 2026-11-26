@@ -408,6 +408,8 @@ export const ACTION_LABEL: Record<string, string> = {
   "connection.add": "חיבור מערכת של לקוח לנהלים",
   "connection.revoke": "ניתוק מערכת של לקוח מהנהלים",
   "connection.test": "בדיקת חיבור של לקוח",
+  "connection.reconnect": "חיבור מחדש של מערכת של לקוח",
+  "connection.mail_read": "קריאה מתיבת הדואר של לקוח",
   "credential.stepup_failed": "אימות זהות שנכשל",
   "credential.exposure_report": "הפקת דוח גישות שנצפו",
   "vault.rewrap": "העברת הכספת למפתח חדש",

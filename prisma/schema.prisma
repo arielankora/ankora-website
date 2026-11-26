@@ -4860,6 +4860,10 @@ model ClientConnection {
   lastUsedAt    DateTime?
   revokedAt     DateTime?
   revokedById   String?
+  /// UNIPILE_MAIL (26.11.2026): the mailbox's account at Unipile ("acc_...").
+  /// Unipile holds the provider's tokens, so no vault row; Ankora reads the
+  /// mailbox and calendar through Unipile with its own API key.
+  unipileAccountId String?   @unique
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
 
@@ -4874,6 +4878,10 @@ enum ConnectionKind {
   MAIL_APP_PASSWORD
   /// The account manager's own mailbox, send only.
   MANAGER_SEND
+  /// The client's mailbox and calendar, connected through Unipile's Hosted
+  /// Auth (26.11.2026, Ariel and Hadas). Read through the Ankora connector
+  /// by everyone who sees the client.
+  UNIPILE_MAIL
 }
 
 // --- Claude usage measurement (17.11.2026) ---------------------------------

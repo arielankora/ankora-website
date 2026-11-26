@@ -574,7 +574,9 @@ export async function flowForEditor(actor: User, processId: string): Promise<Flo
     highlights: latest?.highlights ?? null,
     outputs: latest?.outputs ?? null,
     contacts,
-    connections: await prisma.clientConnection.findMany({ where: { clientId: process.clientId, revokedAt: null }, select: { id: true, kind: true, account: true }, orderBy: { connectedAt: "asc" } }),
+    // A Unipile mailbox (26.11.2026) is read by Claude through the connector,
+    // not by a procedure's branch, so it is not offered here.
+    connections: (await prisma.clientConnection.findMany({ where: { clientId: process.clientId, revokedAt: null, kind: { not: "UNIPILE_MAIL" } }, select: { id: true, kind: true, account: true }, orderBy: { connectedAt: "asc" } })) as FlowEditorData["connections"],
   };
 }
 

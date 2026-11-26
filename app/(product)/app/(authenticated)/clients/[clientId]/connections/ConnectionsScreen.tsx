@@ -3,7 +3,7 @@
 import { useActionState, useState, useTransition } from "react";
 import type { ConnectionKind } from "@prisma/client";
 import { useFormatter, useTranslations } from "next-intl";
-import { addAppPasswordAction, disconnectAction, testConnectionAction } from "./actions";
+import { addAppPasswordAction, disconnectAction, mailboxLinkAction, testConnectionAction } from "./actions";
 
 // The connections screen as designed (artboard "חיבורים של הלקוח",
 // https://claude.ai/artifact/CjzpzkxiB8xRvpaZNBWkAr).
@@ -22,10 +22,11 @@ type Row = {
 };
 
 const INPUT = "w-full rounded-[10px] border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary";
-type ScopeTag = "appPassword" | "mailOnly" | "viaGoogle" | "sendOnly" | "mailReplies" | "driveRead" | "driveWrite";
+type ScopeTag = "appPassword" | "mailOnly" | "viaGoogle" | "sendOnly" | "mailReplies" | "driveRead" | "driveWrite" | "viaUnipile" | "mailRead" | "calendar" | "claudeReads";
 
 function scopeTags(r: Row): ScopeTag[] {
   if (r.kind === "MAIL_APP_PASSWORD") return ["appPassword", "mailOnly"];
+  if (r.kind === "UNIPILE_MAIL") return ["viaUnipile", "mailRead", ...(r.scopes.includes("calendar") ? (["calendar"] as ScopeTag[]) : []), "claudeReads"];
   if (r.kind === "MANAGER_SEND") return ["viaGoogle", "sendOnly"];
   const t: ScopeTag[] = ["viaGoogle"];
   if (r.scopes.some((s) => s.endsWith("gmail.metadata"))) t.push("mailReplies");
@@ -41,6 +42,7 @@ export function ConnectionsScreen(props: {
   connections: Row[];
   mayManage: boolean;
   googleReady: boolean;
+  mailboxReady: boolean;
   userId: string;
   notice: { text: string; error: boolean } | null;
 }) {
@@ -73,6 +75,26 @@ export function ConnectionsScreen(props: {
       </div>
     );
   const [formState, formAction, formPending] = useActionState(addAppPasswordAction, undefined);
+  // A client mailbox through Unipile (26.11.2026): open the sign-in here, or
+  // copy the link to send to whoever holds the mailbox.
+  const mailboxLink = (connectionId: string | null, how: "open" | "copy") =>
+    start(async () => {
+      const r = await mailboxLinkAction(props.clientId, connectionId);
+      if (!r.link) {
+        setMsg({ id: connectionId, text: r.error ?? t("result.generic"), error: true });
+        return;
+      }
+      if (how === "open") {
+        window.location.assign(r.link);
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(r.link);
+        setMsg({ id: connectionId, text: t("mailbox.copied"), error: false });
+      } catch {
+        setMsg({ id: connectionId, text: t("mailbox.copyFailed", { link: r.link }), error: false });
+      }
+    });
   const mine = props.connections.find((c) => c.kind === "MANAGER_SEND" && c.ownerUserId === props.userId);
   const google = (purpose: "CLIENT" | "SEND") => `/api/connections/google/start?clientId=${encodeURIComponent(props.clientId)}&purpose=${purpose}`;
 
@@ -123,6 +145,16 @@ export function ConnectionsScreen(props: {
                 </label>
               )}
               {msg?.id === c.id && <p className={`text-xs ${msg.error ? "text-app-error" : "text-app-success"}`}>{msg.text}</p>}
+              {props.mayManage && c.kind === "UNIPILE_MAIL" && (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => mailboxLink(c.id, "open")}
+                  className="h-11 rounded-[10px] border border-app-border bg-white text-sm text-app-text-primary"
+                >
+                  {t("mailbox.reconnect")}
+                </button>
+              )}
               {props.mayManage && (
                 <div className="mt-auto flex gap-2">
                   <button
@@ -146,7 +178,7 @@ export function ConnectionsScreen(props: {
                   </button>
                 </div>
               )}
-              {confirmBox(c.id, c.usedBy ? t("confirmInUse", { count: c.usedBy }) : t("confirmGoogle"))}
+              {confirmBox(c.id, c.usedBy ? t("confirmInUse", { count: c.usedBy }) : c.kind === "UNIPILE_MAIL" ? t("mailbox.confirm") : t("confirmGoogle"))}
             </li>
           ))}
 
@@ -154,6 +186,22 @@ export function ConnectionsScreen(props: {
           <li className="flex flex-col gap-3 rounded-[14px] border border-dashed border-app-border-strong bg-white p-5">
             <strong className="text-base font-medium text-app-text-primary">{t("new.title")}</strong>
             <span className="text-sm text-app-text-secondary">{t("new.how")}</span>
+            {props.mailboxReady ? (
+              <div className="flex flex-col gap-2 rounded-[10px] border-2 border-app-accent px-3.5 py-2.5" data-testid="mailbox-connect">
+                <span className="text-sm font-medium text-app-text-primary">{t("mailbox.title")}</span>
+                <span className="text-xs text-app-text-secondary">{t("mailbox.hint")}</span>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" disabled={pending} onClick={() => mailboxLink(null, "open")} className="h-11 flex-1 rounded-[10px] bg-app-surface-nav px-3 text-sm font-medium text-app-surface-page">
+                    {t("mailbox.open")}
+                  </button>
+                  <button type="button" disabled={pending} onClick={() => mailboxLink(null, "copy")} className="h-11 flex-1 rounded-[10px] border border-app-border bg-white px-3 text-sm text-app-text-primary">
+                    {t("mailbox.copy")}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="rounded-[10px] bg-app-neutral-soft px-3 py-2 text-xs text-app-text-secondary">{t("mailbox.notReady")}</p>
+            )}
             {props.googleReady ? (
               <a href={google("CLIENT")} className="flex min-h-16 flex-col gap-0.5 rounded-[10px] border-2 border-app-accent px-3.5 py-2.5 text-start text-app-text-primary">
                 <span className="text-sm font-medium">{t("new.google")}</span>
