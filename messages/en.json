@@ -1654,7 +1654,22 @@
         "badDate": "The date {value} is not valid. Write YYYY-MM-DD.",
         "idRequired": "Pass the id of an email or of a thread.",
         "attachmentNotFound": "This email has no attachment with that id. The ids are in the email's attachments.",
-        "attachmentGone": "The attachment is no longer available at the mail provider."
+        "attachmentGone": "The attachment is no longer available at the mail provider.",
+        "badAddress": "The address \"{address}\" in {field} is not valid.",
+        "replyOrForward": "An email is a reply or a forward, not both.",
+        "forwardTooLarge": "The original email's files are too large to forward in one message (over 18MB). Leave some out with dropAttachmentIds.",
+        "noRecipient": "No recipient. Say whom to send to in to.",
+        "noText": "The email has no content. Write the text in text.",
+        "draftIdRequired": "To delete a draft, pass its id in draftId.",
+        "sendNotAsked": "Sending directly only when the user explicitly asked to send. Without that, save a draft (save_client_email_draft) and show it to the user.",
+        "outlookOnly": "Categories exist only in Outlook mailboxes. In Gmail, use labels (folderIds).",
+        "foldersRequired": "Pass the folder or label ids in folderIds (from list_client_mail_folders).",
+        "nameRequired": "Pass a name in name.",
+        "folderIdRequired": "Pass the folder id in folderId (from list_client_mail_folders).",
+        "noCalendar": "The mailbox {account} has no calendar through the connection (an IMAP mailbox). Only a Google or Microsoft account has one.",
+        "noCalendarFound": "No calendar was found in this account.",
+        "eventFieldsRequired": "A new event needs a title, a start and an end.",
+        "calendarIdRequired": "Pass the calendar id in calendarId (from list_client_calendar_events with calendarsOnly)."
       }
     },
     "requestTypes": {
@@ -2316,7 +2331,10 @@
       "agentLessonPropose": "Agent change proposed from a run",
       "agentLessonDecide": "Agent change proposal handled",
       "connectionReconnect": "Reconnecting a client system",
-      "connectionMailRead": "Reading a client mailbox"
+      "connectionMailRead": "Reading a client mailbox",
+      "connectionMailWrite": "Writing in a client mailbox",
+      "connectionCalendarRead": "Reading a client calendar",
+      "connectionCalendarWrite": "Writing in a client calendar"
     },
     "kinds": {
       "failure": "Failure",
@@ -5377,7 +5395,7 @@
         "driveRead": "Drive: sees files in the folder",
         "driveWrite": "Drive: writes files the procedure creates",
         "viaUnipile": "Via Unipile",
-        "mailRead": "Mail: read",
+        "mailRead": "Mail: read, drafts and sending",
         "calendar": "Calendar",
         "claudeReads": "Claude reads, by Ankora permissions"
       },

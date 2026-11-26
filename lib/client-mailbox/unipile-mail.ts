@@ -272,3 +272,202 @@ export async function listOutlookCategories(accountId: string): Promise<RawCateg
   if (Array.isArray(raw)) return raw as RawCategory[];
   return page<RawCategory>(raw as { data?: unknown }).items;
 }
+
+// ---------------------------------------------------------------- writing (stage 2)
+
+export type Address = { email: string; display_name?: string };
+export type OutgoingFile = { filename: string; content_type: string; content: string };
+export type OutgoingEmail = {
+  to?: Address[];
+  cc?: Address[];
+  bcc?: Address[];
+  reply_to?: Address[];
+  from?: Address;
+  subject?: string;
+  plain_text?: string;
+  html?: string;
+  reply_to_provider_id?: string;
+  reply_to_message_id?: string;
+  attachments?: OutgoingFile[];
+};
+
+export async function sendEmail(accountId: string, email: OutgoingEmail): Promise<{ id: string | null }> {
+  const r = await json<{ id?: unknown }>(`/${encodeURIComponent(accountId)}/emails/send`, { method: "POST", body: email });
+  return { id: str(r.id) };
+}
+
+export type RawDraft = RawEmail;
+
+export async function listDrafts(accountId: string, query: { any_email?: string; cursor?: string; limit?: number }): Promise<Page<RawDraft>> {
+  return page<RawDraft>(await json(`/${encodeURIComponent(accountId)}/drafts`, { query }));
+}
+
+export async function getDraft(accountId: string, draftId: string): Promise<RawDraft> {
+  return json<RawDraft>(`/${encodeURIComponent(accountId)}/drafts/${encodeURIComponent(draftId)}`);
+}
+
+export async function createDraft(accountId: string, draft: OutgoingEmail): Promise<RawDraft> {
+  // Drafts take the deprecated name for the email they answer.
+  const { reply_to_provider_id, ...rest } = draft;
+  return json<RawDraft>(`/${encodeURIComponent(accountId)}/drafts`, {
+    method: "POST",
+    body: { ...rest, ...(reply_to_provider_id ? { reply_to_message_id: reply_to_provider_id } : {}) },
+  });
+}
+
+export async function updateDraft(accountId: string, draftId: string, draft: OutgoingEmail): Promise<RawDraft> {
+  const { reply_to_provider_id: _ignored, ...rest } = draft;
+  return json<RawDraft>(`/${encodeURIComponent(accountId)}/drafts/${encodeURIComponent(draftId)}`, { method: "PATCH", body: rest });
+}
+
+export async function deleteDraft(accountId: string, draftId: string): Promise<void> {
+  await request(`/${encodeURIComponent(accountId)}/drafts/${encodeURIComponent(draftId)}`, { method: "DELETE" });
+}
+
+export async function sendDraft(accountId: string, draftId: string): Promise<{ id: string | null }> {
+  const r = await json<{ id?: unknown }>(`/${encodeURIComponent(accountId)}/drafts/${encodeURIComponent(draftId)}/send`, { method: "POST", body: {} });
+  return { id: str(r.id) };
+}
+
+export async function markEmail(accountId: string, emailId: string, read: boolean): Promise<void> {
+  await request(`/${encodeURIComponent(accountId)}/emails/${encodeURIComponent(emailId)}/${read ? "read" : "unread"}`, { method: "POST", body: {} });
+}
+
+export async function modifyEmail(accountId: string, emailId: string, change: { folders_ids?: string[]; outlookCategories?: string[] }): Promise<void> {
+  const body: Record<string, unknown> = {};
+  if (change.folders_ids) body.folders_ids = change.folders_ids;
+  if (change.outlookCategories) body.specifics = { outlook: { categories: change.outlookCategories } };
+  await request(`/${encodeURIComponent(accountId)}/emails/${encodeURIComponent(emailId)}/modify`, { method: "POST", body });
+}
+
+export async function trashEmail(accountId: string, emailId: string): Promise<void> {
+  await request(`/${encodeURIComponent(accountId)}/emails/${encodeURIComponent(emailId)}`, { method: "DELETE" });
+}
+
+export type FolderChange = { name?: string; parent_id?: string; text_color?: string; background_color?: string };
+
+export async function createFolder(accountId: string, folder: FolderChange & { name: string }): Promise<RawFolder> {
+  return json<RawFolder>(`/${encodeURIComponent(accountId)}/folders`, { method: "POST", body: folder });
+}
+
+export async function updateFolder(accountId: string, folderId: string, folder: FolderChange): Promise<RawFolder> {
+  return json<RawFolder>(`/${encodeURIComponent(accountId)}/folders/${encodeURIComponent(folderId)}`, { method: "PATCH", body: folder });
+}
+
+export async function deleteFolder(accountId: string, folderId: string): Promise<void> {
+  await request(`/${encodeURIComponent(accountId)}/folders/${encodeURIComponent(folderId)}`, { method: "DELETE" });
+}
+
+export async function createOutlookCategory(accountId: string, category: { name: string; color?: string }): Promise<void> {
+  await request(`/${encodeURIComponent(accountId)}/outlook/email-categories`, { method: "POST", body: category });
+}
+
+export async function deleteOutlookCategory(accountId: string, name: string): Promise<void> {
+  await request(`/${encodeURIComponent(accountId)}/outlook/email-categories/${encodeURIComponent(name)}`, { method: "DELETE" });
+}
+
+// ---------------------------------------------------------------- calendar (stage 2)
+
+export type RawCalendar = { id?: unknown; name?: unknown; description?: unknown; is_read_only?: unknown; is_owned_by_user?: unknown; is_default?: unknown; timezone?: unknown };
+export type RawEventTime = { type?: unknown; date_time?: unknown; date?: unknown; timezone?: unknown };
+export type RawEvent = {
+  id?: unknown;
+  calendar_id?: unknown;
+  master_event_id?: unknown;
+  title?: unknown;
+  body?: unknown;
+  location?: unknown;
+  is_cancelled?: unknown;
+  is_all_day?: unknown;
+  start?: RawEventTime | unknown;
+  end?: RawEventTime | unknown;
+  attendees?: unknown;
+  organizer?: unknown;
+  conference?: unknown;
+  recurrence?: unknown;
+  visibility?: unknown;
+  transparency?: unknown;
+  timezone?: unknown;
+};
+
+export type CalendarChange = { name?: string; description?: string; background_color?: string; timezone?: string };
+export type EventTime = { type: "datetime"; date_time: string; timezone?: string } | { type: "date"; date: string; timezone?: string };
+export type EventChange = {
+  title?: string;
+  body?: string;
+  location?: string;
+  start?: EventTime;
+  end?: EventTime;
+  timezone?: string;
+  attendees?: { email: string; type?: "required" | "optional" }[];
+  recurrence?: string[];
+  conference?: { provider: "google_meet" | "zoom" | "skype" | "teams" | "unknown"; url?: string };
+  transparency?: "opaque" | "transparent";
+  visibility?: "public" | "private";
+  is_attendees_list_hidden?: boolean;
+  notify?: "all" | "externalOnly" | "none";
+};
+
+const cal = (accountId: string, calendarId?: string) =>
+  `/${encodeURIComponent(accountId)}/calendars${calendarId ? `/${encodeURIComponent(calendarId)}` : ""}`;
+
+export async function listCalendars(accountId: string): Promise<RawCalendar[]> {
+  return page<RawCalendar>(await json(cal(accountId), { query: { limit: 100 } })).items;
+}
+
+export async function createCalendar(accountId: string, change: CalendarChange & { name: string }): Promise<RawCalendar> {
+  return json<RawCalendar>(cal(accountId), { method: "POST", body: change });
+}
+
+export async function updateCalendar(accountId: string, calendarId: string, change: CalendarChange): Promise<RawCalendar> {
+  return json<RawCalendar>(cal(accountId, calendarId), { method: "PATCH", body: change });
+}
+
+export async function deleteCalendar(accountId: string, calendarId: string): Promise<void> {
+  await request(cal(accountId, calendarId), { method: "DELETE" });
+}
+
+export type EventFilters = {
+  start?: string;
+  end?: string;
+  title?: string;
+  description?: string;
+  location?: string;
+  attendees?: string;
+  busy?: boolean;
+  is_cancelled?: boolean;
+  expand_recurring?: boolean;
+  updated_after?: string;
+  ical_uid?: string;
+  cursor?: string;
+  limit?: number;
+};
+
+export async function listEvents(accountId: string, calendarId: string, filters: EventFilters): Promise<Page<RawEvent>> {
+  return page<RawEvent>(await json(`${cal(accountId, calendarId)}/events`, { query: filters }));
+}
+
+export async function getEvent(accountId: string, calendarId: string, eventId: string): Promise<RawEvent> {
+  return json<RawEvent>(`${cal(accountId, calendarId)}/events/${encodeURIComponent(eventId)}`);
+}
+
+export async function createEvent(accountId: string, calendarId: string, event: EventChange): Promise<RawEvent> {
+  return json<RawEvent>(`${cal(accountId, calendarId)}/events`, { method: "POST", body: event });
+}
+
+export async function updateEvent(accountId: string, calendarId: string, eventId: string, event: EventChange): Promise<RawEvent> {
+  return json<RawEvent>(`${cal(accountId, calendarId)}/events/${encodeURIComponent(eventId)}`, { method: "PATCH", body: event });
+}
+
+export async function eventAction(
+  accountId: string,
+  calendarId: string,
+  eventId: string,
+  action: { kind: "rsvp"; status: "yes" | "maybe" | "no"; comment?: string } | { kind: "cancel"; comment?: string } | { kind: "restore" } | { kind: "delete" },
+): Promise<void> {
+  const base = `${cal(accountId, calendarId)}/events/${encodeURIComponent(eventId)}`;
+  if (action.kind === "delete") await request(base, { method: "DELETE" });
+  else if (action.kind === "rsvp") await request(`${base}/rsvp`, { method: "POST", body: { status: action.status, ...(action.comment ? { comment: action.comment } : {}) } });
+  else if (action.kind === "cancel") await request(`${base}/cancel`, { method: "POST", body: action.comment ? { comment: action.comment } : {} });
+  else await request(`${base}/restore`, { method: "POST", body: {} });
+}

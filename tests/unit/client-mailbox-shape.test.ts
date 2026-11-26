@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bodyTextOf, fullOf, htmlToText, israelTimeOf, summaryOf, EMAIL_TEXT_CHARS } from "@/lib/client-mailbox/shape";
+import { addressOf, bodyTextOf, eventOf, eventTimeOf, fullOf, htmlFromText, htmlToText, israelTimeOf, prefixedSubject, summaryOf, EMAIL_TEXT_CHARS } from "@/lib/client-mailbox/shape";
 
 // 26.11.2026: a client's email as the connector hands it to Claude. What is
 // worth holding: who, when (Israel time), the subject and the files with
@@ -65,5 +65,44 @@ describe("client mailbox shapes", () => {
   it("says nothing for a missing or broken date", () => {
     expect(israelTimeOf(undefined)).toBeNull();
     expect(israelTimeOf("not a date")).toBeNull();
+  });
+});
+
+// Stage 2 (26.11.2026): what goes out, and how a calendar event reads.
+describe("client mailbox outgoing and calendar shapes", () => {
+  it("reads addresses as people write them, and refuses what is not one", () => {
+    expect(addressOf("Maya Cohen <maya@x.co.il>")).toEqual({ email: "maya@x.co.il", display_name: "Maya Cohen" });
+    expect(addressOf('"Cohen, Maya" <maya@x.co.il>')).toEqual({ email: "maya@x.co.il", display_name: "Cohen, Maya" });
+    expect(addressOf(" maya@x.co.il ")).toEqual({ email: "maya@x.co.il" });
+    expect(addressOf("maya")).toBeNull();
+    expect(addressOf("maya@x.co.il\nBcc: evil@x.co")).toBeNull();
+  });
+
+  it("does not stack Re: and Fwd:", () => {
+    expect(prefixedSubject("Re", "שלום")).toBe("Re: שלום");
+    expect(prefixedSubject("Re", "RE: שלום")).toBe("RE: שלום");
+    expect(prefixedSubject("Fwd", "Fw: x")).toBe("Fw: x");
+    expect(prefixedSubject("Fwd", undefined)).toBe("Fwd:");
+  });
+
+  it("writes Hebrew right to left and English left to right, escaped", () => {
+    expect(htmlFromText("שלום <b>\nדנה")).toBe('<div dir="rtl" lang="he" style="text-align:right">שלום &lt;b&gt;<br>דנה</div>');
+    expect(htmlFromText("Hello")).toContain('dir="ltr"');
+  });
+
+  it("shows an event in Israel time, an all-day event by its day, and who answered", () => {
+    expect(eventTimeOf({ type: "datetime", date_time: "2026-11-30T12:00:00Z" })).toBe("2026-11-30 14:00");
+    expect(eventTimeOf({ type: "datetime", date_time: "2026-11-30T14:00:00", timezone: "Asia/Jerusalem" })).toBe("2026-11-30 14:00");
+    expect(eventTimeOf({ type: "date", date: "2026-12-01" })).toBe("2026-12-01");
+    const e = eventOf({
+      id: "ev",
+      title: "ראיון",
+      start: { type: "date", date: "2026-12-01" },
+      is_all_day: true,
+      attendees: [{ email: "dana@x.co", display_name: "Dana", response_status: "accepted", is_self: false }],
+      conference: { provider: "google_meet", url: "https://meet.google.com/abc" },
+      body: "<p>פרטים</p>",
+    }, { withBody: true });
+    expect(e).toMatchObject({ id: "ev", start: "2026-12-01", allDay: true, attendees: [{ who: "Dana <dana@x.co>", response: "accepted" }], conference: { url: "https://meet.google.com/abc" }, description: "פרטים" });
   });
 });

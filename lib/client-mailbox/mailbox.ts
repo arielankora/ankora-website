@@ -30,8 +30,8 @@ import { attachmentsOf, categoryOf, contactOf, folderOf, fullOf, israelTimeOf, s
 //   (lookupClient), and refused here again.
 // - Every call is audited on the connection ("connection.mail_read"), with
 //   what was read but never the content, and lastUsedAt moves.
-// - Read only in this stage. Drafts, sending, organising and the calendar
-//   come in the next one.
+// - Stage 2 (26.11.2026): drafts, sending, organising and the calendar are
+//   in lib/client-mailbox/write.ts and calendar.ts, with the same rules.
 
 export type MailboxRow = Pick<ClientConnection, "id" | "clientId" | "account" | "scopes" | "unipileAccountId" | "connectedAt" | "lastUsedAt">;
 
@@ -66,11 +66,17 @@ export async function resolveMailbox(actor: User, clientId: string, mailbox?: st
   return row as MailboxRow & { unipileAccountId: string };
 }
 
-async function used(actor: User, row: MailboxRow, what: string, details: Record<string, unknown> = {}) {
+/// The audit row of a use: reading mail or the calendar, or (stage 2)
+/// writing to them. What was done and on which item, never the content.
+export type MailboxUse = "mail_read" | "mail_write" | "calendar_read" | "calendar_write";
+
+export async function used(actor: User, row: MailboxRow, what: string, details: Record<string, unknown> = {}, use: MailboxUse = "mail_read") {
   await prisma.clientConnection.update({ where: { id: row.id }, data: { lastUsedAt: new Date() } });
+  const calendar = use.startsWith("calendar");
+  const write = use.endsWith("write");
   await recordAudit({
     actorId: actor.id,
-    action: "connection.mail_read",
+    action: calendar ? (write ? "connection.calendar_write" : "connection.calendar_read") : write ? "connection.mail_write" : "connection.mail_read",
     entityType: "ClientConnection",
     entityId: row.id,
     clientId: row.clientId,
@@ -81,7 +87,7 @@ async function used(actor: User, row: MailboxRow, what: string, details: Record<
 /// Runs a Unipile call. When it fails for a reason other than a missing item
 /// or a rate limit, the account's own state says whether the mailbox has to
 /// be reconnected, which is what the person can act on.
-async function guarded<T>(row: MailboxRow & { unipileAccountId: string }, fn: () => Promise<T>): Promise<T> {
+export async function guarded<T>(row: MailboxRow & { unipileAccountId: string }, fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (err) {
