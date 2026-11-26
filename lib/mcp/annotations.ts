@@ -163,6 +163,20 @@ export const TOOL_ANNOTATIONS = {
   get_client_email: READ_ONLY,
   read_client_email_attachment: READ_ONLY,
   list_client_mail_folders: READ_ONLY,
+  // Stage 2 (26.11.2026): writing to the client's mailbox and calendar.
+  // A draft is the default and stays in the client's own Drafts. Sending,
+  // trashing, deleting a folder, cancelling or deleting an event and
+  // deleting a calendar cannot be taken back from here, so they are marked
+  // destructive and a client asks the user before each call.
+  list_client_email_drafts: READ_ONLY,
+  list_client_calendar_events: READ_ONLY,
+  save_client_email_draft: WRITES,
+  send_client_email: { ...WRITES, destructiveHint: true },
+  organize_client_email: { ...WRITES, destructiveHint: true },
+  manage_client_mail_folders: { ...WRITES, destructiveHint: true },
+  save_client_calendar_event: WRITES,
+  respond_client_calendar_event: { ...WRITES, destructiveHint: true },
+  manage_client_calendars: { ...WRITES, destructiveHint: true },
   // The procedure as a document (23.10.2026): the Hebrew to translate, and
   // the English saved as a draft a manager approves on the screen. Saving
   // again replaces the draft, so a retry does no harm.
@@ -294,6 +308,13 @@ export const WRITE_TOOLS = [
   "decide_approval",
   "decide_knowledge_proposals",
   "decide_vendor_check",
+  "save_client_email_draft",
+  "send_client_email",
+  "organize_client_email",
+  "manage_client_mail_folders",
+  "save_client_calendar_event",
+  "respond_client_calendar_event",
+  "manage_client_calendars",
 ] as const;
 
 /// Phase 16: task tools are NOT in TEAM_TOOLS.

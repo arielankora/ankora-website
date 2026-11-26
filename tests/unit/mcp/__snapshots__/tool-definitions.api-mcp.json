@@ -1715,6 +1715,87 @@
     "name": "list_categories",
     "title": "List categories for a client"
   },
+  "list_client_calendar_events": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The calendar of the client's connected Google or Microsoft account: events in a range (`from`, `to`, YYYY-MM-DD or a time, Israel time), filtered by title text, attendee, location, busy time or cancelled; one event in full by `eventId`; or the list of calendars with `calendarsOnly`. Without `calendarId` it reads the account's main calendar. Recurring events come as their occurrences. Read-only.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "attendee": {
+          "description": "Addresses, comma separated.",
+          "maxLength": 1000,
+          "type": "string"
+        },
+        "busyOnly": {
+          "type": "boolean"
+        },
+        "calendarId": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "calendarsOnly": {
+          "type": "boolean"
+        },
+        "client": {
+          "description": "Client name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "cursor": {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        "eventId": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "expandRecurring": {
+          "type": "boolean"
+        },
+        "from": {
+          "maxLength": 40,
+          "type": "string"
+        },
+        "includeCancelled": {
+          "type": "boolean"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "location": {
+          "maxLength": 300,
+          "type": "string"
+        },
+        "mailbox": {
+          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "text": {
+          "description": "Words in the event's title.",
+          "maxLength": 300,
+          "type": "string"
+        },
+        "to": {
+          "maxLength": 40,
+          "type": "string"
+        }
+      },
+      "required": [
+        "client"
+      ],
+      "type": "object"
+    },
+    "name": "list_client_calendar_events",
+    "title": "Read a client's calendar"
+  },
   "list_client_communications": {
     "annotations": {
       "destructiveHint": false,
@@ -1742,6 +1823,53 @@
     },
     "name": "list_client_communications",
     "title": "List a client's WhatsApp conversations and recorded calls"
+  },
+  "list_client_email_drafts": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The drafts in the client's connected mailbox, newest first, or one draft in full by `draftId`. `participant` narrows to drafts with that address. Read-only.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "client": {
+          "description": "Client name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "cursor": {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        "draftId": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "mailbox": {
+          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "participant": {
+          "maxLength": 1000,
+          "type": "string"
+        }
+      },
+      "required": [
+        "client"
+      ],
+      "type": "object"
+    },
+    "name": "list_client_email_drafts",
+    "title": "List or read the drafts in a client's mailbox"
   },
   "list_client_mail_folders": {
     "annotations": {
@@ -2145,6 +2273,130 @@
     "name": "lookup_contact",
     "title": "Look up a contact"
   },
+  "manage_client_calendars": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Creates a calendar in the client's connected account, renames or describes one, or deletes one (`calendarId` from list_client_calendar_events with calendarsOnly). Deleting a calendar deletes its events.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "action": {
+          "enum": [
+            "create",
+            "update",
+            "delete"
+          ],
+          "type": "string"
+        },
+        "calendarId": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "client": {
+          "description": "Client name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "color": {
+          "maxLength": 20,
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        "mailbox": {
+          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "type": "string"
+        },
+        "timezone": {
+          "maxLength": 60,
+          "type": "string"
+        }
+      },
+      "required": [
+        "client",
+        "action"
+      ],
+      "type": "object"
+    },
+    "name": "manage_client_calendars",
+    "title": "Create, change or delete a calendar in a client's account"
+  },
+  "manage_client_mail_folders": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Creates, updates or deletes a folder (in Gmail, a label) in the client's connected mailbox, or creates or deletes an Outlook category. Gmail labels take text and background colours; Outlook folders take a parent folder; Outlook categories a colour (preset0 to preset24). Deleting a folder or a category cannot be undone from here.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "action": {
+          "enum": [
+            "create_folder",
+            "update_folder",
+            "delete_folder",
+            "create_category",
+            "delete_category"
+          ],
+          "type": "string"
+        },
+        "backgroundColor": {
+          "maxLength": 20,
+          "type": "string"
+        },
+        "client": {
+          "description": "Client name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "color": {
+          "maxLength": 20,
+          "type": "string"
+        },
+        "folderId": {
+          "maxLength": 200,
+          "type": "string"
+        },
+        "mailbox": {
+          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "type": "string"
+        },
+        "parentId": {
+          "maxLength": 200,
+          "type": "string"
+        },
+        "textColor": {
+          "maxLength": 20,
+          "type": "string"
+        }
+      },
+      "required": [
+        "client",
+        "action"
+      ],
+      "type": "object"
+    },
+    "name": "manage_client_mail_folders",
+    "title": "Create, rename or delete folders in a client's mailbox"
+  },
   "mark_process_reviewed": {
     "annotations": {
       "destructiveHint": false,
@@ -2197,6 +2449,76 @@
     },
     "name": "move_time_entry_to_open_bank",
     "title": "Move a stopped timer into the open hour bank"
+  },
+  "organize_client_email": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Changes up to 50 emails in the client's connected mailbox: mark read or unread, set, add or remove folders (in Gmail, labels; an empty set archives), set Outlook categories, or move to the trash. Folder ids come from list_client_mail_folders. Trashing can be undone only from the mailbox itself.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "action": {
+          "enum": [
+            "mark_read",
+            "mark_unread",
+            "set_folders",
+            "add_folders",
+            "remove_folders",
+            "set_categories",
+            "trash"
+          ],
+          "type": "string"
+        },
+        "categories": {
+          "description": "Outlook only, for set_categories.",
+          "items": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "client": {
+          "description": "Client name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "emailIds": {
+          "items": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "type": "array"
+        },
+        "folderIds": {
+          "items": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "mailbox": {
+          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "maxLength": 320,
+          "type": "string"
+        }
+      },
+      "required": [
+        "client",
+        "emailIds",
+        "action"
+      ],
+      "type": "object"
+    },
+    "name": "organize_client_email",
+    "title": "Organise emails in a client's mailbox"
   },
   "propose_agent_change": {
     "annotations": {
@@ -4353,6 +4675,61 @@
     "name": "resolve_process_lesson",
     "title": "Decide a lesson left on a process"
   },
+  "respond_client_calendar_event": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "On an event in the client's calendar: accept, maybe or decline an invitation (with an optional comment to the organizer), cancel an event the client organises (its attendees are told), restore a cancelled one, or delete it from the client's calendar. Cancelling and deleting cannot be undone from here except by restore, where the provider keeps the event.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "action": {
+          "enum": [
+            "accept",
+            "maybe",
+            "decline",
+            "cancel",
+            "restore",
+            "delete"
+          ],
+          "type": "string"
+        },
+        "calendarId": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "client": {
+          "description": "Client name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "comment": {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        "eventId": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "mailbox": {
+          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "maxLength": 320,
+          "type": "string"
+        }
+      },
+      "required": [
+        "client",
+        "eventId",
+        "action"
+      ],
+      "type": "object"
+    },
+    "name": "respond_client_calendar_event",
+    "title": "Answer, cancel, restore or delete an event in a client's calendar"
+  },
   "revert_agent_to_version": {
     "annotations": {
       "destructiveHint": false,
@@ -4789,6 +5166,225 @@
     },
     "name": "save_agent_draft",
     "title": "Save a draft of an Ankora agent"
+  },
+  "save_client_calendar_event": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Creates an event in the client's calendar, or changes one (`eventId`): title, description, location, start and end, attendees, recurrence (RFC 5545 RRULE lines), a Google Meet, Teams or Zoom call, busy or free, private. `start` and `end` are YYYY-MM-DD for an all-day event, or YYYY-MM-DDTHH:MM in Israel time unless `timezone` or an offset says otherwise. Guests get no invitation unless `notifyGuests` says so: an invitation is a message in the client's name, so set it only when the user asked to invite them.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "attendees": {
+          "items": {
+            "maxLength": 320,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "busy": {
+          "type": "boolean"
+        },
+        "calendarId": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "client": {
+          "description": "Client name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 20000,
+          "type": "string"
+        },
+        "end": {
+          "maxLength": 40,
+          "type": "string"
+        },
+        "eventId": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "hideAttendees": {
+          "type": "boolean"
+        },
+        "location": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "mailbox": {
+          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "notifyGuests": {
+          "description": "Google only. Default none.",
+          "enum": [
+            "all",
+            "external_only",
+            "none"
+          ],
+          "type": "string"
+        },
+        "optionalAttendees": {
+          "items": {
+            "maxLength": 320,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "private": {
+          "type": "boolean"
+        },
+        "recurrence": {
+          "items": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "maxItems": 10,
+          "type": "array"
+        },
+        "start": {
+          "maxLength": 40,
+          "type": "string"
+        },
+        "timezone": {
+          "description": "IANA zone, e.g. Europe/London. Default Asia/Jerusalem.",
+          "maxLength": 60,
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "videoCall": {
+          "enum": [
+            "google_meet",
+            "teams",
+            "zoom"
+          ],
+          "type": "string"
+        },
+        "videoCallUrl": {
+          "description": "An existing call link to attach instead of creating one.",
+          "maxLength": 1000,
+          "type": "string"
+        }
+      },
+      "required": [
+        "client"
+      ],
+      "type": "object"
+    },
+    "name": "save_client_calendar_event",
+    "title": "Create or change an event in a client's calendar"
+  },
+  "save_client_email_draft": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Writes a new email, a reply or a forward as a draft in the client's own Drafts, or updates a draft (`draftId`), or deletes one (`draftId` with `delete`). This is the default way to write from a client's mailbox: show the user the draft, and send only if they ask to. A forward carries the original's attachments and quotes it under your text. Before writing to or about the client, read the client file (get_client_brief).",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "bcc": {
+          "items": {
+            "maxLength": 320,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "cc": {
+          "items": {
+            "maxLength": 320,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "client": {
+          "description": "Client name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "delete": {
+          "type": "boolean"
+        },
+        "draftId": {
+          "description": "Update or delete this draft.",
+          "maxLength": 500,
+          "type": "string"
+        },
+        "dropAttachmentIds": {
+          "description": "With forwardEmailId: attachment ids to leave out.",
+          "items": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "forwardEmailId": {
+          "description": "Forward this email with its attachments.",
+          "maxLength": 500,
+          "type": "string"
+        },
+        "from": {
+          "description": "Send-as address, one of get_client_mailbox's sendersAvailable.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "mailbox": {
+          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "replyAll": {
+          "description": "With replyToEmailId: also everyone else on the original.",
+          "type": "boolean"
+        },
+        "replyToEmailId": {
+          "description": "Answer this email, inside its thread.",
+          "maxLength": 500,
+          "type": "string"
+        },
+        "subject": {
+          "description": "Defaults to \"Re:\" or \"Fwd:\" and the original subject for a reply or a forward.",
+          "maxLength": 500,
+          "type": "string"
+        },
+        "text": {
+          "description": "The message, plain text. Required, except that a forward may carry only the original.",
+          "maxLength": 50000,
+          "type": "string"
+        },
+        "to": {
+          "description": "Recipients, \"name <address>\" or the address. A reply goes to the original sender when left empty.",
+          "items": {
+            "maxLength": 320,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        }
+      },
+      "required": [
+        "client"
+      ],
+      "type": "object"
+    },
+    "name": "save_client_email_draft",
+    "title": "Save a draft in a client's mailbox"
   },
   "save_procedure_audit_draft": {
     "annotations": {
@@ -5435,6 +6031,109 @@
     },
     "name": "search_client_emails",
     "title": "Search a client's mailbox"
+  },
+  "send_client_email": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Sends from the client's own mailbox: a new email, a reply in its thread, a forward with the original's attachments, or an existing draft (`draftId`). It goes out at once, in the client's name, and cannot be taken back. Call it only when the user asked in so many words to send, and set `userAskedToSend` to true; otherwise save a draft with save_client_email_draft and show it. Before writing to or about the client, read the client file (get_client_brief).",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "bcc": {
+          "items": {
+            "maxLength": 320,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "cc": {
+          "items": {
+            "maxLength": 320,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "client": {
+          "description": "Client name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "draftId": {
+          "description": "Send this draft as it is.",
+          "maxLength": 500,
+          "type": "string"
+        },
+        "dropAttachmentIds": {
+          "description": "With forwardEmailId: attachment ids to leave out.",
+          "items": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "forwardEmailId": {
+          "description": "Forward this email with its attachments.",
+          "maxLength": 500,
+          "type": "string"
+        },
+        "from": {
+          "description": "Send-as address, one of get_client_mailbox's sendersAvailable.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "mailbox": {
+          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "replyAll": {
+          "description": "With replyToEmailId: also everyone else on the original.",
+          "type": "boolean"
+        },
+        "replyToEmailId": {
+          "description": "Answer this email, inside its thread.",
+          "maxLength": 500,
+          "type": "string"
+        },
+        "subject": {
+          "description": "Defaults to \"Re:\" or \"Fwd:\" and the original subject for a reply or a forward.",
+          "maxLength": 500,
+          "type": "string"
+        },
+        "text": {
+          "description": "The message, plain text. Required, except that a forward may carry only the original.",
+          "maxLength": 50000,
+          "type": "string"
+        },
+        "to": {
+          "description": "Recipients, \"name <address>\" or the address. A reply goes to the original sender when left empty.",
+          "items": {
+            "maxLength": 320,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "userAskedToSend": {
+          "description": "True only when the user explicitly asked to send this email now.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "client",
+        "userAskedToSend"
+      ],
+      "type": "object"
+    },
+    "name": "send_client_email",
+    "title": "Send an email from a client's mailbox"
   },
   "set_agent_installation_value": {
     "annotations": {

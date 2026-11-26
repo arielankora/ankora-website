@@ -125,6 +125,15 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   get_client_email: "lookupClient, and resolveMailbox refuses a marked client again",
   read_client_email_attachment: "lookupClient, and resolveMailbox refuses a marked client again",
   list_client_mail_folders: "lookupClient, and resolveMailbox refuses a marked client again",
+  list_client_email_drafts: "lookupClient, and resolveMailbox refuses a marked client again",
+  save_client_email_draft: "lookupClient, and resolveMailbox refuses a marked client again (lib/client-mailbox/write.ts)",
+  send_client_email: "lookupClient, and resolveMailbox refuses a marked client again (lib/client-mailbox/write.ts)",
+  organize_client_email: "lookupClient, and resolveMailbox refuses a marked client again (lib/client-mailbox/write.ts)",
+  manage_client_mail_folders: "lookupClient, and resolveMailbox refuses a marked client again (lib/client-mailbox/write.ts)",
+  list_client_calendar_events: "lookupClient, and resolveMailbox refuses a marked client again (lib/client-mailbox/calendar.ts)",
+  save_client_calendar_event: "lookupClient, and resolveMailbox refuses a marked client again (lib/client-mailbox/calendar.ts)",
+  respond_client_calendar_event: "lookupClient, and resolveMailbox refuses a marked client again (lib/client-mailbox/calendar.ts)",
+  manage_client_calendars: "lookupClient, and resolveMailbox refuses a marked client again (lib/client-mailbox/calendar.ts)",
 
   // lib/mcp/approval-tools.ts
   list_approvals: "lookupClient; rows of a marked client, and tasks and plans of a marked task, are left out (listApprovalsForAi); auto-applied items of a marked client are left out (listAutoReview forAi)",
