@@ -11,9 +11,14 @@ import {
   type SubprocessorNoticeInput,
 } from "@/lib/subprocessor-notice";
 
+/// Every client that is not deleted, except the ones still being set up
+/// (ONBOARDING): those have their own section on the client list
+/// (listOnboardingClients), and every other screen that reads this list
+/// (users, categories, reports, hour banks) has nothing to do with them
+/// until they are activated.
 export async function listClients() {
   return prisma.client.findMany({
-    where: { deletedAt: null },
+    where: { deletedAt: null, status: { not: "ONBOARDING" } },
     orderBy: { name: "asc" },
     include: { _count: { select: { employeeAccess: true, categories: true } } },
   });
@@ -99,6 +104,59 @@ export async function createClient(
   return client;
 }
 
+/// 26.11.2026 (new-client wizard): the clients being set up, for the
+/// "בהקמה" section of the client list. Newest change first.
+export async function listOnboardingClients(actor: User) {
+  assertCan(actor.role, "client.manage");
+  return prisma.client.findMany({
+    where: { deletedAt: null, status: "ONBOARDING" },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, name: true, kind: true, createdAt: true, updatedAt: true },
+  });
+}
+
+/// A client being set up leaves ONBOARDING only through its activation,
+/// which checks that what the automation needs is there. Every other way
+/// of changing a client's status (the settings form, archive, restore)
+/// refuses it, in both directions.
+function assertNotOnboardingTransition(before: { status: ClientStatus }, next: ClientStatus | undefined) {
+  if (next === undefined || next === before.status) return;
+  if (before.status === "ONBOARDING") {
+    throw new DomainError("clients.onboardingStatusLocked", "הלקוח בהקמה. הוא יוצא מההקמה רק בהפעלה, במסך הסיכום של ההקמה.");
+  }
+  if (next === "ONBOARDING") {
+    throw new DomainError("clients.cannotReturnToOnboarding", "לקוח שהופעל לא חוזר להקמה.");
+  }
+}
+
+/// 26.11.2026 (new-client wizard): a client whose setup is abandoned. It
+/// is soft-deleted like any client, and its own domains are released with
+/// it: the check that a domain belongs to one client only reads the domain
+/// rows, so a deleted client kept blocking its domains for everyone.
+export async function discardOnboardingClient(actor: User, clientId: string) {
+  assertCan(actor.role, "client.manage");
+  const before = await prisma.client.findFirst({ where: { id: clientId, deletedAt: null } });
+  if (!before) throw new DomainError("clients.notFound", "הלקוח לא נמצא.");
+  if (before.status !== "ONBOARDING") {
+    throw new DomainError("clients.notOnboarding", "רק לקוח בהקמה נמחק כך. לקוח פעיל עובר לארכיון.");
+  }
+  const now = new Date();
+  const [client, domains] = await prisma.$transaction([
+    prisma.client.update({ where: { id: clientId }, data: { deletedAt: now } }),
+    prisma.clientDomain.updateMany({ where: { clientId, deletedAt: null }, data: { deletedAt: now } }),
+  ]);
+  await recordAudit({
+    actorId: actor.id,
+    action: "client.onboarding_discard",
+    entityType: "Client",
+    entityId: clientId,
+    clientId,
+    before,
+    after: { deletedAt: client.deletedAt, domainsReleased: domains.count },
+  });
+  return client;
+}
+
 export async function updateClient(
   actor: User,
   clientId: string,
@@ -143,6 +201,7 @@ export async function updateClient(
 ) {
   assertCan(actor.role, "client.manage");
   const before = await prisma.client.findUniqueOrThrow({ where: { id: clientId } });
+  assertNotOnboardingTransition(before, input.status);
 
   // Sub-processor notice (3.11.2026). Validated before anything is written,
   // so a missing source does not leave the other settings half-saved.
@@ -282,6 +341,7 @@ export async function updateClient(
 /// דרך UI."
 export async function archiveClient(actor: User, clientId: string) {
   assertCan(actor.role, "client.manage");
+  assertNotOnboardingTransition(await prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { status: true } }), "ARCHIVED");
   const client = await prisma.client.update({
     where: { id: clientId },
     data: { status: "ARCHIVED", deletedAt: new Date() },
@@ -308,6 +368,7 @@ export async function archiveClient(actor: User, clientId: string) {
 // time-entries.ts for the same reason.
 export async function restoreClient(actor: User, clientId: string) {
   assertCan(actor.role, "client.manage");
+  assertNotOnboardingTransition(await prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { status: true } }), "ACTIVE");
   const client = await prisma.client.update({
     where: { id: clientId },
     data: { status: "ACTIVE", deletedAt: null },
