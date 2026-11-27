@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { emailDomain, normalizeDomain, normalizeEmail, normalizePhone, parseList } from "@/lib/contact-normalize";
+import { emailDomain, normalizeDomain, normalizeEmail, normalizePhone, normalizePhones, parseList, splitPhones } from "@/lib/contact-normalize";
 
 // Org-brain spec 3.5 (13.10.2026): one person, however they were typed.
 
@@ -49,5 +49,38 @@ describe("parseList", () => {
     const r = parseList("A@x.com, a@x.com; b@y.org\nnot-an-email", normalizeEmail);
     expect(r.values).toEqual(["a@x.com", "b@y.org"]);
     expect(r.invalid).toEqual(["not-an-email"]);
+  });
+});
+
+describe("a number however it is written (27.11.2026)", () => {
+  const SAME = [
+    "052-1234567", "0521234567", "052 123 4567", "052-123-4567", "(052) 1234567", "0521-234567",
+    "+972-52-1234567", "+972 52 123 4567", "+972521234567", "972521234567", "00972521234567", "00972-52-1234567",
+    "+972 (0)52-1234567", "+972-052-1234567", "972-052-1234567", "+9720521234567", "00972-052-1234567",
+    "52-1234567", "521234567",
+    "נייד: 052-1234567", "Mobile: +972 52 123 4567", "tel:+972521234567",
+    "052-1234567 / 03-1234567", "052-1234567 ext. 12", "052-1234567 שלוחה 3", "052-1234567 או 03-1234567",
+  ];
+  it.each(SAME)("%s is +972521234567", (raw) => {
+    expect(normalizePhone(raw)).toBe("+972521234567");
+  });
+
+  it("keeps landlines, numbers abroad and their own zeros", () => {
+    expect(normalizePhone("03-1234567")).toBe("+97231234567");
+    expect(normalizePhone("+972-3-1234567")).toBe("+97231234567");
+    expect(normalizePhone("+44 (0)20 7946 0958")).toBe("+442079460958");
+    expect(normalizePhone("+1 (415) 555-0100")).toBe("+14155550100");
+    expect(normalizePhone("Fax: 03-1234567")).toBe("+97231234567");
+    expect(normalizePhone("*2345")).toBeNull();
+  });
+
+  it("splits a field with several numbers, and stores each once", () => {
+    expect(splitPhones("052-1234567 / 03-1234567")).toEqual(["052-1234567", "03-1234567"]);
+    expect(splitPhones("052-1234567\n03-1234567; 054-7654321")).toEqual(["052-1234567", "03-1234567", "054-7654321"]);
+    expect(normalizePhones(["052-1234567 / 03-1234567", "+972 52 123 4567", "054-7654321 או 1234"])).toEqual([
+      "+972521234567",
+      "+97231234567",
+      "+972547654321",
+    ]);
   });
 });

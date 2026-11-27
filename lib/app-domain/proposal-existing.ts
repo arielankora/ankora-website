@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { normalizeDomain, normalizeEmail, normalizePhone } from "@/lib/contact-normalize";
+import { normalizeDomain, normalizeEmail, normalizePhones } from "@/lib/contact-normalize";
 import { DUPLICATE_MESSAGES, normalizeForMatch, type ProposalFlag } from "@/lib/knowledge-proposals";
 import { currentItem } from "@/lib/app-domain/proposal-updates";
 
@@ -51,7 +51,7 @@ export async function findExisting(clientId: string, target: string, action: str
     // As findOrCreatePerson finds the person: an email, then a phone. Two
     // people with the same name are two people.
     const emails = list(payload.emails, normalizeEmail);
-    const phones = list(payload.phones, normalizePhone);
+    const phones = normalizePhones(Array.isArray(payload.phones) ? payload.phones.filter((x): x is string => typeof x === "string") : []);
     const or = [...(emails.length ? [{ person: { emails: { hasSome: emails } } }] : []), ...(phones.length ? [{ person: { phones: { hasSome: phones } } }] : [])];
     if (!or.length) return null;
     const row = await prisma.clientContact.findFirst({ where: { ...live, OR: or }, select: { id: true } });

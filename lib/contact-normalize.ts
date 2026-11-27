@@ -33,6 +33,16 @@ export function normalizeDomain(raw: string): string | null {
   return value;
 }
 
+/// The separate numbers in one field: "052-1234567 / 03-1234567",
+/// "052-1234567 או 03-1234567", one per line. Commas and semicolons too.
+/// Each part is still raw: pass it to normalizePhone.
+export function splitPhones(raw: string): string[] {
+  return raw
+    .split(/[\/|,;\n]+|\s+(?:או|or)\s+/i)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
 /// E.164 when it can be inferred, otherwise digits with a leading "+" kept.
 ///
 /// - "+972 54-123-4567" and "00972541234567" give "+972541234567".
@@ -40,20 +50,44 @@ export function normalizeDomain(raw: string): string | null {
 ///   without the leading zero. Israel is the default because almost every
 ///   number this product sees without a country code is Israeli; a number
 ///   from elsewhere is written with its "+" and passes through untouched.
+/// - The zero that signatures keep after the country code ("+972 (0)54",
+///   "+972-054", "972-054") is dropped, and a mobile written without its
+///   zero ("54-1234567", nine digits from 5) is Israeli too (27.11.2026,
+///   Ariel: the WhatsApp screen must find a contact however the number was
+///   written).
+/// - Only the first number of a field that holds several, and without its
+///   extension ("ext. 12", "שלוחה 12").
 /// - Anything shorter than 7 digits is not a phone number. Null.
 export function normalizePhone(raw: string): string | null {
-  const trimmed = raw.trim();
-  const plus = trimmed.startsWith("+");
-  let digits = trimmed.replace(/\D/g, "");
+  let text = splitPhones(raw)[0] ?? "";
+  text = text.split(/(?:\bext\.?|\bextension|\bx|שלוחה|שלו['׳])\s*\d/i)[0];
+  text = text.replace(/\(\s*0\s*\)/g, "");
+  let plus = /^[^\d]*\+/.test(text);
+  let digits = text.replace(/\D/g, "");
+  if (digits.startsWith("00")) {
+    digits = digits.slice(2);
+    plus = true;
+  }
+  if (digits.startsWith("9720")) digits = `972${digits.slice(4)}`;
   if (digits.length < 7) return null;
   if (plus) return `+${digits}`;
-  if (digits.startsWith("00")) return `+${digits.slice(2)}`;
-  if (digits.startsWith("0") && (digits.length === 9 || digits.length === 10)) {
-    digits = digits.slice(1);
-    return `+972${digits}`;
-  }
+  if (digits.startsWith("0") && (digits.length === 9 || digits.length === 10)) return `+972${digits.slice(1)}`;
   if (digits.startsWith("972") && digits.length >= 11) return `+${digits}`;
+  if (digits.length === 9 && digits.startsWith("5")) return `+972${digits}`;
   return digits;
+}
+
+/// Every number in a list of fields, normalized, without duplicates, in
+/// order: what a contact's phones are stored as.
+export function normalizePhones(values: readonly string[] | undefined): string[] {
+  const out: string[] = [];
+  for (const value of values ?? []) {
+    for (const part of splitPhones(value)) {
+      const n = normalizePhone(part);
+      if (n && !out.includes(n)) out.push(n);
+    }
+  }
+  return out;
 }
 
 /// A list typed into one field ("a@x.com, b@y.com" or one per line),
