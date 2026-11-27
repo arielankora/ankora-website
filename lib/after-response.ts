@@ -38,7 +38,18 @@ import "server-only";
 /// that returns before its own side effects have run has not done its
 /// job. So this falls back to awaiting, which also means the integration
 /// suite observes the same behaviour it always did.
-export async function afterResponse(label: string, work: () => Promise<unknown>): Promise<void> {
+///
+/// A FAILURE IS AN ISSUE (27.11.2026)
+///
+/// "Best-effort" used to mean the error went to the log and nowhere else;
+/// the WhatsApp webhook lost messages that way for weeks. A failure is now
+/// a system issue keyed by the label. WARNING by default; a caller whose
+/// failure loses something a person needs passes CRITICAL.
+export async function afterResponse(
+  label: string,
+  work: () => Promise<unknown>,
+  options: { severity?: "CRITICAL" | "WARNING" } = {},
+): Promise<void> {
   // try/catch around an await, not `work().catch(...)`.
   //
   // `() => { throw }` never produces a promise, so a bare `.catch` lets
@@ -51,6 +62,14 @@ export async function afterResponse(label: string, work: () => Promise<unknown>)
       await work();
     } catch (err) {
       console.error(`${label} failed (non-fatal)`, err);
+      const { reportIssue } = await import("@/lib/system-issues");
+      await reportIssue({
+        area: "after-response",
+        key: label,
+        title: `עבודת רקע נכשלה: ${label}`,
+        error: err,
+        severity: options.severity ?? "WARNING",
+      });
     }
   };
 

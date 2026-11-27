@@ -47,7 +47,7 @@ describe("nightly communications run budget", () => {
   it("transcribes and copies what is stored before loading WhatsApp history", () => {
     expect(Object.keys(COMMS_CRON_STEPS)).toEqual(["reconcile", "transcribe", "driveCopies", "whatsapp"]);
     const route = readFileSync("app/api/cron/comms-recordings/route.ts", "utf8");
-    const at = (step: string) => route.indexOf(`timed("${step}"`);
+    const at = (step: string) => route.indexOf(`step("${step}"`);
     expect(at("transcribe")).toBeLessThan(at("whatsapp"));
     expect(at("driveCopies")).toBeLessThan(at("whatsapp"));
   });

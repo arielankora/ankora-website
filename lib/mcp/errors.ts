@@ -14,6 +14,7 @@
 // tests/unit/mcp/errors.test.ts run it directly. It also survives the
 // class being re-exported or wrapped somewhere in between, which
 // `instanceof` does not.
+import { noteUnexpectedToolError } from "@/lib/mcp/tool-context";
 import { AI_EXCLUDED_TOOL_MESSAGE } from "@/lib/ai-exclusion";
 
 export type McpToolError = {
@@ -158,6 +159,9 @@ export function toMcpToolError(err: unknown): McpToolError {
     };
   }
 
+  // A bug, not a refusal: it becomes a system issue, with the tool's name
+  // (lib/mcp/tool-context.ts, reported by withToolMeasurement).
+  noteUnexpectedToolError(err);
   return {
     message:
       "Ankora could not complete this action because of an unexpected server error. Do not retry the same call. Tell the user the action failed and that the error is recorded in Ankora's logs.",

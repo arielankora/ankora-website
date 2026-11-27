@@ -1994,6 +1994,9 @@ model Notification {
   entityType String?
   entityId   String?
   readAt     DateTime?
+  /// When this notification also went out by email (27.11.2026). An admin
+  /// alert counts as sent for the day only when the email did go out.
+  emailedAt  DateTime?
 
   createdAt DateTime @default(now())
 
@@ -4697,6 +4700,66 @@ model CallRecordingSkip {
   createdAt DateTime @default(now())
 
   @@map("call_recording_skips")
+}
+
+/// A failure the system hit and a person must be able to see (27.11.2026,
+/// silent failures plan, stage 1). One row per (area, key): the same failure
+/// again counts on the same row, and a resolved one that happens again opens.
+/// Written only by reportIssue (lib/system-issues.ts), never by a screen form.
+model SystemIssue {
+  id            String              @id @default(cuid())
+  /// What part of the system ("email", "mcp", "cron", "comms", "server", ...).
+  area          String
+  /// What exactly, stable across occurrences ("tool:create_task", "job:mail-waits").
+  key           String
+  /// One line for a person, in Hebrew.
+  title         String
+  /// The latest error, without secrets or message bodies.
+  detail        String?
+  severity      SystemIssueSeverity
+  status        SystemIssueStatus   @default(OPEN)
+  count         Int                 @default(1)
+  firstSeenAt   DateTime            @default(now())
+  lastSeenAt    DateTime            @default(now())
+  /// When the admins were last emailed about it. Set only after the email went out.
+  lastAlertedAt DateTime?
+  resolvedAt    DateTime?
+  resolvedById  String?
+  /// A note and a pull request link left by a person or by Claude.
+  note          String?
+  prUrl         String?
+
+  @@unique([area, key])
+  @@index([status, lastSeenAt])
+  @@map("system_issues")
+}
+
+enum SystemIssueSeverity {
+  /// Something did not reach a person, was not saved, or a connection broke: email the admins now.
+  CRITICAL
+  /// Worth knowing, not urgent: the screen and the morning report.
+  WARNING
+}
+
+enum SystemIssueStatus {
+  OPEN
+  RESOLVED
+}
+
+/// One run of a scheduled job (27.11.2026). A run that started and never
+/// finished was cut off (a timeout); a job with no run on its day did not run.
+model CronRun {
+  id         String    @id @default(cuid())
+  job        String
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  ok         Boolean?
+  /// Counts the job returned, no names or content.
+  summary    Json?
+  error      String?
+
+  @@index([job, startedAt])
+  @@map("cron_runs")
 }
 
 /// A Drive file that should be gone and is not yet (27.11.2026). Retention,

@@ -1,3 +1,4 @@
+import { reportIssue } from "@/lib/system-issues";
 import { mcpServerVersion } from "@/lib/mcp/server-version";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { registerAnkoraTools } from "@/lib/mcp/tools";
@@ -46,7 +47,19 @@ export const maxDuration = 60;
 // tools cost each employee's Claude allowance the most. The wrapper sits
 // here rather than inside registerAnkoraTools so the tool tests, which
 // register against a stand-in server, are untouched by it.
-const handler = createMcpHandler((server) => registerAnkoraTools(withToolMeasurement(server, recordToolCall)), {
+/// An unexpected error inside a tool is a bug: a system issue per tool
+/// (27.11.2026). Refusals of the domain never get here.
+async function reportUnexpectedToolError(tool: string, err: unknown): Promise<void> {
+  await reportIssue({
+    area: "mcp",
+    key: `tool:${tool}`,
+    title: `כלי המחבר ${tool} נכשל בשגיאה לא צפויה`,
+    error: err,
+    severity: "CRITICAL",
+  });
+}
+
+const handler = createMcpHandler((server) => registerAnkoraTools(withToolMeasurement(server, recordToolCall, Date.now, reportUnexpectedToolError)), {
   // Caps the number of array elements and object members one tools/call
   // may ask the SDK to validate. See lib/mcp/limits.ts: without it, the
   // 2.3.0 upgrade that closed GHSA-46jr-4wx8-v453 does nothing, because

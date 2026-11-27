@@ -29,6 +29,16 @@ vi.mock("@/lib/app-domain/task-digest", () => ({ sendDailyTaskDigest: jobs.sendD
 vi.mock("@/lib/app-domain/report-schedules", () => ({ reconcileScheduledReports: jobs.reconcileScheduledReports }));
 vi.mock("@/lib/app-domain/backup-export", () => ({ sendNightlyDataExport: jobs.sendNightlyDataExport }));
 
+// The rest of the jobs, and the run log and issue table (lib/cron-run.ts),
+// are not under test here.
+vi.mock("@/lib/website-leads", () => ({ purgeExpiredWebsiteLeads: vi.fn() }));
+vi.mock("@/lib/app-domain/client-file-attention", () => ({ notifyClientFileAttention: vi.fn() }));
+vi.mock("@/lib/app-domain/brain-metrics", () => ({ sendWeeklyBrainMetrics: vi.fn() }));
+vi.mock("@/lib/app-domain/vendor-detections", () => ({ openOverdueVendorRuns: vi.fn() }));
+vi.mock("@/lib/app-domain/code-backup", () => ({ backupCodeSnapshotToDrive: vi.fn() }));
+vi.mock("@/lib/prisma", () => ({ prisma: { cronRun: { create: vi.fn(async () => ({ id: "run" })), update: vi.fn(async () => ({})) } } }));
+vi.mock("@/lib/system-issues", () => ({ reportIssue: vi.fn(), resolveIssue: vi.fn(), describeError: (e: unknown) => String(e) }));
+
 const { authorizeCronRequest } = await import("@/lib/cron-auth");
 const alertsRoute = await import("@/app/api/cron/alerts-reconcile/route");
 const reportsRoute = await import("@/app/api/cron/scheduled-reports/route");
