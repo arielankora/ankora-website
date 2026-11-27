@@ -1710,7 +1710,18 @@
         "noCalendar": "לתיבה {account} אין יומן דרך החיבור (תיבה בפרוטוקול IMAP). יומן יש רק בחשבון Google או Microsoft.",
         "noCalendarFound": "לא נמצא יומן בחשבון הזה.",
         "eventFieldsRequired": "לאירוע חדש צריך כותרת (title), התחלה (start) וסוף (end).",
-        "calendarIdRequired": "מעבירים את מזהה היומן ב-calendarId (מ-list_client_calendar_events עם calendarsOnly)."
+        "calendarIdRequired": "מעבירים את מזהה היומן ב-calendarId (מ-list_client_calendar_events עם calendarsOnly).",
+        "noAccess": "אין לך גישה לתיבה {account}. מנהל מערכת, מנהל התיק או המחליף שלו יכולים להוסיף אותך לתיבה במסך החיבורים של הלקוח באנקורה.",
+        "readOnly": "יש לך גישת קריאה בלבד לתיבה {account}. כדי לכתוב ממנה (טיוטה, שליחה, סידור או יומן) מנהל מערכת, מנהל התיק או המחליף שלו מעלים את הגישה במסך החיבורים של הלקוח.",
+        "whichMine": "מעבירים את כתובת התיבה, או את שם הלקוח. list_my_mailboxes מציג את כל התיבות שלך.",
+        "unknownMine": "אין באנקורה חיבור לתיבה {account}. list_my_mailboxes מציג את התיבות שלך.",
+        "whichClient": "התיבה {account} מחוברת אצל יותר מלקוח אחד. מעבירים גם את שם הלקוח.",
+        "personalSender": "המייל הזה הוא עם שולח שסומן \"לא לקרוא\" בתיבה, ולכן קלוד לא קורא אותו."
+      },
+      "mailboxAccess": {
+        "notFound": "התיבה לא נמצאה.",
+        "notAllowed": "את רשימת הגישה לתיבה משנים מנהלי המערכת, מנהל התיק והמחליף שלו.",
+        "notOnClient": "אפשר להוסיף לתיבה רק מי שיש לו גישה ללקוח באנקורה."
       }
     },
     "requestTypes": {
@@ -2414,6 +2425,9 @@
       "connectionMailWrite": "כתיבה בתיבת הדואר של לקוח",
       "connectionCalendarRead": "קריאה מהיומן של לקוח",
       "connectionCalendarWrite": "כתיבה ביומן של לקוח",
+      "connectionMailboxAccessGrant": "הוספת עובד לגישה לתיבת דואר של לקוח",
+      "connectionMailboxAccessChange": "שינוי רמת גישה לתיבת דואר של לקוח",
+      "connectionMailboxAccessRevoke": "הסרת עובד מהגישה לתיבת דואר של לקוח",
       "mailChannelConnected": "חיבור תיבת דואר לסריקה",
       "mailChannelReused": "חיבור תיבת דואר של לקוח לסריקה דרך החיבור הקיים",
       "mailChannelReconnected": "חיבור מחדש של תיבת דואר",
@@ -5543,6 +5557,26 @@
         "reconnect": "חיבור מחדש",
         "confirm": "לנתק את התיבה? היא תוסר מ-Unipile, וקלוד לא יוכל לקרוא אותה עוד.",
         "notReady": "חיבור תיבת דואר דרך Unipile עוד לא מוגדר בסביבה הזו."
+      },
+      "access": {
+        "title": "מי ניגש לתיבה דרך קלוד ({count} ברשימה)",
+        "always": "תמיד, לפי התפקיד: {names}.",
+        "admins": "מנהלי המערכת",
+        "accountManager": "{name} (מנהל התיק)",
+        "backupManager": "{name} (המחליף)",
+        "empty": "אין עוד אף אחד ברשימה.",
+        "send": "קריאה ושליחה",
+        "read": "קריאה בלבד",
+        "remove": "הסרה",
+        "add": "הוספה",
+        "pick": "בחירת עובד",
+        "whoLabel": "עובד להוספה",
+        "newLevelLabel": "רמת הגישה של מי שנוסף",
+        "levelLabel": "רמת הגישה של {name}",
+        "noCandidates": "כל מי שיש לו גישה ללקוח כבר ברשימה.",
+        "added": "נוסף לתיבה.",
+        "changed": "רמת הגישה עודכנה.",
+        "removed": "הוסר מהתיבה."
       }
     },
     "knowledge": {

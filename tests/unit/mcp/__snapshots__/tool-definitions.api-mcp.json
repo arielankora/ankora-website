@@ -1192,7 +1192,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "client": {
-          "description": "Client name, as the user said it.",
+          "description": "Client name, as the user said it. Leave it out when `mailbox` names the mailbox.",
           "maxLength": 200,
           "type": "string"
         },
@@ -1201,7 +1201,7 @@
           "type": "string"
         },
         "mailbox": {
-          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "description": "The mailbox address: when the client has more than one, or alone without `client`. list_my_mailboxes lists every mailbox you may use, your own included.",
           "maxLength": 320,
           "type": "string"
         },
@@ -1210,9 +1210,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "client"
-      ],
       "type": "object"
     },
     "name": "get_client_email",
@@ -1804,7 +1801,7 @@
           "type": "boolean"
         },
         "client": {
-          "description": "Client name, as the user said it.",
+          "description": "Client name, as the user said it. Leave it out when `mailbox` names the mailbox.",
           "maxLength": 200,
           "type": "string"
         },
@@ -1836,7 +1833,7 @@
           "type": "string"
         },
         "mailbox": {
-          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "description": "The mailbox address: when the client has more than one, or alone without `client`. list_my_mailboxes lists every mailbox you may use, your own included.",
           "maxLength": 320,
           "type": "string"
         },
@@ -1850,9 +1847,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "client"
-      ],
       "type": "object"
     },
     "name": "list_client_calendar_events",
@@ -1898,7 +1892,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "client": {
-          "description": "Client name, as the user said it.",
+          "description": "Client name, as the user said it. Leave it out when `mailbox` names the mailbox.",
           "maxLength": 200,
           "type": "string"
         },
@@ -1916,7 +1910,7 @@
           "type": "integer"
         },
         "mailbox": {
-          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "description": "The mailbox address: when the client has more than one, or alone without `client`. list_my_mailboxes lists every mailbox you may use, your own included.",
           "maxLength": 320,
           "type": "string"
         },
@@ -1925,9 +1919,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "client"
-      ],
       "type": "object"
     },
     "name": "list_client_email_drafts",
@@ -1945,7 +1936,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "client": {
-          "description": "Client name, as the user said it.",
+          "description": "Client name, as the user said it. Leave it out when `mailbox` names the mailbox.",
           "maxLength": 200,
           "type": "string"
         },
@@ -1967,14 +1958,11 @@
           "type": "array"
         },
         "mailbox": {
-          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "description": "The mailbox address: when the client has more than one, or alone without `client`. list_my_mailboxes lists every mailbox you may use, your own included.",
           "maxLength": 320,
           "type": "string"
         }
       },
-      "required": [
-        "client"
-      ],
       "type": "object"
     },
     "name": "list_client_mail_folders",
@@ -2126,6 +2114,22 @@
     },
     "name": "list_my_clients",
     "title": "List my clients"
+  },
+  "list_my_mailboxes": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Every mailbox you may read or send from through Ankora: your own (connected on \"התיבות שלי\") and the client mailboxes open to you, with the client and whether you may send. Call it when the user names a mailbox by its owner or asks which mailboxes they have. Then pass the address as `mailbox` to search_client_emails, get_client_email, save_client_email_draft and the other mailbox tools; `client` may be left out. Takes nothing. Read-only.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {},
+      "type": "object"
+    },
+    "name": "list_my_mailboxes",
+    "title": "List the mailboxes you can use"
   },
   "list_my_routines": {
     "annotations": {
@@ -2439,7 +2443,7 @@
           "type": "string"
         },
         "client": {
-          "description": "Client name, as the user said it.",
+          "description": "Client name, as the user said it. Leave it out when `mailbox` names the mailbox.",
           "maxLength": 200,
           "type": "string"
         },
@@ -2452,7 +2456,7 @@
           "type": "string"
         },
         "mailbox": {
-          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "description": "The mailbox address: when the client has more than one, or alone without `client`. list_my_mailboxes lists every mailbox you may use, your own included.",
           "maxLength": 320,
           "type": "string"
         },
@@ -2466,7 +2470,6 @@
         }
       },
       "required": [
-        "client",
         "action"
       ],
       "type": "object"
@@ -2500,7 +2503,7 @@
           "type": "string"
         },
         "client": {
-          "description": "Client name, as the user said it.",
+          "description": "Client name, as the user said it. Leave it out when `mailbox` names the mailbox.",
           "maxLength": 200,
           "type": "string"
         },
@@ -2513,7 +2516,7 @@
           "type": "string"
         },
         "mailbox": {
-          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "description": "The mailbox address: when the client has more than one, or alone without `client`. list_my_mailboxes lists every mailbox you may use, your own included.",
           "maxLength": 320,
           "type": "string"
         },
@@ -2531,7 +2534,6 @@
         }
       },
       "required": [
-        "client",
         "action"
       ],
       "type": "object"
@@ -2791,7 +2793,7 @@
           "type": "array"
         },
         "client": {
-          "description": "Client name, as the user said it.",
+          "description": "Client name, as the user said it. Leave it out when `mailbox` names the mailbox.",
           "maxLength": 200,
           "type": "string"
         },
@@ -2813,13 +2815,12 @@
           "type": "array"
         },
         "mailbox": {
-          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "description": "The mailbox address: when the client has more than one, or alone without `client`. list_my_mailboxes lists every mailbox you may use, your own included.",
           "maxLength": 320,
           "type": "string"
         }
       },
       "required": [
-        "client",
         "emailIds",
         "action"
       ],
@@ -4587,7 +4588,7 @@
           "type": "string"
         },
         "client": {
-          "description": "Client name, as the user said it.",
+          "description": "Client name, as the user said it. Leave it out when `mailbox` names the mailbox.",
           "maxLength": 200,
           "type": "string"
         },
@@ -4596,13 +4597,12 @@
           "type": "string"
         },
         "mailbox": {
-          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "description": "The mailbox address: when the client has more than one, or alone without `client`. list_my_mailboxes lists every mailbox you may use, your own included.",
           "maxLength": 320,
           "type": "string"
         }
       },
       "required": [
-        "client",
         "emailId",
         "attachmentId"
       ],
@@ -5089,7 +5089,7 @@
           "type": "string"
         },
         "client": {
-          "description": "Client name, as the user said it.",
+          "description": "Client name, as the user said it. Leave it out when `mailbox` names the mailbox.",
           "maxLength": 200,
           "type": "string"
         },
@@ -5102,13 +5102,12 @@
           "type": "string"
         },
         "mailbox": {
-          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "description": "The mailbox address: when the client has more than one, or alone without `client`. list_my_mailboxes lists every mailbox you may use, your own included.",
           "maxLength": 320,
           "type": "string"
         }
       },
       "required": [
-        "client",
         "eventId",
         "action"
       ],
@@ -5581,7 +5580,7 @@
           "type": "string"
         },
         "client": {
-          "description": "Client name, as the user said it.",
+          "description": "Client name, as the user said it. Leave it out when `mailbox` names the mailbox.",
           "maxLength": 200,
           "type": "string"
         },
@@ -5605,7 +5604,7 @@
           "type": "string"
         },
         "mailbox": {
-          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "description": "The mailbox address: when the client has more than one, or alone without `client`. list_my_mailboxes lists every mailbox you may use, your own included.",
           "maxLength": 320,
           "type": "string"
         },
@@ -5664,9 +5663,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "client"
-      ],
       "type": "object"
     },
     "name": "save_client_calendar_event",
@@ -5700,7 +5696,7 @@
           "type": "array"
         },
         "client": {
-          "description": "Client name, as the user said it.",
+          "description": "Client name, as the user said it. Leave it out when `mailbox` names the mailbox.",
           "maxLength": 200,
           "type": "string"
         },
@@ -5732,7 +5728,7 @@
           "type": "string"
         },
         "mailbox": {
-          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "description": "The mailbox address: when the client has more than one, or alone without `client`. list_my_mailboxes lists every mailbox you may use, your own included.",
           "maxLength": 320,
           "type": "string"
         },
@@ -5765,9 +5761,6 @@
           "type": "array"
         }
       },
-      "required": [
-        "client"
-      ],
       "type": "object"
     },
     "name": "save_client_email_draft",
@@ -6343,7 +6336,7 @@
           "type": "string"
         },
         "client": {
-          "description": "Client name, as the user said it.",
+          "description": "Client name, as the user said it. Leave it out when `mailbox` names the mailbox.",
           "maxLength": 200,
           "type": "string"
         },
@@ -6380,7 +6373,7 @@
           "type": "integer"
         },
         "mailbox": {
-          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "description": "The mailbox address: when the client has more than one, or alone without `client`. list_my_mailboxes lists every mailbox you may use, your own included.",
           "maxLength": 320,
           "type": "string"
         },
@@ -6411,9 +6404,6 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "client"
-      ],
       "type": "object"
     },
     "name": "search_client_emails",
@@ -6447,7 +6437,7 @@
           "type": "array"
         },
         "client": {
-          "description": "Client name, as the user said it.",
+          "description": "Client name, as the user said it. Leave it out when `mailbox` names the mailbox.",
           "maxLength": 200,
           "type": "string"
         },
@@ -6476,7 +6466,7 @@
           "type": "string"
         },
         "mailbox": {
-          "description": "The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.",
+          "description": "The mailbox address: when the client has more than one, or alone without `client`. list_my_mailboxes lists every mailbox you may use, your own included.",
           "maxLength": 320,
           "type": "string"
         },
@@ -6514,7 +6504,6 @@
         }
       },
       "required": [
-        "client",
         "userAskedToSend"
       ],
       "type": "object"

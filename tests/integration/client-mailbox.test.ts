@@ -4,7 +4,8 @@ import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
 
 // 26.11.2026 (Ariel and Hadas): a client's mailbox connected through
-// Unipile and read through the connector by everyone who sees the client.
+// Unipile and read through the connector (since 27.11.2026, by role or by
+// the mailbox's list: tests/integration/mailbox-access.test.ts).
 // What is worth holding:
 // - the way back from Unipile adds a mailbox only with the signed intent of
 //   someone allowed to connect, only for a mail account linked after it, and
@@ -164,6 +165,9 @@ describe("a client mailbox through the connector", () => {
     const { manager, colleague, client } = await world();
     const row = await mailbox(client.id, manager);
     accounts.acc_mail = { provider: "GOOGLE", status: "running", name: "jobs@career.co.il", created_at: "2026-11-01T00:00:00.000Z" };
+    // 27.11.2026: seeing the client is not enough; the colleague is on the
+    // mailbox's list (tests/integration/mailbox-access.test.ts).
+    await prisma.mailboxAccess.create({ data: { connectionId: row.id, userId: colleague.id, grantedById: manager.id } });
 
     const status = await call(colleague, "get_client_mailbox", { client: "קריירה ועוד" });
     expect(status.json.mailboxes).toEqual([

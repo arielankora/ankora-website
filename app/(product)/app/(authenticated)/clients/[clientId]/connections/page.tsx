@@ -7,6 +7,7 @@ import { getClient } from "@/lib/app-domain/clients";
 import { listConnections, type ConnectionView } from "@/lib/app-domain/connections";
 import { googleOAuthConfig } from "@/lib/google-oauth";
 import { unipileConfigured } from "@/lib/client-mailbox/unipile-mail";
+import { mailboxAccessViews, mayEditMailboxAccess } from "@/lib/client-mailbox/access";
 import { ConnectionsScreen } from "./ConnectionsScreen";
 
 // The client's connections (ADR 0001 section 24, task
@@ -46,6 +47,7 @@ export default async function ConnectionsPage(props: { params: Promise<{ clientI
     if (err instanceof ForbiddenError) notFound();
     throw err;
   }
+  const access = await mailboxAccessViews(clientId);
   const t = await getTranslations("clients.connections");
   const found = Object.entries(sp)
     .map(([k, v]) => NOTICES[`${k}=${v}` as keyof typeof NOTICES])
@@ -60,6 +62,8 @@ export default async function ConnectionsPage(props: { params: Promise<{ clientI
         aiExcluded={!!client.aiExcluded}
         connections={rows.map((r) => ({ ...r, connectedAt: r.connectedAt.toISOString(), lastUsedAt: r.lastUsedAt?.toISOString() ?? null }))}
         mayManage={canManageClients(user.role) || client.accountManagerId === user.id}
+        mailboxAccess={access}
+        mayEditAccess={mayEditMailboxAccess(user, client)}
         googleReady={!!googleOAuthConfig()}
         mailboxReady={unipileConfigured()}
         userId={user.id}

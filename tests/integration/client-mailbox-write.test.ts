@@ -109,6 +109,9 @@ async function world() {
   const client = await createTestClient({ name: "קריירה ועוד" });
   const imapClient = await createTestClient({ name: "תיבה רגילה" });
   for (const c of [client, imapClient]) await prisma.userClientAccess.create({ data: { userId: hadas.id, clientId: c.id } });
+  // 27.11.2026: a client mailbox is open by role; Hadas is the account
+  // manager of both clients here.
+  for (const c of [client, imapClient]) await prisma.client.update({ where: { id: c.id }, data: { accountManagerId: hadas.id } });
   const row = await prisma.clientConnection.create({
     data: { clientId: client.id, kind: "UNIPILE_MAIL", account: "jobs@career.co.il", scopes: ["mail", "calendar"], unipileAccountId: "acc_mail", connectedById: hadas.id },
   });

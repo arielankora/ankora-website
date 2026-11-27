@@ -6,7 +6,7 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { lookupClient } from "@/lib/mcp/lookup";
 import { actorOf } from "@/lib/mcp/task-extra-tools";
 import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
-import { mailboxSetup, mailboxStatus, readAttachment, readEmail, searchEmails, type SearchInput } from "@/lib/client-mailbox/mailbox";
+import { listMyMailboxes, mailboxSetup, mailboxStatus, readAttachment, readEmail, searchEmails, type SearchInput } from "@/lib/client-mailbox/mailbox";
 import { listClientDrafts, manageClientMailFolders, organizeClientEmail, saveClientDraft, sendClientEmail, type Compose, type OrganizeAction } from "@/lib/client-mailbox/write";
 import { mailboxStatusForAi } from "@/lib/mail-scan/channels";
 import { registerMailScanTools } from "@/lib/mcp/mail-scan-tools";
@@ -25,9 +25,19 @@ const MAILBOX = z
   .string()
   .max(320)
   .optional()
-  .describe("The mailbox address, only when the client has more than one connected. get_client_mailbox lists them.");
+  .describe("The mailbox address: when the client has more than one, or alone without `client`. list_my_mailboxes lists every mailbox you may use, your own included.");
 
 const CLIENT = z.string().max(200).describe("Client name, as the user said it.");
+
+const CLIENT_OR_MAILBOX = z.string().max(200).optional().describe("Client name, as the user said it. Leave it out when `mailbox` names the mailbox.");
+
+/// The client a mailbox call names, or none: a call may name only the
+/// mailbox (27.11.2026), and resolveMailbox finds it by its address.
+async function clientOf(actor: ReturnType<typeof actorOf>, name: string | undefined): Promise<{ ok: true; id: string | null; name: string | null } | { ok: false; message: string }> {
+  if (!name?.trim()) return { ok: true, id: null, name: null };
+  const client = await lookupClient(actor, name);
+  return client.ok ? { ok: true, id: client.value.id, name: client.value.name } : { ok: false, message: client.message };
+}
 
 export function registerMailboxTools(server: McpServer): void {
   registerMailScanTools(server);
@@ -51,6 +61,29 @@ export function registerMailboxTools(server: McpServer): void {
         const actor = actorOf(ctx);
         const mailboxes = await mailboxStatusForAi(actor);
         return toolJson(withFieldNotes({ mailboxes, connectUrl: `${appBaseUrl()}/app/whatsapp-poc/mail/connect` }, CONNECTED_MAILBOXES_NOTES));
+      } catch (err) {
+        return toolFailure(err);
+      }
+    },
+  );
+
+  // 27.11.2026 (Ariel): every mailbox the person may work in through the
+  // connector, their own and the clients' open to them, in one list.
+  server.registerTool(
+    "list_my_mailboxes",
+    {
+      title: "List the mailboxes you can use",
+      description: [
+        "Every mailbox you may read or send from through Ankora: your own (connected on \"התיבות שלי\") and the client mailboxes open to you, with the client and whether you may send.",
+        "Call it when the user names a mailbox by its owner or asks which mailboxes they have. Then pass the address as `mailbox` to search_client_emails, get_client_email, save_client_email_draft and the other mailbox tools; `client` may be left out. Takes nothing. Read-only.",
+      ].join(" "),
+      inputSchema: z.object({}),
+      annotations: TOOL_ANNOTATIONS.list_my_mailboxes,
+    },
+    async (_args: Record<string, never>, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        return toolJson({ mailboxes: await listMyMailboxes(actor) });
       } catch (err) {
         return toolFailure(err);
       }
@@ -90,7 +123,7 @@ export function registerMailboxTools(server: McpServer): void {
         "`after` and `before` take YYYY-MM-DD (Israel time) or an ISO time. Pass `cursor` from the previous answer for the next page. Text search is the provider's own and may be approximate. Read-only.",
       ].join(" "),
       inputSchema: z.object({
-        client: CLIENT,
+        client: CLIENT_OR_MAILBOX,
         mailbox: MAILBOX,
         text: z.string().max(500).optional().describe("Words to find in the subject or body."),
         from: z.string().max(320).optional().describe("Sender address."),
@@ -109,13 +142,13 @@ export function registerMailboxTools(server: McpServer): void {
       }),
       annotations: TOOL_ANNOTATIONS.search_client_emails,
     },
-    async (args: SearchInput & { client: string }, ctx: ServerContext) => {
+    async (args: SearchInput & { client?: string }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
-        const client = await lookupClient(actor, args.client);
+        const client = await clientOf(actor, args.client);
         if (!client.ok) return toolText(client.message);
         const { client: _name, ...input } = args;
-        return toolJson({ client: client.value.name, ...(await searchEmails(actor, client.value.id, input)) });
+        return toolJson({ ...(client.name ? { client: client.name } : {}), ...(await searchEmails(actor, client.id, input)) });
       } catch (err) {
         return toolFailure(err);
       }
@@ -131,19 +164,20 @@ export function registerMailboxTools(server: McpServer): void {
         "A long thread is cut so one read stays reasonable; read a single email by its id for its full text. Read-only.",
       ].join(" "),
       inputSchema: z.object({
-        client: CLIENT,
+        client: CLIENT_OR_MAILBOX,
         mailbox: MAILBOX,
         emailId: z.string().max(500).optional(),
         threadId: z.string().max(500).optional(),
       }),
       annotations: TOOL_ANNOTATIONS.get_client_email,
     },
-    async (args: { client: string; mailbox?: string; emailId?: string; threadId?: string }, ctx: ServerContext) => {
+    async (args: { client?: string; mailbox?: string; emailId?: string; threadId?: string }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
-        const client = await lookupClient(actor, args.client);
+        const client = await clientOf(actor, args.client);
         if (!client.ok) return toolText(client.message);
-        return toolJson({ client: client.value.name, ...(await readEmail(actor, client.value.id, args)) });
+        const { client: _name, ...input } = args;
+        return toolJson({ ...(client.name ? { client: client.name } : {}), ...(await readEmail(actor, client.id, input)) });
       } catch (err) {
         return toolFailure(err);
       }
@@ -159,19 +193,20 @@ export function registerMailboxTools(server: McpServer): void {
         "Images and scanned PDFs have no text to return; the answer says so. Files over 15MB are not read. Read-only.",
       ].join(" "),
       inputSchema: z.object({
-        client: CLIENT,
+        client: CLIENT_OR_MAILBOX,
         mailbox: MAILBOX,
         emailId: z.string().max(500),
         attachmentId: z.string().max(500),
       }),
       annotations: TOOL_ANNOTATIONS.read_client_email_attachment,
     },
-    async (args: { client: string; mailbox?: string; emailId: string; attachmentId: string }, ctx: ServerContext) => {
+    async (args: { client?: string; mailbox?: string; emailId: string; attachmentId: string }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
-        const client = await lookupClient(actor, args.client);
+        const client = await clientOf(actor, args.client);
         if (!client.ok) return toolText(client.message);
-        return toolJson({ client: client.value.name, ...(await readAttachment(actor, client.value.id, args)) });
+        const { client: _name, ...input } = args;
+        return toolJson({ ...(client.name ? { client: client.name } : {}), ...(await readAttachment(actor, client.id, input)) });
       } catch (err) {
         return toolFailure(err);
       }
@@ -187,19 +222,20 @@ export function registerMailboxTools(server: McpServer): void {
         "`include` adds the mailbox's contacts (paged with `contactsCursor`) and, for Outlook, its categories. Read-only.",
       ].join(" "),
       inputSchema: z.object({
-        client: CLIENT,
+        client: CLIENT_OR_MAILBOX,
         mailbox: MAILBOX,
         include: z.array(z.enum(["folders", "contacts", "categories"])).max(3).optional().describe('What to list. Default ["folders"].'),
         contactsCursor: z.string().max(2000).optional(),
       }),
       annotations: TOOL_ANNOTATIONS.list_client_mail_folders,
     },
-    async (args: { client: string; mailbox?: string; include?: ("folders" | "contacts" | "categories")[]; contactsCursor?: string }, ctx: ServerContext) => {
+    async (args: { client?: string; mailbox?: string; include?: ("folders" | "contacts" | "categories")[]; contactsCursor?: string }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
-        const client = await lookupClient(actor, args.client);
+        const client = await clientOf(actor, args.client);
         if (!client.ok) return toolText(client.message);
-        return toolJson({ client: client.value.name, ...(await mailboxSetup(actor, client.value.id, args)) });
+        const { client: _name, ...input } = args;
+        return toolJson({ ...(client.name ? { client: client.name } : {}), ...(await mailboxSetup(actor, client.id, input)) });
       } catch (err) {
         return toolFailure(err);
       }
@@ -219,13 +255,13 @@ export function registerMailboxTools(server: McpServer): void {
     dropAttachmentIds: z.array(z.string().max(500)).max(50).optional().describe("With forwardEmailId: attachment ids to leave out."),
   };
 
-  async function run<A extends { client: string }>(args: A, ctx: ServerContext, fn: (actor: ReturnType<typeof actorOf>, clientId: string, input: Omit<A, "client">) => Promise<object>) {
+  async function run<A extends { client?: string }>(args: A, ctx: ServerContext, fn: (actor: ReturnType<typeof actorOf>, clientId: string | null, input: Omit<A, "client">) => Promise<object>) {
     try {
       const actor = actorOf(ctx);
-      const client = await lookupClient(actor, args.client);
+      const client = await clientOf(actor, args.client);
       if (!client.ok) return toolText(client.message);
       const { client: _name, ...input } = args;
-      return toolJson({ client: client.value.name, ...(await fn(actor, client.value.id, input)) });
+      return toolJson({ ...(client.name ? { client: client.name } : {}), ...(await fn(actor, client.id, input)) });
     } catch (err) {
       return toolFailure(err);
     }
@@ -237,7 +273,7 @@ export function registerMailboxTools(server: McpServer): void {
       title: "List or read the drafts in a client's mailbox",
       description: "The drafts in the client's connected mailbox, newest first, or one draft in full by `draftId`. `participant` narrows to drafts with that address. Read-only.",
       inputSchema: z.object({
-        client: CLIENT,
+        client: CLIENT_OR_MAILBOX,
         mailbox: MAILBOX,
         draftId: z.string().max(500).optional(),
         participant: z.string().max(1000).optional(),
@@ -246,7 +282,7 @@ export function registerMailboxTools(server: McpServer): void {
       }),
       annotations: TOOL_ANNOTATIONS.list_client_email_drafts,
     },
-    async (args: { client: string; mailbox?: string; draftId?: string; participant?: string; limit?: number; cursor?: string }, ctx: ServerContext) =>
+    async (args: { client?: string; mailbox?: string; draftId?: string; participant?: string; limit?: number; cursor?: string }, ctx: ServerContext) =>
       run(args, ctx, listClientDrafts),
   );
 
@@ -259,7 +295,7 @@ export function registerMailboxTools(server: McpServer): void {
         "A forward carries the original's attachments and quotes it under your text. Before writing to or about the client, read the client file (get_client_brief).",
       ].join(" "),
       inputSchema: z.object({
-        client: CLIENT,
+        client: CLIENT_OR_MAILBOX,
         mailbox: MAILBOX,
         draftId: z.string().max(500).optional().describe("Update or delete this draft."),
         delete: z.boolean().optional(),
@@ -267,7 +303,7 @@ export function registerMailboxTools(server: McpServer): void {
       }),
       annotations: TOOL_ANNOTATIONS.save_client_email_draft,
     },
-    async (args: Compose & { client: string; draftId?: string; delete?: boolean }, ctx: ServerContext) => run(args, ctx, saveClientDraft),
+    async (args: Compose & { client?: string; draftId?: string; delete?: boolean }, ctx: ServerContext) => run(args, ctx, saveClientDraft),
   );
 
   server.registerTool(
@@ -279,7 +315,7 @@ export function registerMailboxTools(server: McpServer): void {
         "Call it only when the user asked in so many words to send, and set `userAskedToSend` to true; otherwise save a draft with save_client_email_draft and show it. Before writing to or about the client, read the client file (get_client_brief).",
       ].join(" "),
       inputSchema: z.object({
-        client: CLIENT,
+        client: CLIENT_OR_MAILBOX,
         mailbox: MAILBOX,
         userAskedToSend: z.boolean().describe("True only when the user explicitly asked to send this email now."),
         draftId: z.string().max(500).optional().describe("Send this draft as it is."),
@@ -287,7 +323,7 @@ export function registerMailboxTools(server: McpServer): void {
       }),
       annotations: TOOL_ANNOTATIONS.send_client_email,
     },
-    async (args: Compose & { client: string; draftId?: string; userAskedToSend?: boolean }, ctx: ServerContext) => run(args, ctx, sendClientEmail),
+    async (args: Compose & { client?: string; draftId?: string; userAskedToSend?: boolean }, ctx: ServerContext) => run(args, ctx, sendClientEmail),
   );
 
   server.registerTool(
@@ -299,7 +335,7 @@ export function registerMailboxTools(server: McpServer): void {
         "Folder ids come from list_client_mail_folders. Trashing can be undone only from the mailbox itself.",
       ].join(" "),
       inputSchema: z.object({
-        client: CLIENT,
+        client: CLIENT_OR_MAILBOX,
         mailbox: MAILBOX,
         emailIds: z.array(z.string().max(500)).min(1).max(50),
         action: z.enum(["mark_read", "mark_unread", "set_folders", "add_folders", "remove_folders", "set_categories", "trash"]),
@@ -308,7 +344,7 @@ export function registerMailboxTools(server: McpServer): void {
       }),
       annotations: TOOL_ANNOTATIONS.organize_client_email,
     },
-    async (args: { client: string; mailbox?: string; emailIds: string[]; action: OrganizeAction; folderIds?: string[]; categories?: string[] }, ctx: ServerContext) =>
+    async (args: { client?: string; mailbox?: string; emailIds: string[]; action: OrganizeAction; folderIds?: string[]; categories?: string[] }, ctx: ServerContext) =>
       run(args, ctx, organizeClientEmail),
   );
 
@@ -321,7 +357,7 @@ export function registerMailboxTools(server: McpServer): void {
         "Deleting a folder or a category cannot be undone from here.",
       ].join(" "),
       inputSchema: z.object({
-        client: CLIENT,
+        client: CLIENT_OR_MAILBOX,
         mailbox: MAILBOX,
         action: z.enum(["create_folder", "update_folder", "delete_folder", "create_category", "delete_category"]),
         folderId: z.string().max(200).optional(),
@@ -335,7 +371,7 @@ export function registerMailboxTools(server: McpServer): void {
     },
     async (
       args: {
-        client: string;
+        client?: string;
         mailbox?: string;
         action: "create_folder" | "update_folder" | "delete_folder" | "create_category" | "delete_category";
         folderId?: string;
@@ -358,7 +394,7 @@ export function registerMailboxTools(server: McpServer): void {
         "Without `calendarId` it reads the account's main calendar. Recurring events come as their occurrences. Read-only.",
       ].join(" "),
       inputSchema: z.object({
-        client: CLIENT,
+        client: CLIENT_OR_MAILBOX,
         mailbox: MAILBOX,
         calendarsOnly: z.boolean().optional(),
         calendarId: z.string().max(500).optional(),
@@ -376,7 +412,7 @@ export function registerMailboxTools(server: McpServer): void {
       }),
       annotations: TOOL_ANNOTATIONS.list_client_calendar_events,
     },
-    async (args: Parameters<typeof listClientCalendar>[2] & { client: string }, ctx: ServerContext) => run(args, ctx, listClientCalendar),
+    async (args: Parameters<typeof listClientCalendar>[2] & { client?: string }, ctx: ServerContext) => run(args, ctx, listClientCalendar),
   );
 
   server.registerTool(
@@ -388,7 +424,7 @@ export function registerMailboxTools(server: McpServer): void {
         "`start` and `end` are YYYY-MM-DD for an all-day event, or YYYY-MM-DDTHH:MM in Israel time unless `timezone` or an offset says otherwise. Guests get no invitation unless `notifyGuests` says so: an invitation is a message in the client's name, so set it only when the user asked to invite them.",
       ].join(" "),
       inputSchema: z.object({
-        client: CLIENT,
+        client: CLIENT_OR_MAILBOX,
         mailbox: MAILBOX,
         calendarId: z.string().max(500).optional(),
         eventId: z.string().max(500).optional(),
@@ -410,7 +446,7 @@ export function registerMailboxTools(server: McpServer): void {
       }),
       annotations: TOOL_ANNOTATIONS.save_client_calendar_event,
     },
-    async (args: EventInput & { client: string }, ctx: ServerContext) => run(args, ctx, saveClientEvent),
+    async (args: EventInput & { client?: string }, ctx: ServerContext) => run(args, ctx, saveClientEvent),
   );
 
   server.registerTool(
@@ -422,7 +458,7 @@ export function registerMailboxTools(server: McpServer): void {
         "Cancelling and deleting cannot be undone from here except by restore, where the provider keeps the event.",
       ].join(" "),
       inputSchema: z.object({
-        client: CLIENT,
+        client: CLIENT_OR_MAILBOX,
         mailbox: MAILBOX,
         calendarId: z.string().max(500).optional(),
         eventId: z.string().max(500),
@@ -432,7 +468,7 @@ export function registerMailboxTools(server: McpServer): void {
       annotations: TOOL_ANNOTATIONS.respond_client_calendar_event,
     },
     async (
-      args: { client: string; mailbox?: string; calendarId?: string; eventId: string; action: "accept" | "maybe" | "decline" | "cancel" | "restore" | "delete"; comment?: string },
+      args: { client?: string; mailbox?: string; calendarId?: string; eventId: string; action: "accept" | "maybe" | "decline" | "cancel" | "restore" | "delete"; comment?: string },
       ctx: ServerContext,
     ) => run(args, ctx, respondClientEvent),
   );
@@ -443,7 +479,7 @@ export function registerMailboxTools(server: McpServer): void {
       title: "Create, change or delete a calendar in a client's account",
       description: "Creates a calendar in the client's connected account, renames or describes one, or deletes one (`calendarId` from list_client_calendar_events with calendarsOnly). Deleting a calendar deletes its events.",
       inputSchema: z.object({
-        client: CLIENT,
+        client: CLIENT_OR_MAILBOX,
         mailbox: MAILBOX,
         action: z.enum(["create", "update", "delete"]),
         calendarId: z.string().max(500).optional(),
@@ -455,7 +491,7 @@ export function registerMailboxTools(server: McpServer): void {
       annotations: TOOL_ANNOTATIONS.manage_client_calendars,
     },
     async (
-      args: { client: string; mailbox?: string; action: "create" | "update" | "delete"; calendarId?: string; name?: string; description?: string; timezone?: string; color?: string },
+      args: { client?: string; mailbox?: string; action: "create" | "update" | "delete"; calendarId?: string; name?: string; description?: string; timezone?: string; color?: string },
       ctx: ServerContext,
     ) => run(args, ctx, manageClientCalendars),
   );

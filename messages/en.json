@@ -1710,7 +1710,18 @@
         "noCalendar": "The mailbox {account} has no calendar through the connection (an IMAP mailbox). Only a Google or Microsoft account has one.",
         "noCalendarFound": "No calendar was found in this account.",
         "eventFieldsRequired": "A new event needs a title, a start and an end.",
-        "calendarIdRequired": "Pass the calendar id in calendarId (from list_client_calendar_events with calendarsOnly)."
+        "calendarIdRequired": "Pass the calendar id in calendarId (from list_client_calendar_events with calendarsOnly).",
+        "noAccess": "You have no access to the mailbox {account}. A system admin, the account manager or the backup manager can add you on the client's connections screen in Ankora.",
+        "readOnly": "You may only read the mailbox {account}. To write from it (a draft, sending, organising or the calendar), a system admin, the account manager or the backup manager raises your access on the client's connections screen.",
+        "whichMine": "Pass the mailbox address, or the client's name. list_my_mailboxes lists all your mailboxes.",
+        "unknownMine": "Ankora has no connection to the mailbox {account}. list_my_mailboxes lists your mailboxes.",
+        "whichClient": "The mailbox {account} is connected at more than one client. Pass the client's name too.",
+        "personalSender": "This email is with a sender marked \"do not read\" in the mailbox, so Claude does not read it."
+      },
+      "mailboxAccess": {
+        "notFound": "The mailbox was not found.",
+        "notAllowed": "The mailbox's access list is changed by the system admins, the account manager and the backup manager.",
+        "notOnClient": "Only someone who sees the client in Ankora can be added to the mailbox."
       }
     },
     "requestTypes": {
@@ -2414,6 +2425,9 @@
       "connectionMailWrite": "Writing in a client mailbox",
       "connectionCalendarRead": "Reading a client calendar",
       "connectionCalendarWrite": "Writing in a client calendar",
+      "connectionMailboxAccessGrant": "Person added to a client mailbox's access",
+      "connectionMailboxAccessChange": "Access level changed on a client mailbox",
+      "connectionMailboxAccessRevoke": "Person removed from a client mailbox's access",
       "mailChannelConnected": "Mailbox connected for scanning",
       "mailChannelReused": "Client mailbox connected for scanning through the existing connection",
       "mailChannelReconnected": "Mailbox reconnected",
@@ -5543,6 +5557,26 @@
         "reconnect": "Reconnect",
         "confirm": "Disconnect the mailbox? It will be removed from Unipile, and Claude will no longer be able to read it.",
         "notReady": "Connecting a mailbox through Unipile is not set up in this environment yet."
+      },
+      "access": {
+        "title": "Who uses this mailbox through Claude ({count} on the list)",
+        "always": "Always, by role: {names}.",
+        "admins": "the system admins",
+        "accountManager": "{name} (account manager)",
+        "backupManager": "{name} (backup manager)",
+        "empty": "No one else is on the list yet.",
+        "send": "Read and send",
+        "read": "Read only",
+        "remove": "Remove",
+        "add": "Add",
+        "pick": "Choose a person",
+        "whoLabel": "Person to add",
+        "newLevelLabel": "Access for the person added",
+        "levelLabel": "Access for {name}",
+        "noCandidates": "Everyone who sees this client is already on the list.",
+        "added": "Added to the mailbox.",
+        "changed": "Access updated.",
+        "removed": "Removed from the mailbox."
       }
     },
     "knowledge": {

@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { addAppPasswordConnection, disconnect, testConnection } from "@/lib/app-domain/connections";
 import { appBaseUrl } from "@/lib/email-templates";
 import { createMailboxConnectLink } from "@/lib/client-mailbox/connect";
+import { changeMailboxAccess, grantMailboxAccess } from "@/lib/client-mailbox/access";
 
 // Client connections (ADR 0001 section 24, task cmvtivumj000pjs08q9qj4t67).
 // The Google round trip goes through /api/connections/google; these are
@@ -83,4 +84,29 @@ export async function mailboxLinkAction(clientId: string, connectionId: string |
   } catch (err) {
     return await fail(err);
   }
+}
+
+/// A client mailbox's list (27.11.2026): add a person, change what they may
+/// do, or take them off. Who may edit is checked in lib/client-mailbox/access.ts.
+export async function grantMailboxAccessAction(clientId: string, connectionId: string, userId: string, canSend: boolean): Promise<Result> {
+  const user = await requireUser();
+  try {
+    await grantMailboxAccess(user, { connectionId, userId, canSend });
+  } catch (err) {
+    return await fail(err);
+  }
+  revalidatePath(`/app/clients/${clientId}/connections`);
+  return { ok: (await getTranslations("clients.connections.access"))("added") };
+}
+
+export async function changeMailboxAccessAction(clientId: string, accessId: string, change: { canSend?: boolean; remove?: boolean }): Promise<Result> {
+  const user = await requireUser();
+  try {
+    await changeMailboxAccess(user, { accessId, ...change });
+  } catch (err) {
+    return await fail(err);
+  }
+  revalidatePath(`/app/clients/${clientId}/connections`);
+  const t = await getTranslations("clients.connections.access");
+  return { ok: change.remove ? t("removed") : t("changed") };
 }
