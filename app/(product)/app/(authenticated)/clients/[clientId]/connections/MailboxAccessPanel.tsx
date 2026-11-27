@@ -77,11 +77,11 @@ export function MailboxAccessPanel(props: { clientId: string; connectionId: stri
           (props.view.candidates.length === 0 ? (
             <p>{t("noCandidates")}</p>
           ) : (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col gap-2 border-t border-app-border pt-2">
               <label className="sr-only" htmlFor={`add-${props.connectionId}`}>
                 {t("whoLabel")}
               </label>
-              <select id={`add-${props.connectionId}`} className={`${SELECT} min-w-0 flex-1`} value={userId} disabled={pending} onChange={(e) => setUserId(e.target.value)}>
+              <select id={`add-${props.connectionId}`} className={`${SELECT} w-full`} value={userId} disabled={pending} onChange={(e) => setUserId(e.target.value)}>
                 <option value="">{t("pick")}</option>
                 {props.view.candidates.map((c) => (
                   <option key={c.userId} value={c.userId}>
@@ -89,10 +89,11 @@ export function MailboxAccessPanel(props: { clientId: string; connectionId: stri
                   </option>
                 ))}
               </select>
-              <label className="sr-only" htmlFor={`add-level-${props.connectionId}`}>
-                {t("newLevelLabel")}
-              </label>
-              <select id={`add-level-${props.connectionId}`} className={SELECT} value={level} disabled={pending} onChange={(e) => setLevel(e.target.value as "send" | "read")}>
+              <div className="flex gap-2">
+                <label className="sr-only" htmlFor={`add-level-${props.connectionId}`}>
+                  {t("newLevelLabel")}
+                </label>
+                <select id={`add-level-${props.connectionId}`} className={`${SELECT} min-w-0 flex-1`} value={level} disabled={pending} onChange={(e) => setLevel(e.target.value as "send" | "read")}>
                 <option value="send">{t("send")}</option>
                 <option value="read">{t("read")}</option>
               </select>
@@ -110,6 +111,7 @@ export function MailboxAccessPanel(props: { clientId: string; connectionId: stri
               >
                 {t("add")}
               </button>
+              </div>
             </div>
           ))}
         {msg && (
