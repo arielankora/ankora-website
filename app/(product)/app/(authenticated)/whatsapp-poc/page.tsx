@@ -6,7 +6,7 @@ import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { ArrowRight, ChevronDown, Eye, Forward, MessageCircle, MoreHorizontal, Phone, PhoneMissed, Search, Timer, Trash2, UserRound, Users } from "lucide-react";
 import { parseWhatsappText, phoneDigits, type RichNode } from "@/lib/whatsapp-poc/rich-text";
 import { CALL_EVENTS } from "@/lib/whatsapp-poc/unipile";
-import { ContactRail, ReadToggle, RememberFilters, RowPending, TimelineScroller } from "./CommsControls";
+import { ContactRail, FilterMenu, ReadToggle, RememberFilters, RowPending, TimelineScroller } from "./CommsControls";
 import { ScrollToActive } from "./ScrollToActive";
 import { BlockButton } from "./setup/SetupForms";
 import { searchStoredMessages, type MessageHit, type StoredTranscript } from "@/lib/comms/stored-chats";
@@ -1051,7 +1051,7 @@ export default async function CommunicationsPage(props: {
   // "סוג" and "צוות", each showing what is chosen. Until then the type was
   // four chips over two lines and the team menu a third line under them.
   // Each is a <details>, so it works without script; each choice is a link
-  // that keeps the rest.
+  // that keeps the rest. FilterMenu closes it on a choice (27.11.2026).
   const menu = (props: {
     label: string;
     value: string;
@@ -1059,7 +1059,7 @@ export default async function CommunicationsPage(props: {
     align: "start" | "end";
     items: Array<{ id: string; name: string; count?: number; href: string; current: boolean }>;
   }) => (
-    <details className="relative min-w-0 flex-1">
+    <FilterMenu className="relative min-w-0 flex-1">
       <summary
         className={`flex min-h-10 cursor-pointer list-none items-center justify-between gap-1 rounded-lg border px-3 text-[13px] ${
           props.active ? "border-navy bg-app-accent-soft font-medium text-app-text-primary" : "border-app-border-strong bg-white text-app-text-primary"
@@ -1088,7 +1088,7 @@ export default async function CommunicationsPage(props: {
           </li>
         ))}
       </ul>
-    </details>
+    </FilterMenu>
   );
 
   const typeMenu = menu({
