@@ -16,6 +16,9 @@ import {
 import { moveEntryIntoOpenBankAction } from "../../timer/actions";
 import { TaskManualEntry } from "./TaskManualEntry";
 import { waitingTitle } from "../waiting-title";
+import { useRouter } from "next/navigation";
+import { MailPicker, MailWaitStatus, type MailCandidate, type MailWaitInfo } from "./MailWaitPanel";
+import { followMailAction } from "./mail-actions";
 import { MESSAGE_PRIORITY_LABELS, MESSAGE_STATUS_LABELS, TaskShare, type SharePerson } from "./TaskShare";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 import type { AiExclusionSource } from "@/lib/ai-exclusion";
@@ -88,6 +91,7 @@ export function TaskDetail({
   leadComment = null,
   viewerId = null,
   viewerEmail = null,
+  mail = null,
 }: {
   task: TaskDetailData;
   people: { id: string; name: string; email: string }[];
@@ -111,6 +115,9 @@ export function TaskDetail({
   /// The viewer's work address, so "שיתוף" opens the Gmail draft in that
   /// Google account even when the browser is signed in to several.
   viewerEmail?: string | null;
+  /// Stage 2 of "התיבות שלי" (27.11.2026): the email this task waits for a
+  /// reply to, and the emails the viewer may pick.
+  mail?: TaskMailProps | null;
 }) {
   const t = useTranslations("tasks.detail");
   const tc = useTranslations("tasks.common");
@@ -583,7 +590,7 @@ export function TaskDetail({
         </section>
       )}
 
-      <BlockSection task={task} pending={pending} write={write} isClosed={status === "DONE" || status === "ARCHIVED"} />
+      <BlockSection task={task} pending={pending} write={write} isClosed={status === "DONE" || status === "ARCHIVED"} mail={mail} />
 
       <ClientSection
         task={task}
@@ -866,11 +873,14 @@ function Select({
 /// on the way in, so the age keeps counting while somebody corrects the
 /// wording. "ממתין ללקוח, 6 ימים" is the sentence this whole feature
 /// exists to be able to say.
+export type TaskMailProps = { wait: MailWaitInfo | null; candidates: MailCandidate[]; suggested: string | null; defaultRemindAt: string };
+
 function BlockSection({
   task,
   pending,
   write,
   isClosed,
+  mail,
 }: {
   task: TaskDetailData;
   pending: boolean;
@@ -879,15 +889,36 @@ function BlockSection({
     toast: { title: string; description?: string }
   ) => Promise<boolean>;
   isClosed: boolean;
+  mail: TaskMailProps | null;
 }) {
   const t = useTranslations("tasks.detail.block");
+  const tm = useTranslations("tasks.detail.mail");
+  const router = useRouter();
+  const { showToast } = useToast();
   const [open, setOpen] = useState(false);
   const [on, setOn] = useState<TaskBlocker>(task.blockedOn ?? "CLIENT");
   const [reason, setReason] = useState(task.blockedReason ?? "");
+  const [threadId, setThreadId] = useState(mail?.suggested ?? "");
+  const [remindAt, setRemindAt] = useState(mail?.defaultRemindAt ?? "");
+  const [following, setFollowing] = useState(false);
 
   const blocked = task.blockedOn !== null;
+  const wait = mail?.wait ?? null;
 
   async function save() {
+    if (threadId) {
+      setFollowing(true);
+      const result = await followMailAction({ taskId: task.id, threadId, on, reason: reason.trim() || null, remindAt: remindAt || null });
+      setFollowing(false);
+      if (!result.ok) {
+        showToast({ tone: "error", title: t(`on.${on}`), description: result.error });
+        return;
+      }
+      showToast({ tone: "success", title: t(`on.${on}`), description: tm("followed") });
+      setOpen(false);
+      router.refresh();
+      return;
+    }
     const ok = await write(
       { block: { on, reason: reason.trim() || null } },
       { title: t(`on.${on}`), description: reason.trim() || task.title }
@@ -936,7 +967,10 @@ function BlockSection({
               {t("noReason")}
             </p>
           )}
+          {wait && (wait.state === "waiting" || wait.state === "overdue") && mail && <MailWaitStatus taskId={task.id} wait={wait} defaultRemindAt={mail.defaultRemindAt} />}
         </div>
+      ) : wait?.state === "replied" && mail ? (
+        <MailWaitStatus taskId={task.id} wait={wait} defaultRemindAt={mail.defaultRemindAt} />
       ) : isClosed ? (
         <p className="mt-2 text-[12.5px] text-app-text-tertiary">{t("closed")}</p>
       ) : (
@@ -966,6 +1000,17 @@ function BlockSection({
               </button>
             ))}
           </div>
+          {mail && (
+            <MailPicker
+              candidates={mail.candidates}
+              suggested={mail.suggested}
+              value={threadId}
+              onChange={setThreadId}
+              remindAt={remindAt}
+              onRemindAt={setRemindAt}
+              disabled={pending || following}
+            />
+          )}
           <input
             value={reason}
             disabled={pending}
@@ -982,7 +1027,7 @@ function BlockSection({
           )}
           <button
             type="button"
-            disabled={pending}
+            disabled={pending || following}
             onClick={save}
             className="rounded-full bg-app-surface-nav px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
           >

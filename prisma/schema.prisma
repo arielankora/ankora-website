@@ -336,6 +336,8 @@ model User {
   commsChannels      CommsChannel[]      @relation("CommsChannelOwner")
   /// "התיבות שלי" (27.11.2026): the mailboxes this person connected for scanning.
   mailChannels       MailChannel[]       @relation("MailChannelOwner")
+  /// Stage 2 (27.11.2026): the email replies this person follows on tasks.
+  mailWaits          TaskMailWait[]      @relation("TaskMailWaitCreator")
   commsLines         CommsLineOwner[]    @relation("CommsLineOwner")
 
   @@index([role, status])
@@ -1183,6 +1185,8 @@ model Task {
   comments            TaskComment[]
   portalNotes         TaskPortalNote[]
   plans               TaskPlan[]
+  /// Stage 2 of "התיבות שלי" (27.11.2026): replies to emails it waits for.
+  mailWaits           TaskMailWait[]
   /// P8, 3.11.2026: a new vendor noticed in this task (lib/app-domain/vendor-detections.ts).
   vendorDetection     VendorDetection?  @relation("VendorDetectionSource")
   /// The detections that opened this P8 run, or were noted on it.
@@ -4893,6 +4897,60 @@ model MailChannel {
   @@map("mail_channels")
 }
 
+enum MailWaitVia {
+  /// Picked on the task screen.
+  MANUAL
+  /// Through the connector (follow_email_reply).
+  CLAUDE
+}
+
+enum MailWaitEnd {
+  /// Someone other than the sender wrote in the thread.
+  REPLY
+  /// Stopped by a person ("לא לעקוב אחרי המייל", "כבר לא ממתינים").
+  STOPPED
+  /// The task was closed, or another email was picked instead.
+  REPLACED
+}
+
+/// Stage 2 of "התיבות שלי" (27.11.2026, Ariel): a task, or a step, waits for
+/// a reply to an email. When someone other than its sender writes in the
+/// thread, the task stops waiting and whoever followed it is told; if
+/// nobody has by `remindAt`, they are reminded and may send a reminder in
+/// the same thread. One open wait per task.
+model TaskMailWait {
+  id          String       @id @default(cuid())
+  taskId      String
+  threadId    String?
+  channelId   String
+  /// The provider's thread id, kept if the thread row goes.
+  externalThreadId String
+  /// Whom the email went to, and when: what the screens show.
+  sentTo      String[]     @default([])
+  sentAt      DateTime
+  /// The email a reminder answers.
+  lastEmailId String
+  createdById String
+  via         MailWaitVia  @default(MANUAL)
+  remindAt    DateTime?
+  remindedAt  DateTime?
+  replyAt     DateTime?
+  replyFrom   String?
+  endedAt     DateTime?
+  endedHow    MailWaitEnd?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  task      Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  thread    MailThread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  createdBy User        @relation("TaskMailWaitCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([taskId])
+  @@index([channelId, externalThreadId])
+  @@index([endedAt, remindAt])
+  @@map("task_mail_waits")
+}
+
 enum MailBlockKind {
   /// One address ("mom@gmail.com").
   ADDRESS
@@ -4943,10 +5001,19 @@ model MailThread {
   emailCount       Int      @default(1)
   /// Held by an employee's "לא לקרוא" until a manager decides.
   held             Boolean  @default(false)
+  /// Stage 2 (27.11.2026): the newest email the mailbox's owner sent in it,
+  /// and to whom, so it can be picked on "ממתינים לתשובה למייל".
+  lastSentAt       DateTime?
+  lastSentTo       String[] @default([])
+  /// A thread kept only because the owner sent it (to a supplier, a
+  /// colleague, anyone who is no client's): deleted after this, unless a
+  /// task follows it. Null on a thread with a client.
+  keepUntil        DateTime?
   firstSeenAt      DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  channel MailChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  channel MailChannel    @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  waits   TaskMailWait[]
 
   @@unique([channelId, externalThreadId])
   @@index([lastEmailAt])

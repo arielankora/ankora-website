@@ -2479,6 +2479,30 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-27",
       "riskReason": "Mailbox scanning (27.11.2026, \"התיבות שלי\"): built like the WhatsApp self-connect. Staff only; a mailbox is changed by its owner or a manager (lib/mail-scan/channels.ts); the way back from Unipile counts only with the user's signed cookie."
+    },
+    "api:/api/cron/mail-waits": {
+      "kind": "api",
+      "area": "cron",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-27",
+      "riskReason": "Stage 2 of mailbox scanning (27.11.2026): sends due reminders for tasks waiting on an email reply (bell and email to whoever followed it), ends waits on closed tasks, and deletes sent-only threads past 14 days that no task follows. Behind CRON_SECRET; touches task_mail_waits, mail_threads and notifications only."
+    },
+    "cron:/api/cron/mail-waits": {
+      "kind": "cron",
+      "area": "cron",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-27",
+      "riskReason": "Stage 2 of mailbox scanning (27.11.2026): sends due reminders for tasks waiting on an email reply (bell and email to whoever followed it), ends waits on closed tasks, and deletes sent-only threads past 14 days that no task follows. Behind CRON_SECRET; touches task_mail_waits, mail_threads and notifications only."
+    },
+    "action:(product)/app/(authenticated)/tasks/[id]/mail-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-27",
+      "riskReason": "Stage 2 of mailbox scanning (27.11.2026): follow, stop, reschedule a task's wait for an email reply, and send a reminder as a reply from the sender's own mailbox. Signed-in staff; task access through getTaskDetail and updateTask; only the email's sender may follow it or send its reminder (lib/mail-scan/waits.ts)."
     }
   },
   "waivers": {},

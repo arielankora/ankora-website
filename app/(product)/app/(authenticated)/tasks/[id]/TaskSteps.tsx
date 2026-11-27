@@ -3,7 +3,7 @@ import { taskHref } from "../list-query";
 import Link from "next/link";
 import { useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
-import { Plus } from "lucide-react";
+import { Mail, Plus } from "lucide-react";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { addTaskStepAction, applyTaskTemplateAction, recordClientApprovalAction, setStepEvidenceLinkAction, setTaskStepDoneAction } from "./actions";
@@ -52,6 +52,9 @@ export type Step = {
   /// procedure names only in words (no gate, no contact).
   mode?: "ASSISTED" | "AUTOMATED" | null;
   namedApprover?: string | null;
+  /// Stage 2 of "התיבות שלי" (27.11.2026): the email the step waits for a
+  /// reply to, or the reply that came this week.
+  mailWait?: { state: "waiting" | "overdue" | "replied" | "stopped"; sentAt: string; remindAt: string | null; replyAt: string | null } | null;
 };
 
 /// The message composer the run's page already has, opened as a reminder
@@ -214,6 +217,7 @@ function StepRow({ step, n, parentId, listQuery, reminder, evidence }: { step: S
             </div>
           </div>
         )}
+        {step.mailWait && step.mailWait.state !== "stopped" && <StepMailLine wait={step.mailWait} />}
         {evidence && <EvidenceLink step={step} parentId={parentId} />}
         {recording && <ClientApprovalDialog step={step} n={n} parentId={parentId} onClose={() => setRecording(false)} />}
         {(step.assignedToName || step.dueDate) && (
@@ -448,5 +452,27 @@ function FromTheBook({ taskId, templates }: { taskId: string; templates: Templat
       </ul>
       {error && <p className="mt-1.5 text-[11.5px] text-app-error">{error}</p>}
     </div>
+  );
+}
+
+/// The step's line about the email it waits for (stage 2 of "התיבות שלי").
+function StepMailLine({ wait }: { wait: NonNullable<Step["mailWait"]> }) {
+  const t = useTranslations("tasks.detail.mail");
+  const format = useFormatter();
+  const day = (iso: string) => format.dateTime(new Date(iso), { day: "numeric", month: "numeric" });
+  const when = (iso: string) => format.dateTime(new Date(iso), { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+  if (wait.state === "replied") {
+    return <p className="mt-0.5 text-[11.5px] font-medium text-app-success" data-testid="step-mail-replied">{t("stepReplied", { when: when(wait.replyAt!) })}</p>;
+  }
+  const overdue = wait.state === "overdue";
+  return (
+    <p className={`mt-0.5 flex items-center gap-1 text-[11.5px] font-medium ${overdue ? "text-app-warning" : "text-app-text-secondary"}`} data-testid={overdue ? "step-mail-overdue" : "step-mail-waiting"}>
+      <Mail size={13} aria-hidden />
+      {overdue
+        ? t("stepOverdue", { day: day(wait.sentAt) })
+        : wait.remindAt
+          ? t("stepWaitingReminder", { day: day(wait.sentAt), remind: day(wait.remindAt) })
+          : t("stepWaiting", { day: day(wait.sentAt) })}
+    </p>
   );
 }

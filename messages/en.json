@@ -904,6 +904,44 @@
         "missing": "Missing: {field}",
         "noAccess": "We have no access to: {systems}",
         "playbook": "When something goes off course:"
+      },
+      "mail": {
+        "heading": "Waiting for a reply to an email? (optional)",
+        "hint": "Emails you sent in the last 14 days from your mailboxes connected for scanning. Only you see this list. When a reply arrives, the task is updated.",
+        "row": "To {to} · sent {when} from {mailbox}",
+        "suggested": "Suggested",
+        "none": "No email",
+        "remindLabel": "Remind me if there is no reply by",
+        "remindHint": "Default: two working days.",
+        "waitingFor": "Waiting for a reply to the email to {to}, sent {when}",
+        "remindAt": "Reminder if no reply: {when}",
+        "noReminder": "No reminder",
+        "change": "Change the date",
+        "stop": "Stop following the email",
+        "byClaude": "Claude started following this.",
+        "notMine": "The email is followed by whoever sent it, and only they can send a reminder.",
+        "overdue": "Overdue: no reply from {to} to the email of {day}",
+        "overdueSub": "The reminder was for {when}.",
+        "sendReminder": "Send a reminder",
+        "postpone": "Postpone",
+        "notWaiting": "Not waiting anymore",
+        "composerTitle": "Reminder to {to}",
+        "composerHint": "Sent as a reply in the same thread, from {mailbox}. You can edit it.",
+        "composerText": "Hello,\nJust checking that my previous email reached you. I would be glad to hear back when convenient.\nThanks",
+        "newDate": "New reminder date",
+        "send": "Send",
+        "cancel": "Cancel",
+        "save": "Save",
+        "arrived": "✓ A reply arrived from {from}, {when}",
+        "arrivedBody": "The task is no longer waiting and is back in progress. The reminder was cancelled.",
+        "sent": "The reminder was sent.",
+        "followed": "The task is waiting for a reply to the email.",
+        "stopped": "Stopped following the email.",
+        "rescheduled": "The reminder date was changed.",
+        "stepWaiting": "Waiting for a reply by email, since {day}",
+        "stepWaitingReminder": "Waiting for a reply by email, since {day} · reminder {remind}",
+        "stepOverdue": "Overdue: no email reply since {day}",
+        "stepReplied": "✓ A reply arrived by email, {when}"
       }
     },
     "list": {
@@ -2047,7 +2085,17 @@
       "notActive": "The mark is not active.",
       "kindFirst": "First choose whose mailbox it is.",
       "managerOnly": "Only a manager changes this.",
-      "ownerMustBeActive": "The owner must be an active team member."
+      "ownerMustBeActive": "The owner must be an active team member.",
+      "whichMailbox": "You have more than one mailbox: say which, by its address.",
+      "blockNotFound": "The mailbox's \"do not read\" list has no such address or domain."
+    },
+    "mailWaits": {
+      "taskClosed": "A task that is done does not wait for a reply.",
+      "notYourEmail": "You can follow only an email you sent from one of your mailboxes connected for scanning.",
+      "notFollowing": "The task is not waiting for a reply to an email.",
+      "emptyReminder": "Write the text of the reminder.",
+      "noRecipients": "It is not known whom the email went to, so no reminder can be sent.",
+      "badDate": "The time must be a date and time in the future."
     }
   },
   "auditLog": {
@@ -2370,7 +2418,12 @@
       "mailBlockRequested": "Asked not to read an address in a mailbox",
       "mailBlockApproved": "\"Do not read\" in a mailbox, and what was recorded deleted",
       "mailBlockRejected": "\"Do not read\" request rejected",
-      "mailBlockRevoked": "\"Do not read\" in a mailbox revoked"
+      "mailBlockRevoked": "\"Do not read\" in a mailbox revoked",
+      "taskMailWaitStarted": "Following an email reply on a task",
+      "taskMailWaitStopped": "Stopped following an email reply",
+      "taskMailWaitRescheduled": "Email reply reminder rescheduled",
+      "taskMailReminderSent": "Email reminder sent",
+      "taskUnblockedByReply": "An email reply arrived, and the task stopped waiting"
     },
     "kinds": {
       "failure": "Failure",
@@ -9264,6 +9317,14 @@
     "mailWebhookAccountFailed": {
       "title": "{owner}'s mailbox was not added to the webhook",
       "body": "{owner} connected a mailbox, but it could not be added to the Unipile webhook, so its emails are not recorded. The error: {error}. Add the account by hand in Unipile (Webhooks → Modify → Account filter)."
+    },
+    "mailWaitReply": {
+      "title": "A reply arrived by email: {client}",
+      "body": "{from} replied by email on the task \"{task}\". The task is no longer waiting and is back in progress.\n\n{link}"
+    },
+    "mailWaitReminder": {
+      "title": "Still no reply: {client}",
+      "body": "{to} has not replied to the email you sent on {day} on the task \"{task}\". You can send a reminder, postpone, or mark that you are not waiting anymore.\n\n{link}"
     }
   },
   "agents": {

@@ -20,6 +20,8 @@ vi.mock("@/app/(product)/app/(authenticated)/tasks/[id]/actions", () => ({
   updateTaskDetailAction: (...a: unknown[]) => update(...a),
 }));
 vi.mock("@/app/(product)/app/(authenticated)/timer/actions", () => ({ moveEntryIntoOpenBankAction: vi.fn() }));
+// Stage 2 of "התיבות שלי": the email-wait actions, not used here.
+vi.mock("@/app/(product)/app/(authenticated)/tasks/[id]/mail-actions", () => ({ followMailAction: vi.fn(), stopMailAction: vi.fn(), rescheduleMailAction: vi.fn(), sendReminderAction: vi.fn() }));
 vi.mock("@/components/app/toast/ToastProvider", () => ({ useToast: () => ({ showToast: toast }) }));
 vi.mock("@/components/app/ActiveTimerProvider", () => ({ useActiveTimer: () => ({ announce: vi.fn() }) }));
 

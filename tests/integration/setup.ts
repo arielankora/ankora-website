@@ -35,6 +35,7 @@ const TABLES = [
   "comms_conversations",
   "comms_blocks",
   // "התיבות שלי" (27.11.2026): threads and blocks before their mailboxes.
+  "task_mail_waits",
   "mail_threads",
   "mail_blocks",
   "mail_channels",

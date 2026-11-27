@@ -15,6 +15,9 @@ import { createDecision, listDecisionsForClient } from "@/lib/app-domain/decisio
 import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
 import { READ_ONLY, TOOL_ANNOTATIONS, WRITES } from "@/lib/mcp/annotations";
 import { taskUrl } from "@/lib/mcp/serialize";
+import { waitViews } from "@/lib/mail-scan/waits";
+import { FIELD_NOTES_SENTENCE, withFieldNotes } from "@/lib/mcp/field-notes";
+import { GET_TASK_NOTES } from "@/lib/mcp/tool-field-notes";
 import { clientDecisionUrl } from "@/lib/approval-links";
 import { appBaseUrl } from "@/lib/email-templates";
 import { PlanVersionConflictError, applyPlanSteps, getTaskPlans, saveTaskPlan, type TaskPlanRow } from "@/lib/app-domain/task-plans";
@@ -173,7 +176,7 @@ export function registerTaskExtraTools(server: McpServer): void {
     {
       title: "Read one task in full",
       description:
-        "Reads one Ankora task with everything on it: details, owner, supervisor and approval, portal visibility and outcome, what it is waiting on, its steps with their status, recent comments, the time logged against it, and its current work plan. Use it to answer 'where does X stand'. Identify the task by its title. The result includes `url`, the task's address in the Ankora app: quote it exactly when the user wants a link (it needs an Ankora staff sign-in; clients cannot open it).",
+        "Reads one Ankora task with everything on it: details, owner, supervisor and approval, portal visibility and outcome, what it is waiting on, its steps with their status, recent comments, the time logged against it, and its current work plan. Use it to answer 'where does X stand'. Identify the task by its title. The result includes `url`, the task's address in the Ankora app: quote it exactly when the user wants a link (it needs an Ankora staff sign-in; clients cannot open it). " + FIELD_NOTES_SENTENCE,
       inputSchema: z.object({
         ...TASK_ARGS,
         includeDone: z.boolean().optional().describe("Look among completed and archived tasks too."),
@@ -193,6 +196,14 @@ export function registerTaskExtraTools(server: McpServer): void {
         const plans = task.parentId ? null : await getTaskPlans(actor, task.id);
 
         const run = await runFacts(actor.id, task, subtasks);
+        // Stage 2 of "התיבות שלי" (27.11.2026): what it, and each step,
+        // waits for by email.
+        const waits = await waitViews([task.id, ...subtasks.map((s) => s.id)], actor.id);
+        const emailWait = (id: string) => {
+          const w = waits.get(id);
+          if (!w || w.state === "stopped") return undefined;
+          return { state: w.state, to: w.sentTo, sentAt: w.sentAt, remindAt: w.remindAt, replyFrom: w.replyFrom, replyAt: w.replyAt, followedBy: w.mine ? "you" : "a colleague" };
+        };
 
         const comments = thread
           .filter((e) => e.kind === "comment")
@@ -203,7 +214,7 @@ export function registerTaskExtraTools(server: McpServer): void {
             text: "body" in e ? e.body : "",
           }));
 
-        return toolJson({
+        return toolJson(withFieldNotes({
           id: task.id,
           url: taskUrl(appBaseUrl(), task.id),
           title: task.title,
@@ -227,6 +238,7 @@ export function registerTaskExtraTools(server: McpServer): void {
           waitingOn: task.blockedOn,
           waitingReason: task.blockedReason,
           waitingSince: task.blockedSince ? localDateKey(task.blockedSince, tz) : null,
+          waitingOnEmail: emailWait(task.id),
           // A run of a process (processes redesign, 14.11.2026): which
           // process, and on each step who approves it and what was written
           // down. Link a task to a process with set_task_process.
@@ -237,6 +249,7 @@ export function registerTaskExtraTools(server: McpServer): void {
             status: s.status,
             assignedTo: s.assignedTo?.name ?? null,
             ...run.step(s),
+            waitingOnEmail: emailWait(s.id),
           })),
           stepsDone: subtasks.filter((s) => s.status === "DONE").length,
           stepsTotal: subtasks.filter((s) => s.status !== "ARCHIVED").length,
@@ -245,7 +258,7 @@ export function registerTaskExtraTools(server: McpServer): void {
           // "קדם עם קלוד": the current work plan, or null. Read and save
           // it with get_task_plan and save_task_plan.
           plan: plans?.current ? serializePlan(plans.current, tz) : null,
-        });
+        }, GET_TASK_NOTES));
       } catch (err) {
         console.error("[mcp] get_task failed", err);
         return toolFailure(err);
