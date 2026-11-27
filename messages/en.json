@@ -3220,6 +3220,7 @@
       "bulkPartial": "{count, plural, one {# entry was} other {# entries were}} not deleted because of permissions or the edit window.",
       "undone": "Delete undone",
       "restored": "{count, plural, one {# entry restored.} other {# entries restored.}}",
+      "undoPartial": "{count, plural, one {# entry was not restored and is still deleted} other {# entries were not restored and are still deleted}}",
       "deleteFailed": "Delete failed",
       "bulkDeleteFailed": "The selected entries couldn't be deleted."
     },
@@ -4943,7 +4944,8 @@
         "badSources": "Source not understood: {refs}. Write a code and a minute, for example S1 08:13.",
         "unknownTextKind": "Unknown text type.",
         "noPortalUser": "This client has no portal user to email.",
-        "emailNotSent": "The email was not sent. You can copy it and send it yourself."
+        "emailNotSent": "The email was not sent. You can copy it and send it yourself.",
+        "sentNotRecorded": "The email was sent to the client, but it was not saved to the record. There is no need to send it again."
       },
       "inactive": {
         "paused": "Paused",

@@ -186,12 +186,22 @@ export async function bulkDeleteEntriesAction(timeEntryIds: string[]) {
   return { deleted: timeEntryIds.filter((id) => !failed.includes(id)), failed };
 }
 
+/// Returns per-id results like bulkDeleteEntriesAction (27.11.2026). It
+/// used to swallow every failure and return nothing, so the toast said
+/// every entry was restored while some stayed deleted.
 export async function bulkRestoreEntriesAction(timeEntryIds: string[]) {
   const admin = await requireUser();
+  const failed: string[] = [];
   for (const id of timeEntryIds) {
-    await restoreTimeEntry(admin, id).catch(() => {});
+    try {
+      await restoreTimeEntry(admin, id);
+    } catch (err) {
+      console.error("time entries: bulk undo could not restore an entry", { timeEntryId: id }, err);
+      failed.push(id);
+    }
   }
   revalidatePath("/app/time-entries");
+  return { restored: timeEntryIds.filter((id) => !failed.includes(id)), failed };
 }
 
 /// Spec 18.1's PATCH time-entry implies revisions are readable wherever

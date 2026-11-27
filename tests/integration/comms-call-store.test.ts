@@ -48,12 +48,15 @@ import {
   transcribePending,
 } from "@/lib/comms/call-store";
 import { TranscriptionError } from "@/lib/whatsapp-poc/transcribe";
+import { removeDriveFile } from "@/lib/google-drive";
+import { retryDriveFileDeletions } from "@/lib/comms/drive-deletions";
 
 const LINE = "+972553302266";
 const CALLER = "+972541111111";
 
 beforeEach(() => {
   recordingFor.clear();
+  vi.mocked(removeDriveFile).mockResolvedValue({ ok: true, how: "deleted" });
   transcribe.mockReset();
   process.env.UNIPILE_API_KEY = "k";
   process.env.ALOHA_UNIPILE_ACCOUNT_ID = "acc_mail";
@@ -134,6 +137,25 @@ describe("call recordings store", () => {
     const result = await sweepCallRetention(new Date("2026-11-01T00:00:00Z"));
     expect(result.recordingsRemoved).toBe(1);
     expect(await prisma.callRecording.count()).toBe(0);
+  });
+
+  // Found 27.11.2026 (silent failures audit). Was: the row was deleted
+  // whatever Drive answered, so audio Drive refused to remove stayed there
+  // with nothing left that knew its id.
+  it("queues a Drive file it could not delete with its row, and the nightly retry removes it", async () => {
+    recordingFor.set("old", { from: CALLER, to: LINE, callAt: "2025-01-01T08:00:00.000Z" });
+    await storeRecording("old");
+    vi.mocked(removeDriveFile).mockResolvedValue({ ok: false, error: "Drive delete failed 500" });
+
+    const result = await sweepCallRetention(new Date("2026-11-01T00:00:00Z"));
+    expect(result.recordingsRemoved).toBe(1);
+    expect(await prisma.callRecording.count()).toBe(0);
+    const queued = await prisma.driveFileDeletion.findUniqueOrThrow({ where: { fileId: "drive-1" } });
+    expect(queued).toMatchObject({ reason: "call-quiet-number", lastError: "Drive delete failed 500" });
+
+    vi.mocked(removeDriveFile).mockResolvedValue({ ok: true, how: "deleted" });
+    expect(await retryDriveFileDeletions()).toEqual({ removed: 1, failed: 0 });
+    expect(await prisma.driveFileDeletion.count()).toBe(0);
   });
 
   it("keeps the transcript of a client's old call, without its audio", async () => {

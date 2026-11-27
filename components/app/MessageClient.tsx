@@ -130,7 +130,11 @@ export function MessageClient({
     });
     setBusy(false);
     if (!result.ok) setError(result.error);
-    else setSent(channel);
+    else {
+      setSent(channel);
+      // Sent, but the record did not save: said, so nobody sends it again.
+      if ("warning" in result && result.warning) setError(result.warning);
+    }
   }
 
   return (

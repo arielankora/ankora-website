@@ -1,7 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
-import { removeDriveFile, uploadLargeFileToDriveFolder } from "@/lib/google-drive";
+import { uploadLargeFileToDriveFolder } from "@/lib/google-drive";
+import { removeDriveFileOrQueue } from "@/lib/comms/drive-deletions";
 import { callSide, fetchRecordingAudio } from "@/lib/whatsapp-poc/recordings";
 import { UnipileError } from "@/lib/whatsapp-poc/unipile";
 import { readCallStoreConfig } from "./call-store";
@@ -133,12 +134,12 @@ export async function sweepEndedEngagements(now = new Date()) {
     });
     if (recordings.length === 0 && conversations.length === 0) continue;
 
-    for (const r of recordings) if (r.driveFileId) await removeDriveFile(r.driveFileId);
+    for (const r of recordings) if (r.driveFileId) await removeDriveFileOrQueue(r.driveFileId, "engagement-end");
     const voiceFiles = await prisma.commsAttachment.findMany({
       where: { driveFileId: { not: null }, message: { conversationId: { in: conversations.map((c) => c.id) } } },
       select: { driveFileId: true },
     });
-    for (const f of voiceFiles) await removeDriveFile(f.driveFileId!);
+    for (const f of voiceFiles) await removeDriveFileOrQueue(f.driveFileId!, "engagement-end");
     await prisma.callRecording.deleteMany({ where: { id: { in: recordings.map((r) => r.id) } } });
     await prisma.commsConversation.deleteMany({ where: { id: { in: conversations.map((c) => c.id) } } });
 

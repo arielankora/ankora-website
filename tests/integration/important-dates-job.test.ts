@@ -574,6 +574,33 @@ describe("escalateUnhandledReminders() - only after the configured delay, only t
     const [email] = vi.mocked(sendEmail).mock.calls[0];
     expect(email.to).toEqual(["boss@ankora.test"]);
   });
+
+  // Found 27.11.2026 (silent failures audit). Was: a FAILED escalation row
+  // was picked up by sendPendingReminders and resent as an ordinary
+  // reminder, to the responsible person and the date's client side
+  // addresses, up to four more times, and never to the admins.
+  it("retries a failed escalation to the admins only, never as an ordinary reminder", async () => {
+    await escalatingDate();
+    vi.mocked(sendEmail).mockResolvedValueOnce({ ok: false, error: "provider down" });
+    await reconcileImportantDates(cronAt("2026-10-27"));
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+
+    vi.mocked(sendEmail).mockClear();
+    const result = await reconcileImportantDates(cronAt("2026-10-28"));
+    expect(result.escalated).toBe(1);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    const [email] = vi.mocked(sendEmail).mock.calls[0];
+    expect([...email.to].sort()).toEqual(["boss@ankora.test", "ops-admin@ankora.test"]);
+
+    const rows = await prisma.reminderOccurrence.findMany({ where: { idempotencyKey: { endsWith: ":escalation" } } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: "SENT", attempts: 2 });
+
+    // Sent now: nothing more on later days.
+    vi.mocked(sendEmail).mockClear();
+    await reconcileImportantDates(cronAt("2026-10-29"));
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
 });
 
 describe("recomputeOccurrences() / flagOverdueDates() - the date moves on, and an unhandled one is flagged", () => {

@@ -157,6 +157,7 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   MailThread: { decision: "DUMP", table: "mail_threads", reason: "Which threads with clients were recorded (who and when, no content), so replies to tasks are not lost after a restore." },
   TaskMailWait: { decision: "DUMP", table: "task_mail_waits", reason: "Which tasks wait for which email reply, the reminder, and the reply that came: the work state of those tasks." },
   CallRecording: { decision: "DUMP", table: "call_recordings", reason: "The Aloha line's calls: numbers, direction, time and where the audio sits in Drive. The audio itself is in Drive, not here." },
+  DriveFileDeletion: { decision: "DUMP", table: "drive_file_deletions", reason: "Drive files whose rows were deleted (retention, a block, the end of an engagement) and that Drive refused to remove. Only the file id and why; without it the audio stays in Drive with nothing that can find it." },
   CallRecordingSkip: { decision: "DUMP", table: "call_recording_skips", reason: "Recording emails deliberately not stored because the number is blocked. Only the email id; without it the nightly reconcile would store them again." },
   Transcript: { decision: "DUMP", table: "transcripts", reason: "The text of each call recording, transcribed once at a cost. Cannot be produced again once the audio is removed after 12 months." },
   ProcessStrangerTest: { decision: "DUMP", table: "process_stranger_tests", reason: "Each stranger test of a procedure: who ran it, on which version, and where its answers are sourced." },

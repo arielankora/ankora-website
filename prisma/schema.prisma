@@ -4698,6 +4698,22 @@ model CallRecordingSkip {
   @@map("call_recording_skips")
 }
 
+/// A Drive file that should be gone and is not yet (27.11.2026). Retention,
+/// a block or the end of an engagement deletes the rows that point at an
+/// audio file; when Drive refused to delete the file itself, nothing could
+/// find it again. Now its id waits here and the nightly run retries it.
+model DriveFileDeletion {
+  fileId      String   @id
+  /// Why it is being deleted ("call-retention", "whatsapp-block", ...).
+  reason      String
+  attempts    Int      @default(1)
+  lastError   String?
+  createdAt   DateTime @default(now())
+  attemptedAt DateTime @default(now())
+
+  @@map("drive_file_deletions")
+}
+
 model CommsLineOwner {
   /// The line, E.164 (one of ALOHA_LINE_NUMBER).
   line      String   @id
