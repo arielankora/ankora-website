@@ -116,6 +116,41 @@
     "name": "add_task_steps",
     "title": "Add steps to a task"
   },
+  "annotate_system_issue": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Saves a note and/or the link of a pull request that fixes a system issue, so the screen and the next analysis see it is being handled. Admins only. It does not close the issue: a person closes it on /app/system-issues. Take issueId from list_system_issues. The link must be a pull request in Ankora's GitHub repositories.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "issueId": {
+          "maxLength": 40,
+          "minLength": 1,
+          "type": "string"
+        },
+        "note": {
+          "description": "What was found or done, in Hebrew.",
+          "maxLength": 1000,
+          "type": "string"
+        },
+        "prUrl": {
+          "description": "https://github.com/arielankora/<repo>/pull/<number>",
+          "maxLength": 200,
+          "type": "string"
+        }
+      },
+      "required": [
+        "issueId"
+      ],
+      "type": "object"
+    },
+    "name": "annotate_system_issue",
+    "title": "Leave a note or a pull request link on a system issue"
+  },
   "answer_stranger_question": {
     "annotations": {
       "destructiveHint": false,
@@ -2268,6 +2303,43 @@
     },
     "name": "list_subprocessor_notice_recipients",
     "title": "List sub-processor notice recipients"
+  },
+  "list_system_issues": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The failures Ankora recorded (an email that did not go out, a nightly step that failed, a connector tool that failed, a server error) and the latest run of each nightly job, as on the screen /app/system-issues. Admins only. Each issue is one row per failure, counted when it happens again, with its first and last time, its error, and any note or pull request link left on it. Pass sinceHours to read only issues seen lately (24 for the last day). Use it to say what is broken now and what keeps coming back.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "area": {
+          "description": "Only one area: email, cron, mcp, server, after-response, comms.",
+          "maxLength": 40,
+          "type": "string"
+        },
+        "sinceHours": {
+          "description": "Only issues seen in this many hours.",
+          "maximum": 720,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "status": {
+          "description": "OPEN (default), RESOLVED (closed in the last 14 days) or ALL.",
+          "enum": [
+            "OPEN",
+            "RESOLVED",
+            "ALL"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "list_system_issues",
+    "title": "List Ankora's system issues"
   },
   "list_tasks": {
     "annotations": {

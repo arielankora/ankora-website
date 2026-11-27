@@ -96,6 +96,10 @@ export type Permission =
   // 17.11.2026: "רק מנהלי מערכת"). SUPER_ADMIN only, like audit.view;
   // granting it to ANKORA_ADMIN is one line below.
   | "claude_usage.view"
+  // System issues (27.11.2026, silent failures plan): the failures the
+  // system recorded, the nightly runs, and closing an issue. For the same
+  // people the issue alerts go to: SUPER_ADMIN and ANKORA_ADMIN.
+  | "system_issue.manage"
   // Credentials vault (claude/credentials-vault-spec-2026-10-06.md,
   // approved by Ariel 6.10.2026). Three literals rather than one, unlike
   // Tasks and Important Dates above, because the three really can diverge:
@@ -148,6 +152,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "integration.manage",
     "important_date.manage_catalog",
     "claude_usage.view",
+    "system_issue.manage",
     ...CREDENTIAL_PERMISSIONS,
   ],
   // Spec 4: Ankora Admin/Manager gets clients/categories/edits, but not
@@ -166,6 +171,8 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "time_entry.edit_self",
     "time_entry.edit_others",
     "report.internal.view",
+    // System issues: the admins get the alerts, so they get the screen.
+    "system_issue.manage",
     // Credentials vault: the procedures book gives management full access
     // to client information. Admins are on every client, so they can
     // reveal every credential; Ariel accepted that scope knowingly

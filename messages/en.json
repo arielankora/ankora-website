@@ -37,6 +37,7 @@
       "integrations": "Integrations",
       "auditLog": "Activity log",
       "claudeUsage": "Claude usage",
+      "systemIssues": "System issues",
       "myNotifications": "My notifications",
       "myProfile": "My profile",
       "guide": "User guide",
@@ -1363,6 +1364,12 @@
     }
   },
   "domainErrors": {
+    "systemIssues": {
+      "forbidden": "Only admins see the system issues.",
+      "notFound": "The issue was not found.",
+      "nothingToSave": "A note or a pull request link is needed.",
+      "badPrUrl": "The link must be a pull request in Ankora's repository on GitHub."
+    },
     "tasks": {
       "notFound": "Task not found.",
       "parentOtherClient": "A task can only be split into steps within the same client.",
@@ -2182,6 +2189,8 @@
       "knowledgeAutoApplyPause": "Automatic adding paused after errors: proposals go back to a person for approval",
       "knowledgeAutoApplyLift": "A manager turned automatic adding back on",
       "claudeUsageSettings": "Claude usage seats or threshold changed",
+      "systemIssueResolved": "System issue closed",
+      "systemIssueAnnotated": "Note or fix link left on a system issue",
       "brainMetricsWeeklyEmail": "Weekly file metrics email sent",
       "requestTypeAdd": "Request type added to the client file",
       "requestTypeUpdate": "Request type updated in the client file",
@@ -2482,6 +2491,34 @@
       "page": "Page {page} of {total}"
     },
     "retention": "The log is kept for two years and cannot be edited or deleted."
+  },
+  "systemIssues": {
+    "title": "System issues",
+    "intro": "Every failure the system hit and recorded: an email that did not go out, a nightly step that failed, a connector tool that failed, a server error. The same failure again counts on the same row. A critical issue emails the admins, at most once every 20 hours.",
+    "openTitle": "Open issues ({count})",
+    "noneOpen": "No open issues.",
+    "seen": "{count, plural, one {# time} other {# times}}. First: {first}. Last: {last}.",
+    "prLink": "Pull request",
+    "notePlaceholder": "Note (optional): what was fixed",
+    "resolve": "Close the issue",
+    "resolvedDone": "The issue is closed. If it happens again, it opens again.",
+    "jobsTitle": "Nightly runs",
+    "jobColumn": "Job",
+    "lastRunColumn": "Last run",
+    "stateColumn": "State",
+    "never": "Never ran",
+    "resolvedTitle": "Closed in the last 14 days",
+    "resolvedAt": "Closed {when}",
+    "severity": {
+      "CRITICAL": "Critical",
+      "WARNING": "Notice"
+    },
+    "state": {
+      "never": "No run",
+      "cutOff": "Cut off",
+      "ok": "OK",
+      "failed": "Failed: {steps}"
+    }
   },
   "claudeUsage": {
     "summary": {
@@ -8914,7 +8951,7 @@
     },
     "systemIssue": {
       "title": "System issue: {title}",
-      "body": "The system hit a failure and recorded it.\n\nWhat happened: {title}\nDetails: {detail}\nTimes so far: {count}\n\nThe same issue sends at most one alert every 20 hours. Close it once it is fixed."
+      "body": "The system hit a failure and recorded it.\n\nWhat happened: {title}\nDetails: {detail}\nTimes so far: {count}\n\nThe same issue sends at most one alert every 20 hours. Close it once it is fixed, on the system issues screen: {link}"
     },
     "channelBackfillFailed": {
       "title": "The nightly WhatsApp backfill failed for {owner}'s number",

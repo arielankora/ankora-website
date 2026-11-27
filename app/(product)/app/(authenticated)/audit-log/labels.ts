@@ -103,6 +103,8 @@ export const ENTITY_TYPES = [
   "MailChannel",
   "MailBlock",
   "MailThread",
+  // System issues (27.11.2026): closed by a person, or noted by Claude.
+  "SystemIssue",
 ];
 
 export const ACTION_LABEL: Record<string, string> = {
@@ -174,6 +176,8 @@ export const ACTION_LABEL: Record<string, string> = {
   "knowledge.auto_apply_pause": "כניסה אוטומטית נעצרה אחרי שגיאות: ההצעות חוזרות לאישור של אדם",
   "knowledge.auto_apply_lift": "מנהל החזיר לכניסה אוטומטית",
   "claude_usage.settings": "שינוי מושבים או סף בשימוש בקלוד",
+  "system_issue.resolved": "סגירת תקלת מערכת",
+  "system_issue.annotated": "הערה או קישור לתיקון על תקלת מערכת",
   "brain_metrics.weekly_email": "נשלח מייל שבועי של מדדי התיק",
   "request_type.add": "הוספת סוג פנייה לתיק הלקוח",
   "request_type.update": "עדכון סוג פנייה בתיק הלקוח",

@@ -73,6 +73,11 @@ export function emailFailureKind(error: string): string | null {
   return "network";
 }
 
+/// Where an email issue's detail starts naming the subject. A subject can
+/// name a client, so the connector cuts the detail here
+/// (lib/app-domain/system-issues.ts, issuesForAi).
+export const EMAIL_SUBJECT_MARK = " | נושא: ";
+
 async function reportEmailFailure(input: SendEmailInput, error: string): Promise<void> {
   const kind = emailFailureKind(error);
   if (!kind) return;
@@ -82,7 +87,7 @@ async function reportEmailFailure(input: SendEmailInput, error: string): Promise
     key: kind,
     title: "מייל לא נשלח",
     // The subject names what kind of email it was; the body never goes here.
-    detail: `${error.slice(0, 300)} | נושא: ${input.subject.slice(0, 120)}`,
+    detail: `${error.slice(0, 300)}${EMAIL_SUBJECT_MARK}${input.subject.slice(0, 120)}`,
     severity: "CRITICAL",
   });
 }

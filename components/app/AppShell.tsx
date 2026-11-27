@@ -81,6 +81,9 @@ function navItemsFor(role: User["role"], t: Translate, options: { whatsappPoc?: 
   // with the rest of "control": a group's items must sit together, or the
   // menu draws the group's heading twice.
   if (can(role, "claude_usage.view")) items.push(item("/app/claude-usage", "nav.claudeUsage", "control"));
+  // System issues (27.11.2026): every failure the system recorded, for the
+  // admins who get the alerts. With the rest of "control".
+  if (can(role, "system_issue.manage")) items.push(item("/app/system-issues", "nav.systemIssues", "control"));
   // Agents (22.11.2026): every agent the team runs on Claude, for anyone
   // on the staff, since anyone may write a draft and install an agent.
   if (tracks) items.push(item("/app/agents", "nav.agents", "control"));

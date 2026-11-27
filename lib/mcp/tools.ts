@@ -70,6 +70,7 @@ import { registerApprovalTools } from "@/lib/mcp/approval-tools";
 import { registerCommsTools } from "@/lib/mcp/comms-tools";
 import { registerMailboxTools } from "@/lib/mcp/mailbox-tools";
 import { registerUsageTools } from "@/lib/mcp/usage-tools";
+import { registerSystemIssueTools } from "@/lib/mcp/system-issue-tools";
 import { registerAgentTools } from "@/lib/mcp/agent-tools";
 import { appBaseUrl } from "@/lib/email-templates";
 import { describePick, type CategoryPick } from "@/lib/mcp/category-pick";
@@ -1779,6 +1780,7 @@ export function registerAnkoraTools(server: McpServer): void {
   registerCommsTools(server);
   registerMailboxTools(server);
   registerUsageTools(server);
+  registerSystemIssueTools(server);
   registerAgentTools(server);
   // New-client wizard (26.11.2026).
   registerOnboardingTools(server);

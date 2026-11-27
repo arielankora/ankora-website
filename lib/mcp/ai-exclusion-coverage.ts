@@ -114,6 +114,10 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   // lib/mcp/usage-tools.ts
   get_claude_usage: "staff usage measurements only: names of staff, sizes, counts and cost estimates. No client, task or document is read",
 
+  // lib/mcp/system-issue-tools.ts
+  list_system_issues: "system failures only, no client data is read; an email issue's subject, which can name a client, is cut from its detail (issuesForAi)",
+  annotate_system_issue: "writes a note and a link on a system issue; no client data is read, and the issue returned goes through issuesForAi",
+
   // lib/mcp/hour-bank-tools.ts
   get_hours_bank: "lookupClient; entries of marked tasks count only as minutes in the totals, no titles or notes",
   list_client_communications: "lookupClient; a number that also belongs to a marked client is left out (lib/comms/client-comms.ts scopeFor)",

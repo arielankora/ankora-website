@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { outgoingOf } from "@/lib/i18n/recipients";
+import { appBaseUrl } from "@/lib/email-templates";
 
 /// System issues (27.11.2026, silent failures plan, stage 1).
 ///
@@ -127,7 +128,7 @@ async function emailAdmins(issueId: string, title: string, detail: string | null
   for (const admin of admins) {
     const { t } = outgoingOf(admin);
     const subject = t("systemIssue.title", { title });
-    const body = t("systemIssue.body", { title, detail: detail ?? "", count });
+    const body = t("systemIssue.body", { title, detail: detail ?? "", count, link: `${appBaseUrl()}/app/system-issues` });
     const notification = await prisma.notification.create({
       data: { userId: admin.id, type: "system.issue", title: subject, body, entityType: "SystemIssue", entityId: issueId },
     });
