@@ -1,6 +1,7 @@
 import "server-only";
 import { Prisma, type CallDirection } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { removeDriveFileOrQueue } from "@/lib/comms/drive-deletions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { downloadFileFromDrive, removeDriveFile, uploadLargeFileToDriveFolder } from "@/lib/google-drive";
 import { callSide, fetchRecording, fetchRecordingAudio, listRecordingPage, type Recording } from "@/lib/whatsapp-poc/recordings";
@@ -129,7 +130,7 @@ export async function storeRecording(emailId: string): Promise<StoreResult> {
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       // Lost the race to another call for the same email; drop our copy.
-      if (driveFileId) await removeDriveFile(driveFileId);
+      if (driveFileId) await removeDriveFileOrQueue(driveFileId, "call-duplicate");
       return "exists";
     }
     throw err;
@@ -395,7 +396,7 @@ export async function sweepCallRetention(now = new Date()) {
   let recordingsRemoved = 0;
   for (const phone of phones.filter((p) => !owned.has(p))) {
     const recs = await prisma.callRecording.findMany({ where: { otherPhone: phone }, select: { id: true, driveFileId: true } });
-    for (const rec of recs) if (rec.driveFileId) await removeDriveFile(rec.driveFileId);
+    for (const rec of recs) if (rec.driveFileId) await removeDriveFileOrQueue(rec.driveFileId, "call-quiet-number");
     const { count } = await prisma.callRecording.deleteMany({ where: { otherPhone: phone } });
     recordingsRemoved += count;
   }

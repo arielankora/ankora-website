@@ -29,6 +29,7 @@ const TABLES = [
   "transcripts",
   "call_recordings",
   "call_recording_skips",
+  "drive_file_deletions",
   // Stage 3: messages before conversations before channels.
   "comms_attachments",
   "comms_messages",

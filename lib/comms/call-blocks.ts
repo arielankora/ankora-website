@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { normalizeEmail } from "@/lib/contact-normalize";
-import { removeDriveFile } from "@/lib/google-drive";
+import { removeDriveFileOrQueue } from "@/lib/comms/drive-deletions";
 import { lineOwnerEmails } from "./grants";
 import { buildCallBlockIndex, linesOf, type CallBlockIndex } from "./call-block-rules";
 
@@ -52,7 +52,7 @@ export async function purgeBlockedCalls(ownerUserId: string, phone: string): Pro
   // A hand-sent recording has our line on both sides and no other number.
   const doomed = calls.filter((c) => c.fromPhone !== c.toPhone);
   if (doomed.length === 0) return 0;
-  for (const c of doomed) if (c.driveFileId) await removeDriveFile(c.driveFileId);
+  for (const c of doomed) if (c.driveFileId) await removeDriveFileOrQueue(c.driveFileId, "call-block");
   await prisma.callRecording.deleteMany({ where: { id: { in: doomed.map((c) => c.id) } } });
   await prisma.callRecordingSkip.createMany({ data: doomed.map((c) => ({ emailId: c.emailId })), skipDuplicates: true });
   return doomed.length;

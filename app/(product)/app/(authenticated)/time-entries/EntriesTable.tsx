@@ -46,8 +46,16 @@ export function EntriesTable({ entries }: { entries: Entry[] }) {
         title: t("bulkDeleted", { count: result.deleted.length }),
         description: result.failed.length > 0 ? t("bulkPartial", { count: result.failed.length }) : undefined,
         undo: async () => {
-          await bulkRestoreEntriesAction(result.deleted);
-          showToast({ tone: "info", title: t("undone"), description: t("restored", { count: result.deleted.length }) });
+          const undo = await bulkRestoreEntriesAction(result.deleted);
+          if (undo.failed.length > 0) {
+            showToast({
+              tone: "error",
+              title: t("undoPartial", { count: undo.failed.length }),
+              description: t("restored", { count: undo.restored.length }),
+            });
+          } else {
+            showToast({ tone: "info", title: t("undone"), description: t("restored", { count: undo.restored.length }) });
+          }
         },
       });
     } else {

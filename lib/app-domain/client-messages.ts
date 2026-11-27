@@ -255,6 +255,37 @@ export async function recordClientMessage(
   actor: User,
   input: { clientId: string; taskId?: string | null; kind: MessageKind; channel: MessageChannel; body: string }
 ) {
+  const { body, task } = await checkClientMessage(input);
+
+  await recordAudit({
+    actorId: actor.id,
+    action: "client.message_sent",
+    entityType: "Client",
+    entityId: input.clientId,
+    clientId: input.clientId,
+    after: { kind: input.kind, channel: input.channel, taskId: input.taskId ?? null, length: body.length },
+  });
+
+  if (task) {
+    await prisma.taskComment.create({
+      data: {
+        taskId: task.id,
+        authorId: actor.id,
+        // Prefixed so the thread reads as what happened rather than as
+        // an internal note somebody wrote to themselves. The thread
+        // shows comments verbatim, and "היי, רק שתדע" with no frame
+        // would read as a message to a colleague.
+        body: `${CHANNEL_LABELS[input.channel]} ללקוח:\n\n${body}`,
+      },
+    });
+  }
+}
+
+/// The refusals of recordClientMessage, on their own, so a caller that
+/// sends before it records can ask them first (27.11.2026: an email went
+/// out to the client and only then was the message refused, so the person
+/// was told it failed and a second try sent it twice).
+export async function checkClientMessage(input: { clientId: string; taskId?: string | null; body: string }) {
   const body = input.body.trim();
   if (!body) throw new DomainError("clientMessages.empty", "אין מה לשמור: ההודעה ריקה.");
 
@@ -293,28 +324,7 @@ export async function recordClientMessage(
     }
   }
 
-  await recordAudit({
-    actorId: actor.id,
-    action: "client.message_sent",
-    entityType: "Client",
-    entityId: input.clientId,
-    clientId: input.clientId,
-    after: { kind: input.kind, channel: input.channel, taskId: input.taskId ?? null, length: body.length },
-  });
-
-  if (task) {
-    await prisma.taskComment.create({
-      data: {
-        taskId: task.id,
-        authorId: actor.id,
-        // Prefixed so the thread reads as what happened rather than as
-        // an internal note somebody wrote to themselves. The thread
-        // shows comments verbatim, and "היי, רק שתדע" with no frame
-        // would read as a message to a colleague.
-        body: `${CHANNEL_LABELS[input.channel]} ללקוח:\n\n${body}`,
-      },
-    });
-  }
+  return { body, task };
 }
 
 export type MessageChannel = "whatsapp" | "email" | "copied";

@@ -2,6 +2,7 @@ import "server-only";
 import { purgeBlockedCalls } from "./call-blocks";
 import { Prisma, type CommsChannel, type User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { removeDriveFileOrQueue } from "@/lib/comms/drive-deletions";
 import { DomainError } from "@/lib/domain-error";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canManageClients } from "@/lib/app-auth/permissions";
@@ -379,7 +380,7 @@ async function purge(channelId: string, target: { kind: "PHONE" | "CHAT"; value:
     where: { message: { conversationId: { in: ids } }, driveFileId: { not: null } },
     select: { driveFileId: true },
   });
-  for (const f of files) await removeDriveFile(f.driveFileId!);
+  for (const f of files) await removeDriveFileOrQueue(f.driveFileId!, "whatsapp-block");
   const { count } = await prisma.commsMessage.deleteMany({ where: { conversationId: { in: ids } } });
   await prisma.commsConversation.deleteMany({ where: { id: { in: ids } } });
   return count;
@@ -637,7 +638,7 @@ export async function sweepWhatsappRetention(now = new Date()) {
       where: { message: { conversationId: { in: doomed } }, driveFileId: { not: null } },
       select: { driveFileId: true },
     });
-    for (const f of files) await removeDriveFile(f.driveFileId!);
+    for (const f of files) await removeDriveFileOrQueue(f.driveFileId!, "whatsapp-quiet-conversation");
     await prisma.commsConversation.deleteMany({ where: { id: { in: doomed } } });
   }
   if (audioRemoved || doomed.length) {

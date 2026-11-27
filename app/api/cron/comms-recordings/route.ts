@@ -3,6 +3,7 @@ import { authorizeCronRequest } from "@/lib/cron-auth";
 import { reconcileRecordings, sweepCallRetention, transcribePending } from "@/lib/comms/call-store";
 import { backfillChannel, sweepWhatsappRetention } from "@/lib/comms/whatsapp-store";
 import { completeDriveCopies, repairCallLines, sweepEndedEngagements } from "@/lib/comms/maintenance";
+import { retryDriveFileDeletions } from "@/lib/comms/drive-deletions";
 import { COMMS_CRON_STEPS, perChannelShare, stepBudget } from "@/lib/comms/cron-budget";
 import { alertChannelFailure, runPerChannel } from "@/lib/comms/cron-channels";
 import { prisma } from "@/lib/prisma";
@@ -60,6 +61,8 @@ export async function GET(request: Request) {
       calls: await sweepCallRetention(),
       whatsapp: await sweepWhatsappRetention(),
       endedEngagements: await sweepEndedEngagements(),
+      // Drive files a sweep or a block could not delete before (27.11.2026).
+      driveDeletions: await retryDriveFileDeletions(),
     }));
     const summary = { ok: true, reconcile, lines, whatsapp, transcribe, driveCopies, retention, seconds, totalSeconds: Math.round((Date.now() - startedAt) / 1000) };
     console.log(`comms-recordings summary ${JSON.stringify(summary)}`);

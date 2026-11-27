@@ -364,6 +364,11 @@ export async function sendPendingReminders(now = new Date()): Promise<{ sent: nu
         { status: "FAILED", attempts: { lt: MAX_REMINDER_ATTEMPTS } },
       ],
       scheduledFor: { lte: now },
+      // A failed escalation is retried by escalateUnhandledReminders, to the
+      // admins. Before 27.11.2026 it was picked up here and resent as an
+      // ordinary reminder: to the responsible person and the date's client
+      // side addresses, never to the admins it was written for.
+      NOT: { idempotencyKey: { endsWith: ESCALATION_SUFFIX } },
     },
     include: { importantDate: { include: { client: true, responsibleUser: true } }, reminderRule: true },
   });
@@ -625,8 +630,10 @@ export async function escalateUnhandledReminders(now = new Date()): Promise<{ es
     // other reminder, rather than inventing a parallel "escalated"
     // boolean flag that could drift out of sync under concurrent cron runs.
     const escalationKey = `${occ.idempotencyKey}${ESCALATION_SUFFIX}`;
+    // A FAILED escalation with attempts left is sent again here, to the
+    // admins, and its row updated. sendPendingReminders leaves it alone.
     const already = await prisma.reminderOccurrence.findUnique({ where: { idempotencyKey: escalationKey } });
-    if (already) continue;
+    if (already && (already.status !== "FAILED" || already.attempts >= MAX_REMINDER_ATTEMPTS)) continue;
 
     const adminEmails = await getAdminEmails();
     if (!adminEmails.length) continue;
@@ -651,22 +658,29 @@ export async function escalateUnhandledReminders(now = new Date()): Promise<{ es
       if (result.ok) result = r;
     }
 
-    await prisma.reminderOccurrence.create({
-      data: {
-        importantDateId: date.id,
-        reminderRuleId: rule.id,
-        occurrenceYear: occ.occurrenceYear,
-        occurrenceDate: occ.occurrenceDate,
-        channel: "EMAIL",
-        scheduledFor: now,
-        status: result.ok ? "SENT" : "FAILED",
-        sentAt: result.ok ? now : undefined,
-        attemptedAt: now,
-        attempts: 1,
-        error: result.ok ? null : result.error ?? "Unknown error",
-        idempotencyKey: escalationKey,
-      },
-    });
+    const outcome = {
+      status: result.ok ? ("SENT" as const) : ("FAILED" as const),
+      sentAt: result.ok ? now : undefined,
+      attemptedAt: now,
+      error: result.ok ? null : result.error ?? "Unknown error",
+    };
+    if (already) {
+      await prisma.reminderOccurrence.update({ where: { id: already.id }, data: { ...outcome, attempts: { increment: 1 } } });
+    } else {
+      await prisma.reminderOccurrence.create({
+        data: {
+          importantDateId: date.id,
+          reminderRuleId: rule.id,
+          occurrenceYear: occ.occurrenceYear,
+          occurrenceDate: occ.occurrenceDate,
+          channel: "EMAIL",
+          scheduledFor: now,
+          ...outcome,
+          attempts: 1,
+          idempotencyKey: escalationKey,
+        },
+      });
+    }
 
     if (result.ok) escalated++;
   }

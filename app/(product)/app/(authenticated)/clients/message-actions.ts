@@ -5,7 +5,7 @@ import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError, assertCan } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { recordClientMessage, type MessageChannel, type MessageKind } from "@/lib/app-domain/client-messages";
+import { checkClientMessage, recordClientMessage, type MessageChannel, type MessageKind } from "@/lib/app-domain/client-messages";
 import { sendEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 
@@ -40,6 +40,9 @@ export async function recordClientMessageAction(input: {
       throw new ForbiddenError("You are not assigned to this client.");
     }
 
+    // The refusals first: once the email is out it cannot be taken back.
+    await checkClientMessage(input);
+
     if (input.channel === "email") {
       const recipients = await prisma.clientUser.findMany({
         where: {
@@ -69,13 +72,22 @@ export async function recordClientMessageAction(input: {
       }
     }
 
-    await recordClientMessage(user, {
-      clientId: input.clientId,
-      taskId: input.taskId,
-      kind: input.kind as MessageKind,
-      channel: input.channel,
-      body: input.body,
-    });
+    try {
+      await recordClientMessage(user, {
+        clientId: input.clientId,
+        taskId: input.taskId,
+        kind: input.kind as MessageKind,
+        channel: input.channel,
+        body: input.body,
+      });
+    } catch (err) {
+      // Sent but not recorded (27.11.2026). The client already has the
+      // email, so this is not a failure to send: saying it was invited a
+      // second try and a second copy of the same email.
+      if (input.channel !== "email") throw err;
+      console.error("client message: email sent, record failed", { clientId: input.clientId, taskId: input.taskId }, err);
+      return { ok: true as const, warning: t("sentNotRecorded") };
+    }
 
     if (input.taskId) revalidatePath(`/app/tasks/${input.taskId}`);
     revalidatePath(`/app/clients/${input.clientId}`);
