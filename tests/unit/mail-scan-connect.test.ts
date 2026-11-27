@@ -54,3 +54,12 @@ describe("Unipile's words on a failed way back", () => {
     expect(cleanDetail("הגישה נחסמה")).toBe("הגישה נחסמה");
   });
 });
+
+describe("the plan is full", () => {
+  it("knows Unipile's account limit, and nothing else", async () => {
+    const { isAccountLimit } = await import("@/lib/mail-scan/connect-errors");
+    expect(isAccountLimit("api/account_limit_reached")).toBe(true);
+    expect(isAccountLimit("cancelled")).toBe(false);
+    expect(isAccountLimit(null)).toBe(false);
+  });
+});

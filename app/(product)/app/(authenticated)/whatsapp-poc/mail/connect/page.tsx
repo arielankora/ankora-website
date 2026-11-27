@@ -8,6 +8,7 @@ import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { mailScanErrorText } from "../error-text";
 import { kindOptions, senderSuggestions, visibleMailboxes } from "@/lib/mail-scan/channels";
 import { chooseKindAction, markSendersAction, startMailConnectAction, startScanAction } from "../actions";
+import { PendingSubmit } from "../PendingSubmit";
 
 // "חיבור תיבת הדואר שלי" (27.11.2026): the employee's own steps, as on
 // "חיבור ה-WhatsApp שלי" (../../connect/page.tsx): connect, whose mailbox
@@ -31,6 +32,7 @@ const RESULTS = [
   "active",
   "expired",
   "failed",
+  "limit",
   "wrong-provider",
   "taken",
   "link-failed",
@@ -68,9 +70,9 @@ export default async function ConnectMailboxPage(props: { searchParams: Promise<
         </ol>
         <p className="text-sm text-app-text-secondary">{t("step1.privacy")}</p>
         <form action={startMailConnectAction}>
-          <button type="submit" className={primary}>
+          <PendingSubmit className={primary}>
             {t("step1.button")}
-          </button>
+          </PendingSubmit>
         </form>
       </section>
     );
@@ -115,9 +117,9 @@ export default async function ConnectMailboxPage(props: { searchParams: Promise<
               ))}
             </select>
           </div>
-          <button type="submit" className={primary}>
+          <PendingSubmit className={primary}>
             {t("kind.continue")}
-          </button>
+          </PendingSubmit>
         </form>
       </section>
     );
@@ -149,10 +151,16 @@ export default async function ConnectMailboxPage(props: { searchParams: Promise<
                 return (
                   <li key={s.address} className="flex flex-wrap items-center justify-between gap-2 py-2">
                     <span className="min-w-0 text-sm text-app-text-primary">
-                      {s.name ? <bdi>{s.name} </bdi> : null}
-                      <span dir="ltr" className="text-xs text-app-text-secondary">
+                      {/* The space sits between the two isolates, not inside the name's,
+                          so a name in English does not run into the address. */}
+                      {s.name ? (
+                        <>
+                          <bdi>{s.name}</bdi>{" "}
+                        </>
+                      ) : null}
+                      <bdi dir="ltr" className="text-xs text-app-text-secondary">
                         {s.address}
-                      </span>{" "}
+                      </bdi>{" "}
                       <span className="text-xs text-app-text-secondary">· {t("step2.emails", { count: s.count })}</span>
                     </span>
                     {s.blocked ? (
@@ -184,17 +192,17 @@ export default async function ConnectMailboxPage(props: { searchParams: Promise<
               className="mt-1 min-h-11 w-full max-w-xs rounded-lg border border-app-border-strong px-2 text-sm"
             />
           </div>
-          <button type="submit" className={secondary}>
+          <PendingSubmit className={secondary}>
             {t("step2.saveMarks")}
-          </button>
+          </PendingSubmit>
         </form>
         <h3 className="pt-2 text-sm font-medium text-app-text-primary">{t("step2.startHeading")}</h3>
         <form action={startScanAction} className="space-y-2 rounded-lg bg-app-surface-sunken p-3">
           <input type="hidden" name="channelId" value={current.id} />
           <p className="text-sm text-app-text-primary">{t("step2.startQuestion")}</p>
-          <button type="submit" className={primary}>
+          <PendingSubmit className={primary}>
             {t("step2.startButton")}
-          </button>
+          </PendingSubmit>
         </form>
       </section>
     );
@@ -254,9 +262,9 @@ export default async function ConnectMailboxPage(props: { searchParams: Promise<
                   {bad ? (
                     <form action={startMailConnectAction}>
                       <input type="hidden" name="channelId" value={c.id} />
-                      <button type="submit" className={primary}>
+                      <PendingSubmit className={primary}>
                         {t("mine.reconnect")}
-                      </button>
+                      </PendingSubmit>
                     </form>
                   ) : null}
                 </li>
@@ -265,9 +273,9 @@ export default async function ConnectMailboxPage(props: { searchParams: Promise<
           </ul>
           <p className="text-sm text-app-text-secondary">{t("mine.doneBody")}</p>
           <form action={startMailConnectAction}>
-            <button type="submit" className={secondary}>
+            <PendingSubmit className={secondary}>
               {t("mine.addAnother")}
-            </button>
+            </PendingSubmit>
           </form>
           <Link prefetch={false} href="/app/whatsapp-poc/mail/setup" className="flex min-h-11 items-center text-sm text-app-text-primary underline">
             {t("settingsLink")}

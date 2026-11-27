@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLinkStatus } from "next/link";
 import { useTranslations } from "next-intl";
@@ -188,5 +188,45 @@ export function RowPending() {
     <span data-nav-pending="" role="status" aria-label={t("rowLoading")} className="flex flex-none items-center">
       <Loader2 className="size-4 animate-spin text-app-text-secondary" aria-hidden="true" />
     </span>
+  );
+}
+
+/// A list filter's menu ("סוג", "צוות"). A plain <details> stayed open after
+/// a choice, because the screen changes without a new page, and closed only
+/// on another press of its button (27.11.2026, Ariel). Now it closes on a
+/// choice, on a press outside it, and on Escape. Without script it is still
+/// a <details> that works.
+export function FilterMenu({ className, children }: { className: string; children: ReactNode }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const close = () => {
+      if (el.open) el.open = false;
+    };
+    const onPick = (e: MouseEvent) => {
+      if ((e.target as Element | null)?.closest("a")) close();
+    };
+    const onOutside = (e: PointerEvent) => {
+      if (!el.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || !el.open) return;
+      close();
+      el.querySelector("summary")?.focus();
+    };
+    el.addEventListener("click", onPick);
+    document.addEventListener("pointerdown", onOutside);
+    el.addEventListener("keydown", onKey);
+    return () => {
+      el.removeEventListener("click", onPick);
+      document.removeEventListener("pointerdown", onOutside);
+      el.removeEventListener("keydown", onKey);
+    };
+  }, []);
+  return (
+    <details ref={ref} className={className}>
+      {children}
+    </details>
   );
 }

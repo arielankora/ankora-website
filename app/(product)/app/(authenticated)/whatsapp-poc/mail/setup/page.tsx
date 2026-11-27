@@ -7,6 +7,7 @@ import { mailScanErrorText } from "../error-text";
 import { listChannelPeople, personLabel } from "@/lib/comms/channel-people";
 import { visibleMailboxes } from "@/lib/mail-scan/channels";
 import { changeMailOwnerAction, decideMailBlockAction, markSendersAction, revokeMailBlockAction, setMailExtractionAction } from "../actions";
+import { PendingSubmit } from "../PendingSubmit";
 
 // "סריקת תיבות דואר" (27.11.2026): each connected mailbox with its state,
 // whose it is, what was recorded from it (counts only), and its "לא לקרוא"
@@ -93,9 +94,9 @@ export default async function MailSetupPage(props: { searchParams: Promise<{ don
                 <label className="flex min-h-11 items-center gap-1">
                   <input type="checkbox" name="extractionAllowed" defaultChecked={c.extractionAllowed} /> {t("setup.extractionAllowed")}
                 </label>
-                <button type="submit" className={secondary}>
+                <PendingSubmit className={secondary}>
                   {t("setup.save")}
-                </button>
+                </PendingSubmit>
               </form>
             ) : (
               <p className="text-sm text-app-text-secondary">{c.extractionAllowed ? t("setup.extractionOn") : t("setup.extractionOff")}</p>
@@ -123,9 +124,9 @@ export default async function MailSetupPage(props: { searchParams: Promise<{ don
                         ))}
                     </select>
                   </div>
-                  <button type="submit" className={secondary}>
+                  <PendingSubmit className={secondary}>
                     {t("setup.save")}
-                  </button>
+                  </PendingSubmit>
                 </form>
               </details>
             ) : null}
@@ -144,9 +145,9 @@ export default async function MailSetupPage(props: { searchParams: Promise<{ don
                   placeholder="name@example.com / example.com"
                   className="min-h-11 w-full max-w-xs rounded-lg border border-app-border-strong px-2 text-sm"
                 />
-                <button type="submit" className={secondary}>
+                <PendingSubmit className={secondary}>
                   {t("setup.add")}
-                </button>
+                </PendingSubmit>
               </div>
             </form>
 
@@ -166,16 +167,16 @@ export default async function MailSetupPage(props: { searchParams: Promise<{ don
                           <form action={decideMailBlockAction}>
                             <input type="hidden" name="blockId" value={b.id} />
                             <input type="hidden" name="decision" value="approve" />
-                            <button type="submit" className={primary}>
+                            <PendingSubmit className={primary}>
                               {t("setup.approve")}
-                            </button>
+                            </PendingSubmit>
                           </form>
                           <form action={decideMailBlockAction}>
                             <input type="hidden" name="blockId" value={b.id} />
                             <input type="hidden" name="decision" value="reject" />
-                            <button type="submit" className={secondary}>
+                            <PendingSubmit className={secondary}>
                               {t("setup.reject")}
-                            </button>
+                            </PendingSubmit>
                           </form>
                         </div>
                       ) : (
@@ -204,9 +205,9 @@ export default async function MailSetupPage(props: { searchParams: Promise<{ don
                     {manager ? (
                       <form action={revokeMailBlockAction}>
                         <input type="hidden" name="blockId" value={b.id} />
-                        <button type="submit" className={secondary}>
+                        <PendingSubmit className={secondary}>
                           {t("setup.revoke")}
-                        </button>
+                        </PendingSubmit>
                       </form>
                     ) : null}
                   </li>
