@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { User } from "@prisma/client";
+import type { Prisma, User } from "@prisma/client";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
 
@@ -35,7 +35,7 @@ function form(fields: Record<string, string>): FormData {
   return fd;
 }
 
-async function proposal(clientId: string, payload: Record<string, unknown>) {
+async function proposal(clientId: string, payload: Prisma.InputJsonObject) {
   const source = await prisma.clientSource.create({ data: { clientId, seq: 1, code: "S1", kind: "EMAIL", title: "מייל", externalRefs: [] } });
   const batch = await prisma.knowledgeBatch.create({ data: { clientId, sourceId: source.id } });
   return prisma.knowledgeProposal.create({ data: { batchId: batch.id, clientId, target: "CONTACT", payload, reason: "מהחתימה", confidence: "HIGH" } });
