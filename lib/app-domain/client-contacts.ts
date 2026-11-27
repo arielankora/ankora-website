@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { isPublicEmailDomain, normalizeDomain, normalizeEmail, normalizePhone } from "@/lib/contact-normalize";
+import { isPublicEmailDomain, normalizeDomain, normalizeEmail, normalizePhone, normalizePhones } from "@/lib/contact-normalize";
 import { canSeeKnowledgeItem, canSendToAi } from "@/lib/knowledge";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { assertEntityBelongs } from "@/lib/app-domain/client-entities";
@@ -315,7 +315,7 @@ export async function addClientContact(actor: User, input: ClientContactInput) {
   const sourced = await sourcedFields(input.clientId, input, [input.context]);
   await assertEntityBelongs(input.clientId, input.entityId);
   const emails = cleanList(input.emails, normalizeEmail);
-  const phones = cleanList(input.phones, normalizePhone);
+  const phones = normalizePhones(input.phones);
   const organization = input.organizationName?.trim() ? await findOrCreateOrganization(input.organizationName, []) : null;
   const person = await findOrCreatePerson({ name, emails, phones, organizationId: organization?.id ?? null });
 
@@ -388,7 +388,7 @@ export async function updateClientContact(actor: User, id: string, input: Partia
   // silently merging two people.
   if (input.emails !== undefined || input.phones !== undefined || input.name !== undefined) {
     const emails = input.emails !== undefined ? cleanList(input.emails, normalizeEmail) : before.person.emails;
-    const phones = input.phones !== undefined ? cleanList(input.phones, normalizePhone) : before.person.phones;
+    const phones = input.phones !== undefined ? normalizePhones(input.phones) : before.person.phones;
     const clash =
       emails.length > 0
         ? await prisma.person.findFirst({ where: { id: { not: before.personId }, deletedAt: null, emails: { hasSome: emails } } })

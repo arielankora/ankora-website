@@ -61,6 +61,10 @@ export function canViewWhatsappPoc(user: { role: UserRole; email: string }, view
 /// else, a group or a chat with no number, is refused.
 export function canSendTo(publicIdentifier: string | null | undefined, allowlist: readonly string[]): boolean {
   if (!publicIdentifier) return false;
+  // A bare nine-digit number is not a chat's own identifier. normalizePhone
+  // reads it as an Israeli mobile for the client file (27.11.2026); sending
+  // stays stricter and refuses it, as before.
+  if (/^\d{9}$/.test(publicIdentifier.trim())) return false;
   const phone = normalizePhone(publicIdentifier);
   if (!phone || !phone.startsWith("+")) return false;
   return allowlist.includes(phone);
