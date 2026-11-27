@@ -2447,6 +2447,38 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-26",
       "riskReason": "The new-client wizard: setup steps, summary and activation"
+    },
+    "action:(product)/app/(authenticated)/whatsapp-poc/mail/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-27",
+      "riskReason": "Mailbox scanning (27.11.2026, \"התיבות שלי\"): built like the WhatsApp self-connect. Staff only; a mailbox is changed by its owner or a manager (lib/mail-scan/channels.ts); the way back from Unipile counts only with the user's signed cookie."
+    },
+    "api:/app/whatsapp-poc/mail/connect/callback": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-27",
+      "riskReason": "Mailbox scanning (27.11.2026, \"התיבות שלי\"): built like the WhatsApp self-connect. Staff only; a mailbox is changed by its owner or a manager (lib/mail-scan/channels.ts); the way back from Unipile counts only with the user's signed cookie."
+    },
+    "screen:/app/whatsapp-poc/mail/connect": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-27",
+      "riskReason": "Mailbox scanning (27.11.2026, \"התיבות שלי\"): built like the WhatsApp self-connect. Staff only; a mailbox is changed by its owner or a manager (lib/mail-scan/channels.ts); the way back from Unipile counts only with the user's signed cookie."
+    },
+    "screen:/app/whatsapp-poc/mail/setup": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-27",
+      "riskReason": "Mailbox scanning (27.11.2026, \"התיבות שלי\"): built like the WhatsApp self-connect. Staff only; a mailbox is changed by its owner or a manager (lib/mail-scan/channels.ts); the way back from Unipile counts only with the user's signed cookie."
     }
   },
   "waivers": {},

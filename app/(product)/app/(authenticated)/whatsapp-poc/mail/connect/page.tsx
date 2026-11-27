@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
+import { parsePageNumber } from "@/lib/url-numbers";
 import { Forbidden } from "@/components/app/Forbidden";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { mailScanErrorText } from "../error-text";
@@ -207,7 +208,7 @@ export default async function ConnectMailboxPage(props: { searchParams: Promise<
           role={GOOD.includes(result) ? "status" : "alert"}
           className={`rounded-lg p-3 text-sm ${GOOD.includes(result) ? "bg-app-success-soft text-app-success" : "bg-app-error-soft text-app-error"}`}
         >
-          {t(`result.${result}`, { count: Number(query.count) || 0 })}
+          {t(`result.${result}`, { count: parsePageNumber(query.count, 200) })}
         </p>
       ) : null}
       {errorText ? (
