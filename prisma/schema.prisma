@@ -4806,6 +4806,9 @@ model CommsAttachment {
   transcript Transcript?
 
   @@unique([messageId, externalId])
+  /// 27.11.2026: finds the same voice message stored on another of our
+  /// numbers, so it is transcribed once (lib/comms/call-store.ts, voiceTwin).
+  @@index([externalId])
   @@map("comms_attachments")
 }
 

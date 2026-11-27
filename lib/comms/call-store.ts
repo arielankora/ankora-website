@@ -174,7 +174,10 @@ export async function storedVoiceAudio(a: {
 
 /// "held": waits for a manager's decision on a block request, and the queue
 /// moves on to the next one.
-export type TranscribeOutcome = "done" | "failed" | "retry" | "capped" | "skipped" | "unavailable" | "held";
+/// "copied": the same voice message, stored on another of our numbers, was
+/// already transcribed, and its text was copied. "waiting": it is queued on
+/// another of our numbers that stored it first; the next run copies it.
+export type TranscribeOutcome = "done" | "failed" | "retry" | "capped" | "skipped" | "unavailable" | "held" | "copied" | "waiting";
 
 /// Transcribe one queued recording. A 429 from OpenAI (the monthly cap, or
 /// a burst limit) leaves it waiting without using up an attempt.
@@ -197,6 +200,26 @@ export async function transcribeRecording(transcriptId: string): Promise<Transcr
   if (phone && (await isAiExcludedNumber(phone))) {
     await prisma.transcript.update({ where: { id: t.id }, data: { status: "SKIPPED" } });
     return "skipped";
+  }
+
+  // 27.11.2026: a voice message in a group with two of our numbers, or sent
+  // from one of our numbers to another, is stored once per number, and was
+  // sent to OpenAI once per number. The first one stored is transcribed; the
+  // others copy its text.
+  if (t.attachment) {
+    const twin = await voiceTwin(t.id, t.createdAt, t.attachment.id, t.attachment.externalId, t.attachment.message.externalId);
+    if (twin.kind === "done") {
+      await prisma.transcript.update({
+        where: { id: t.id },
+        data: { status: "DONE", text: twin.text, model: twin.model, doneAt: new Date(), lastError: null },
+      });
+      console.log("transcribe: copied", { transcriptId: t.id, from: twin.transcriptId });
+      return "copied";
+    }
+    if (twin.kind === "waiting") {
+      console.log("transcribe: waiting for twin", { transcriptId: t.id, twin: twin.transcriptId });
+      return "waiting";
+    }
   }
 
   // 25.11.2026: what was tried, and why it failed, goes to the log (ids,
@@ -240,12 +263,44 @@ export async function transcribeRecording(transcriptId: string): Promise<Transcr
   }
 }
 
+/// The same voice message stored on another of our numbers: same WhatsApp
+/// message id and attachment id, another attachment row. Its transcript is
+/// copied when done; while it is queued and was stored first (and is not
+/// held by a block request), this one waits for it. A twin that was skipped
+/// ("בלי AI" on that number's side) or failed is not waited for.
+export async function voiceTwin(
+  transcriptId: string,
+  createdAt: Date,
+  attachmentId: string,
+  attachmentExternalId: string,
+  messageExternalId: string,
+): Promise<{ kind: "none" } | { kind: "done"; transcriptId: string; text: string; model: string | null } | { kind: "waiting"; transcriptId: string }> {
+  const twins = await prisma.transcript.findMany({
+    where: {
+      id: { not: transcriptId },
+      attachment: { id: { not: attachmentId }, externalId: attachmentExternalId, type: "audio", message: { externalId: messageExternalId } },
+    },
+    select: { id: true, status: true, text: true, model: true, attempts: true, createdAt: true, attachment: { select: { message: { select: { held: true } } } } },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
+  const done = twins.find((w) => w.status === "DONE" && w.text);
+  if (done) return { kind: "done", transcriptId: done.id, text: done.text!, model: done.model };
+  const first = twins.find(
+    (w) =>
+      w.status === "PENDING" &&
+      w.attempts < TRANSCRIBE_MAX_ATTEMPTS &&
+      !w.attachment?.message.held &&
+      (w.createdAt < createdAt || (w.createdAt.getTime() === createdAt.getTime() && w.id < transcriptId)),
+  );
+  return first ? { kind: "waiting", transcriptId: first.id } : { kind: "none" };
+}
+
 /// Work through the queue, oldest first, until it is empty, the time
 /// budget is spent, or OpenAI says the cap is reached.
 export async function transcribePending(options: { budgetMs: number; max?: number; now?: () => number }) {
   const now = options.now ?? Date.now;
   const start = now();
-  const counts: Record<TranscribeOutcome, number> = { done: 0, failed: 0, retry: 0, capped: 0, skipped: 0, unavailable: 0, held: 0 };
+  const counts: Record<TranscribeOutcome, number> = { done: 0, failed: 0, retry: 0, capped: 0, skipped: 0, unavailable: 0, held: 0, copied: 0, waiting: 0 };
   const queue = await prisma.transcript.findMany({
     where: { status: "PENDING", attempts: { lt: TRANSCRIBE_MAX_ATTEMPTS } },
     orderBy: { createdAt: "asc" },
