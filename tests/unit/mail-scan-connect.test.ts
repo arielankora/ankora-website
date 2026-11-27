@@ -41,3 +41,16 @@ describe("mail-scan: the step a mailbox is at", () => {
     expect(mailboxState({ kindChosenAt: chosen, scanEnabled: true }, null)).toBe("unknown");
   });
 });
+
+describe("Unipile's words on a failed way back", () => {
+  it("takes error_type, then error_title, then error, cleaned and short", async () => {
+    const { providerErrorOf, cleanDetail } = await import("@/lib/mail-scan/connect-errors");
+    expect(providerErrorOf(new URLSearchParams("account_id=acc_1"))).toBeNull();
+    expect(providerErrorOf(new URLSearchParams("error_type=insufficient_scopes&error=x"))).toBe("insufficient_scopes");
+    expect(providerErrorOf(new URLSearchParams("error_title=Access%20denied"))).toBe("Access denied");
+    expect(providerErrorOf(new URLSearchParams("error=%3Cscript%3Ealert(1)%3C%2Fscript%3E"))).toBe("script alert(1) /script");
+    expect(cleanDetail("x".repeat(300))).toHaveLength(120);
+    expect(cleanDetail("   ")).toBeNull();
+    expect(cleanDetail("הגישה נחסמה")).toBe("הגישה נחסמה");
+  });
+});
