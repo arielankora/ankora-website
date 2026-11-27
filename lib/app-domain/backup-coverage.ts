@@ -151,6 +151,10 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   CommsMessage: { decision: "DUMP", table: "comms_messages", reason: "The stored WhatsApp messages. Unipile keeps no history we can rely on, so this is the only copy." },
   CommsAttachment: { decision: "DUMP", table: "comms_attachments", reason: "What each message carried, and where a voice message's audio sits in Drive." },
   CommsBlock: { decision: "DUMP", table: "comms_blocks", reason: "The block list: who asked, who decided. Evidence of what was deliberately not kept." },
+  // "התיבות שלי" (27.11.2026).
+  MailChannel: { decision: "DUMP", table: "mail_channels", reason: "Which mailboxes are scanned, whose they are, whose client's, and whether extraction is allowed." },
+  MailBlock: { decision: "DUMP", table: "mail_blocks", reason: "The \"do not read\" list: who asked, who decided. Evidence of what was deliberately not read." },
+  MailThread: { decision: "DUMP", table: "mail_threads", reason: "Which threads with clients were recorded (who and when, no content), so replies to tasks are not lost after a restore." },
   CallRecording: { decision: "DUMP", table: "call_recordings", reason: "The Aloha line's calls: numbers, direction, time and where the audio sits in Drive. The audio itself is in Drive, not here." },
   CallRecordingSkip: { decision: "DUMP", table: "call_recording_skips", reason: "Recording emails deliberately not stored because the number is blocked. Only the email id; without it the nightly reconcile would store them again." },
   Transcript: { decision: "DUMP", table: "transcripts", reason: "The text of each call recording, transcribed once at a cost. Cannot be produced again once the audio is removed after 12 months." },

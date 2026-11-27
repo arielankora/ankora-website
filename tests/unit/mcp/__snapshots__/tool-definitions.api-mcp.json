@@ -1918,6 +1918,22 @@
     "name": "list_client_mail_folders",
     "title": "List a client mailbox's folders, labels, contacts and categories"
   },
+  "list_connected_mailboxes": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The mailboxes employees connected on \"התיבות שלי\" so Ankora recognises their emails with clients: your own, or every one for a manager. Call it when asked whether someone's mailbox is connected, why a reply was not noticed, or what still needs setting up. Takes nothing. To connect, reconnect or change one, the user goes to the link in `connectUrl`. Read-only. Its result explains the fields it carries in `fieldNotes`: read them before answering.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {},
+      "type": "object"
+    },
+    "name": "list_connected_mailboxes",
+    "title": "List the mailboxes connected for scanning"
+  },
   "list_decisions": {
     "annotations": {
       "destructiveHint": false,

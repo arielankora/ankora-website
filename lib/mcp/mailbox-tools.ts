@@ -2,11 +2,15 @@ import "server-only";
 import { z } from "zod";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import { toolFailure, toolJson, toolText } from "@/lib/mcp/errors";
+import { appBaseUrl } from "@/lib/email-templates";
 import { lookupClient } from "@/lib/mcp/lookup";
 import { actorOf } from "@/lib/mcp/task-extra-tools";
 import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
 import { mailboxSetup, mailboxStatus, readAttachment, readEmail, searchEmails, type SearchInput } from "@/lib/client-mailbox/mailbox";
 import { listClientDrafts, manageClientMailFolders, organizeClientEmail, saveClientDraft, sendClientEmail, type Compose, type OrganizeAction } from "@/lib/client-mailbox/write";
+import { mailboxStatusForAi } from "@/lib/mail-scan/channels";
+import { withFieldNotes, FIELD_NOTES_SENTENCE } from "@/lib/mcp/field-notes";
+import { CONNECTED_MAILBOXES_NOTES } from "@/lib/mcp/tool-field-notes";
 import { listClientCalendar, manageClientCalendars, respondClientEvent, saveClientEvent, type EventInput } from "@/lib/client-mailbox/calendar";
 
 // 26.11.2026 (Ariel and Hadas): a client's own mailbox, connected through
@@ -25,6 +29,32 @@ const MAILBOX = z
 const CLIENT = z.string().max(200).describe("Client name, as the user said it.");
 
 export function registerMailboxTools(server: McpServer): void {
+  // "התיבות שלי" (27.11.2026): the mailboxes employees connected for
+  // scanning, and how each is doing. Never an email: what was recorded is
+  // only counted.
+  server.registerTool(
+    "list_connected_mailboxes",
+    {
+      title: "List the mailboxes connected for scanning",
+      description: [
+        "The mailboxes employees connected on \"התיבות שלי\" so Ankora recognises their emails with clients: your own, or every one for a manager. Call it when asked whether someone's mailbox is connected, why a reply was not noticed, or what still needs setting up.",
+        "Takes nothing. To connect, reconnect or change one, the user goes to the link in `connectUrl`. Read-only.",
+        FIELD_NOTES_SENTENCE,
+      ].join(" "),
+      inputSchema: z.object({}),
+      annotations: TOOL_ANNOTATIONS.list_connected_mailboxes,
+    },
+    async (_args: Record<string, never>, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const mailboxes = await mailboxStatusForAi(actor);
+        return toolJson(withFieldNotes({ mailboxes, connectUrl: `${appBaseUrl()}/app/whatsapp-poc/mail/connect` }, CONNECTED_MAILBOXES_NOTES));
+      } catch (err) {
+        return toolFailure(err);
+      }
+    },
+  );
+
   server.registerTool(
     "get_client_mailbox",
     {

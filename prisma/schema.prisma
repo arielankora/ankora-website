@@ -334,6 +334,8 @@ model User {
   lifecycleTasks     Task[]              @relation("TaskSubject")
   agreementSignLinks AgreementSignLink[]
   commsChannels      CommsChannel[]      @relation("CommsChannelOwner")
+  /// "התיבות שלי" (27.11.2026): the mailboxes this person connected for scanning.
+  mailChannels       MailChannel[]       @relation("MailChannelOwner")
   commsLines         CommsLineOwner[]    @relation("CommsLineOwner")
 
   @@index([role, status])
@@ -714,6 +716,8 @@ model Client {
   documents                   ClientDocument[]
   credentials                 ClientCredential[]
   connections                 ClientConnection[]
+  /// A client's mailbox an employee works from, connected for scanning (27.11.2026).
+  mailChannels                MailChannel[]
   portalSummaries             PortalSummary[]
 
   // Org brain, phase 2 (spec 3.5).
@@ -4847,6 +4851,106 @@ model CommsBlock {
   @@unique([channelId, kind, value])
   @@index([status])
   @@map("comms_blocks")
+}
+
+/// "התיבות שלי" (27.11.2026, Ariel: "יוניפייל גם לתיבות של אנקורה כמו שיש
+/// לווצאפ"): a mailbox an employee connected through Unipile, so Ankora can
+/// tell which emails are with clients. Nothing of an email's content is
+/// kept: only which thread, when, who took part and which client
+/// (MailThread). Mirrors CommsChannel.
+model MailChannel {
+  id                String    @id @default(cuid())
+  /// Unipile's account id ("acc_..."). A client's mailbox already connected
+  /// on the client's connections screen is not connected twice: the
+  /// channel reads the same account (ClientConnection.unipileAccountId).
+  accountId         String    @unique
+  /// The address, lower case ("anna@ankora.co.il").
+  address           String
+  ownerUserId       String
+  /// The client whose mailbox this is (office@grantor.co.il): every thread
+  /// in it is that client's. Null for an Ankora mailbox, where each thread
+  /// is matched by its participants.
+  clientId          String?
+  /// When the owner answered "של מי התיבה". Scanning waits for it.
+  kindChosenAt      DateTime?
+  /// As on CommsChannel: a manager may turn off extraction from it.
+  extractionAllowed Boolean   @default(true)
+  /// Nothing is scanned until the owner went through "מה לא לקרוא" and
+  /// pressed "הפעלת סריקה".
+  scanEnabled       Boolean   @default(false)
+  scanStartedAt     DateTime?
+  /// The newest email recorded from this mailbox.
+  lastEmailAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  owner   User         @relation("MailChannelOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  client  Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  blocks  MailBlock[]
+  threads MailThread[]
+
+  @@index([ownerUserId])
+  @@map("mail_channels")
+}
+
+enum MailBlockKind {
+  /// One address ("mom@gmail.com").
+  ADDRESS
+  /// A whole domain ("bank-hapoalim.co.il").
+  DOMAIN
+}
+
+/// "לא לקרוא", per connected mailbox. Statuses as on CommsBlock: an
+/// employee's request holds what was recorded until a manager decides; a
+/// manager's takes effect at once and deletes it.
+model MailBlock {
+  id            String           @id @default(cuid())
+  channelId     String
+  kind          MailBlockKind
+  /// Lower case.
+  value         String
+  /// A name shown with the request, so a manager knows who it is.
+  label         String?
+  status        CommsBlockStatus
+  requestedById String
+  requestedAt   DateTime         @default(now())
+  decidedById   String?
+  decidedAt     DateTime?
+
+  channel MailChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, kind, value])
+  @@index([status])
+  @@map("mail_blocks")
+}
+
+/// A thread with a client in a connected mailbox: who and when, never the
+/// subject or the body. The content stays at the provider and is read
+/// through Unipile when it is needed.
+model MailThread {
+  id               String   @id @default(cuid())
+  channelId        String
+  /// The provider's thread id, as Unipile gives it.
+  externalThreadId String
+  /// The clients it was matched to (more than one for a shared partner).
+  clientIds        String[] @default([])
+  /// Every address seen in it, lower case.
+  participants     String[] @default([])
+  lastEmailId      String
+  lastEmailAt      DateTime
+  /// Who wrote the newest email, lower case.
+  lastFromAddress  String?
+  emailCount       Int      @default(1)
+  /// Held by an employee's "לא לקרוא" until a manager decides.
+  held             Boolean  @default(false)
+  firstSeenAt      DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  channel MailChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, externalThreadId])
+  @@index([lastEmailAt])
+  @@map("mail_threads")
 }
 
 /// 4.11.2026 (task cmvtivumj000pjs08q9qj4t67, ADR 0001 section 24): an

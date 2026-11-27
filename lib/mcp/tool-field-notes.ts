@@ -117,3 +117,15 @@ export const CLIENT_ONBOARDING_NOTES: FieldNotes = {
   errors: "Items that were not saved, each with why, in the domain's own words. The rest were saved.",
   setups: "Every client being set up, with what each still needs.",
 };
+
+/// list_connected_mailboxes (27.11.2026, "התיבות שלי").
+export const CONNECTED_MAILBOXES_NOTES: FieldNotes = {
+  kind: "ANKORA: an Ankora mailbox with several clients, each thread matched to a client by its participants. CLIENT: a client's own mailbox (`client`), every email in it that client's. null: the owner has not chosen yet.",
+  clientAiExcluded: 'The mailbox is a client\'s marked "בלי AI": its name is not given, and nothing from it is for you.',
+  state:
+    'choose-kind (connected, whose it is not chosen), not-scanning (the owner has not pressed "הפעלת סריקה"), scanning, disconnected (nothing new comes in until the owner reconnects at `connectUrl`), or unknown (Unipile did not answer now).',
+  lastEmailAt: "The newest email recorded from it with a client. Emails that are not with a client, and the team writing to itself, are never recorded.",
+  threadsRecorded: "How many threads with clients were recorded: who and when only, never the content.",
+  extractionAllowed: "Whether a manager allows knowledge extraction from this mailbox.",
+  pendingDoNotRead: 'Requests by the owner not to read an address or a domain, waiting for a manager on the settings screen. Threads they cover are held meanwhile.',
+};

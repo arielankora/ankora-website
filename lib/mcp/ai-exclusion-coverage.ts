@@ -121,6 +121,7 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
 
   // lib/mcp/mailbox-tools.ts
   get_client_mailbox: "lookupClient; only the connections of the client named, no mail is read",
+  list_connected_mailboxes: "no email content; a client's own mailbox shows its client's name, never a marked client's (mailboxStatusForAi, lib/mail-scan/channels.ts)",
   search_client_emails: "lookupClient, and resolveMailbox refuses a marked client again (lib/client-mailbox/mailbox.ts)",
   get_client_email: "lookupClient, and resolveMailbox refuses a marked client again",
   read_client_email_attachment: "lookupClient, and resolveMailbox refuses a marked client again",

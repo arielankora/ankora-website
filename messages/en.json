@@ -2035,6 +2035,19 @@
       "ruleKind": "Setup takes rules about handling information and \"do not tell\" rules. Other rules are written in the file after activation.",
       "hasRules": "This client already has rules. To mark that it has none, remove them first.",
       "notReady": "Still missing before activation: {missing}."
+    },
+    "mailScan": {
+      "channelNotFound": "The mailbox was not found.",
+      "notYourMailbox": "You can change only your own mailbox.",
+      "kindAfterScan": "Whose mailbox it is cannot change after scanning was turned on.",
+      "clientNotYours": "This client is not on your list of clients.",
+      "managerDecides": "Only a manager decides on \"do not read\".",
+      "alreadyHandled": "The request was already handled.",
+      "managerRevokes": "Only a manager revokes \"do not read\".",
+      "notActive": "The mark is not active.",
+      "kindFirst": "First choose whose mailbox it is.",
+      "managerOnly": "Only a manager changes this.",
+      "ownerMustBeActive": "The owner must be an active team member."
     }
   },
   "auditLog": {
@@ -2346,7 +2359,18 @@
       "connectionMailRead": "Reading a client mailbox",
       "connectionMailWrite": "Writing in a client mailbox",
       "connectionCalendarRead": "Reading a client calendar",
-      "connectionCalendarWrite": "Writing in a client calendar"
+      "connectionCalendarWrite": "Writing in a client calendar",
+      "mailChannelConnected": "Mailbox connected for scanning",
+      "mailChannelReused": "Client mailbox connected for scanning through the existing connection",
+      "mailChannelReconnected": "Mailbox reconnected",
+      "mailChannelKindChosen": "Chose whose mailbox it is",
+      "mailChannelScanStarted": "Mailbox scanning turned on",
+      "mailChannelExtractionUpdated": "Knowledge extraction from a mailbox changed",
+      "mailChannelOwnerChanged": "Mailbox owner changed",
+      "mailBlockRequested": "Asked not to read an address in a mailbox",
+      "mailBlockApproved": "\"Do not read\" in a mailbox, and what was recorded deleted",
+      "mailBlockRejected": "\"Do not read\" request rejected",
+      "mailBlockRevoked": "\"Do not read\" in a mailbox revoked"
     },
     "kinds": {
       "failure": "Failure",
@@ -7678,7 +7702,9 @@
       "badPhone": "That number isn't valid.",
       "waError": "WhatsApp: {error}",
       "callsError": "Phone calls: {error}",
-      "callsStale": "The call list is from the previous load, because Unipile isn't answering right now."
+      "callsStale": "The call list is from the previous load, because Unipile isn't answering right now.",
+      "mailConnectLink": "Connect my mailbox",
+      "mailSetupLink": "Mailbox scanning: mailboxes and \"do not read\" list"
     },
     "filters": {
       "label": "Type",
@@ -8200,6 +8226,122 @@
         "wrong-provider": "The account connected is not WhatsApp. Press again and choose WhatsApp.",
         "taken": "This number is already connected to another employee. Contact Ariel.",
         "link-failed": "The connection screen could not be opened. Try again in a minute."
+      }
+    },
+    "mail": {
+      "back": "Back to communications",
+      "title": "Connect my mailbox",
+      "settingsLink": "Mailbox settings: what not to read",
+      "step1": {
+        "title": "Step 1: connect the mailbox",
+        "why": "With your mailbox connected, Ankora recognises emails with clients: it updates a task when a reply arrives, and proposes knowledge for the client file. Nobody reads your mail on a screen.",
+        "a": "Press the button. Google's or Microsoft's sign-in screen opens.",
+        "b": "Sign in to the mailbox you work from: Ankora's, or a client's (for example office@grantor.co.il).",
+        "c": "You come back here automatically, and the mailbox is connected.",
+        "privacy": "Nothing is scanned before step 2. Your password never reaches Ankora, and the mailbox keeps working as usual.",
+        "button": "Connect a mailbox"
+      },
+      "kind": {
+        "title": "Whose mailbox is this?",
+        "hintSuggested": "The mailbox's domain is in the client file of {client}. Every email in a client's mailbox counts as the client's.",
+        "hint": "Every email in a client's mailbox counts as the client's. In an Ankora mailbox, each thread is matched to a client by its participants.",
+        "ankora": "An Ankora mailbox (several clients). Each thread is matched to a client by its participants.",
+        "client": "The client's mailbox:",
+        "pickClient": "Choose a client",
+        "continue": "Continue"
+      },
+      "step2": {
+        "connected": "The mailbox is connected ✓",
+        "why": "Step 2: mark personal senders that must not be read (bank, doctor, family), and press \"Turn on scanning\". The {count} most frequent senders of the last 30 days are shown.",
+        "noSenders": "No outside senders in the last 30 days. You can add an address or a domain by hand.",
+        "sendersError": "Could not get the senders from the mailbox ({error}). You can add an address or a domain by hand.",
+        "emails": "{count} emails",
+        "dontRead": "Do not read",
+        "wholeDomain": "Whole domain",
+        "alreadyBlocked": "Marked",
+        "addManual": "Add an address or domain",
+        "saveMarks": "Save the marks",
+        "startHeading": "Turn on scanning",
+        "startQuestion": "From now on new emails in this mailbox are scanned, except what you marked. Only threads with clients are recorded, with no content. Turn it on?",
+        "startButton": "Turn on scanning"
+      },
+      "mine": {
+        "title": "My mailboxes",
+        "ankora": "Ankora mailbox",
+        "clientOf": "The client {client}'s mailbox",
+        "kindPending": "Not yet chosen whose it is",
+        "state": {
+          "choose-kind": "Connected. Choose whose it is and turn on scanning.",
+          "not-scanning": "Connected. Scanning is not on yet.",
+          "scanning": "Scanning ✓",
+          "disconnected": "Disconnected. New emails are not coming in, and replies to tasks will not be recognised.",
+          "unknown": "Could not check the connection right now."
+        },
+        "lastEmail": "Last recorded: {date}",
+        "reconnect": "Reconnect",
+        "continueSetup": "Continue the setup",
+        "addAnother": "Connect another mailbox",
+        "doneBody": "Nothing else to do. If a mailbox disconnects you will be told, and a reconnect button will appear here."
+      },
+      "result": {
+        "connected": "The mailbox is connected. Choose whose it is and turn on scanning.",
+        "reused": "This mailbox was already connected on the client's connections screen, so it was not connected twice. Scanning uses the existing connection.",
+        "reconnected": "The mailbox is reconnected, and new emails are coming in again.",
+        "kindSaved": "Saved. Now mark what not to read and turn on scanning.",
+        "marked": "{count} marks saved.",
+        "noneMarked": "Nothing was marked.",
+        "badTarget": "That is neither an email address nor a domain. For example name@example.com or example.com.",
+        "active": "Scanning is on. From now on new emails with clients are recorded.",
+        "expired": "The connection expired or was started by another user. Press the button again.",
+        "failed": "The connection did not complete. Press the button again, and if it happens again, ask Ariel.",
+        "wrong-provider": "The account connected is not a mailbox. Press again and choose Google or Microsoft.",
+        "taken": "This mailbox is already connected by another employee. Ask Ariel.",
+        "link-failed": "Could not open the connection screen. Try again in a minute.",
+        "error": "Not done: {error}"
+      },
+      "setup": {
+        "title": "Mailbox scanning",
+        "intro": "From each mailbox only threads with clients are recorded: who, when and which client, with no content. The agent reads the content through the connector only in a thread matched to a client. An employee's \"do not read\" takes effect at once, and a manager decides whether to approve it.",
+        "empty": "No mailbox connected yet.",
+        "mailboxOf": "{name}'s mailbox",
+        "stateLine": "State: {state}",
+        "kindLine": "Kind: {kind}",
+        "recorded": "{threads} threads recorded with {clients} clients.",
+        "extractionLabel": "Knowledge extraction from this mailbox",
+        "extractionAllowed": "Allowed",
+        "extractionOn": "Knowledge extraction from this mailbox: allowed.",
+        "extractionOff": "Knowledge extraction from this mailbox: off.",
+        "save": "Save",
+        "changeOwner": "Change owner",
+        "newOwner": "The new owner (active users only)",
+        "pickUser": "Choose a user",
+        "addHeading": "Add to the \"do not read\" list",
+        "add": "Add",
+        "pendingHeading": "\"Do not read\" requests waiting",
+        "awaitingManager": "Waiting for a manager.",
+        "approve": "Approve",
+        "reject": "Reject",
+        "blockList": "\"Do not read\" list ({count})",
+        "address": "Address",
+        "domain": "Domain",
+        "revoke": "Revoke",
+        "status": {
+          "PENDING": "Waiting for a manager",
+          "APPROVED": "Not read",
+          "REJECTED": "Rejected",
+          "REVOKED": "Revoked"
+        },
+        "done": {
+          "added": "Added to the list.",
+          "requested": "A request was sent to a manager. Threads with this address are hidden meanwhile.",
+          "approved": "Approved. What was recorded from this address was deleted.",
+          "rejected": "The request was rejected.",
+          "revoked": "The mark was revoked.",
+          "extraction": "Saved.",
+          "owner": "The owner was changed.",
+          "badTarget": "That is neither an email address nor a domain. For example name@example.com or example.com.",
+          "noneMarked": "Nothing was marked."
+        }
       }
     }
   },
@@ -9114,6 +9256,14 @@
       "runFailedTitle": "{agent}: the run failed",
       "runMissingTitle": "{agent}: a requirement was missing in the run",
       "missing": "Missing: {item}"
+    },
+    "mailChannelDisconnected": {
+      "title": "{owner}'s mailbox {address} was disconnected from Ankora",
+      "body": "Hi {owner},\n\nThe mailbox {address} was disconnected from Ankora, so new emails from it are not coming in right now, and replies to tasks will not be recognised.\n\nTo reconnect (takes a minute):\n1. Open: {link}\n2. Press \"Reconnect\" next to the mailbox.\n3. Sign in to the mailbox on Google's or Microsoft's screen.\n\nThe mailbox itself keeps working as usual.\n\nThanks,\nAnkora"
+    },
+    "mailWebhookAccountFailed": {
+      "title": "{owner}'s mailbox was not added to the webhook",
+      "body": "{owner} connected a mailbox, but it could not be added to the Unipile webhook, so its emails are not recorded. The error: {error}. Add the account by hand in Unipile (Webhooks → Modify → Account filter)."
     }
   },
   "agents": {

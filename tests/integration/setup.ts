@@ -34,6 +34,10 @@ const TABLES = [
   "comms_messages",
   "comms_conversations",
   "comms_blocks",
+  // "התיבות שלי" (27.11.2026): threads and blocks before their mailboxes.
+  "mail_threads",
+  "mail_blocks",
+  "mail_channels",
   "comms_channels",
   "comms_line_owners",
   // Phase 4 tables truncate before the Phase 3 tables they (loosely)
