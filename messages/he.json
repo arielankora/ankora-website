@@ -37,6 +37,7 @@
       "integrations": "אינטגרציות",
       "auditLog": "יומן פעולות",
       "claudeUsage": "שימוש בקלוד",
+      "systemIssues": "תקלות מערכת",
       "myNotifications": "התראות שלי",
       "myProfile": "הפרופיל שלי",
       "guide": "מדריך שימוש",
@@ -1363,6 +1364,12 @@
     }
   },
   "domainErrors": {
+    "systemIssues": {
+      "forbidden": "רק מנהלים רואים את תקלות המערכת.",
+      "notFound": "התקלה לא נמצאה.",
+      "nothingToSave": "צריך הערה או קישור לבקשת מיזוג.",
+      "badPrUrl": "הקישור צריך להיות לבקשת מיזוג בריפו של אנקורה ב-GitHub."
+    },
     "tasks": {
       "notFound": "המשימה לא נמצאה.",
       "parentOtherClient": "אפשר לפרק משימה לשלבים רק בתוך אותו לקוח.",
@@ -2182,6 +2189,8 @@
       "knowledgeAutoApplyPause": "כניסה אוטומטית נעצרה אחרי שגיאות: ההצעות חוזרות לאישור של אדם",
       "knowledgeAutoApplyLift": "מנהל החזיר לכניסה אוטומטית",
       "claudeUsageSettings": "שינוי מושבים או סף בשימוש בקלוד",
+      "systemIssueResolved": "סגירת תקלת מערכת",
+      "systemIssueAnnotated": "הערה או קישור לתיקון על תקלת מערכת",
       "brainMetricsWeeklyEmail": "נשלח מייל שבועי של מדדי התיק",
       "requestTypeAdd": "הוספת סוג פנייה לתיק הלקוח",
       "requestTypeUpdate": "עדכון סוג פנייה בתיק הלקוח",
@@ -2482,6 +2491,34 @@
       "page": "עמוד {page} מתוך {total}"
     },
     "retention": "היומן נשמר לשנתיים ואינו ניתן לעריכה או למחיקה."
+  },
+  "systemIssues": {
+    "title": "תקלות מערכת",
+    "intro": "כל תקלה שהמערכת נתקלה בה ורשמה: מייל שלא נשלח, שלב בריצת לילה שנכשל, כלי במחבר שנכשל, שגיאת שרת. תקלה שחוזרת נספרת באותה שורה. תקלה חמורה שולחת למנהלים מייל, לכל היותר פעם ב-20 שעות.",
+    "openTitle": "תקלות פתוחות ({count})",
+    "noneOpen": "אין תקלות פתוחות.",
+    "seen": "{count, plural, one {פעם אחת} other {# פעמים}}. ראשונה: {first}. אחרונה: {last}.",
+    "prLink": "בקשת מיזוג",
+    "notePlaceholder": "הערה (לא חובה): מה תוקן",
+    "resolve": "סגירת התקלה",
+    "resolvedDone": "התקלה נסגרה. אם היא תחזור, היא תיפתח מחדש.",
+    "jobsTitle": "ריצות הלילה",
+    "jobColumn": "משימה",
+    "lastRunColumn": "ריצה אחרונה",
+    "stateColumn": "מצב",
+    "never": "לא רצה",
+    "resolvedTitle": "נסגרו ב-14 הימים האחרונים",
+    "resolvedAt": "נסגרה {when}",
+    "severity": {
+      "CRITICAL": "חמורה",
+      "WARNING": "לידיעה"
+    },
+    "state": {
+      "never": "אין ריצה",
+      "cutOff": "נקטעה",
+      "ok": "תקינה",
+      "failed": "נכשל: {steps}"
+    }
   },
   "claudeUsage": {
     "summary": {
@@ -8914,7 +8951,7 @@
     },
     "systemIssue": {
       "title": "תקלת מערכת: {title}",
-      "body": "המערכת נתקלה בתקלה ורשמה אותה.\n\nמה קרה: {title}\nפרטים: {detail}\nמספר הפעמים עד עכשיו: {count}\n\nעל אותה תקלה נשלחת התראה אחת לכל היותר בכל 20 שעות. כשהיא נפתרת, אפשר לסגור אותה."
+      "body": "המערכת נתקלה בתקלה ורשמה אותה.\n\nמה קרה: {title}\nפרטים: {detail}\nמספר הפעמים עד עכשיו: {count}\n\nעל אותה תקלה נשלחת התראה אחת לכל היותר בכל 20 שעות. כשהיא נפתרת, אפשר לסגור אותה במסך תקלות המערכת: {link}"
     },
     "channelBackfillFailed": {
       "title": "השמירה הלילית של WhatsApp נכשלה למספר של {owner}",

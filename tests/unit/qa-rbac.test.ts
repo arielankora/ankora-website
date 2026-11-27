@@ -189,6 +189,7 @@ describe("the role and permission table", () => {
       "time_entry.edit_self",
       "time_entry.edit_others",
       "report.internal.view",
+      "system_issue.manage",
       "credential.view",
       "credential.reveal",
       "credential.manage",

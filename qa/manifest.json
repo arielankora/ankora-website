@@ -2503,6 +2503,30 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-27",
       "riskReason": "Stage 2 of mailbox scanning (27.11.2026): follow, stop, reschedule a task's wait for an email reply, and send a reminder as a reply from the sender's own mailbox. Signed-in staff; task access through getTaskDetail and updateTask; only the email's sender may follow it or send its reminder (lib/mail-scan/waits.ts)."
+    },
+    "action:(product)/app/(authenticated)/system-issues/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "medium",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-27",
+      "riskReason": "Closes a system issue with an optional note. Admins only, audited. Changes a status the system reopens by itself if the failure returns; sends and deletes nothing."
+    },
+    "domain:system-issues": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-27",
+      "riskReason": "Who may read and close system issues is the risk: system_issue.manage, admins only, tested through the connector. Closing only changes a status the system reopens by itself if the failure returns; audited."
+    },
+    "screen:/app/system-issues": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-27",
+      "riskReason": "The failures the system recorded and the nightly runs, for SUPER_ADMIN and ANKORA_ADMIN (system_issue.manage). Shows error text, never message bodies or secrets."
     }
   },
   "waivers": {},
