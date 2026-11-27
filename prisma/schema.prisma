@@ -4669,6 +4669,10 @@ model CommsChannel {
   /// and pressed "התחל לשמור".
   storeEnabled      Boolean   @default(false)
   storeStartedAt    DateTime?
+  /// When the nightly load of the history first went through every chat
+  /// (lib/comms/whatsapp-store.ts, backfillChannel). The setup screen then
+  /// says the history is loaded and stops offering to load more.
+  historyLoadedAt   DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

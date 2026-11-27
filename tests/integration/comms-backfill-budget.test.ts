@@ -52,6 +52,7 @@ describe("WhatsApp history load: the budget holds inside a chat", () => {
     const clock = () => (t += 10_000);
     const first = await backfillChannel(channel, { budgetMs: 25_000, now: clock });
     expect(first.stoppedBy).toBe("budget");
+    expect((await prisma.commsChannel.findUniqueOrThrow({ where: { id: channel.id } })).historyLoadedAt).toBeNull();
     expect(first.messages).toBeGreaterThan(0);
     expect(first.messages).toBeLessThan(messages.length);
     const conversation = await prisma.commsConversation.findFirstOrThrow({ where: { channelId: channel.id } });
@@ -61,5 +62,11 @@ describe("WhatsApp history load: the budget holds inside a chat", () => {
     expect(second).toMatchObject({ stoppedBy: "done", chats: 1, messages: messages.length - first.messages });
     expect(await prisma.commsMessage.count({ where: { conversationId: conversation.id } })).toBe(messages.length);
     expect((await prisma.commsConversation.findUniqueOrThrow({ where: { id: conversation.id } })).backfilledAt).not.toBeNull();
+    // 27.11.2026: a run cut short does not mark the history loaded; the run
+    // that went through the whole list does, and says what it saw.
+    expect(second).toMatchObject({ listed: 1, blocked: 0, loadedBefore: 0 });
+    expect((await prisma.commsChannel.findUniqueOrThrow({ where: { id: channel.id } })).historyLoadedAt).not.toBeNull();
+    const third = await backfillChannel({ ...channel, historyLoadedAt: new Date() }, { budgetMs: 600_000 });
+    expect(third).toMatchObject({ stoppedBy: "done", chats: 0, listed: 1, loadedBefore: 1 });
   });
 });
