@@ -9,6 +9,7 @@ import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
 import { mailboxSetup, mailboxStatus, readAttachment, readEmail, searchEmails, type SearchInput } from "@/lib/client-mailbox/mailbox";
 import { listClientDrafts, manageClientMailFolders, organizeClientEmail, saveClientDraft, sendClientEmail, type Compose, type OrganizeAction } from "@/lib/client-mailbox/write";
 import { mailboxStatusForAi } from "@/lib/mail-scan/channels";
+import { registerMailScanTools } from "@/lib/mcp/mail-scan-tools";
 import { withFieldNotes, FIELD_NOTES_SENTENCE } from "@/lib/mcp/field-notes";
 import { CONNECTED_MAILBOXES_NOTES } from "@/lib/mcp/tool-field-notes";
 import { listClientCalendar, manageClientCalendars, respondClientEvent, saveClientEvent, type EventInput } from "@/lib/client-mailbox/calendar";
@@ -29,6 +30,7 @@ const MAILBOX = z
 const CLIENT = z.string().max(200).describe("Client name, as the user said it.");
 
 export function registerMailboxTools(server: McpServer): void {
+  registerMailScanTools(server);
   // "התיבות שלי" (27.11.2026): the mailboxes employees connected for
   // scanning, and how each is doing. Never an email: what was recorded is
   // only counted.

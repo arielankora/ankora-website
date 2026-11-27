@@ -161,6 +161,11 @@ export const TOOL_ANNOTATIONS = {
   get_client_mailbox: READ_ONLY,
   search_client_emails: READ_ONLY,
   list_connected_mailboxes: READ_ONLY,
+  list_sent_emails: READ_ONLY,
+  list_email_waits: READ_ONLY,
+  manage_connected_mailbox: WRITES,
+  follow_email_reply: WRITES,
+  manage_email_wait: WRITES,
   get_client_email: READ_ONLY,
   read_client_email_attachment: READ_ONLY,
   list_client_mail_folders: READ_ONLY,
@@ -316,6 +321,9 @@ export const WRITE_TOOLS = [
   "save_client_calendar_event",
   "respond_client_calendar_event",
   "manage_client_calendars",
+  "manage_connected_mailbox",
+  "follow_email_reply",
+  "manage_email_wait",
 ] as const;
 
 /// Phase 16: task tools are NOT in TEAM_TOOLS.

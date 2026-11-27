@@ -77,6 +77,8 @@ vi.mock("@/lib/app-domain/decisions", () => decisions);
 vi.mock("@/lib/mcp/lookup", () => lookup);
 vi.mock("@/lib/mcp/auth", () => auth);
 vi.mock("@/lib/app-domain/task-plans", () => plans);
+// Stage 2 of "התיבות שלי": no email waits in these tests.
+vi.mock("@/lib/mail-scan/waits", () => ({ waitViews: vi.fn(async () => new Map()) }));
 vi.mock("@/lib/app-domain/clients", () => ({ listAccessibleClients: vi.fn(async () => []) }));
 vi.mock("@/lib/app-auth/permissions", () => ({ assertCan: vi.fn() }));
 

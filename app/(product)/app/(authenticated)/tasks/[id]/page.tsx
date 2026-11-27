@@ -15,6 +15,8 @@ import { getActiveTimers } from "@/lib/app-domain/time-entries";
 import { Forbidden } from "@/components/app/Forbidden";
 import { NotFound } from "@/components/app/states/NotFound";
 import { TaskDetail } from "./TaskDetail";
+import { sentEmails, waitViews } from "@/lib/mail-scan/waits";
+import { defaultRemindAt, suggestCandidate, toLocalInput } from "@/lib/mail-scan/wait-rules";
 import { TaskThread } from "./TaskThread";
 import { RunOfPicker } from "./RunOfPicker";
 import { readApprovalEvidence } from "@/lib/step-approval";
@@ -237,6 +239,16 @@ export default async function TaskDetailPage(props: {
   // 14.11.2026 (stage 3, "Run.dc.html"): the run's steps approved at the
   // client, by name; and for a task opened by hand, the client's
   // processes it could be a run of, the one its title names first.
+  // Stage 2 of "התיבות שלי" (27.11.2026): what the task and its steps wait
+  // for by email, and the emails this person may pick.
+  const mailWaits = await waitViews([task.id, ...subtasks.map((s) => s.id)], user.id);
+  const sent = await sentEmails(user);
+  const mailProps = {
+    wait: mailWaits.get(task.id) ?? null,
+    candidates: sent.map((c) => ({ threadId: c.threadId, mailbox: c.mailbox, sentTo: c.sentTo, sentAt: c.sentAt.toISOString() })),
+    suggested: suggestCandidate(sent, task.clientId),
+    defaultRemindAt: toLocalInput(defaultRemindAt(new Date())),
+  };
   const clientApproverIds = [...new Set(subtasks.map((s) => s.approvalContactId).filter((x): x is string => !!x))];
   const clientApprovers = clientApproverIds.length
     ? new Map(
@@ -357,6 +369,7 @@ export default async function TaskDetailPage(props: {
           createdAt: task.createdAt.toISOString(),
           reportedSeconds: time.totalSeconds,
         }}
+        mail={mailProps}
         people={people}
         shareWith={people.map((p) => ({ ...p, whatsappNumber: whatsappById.get(p.id) ?? null }))}
         taskUrl={`${appBaseUrl()}/app/tasks/${task.id}`}
@@ -470,6 +483,7 @@ export default async function TaskDetailPage(props: {
           // words, said here in the reader's language (no longer in the title).
           mode: s.stepMode && s.stepMode !== "MANUAL" ? s.stepMode : null,
           namedApprover: !s.requiresApproval && !s.approvalContactId ? (brief?.steps.find((b) => b.title === s.title)?.approver ?? null) : null,
+          mailWait: mailWaits.get(s.id) ?? null,
         }))}
         evidence={!!task.processId && !!task.client.auditRequirements}
         reminder={composer ? { clientId: task.clientId, taskId: task.id, composer } : null}

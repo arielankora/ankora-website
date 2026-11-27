@@ -19,6 +19,8 @@ import {
   readMailAccount,
   removeMailAccount,
 } from "@/lib/client-mailbox/unipile-mail";
+import { onThreadEmail } from "./waits";
+import { SENT_KEEP_DAYS, recipientsOf } from "./wait-rules";
 import {
   TEAM_DOMAINS,
   decideEmail,
@@ -434,25 +436,42 @@ export async function recordMailEvent(accountId: string, emailId: string): Promi
   const threadId = typeof email.thread_id === "string" && email.thread_id ? email.thread_id : null;
   if (!threadId) return "no-thread";
   const participants = participantsOf(email);
-  const team = await loadTeam();
-  const lookup: ClientLookup = { byDomain: await domainsOfClients(), byAddress: await contactsOf(participants) };
-  const decision = decideEmail({ participants, mailbox: { address: channel.address, clientId: channel.clientId }, blocks: channel.blocks, team, lookup });
-  if (!decision.record) return decision.reason;
-
   const at = typeof email.date === "string" && !Number.isNaN(Date.parse(email.date)) ? new Date(email.date) : new Date();
   const from = fromOf(email);
   const existing = await prisma.mailThread.findUnique({ where: { channelId_externalThreadId: { channelId: channel.id, externalThreadId: threadId } } });
   if (existing?.lastEmailId === emailId) return "same";
+
+  // Stage 2: a reply in a thread a task follows ends the wait, whatever
+  // else is decided below; and a followed thread is always recorded.
+  const followed = await onThreadEmail(channel, { externalThreadId: threadId, emailId, from, at });
+  const team = await loadTeam();
+  const lookup: ClientLookup = { byDomain: await domainsOfClients(), byAddress: await contactsOf(participants) };
+  const decision = decideEmail({ participants, mailbox: { address: channel.address, clientId: channel.clientId }, blocks: channel.blocks, team, lookup });
+  const sentByOwner = from === channel.address;
+  let keepUntil: Date | null = null;
+  if (!decision.record) {
+    if (decision.reason === "blocked") return "blocked";
+    // An email the owner sent to someone who is no client's (a supplier, a
+    // colleague) is kept 14 days, to be picked on "ממתינים לתשובה למייל".
+    if (!followed && !sentByOwner) return decision.reason;
+    if (!followed) keepUntil = new Date(Date.now() + SENT_KEEP_DAYS * 24 * 60 * 60 * 1000);
+  }
+  const clientIds = decision.record ? decision.clientIds : [];
+  const held = decision.record ? decision.held : false;
+  const sent = sentByOwner ? { lastSentAt: at, lastSentTo: recipientsOf(participants, channel.address) } : {};
+
   if (existing) {
     const newer = at >= existing.lastEmailAt;
+    const stillTemporary = keepUntil !== null && existing.keepUntil !== null;
     await prisma.mailThread.update({
       where: { id: existing.id },
       data: {
-        clientIds: [...new Set([...existing.clientIds, ...decision.clientIds])].sort(),
+        clientIds: [...new Set([...existing.clientIds, ...clientIds])].sort(),
         participants: [...new Set([...existing.participants, ...participants])],
         emailCount: { increment: 1 },
-        held: existing.held || decision.held,
-        ...(newer ? { lastEmailId: emailId, lastEmailAt: at, lastFromAddress: from } : {}),
+        held: existing.held || held,
+        keepUntil: stillTemporary ? keepUntil : null,
+        ...(newer ? { lastEmailId: emailId, lastEmailAt: at, lastFromAddress: from, ...sent } : {}),
       },
     });
   } else {
@@ -460,16 +479,18 @@ export async function recordMailEvent(accountId: string, emailId: string): Promi
       data: {
         channelId: channel.id,
         externalThreadId: threadId,
-        clientIds: decision.clientIds,
+        clientIds,
         participants,
         lastEmailId: emailId,
         lastEmailAt: at,
         lastFromAddress: from,
-        held: decision.held,
+        held,
+        keepUntil,
+        ...sent,
       },
     });
   }
-  if (!channel.lastEmailAt || at > channel.lastEmailAt) await prisma.mailChannel.update({ where: { id: channel.id }, data: { lastEmailAt: at } });
+  if (decision.record && (!channel.lastEmailAt || at > channel.lastEmailAt)) await prisma.mailChannel.update({ where: { id: channel.id }, data: { lastEmailAt: at } });
   return existing ? "updated" : "recorded";
 }
 
@@ -501,7 +522,7 @@ export async function visibleMailboxes(actor: Actor, opts: { onlyOwn?: boolean }
       owner: { select: { id: true, name: true, email: true } },
       client: { select: { id: true, name: true, aiExcluded: true } },
       blocks: { orderBy: { requestedAt: "desc" } },
-      _count: { select: { threads: true } },
+      _count: { select: { threads: { where: { clientIds: { isEmpty: false } } } } },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -530,7 +551,29 @@ export async function mailboxStatusForAi(actor: Actor) {
     clientsInThreads: c.clientCount,
     extractionAllowed: c.extractionAllowed,
     pendingDoNotRead: c.blocks.filter((b) => b.status === "PENDING").length,
+    doNotRead: c.blocks
+      .filter((b) => b.status === "PENDING" || b.status === "APPROVED")
+      .map((b) => ({ value: b.value, kind: b.kind, status: b.status, label: b.label })),
   }));
 }
 
 
+
+// ---------------------------------------------------------------- the connector
+
+/// The mailbox a connector call is about: the one with this address (the
+/// actor's own, or any for a manager), or the actor's only one.
+export async function mailboxFor(actor: Actor, address?: string | null): Promise<MailChannel> {
+  const own = isManager(actor) && address ? {} : { ownerUserId: actor.id };
+  const rows = await prisma.mailChannel.findMany({ where: { ...own, ...(address ? { address: address.trim().toLowerCase() } : {}) }, orderBy: { createdAt: "asc" } });
+  if (rows.length === 1) return rows[0];
+  if (!rows.length) throw new DomainError("mailScan.channelNotFound", "התיבה לא נמצאה.");
+  throw new DomainError("mailScan.whichMailbox", "יש לך יותר מתיבה אחת: צריך לציין את כתובת התיבה.");
+}
+
+/// A "לא לקרוא" entry of a mailbox, by what it says ("bank.co.il").
+export async function blockByValue(channelId: string, value: string) {
+  const block = await prisma.mailBlock.findFirst({ where: { channelId, value: value.trim().toLowerCase() }, orderBy: { requestedAt: "desc" } });
+  if (!block) throw new DomainError("mailScan.blockNotFound", "אין ברשימת \"לא לקרוא\" של התיבה כתובת או דומיין כאלה.");
+  return block;
+}

@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { deleteStoredMessage, readMessageEvent, storeMessage, updateStoredMessage } from "@/lib/comms/whatsapp-store";
 import { alertChannelDisconnected } from "@/lib/comms/disconnect-alert";
 import { recordMailEvent } from "@/lib/mail-scan/channels";
+import { sweepIfDue } from "@/lib/mail-scan/waits";
 import { alertMailChannelDisconnected } from "@/lib/mail-scan/disconnect";
 
 // Unipile's webhook (communications storage, 1.11.2026):
@@ -84,6 +85,9 @@ export async function POST(request: Request) {
     if (accountId !== config.mailAccountId) {
       await afterResponse("unipile webhook: mailbox scan", async () => {
         await recordMailEvent(accountId, emailId);
+        // Stage 2: due reminders go out close to their time on a working
+        // day, since the cron on this plan runs once a day.
+        await sweepIfDue();
       });
     }
   }

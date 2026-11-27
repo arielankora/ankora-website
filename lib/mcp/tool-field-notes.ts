@@ -128,4 +128,24 @@ export const CONNECTED_MAILBOXES_NOTES: FieldNotes = {
   threadsRecorded: "How many threads with clients were recorded: who and when only, never the content.",
   extractionAllowed: "Whether a manager allows knowledge extraction from this mailbox.",
   pendingDoNotRead: 'Requests by the owner not to read an address or a domain, waiting for a manager on the settings screen. Threads they cover are held meanwhile.',
+  doNotRead:
+    'The mailbox\'s "לא לקרוא" list: each `value` (an address, or a domain with everything under it), its `kind`, and `status` APPROVED (not read) or PENDING (asked by the owner, held until a manager decides with manage_connected_mailbox).',
+};
+
+/// list_sent_emails (27.11.2026, stage 2 of "התיבות שלי").
+export const SENT_EMAILS_NOTES: FieldNotes = {
+  emails:
+    "Each email: `to` (whom it went to), `sentAt`, `mailbox` (which of the user's mailboxes sent it), and `clients` (the clients its thread is with, empty for a supplier or a colleague). Only who and when: the content stays in the mailbox. Kept 14 days unless a task follows it.",
+};
+
+/// list_email_waits (27.11.2026, stage 2 of "התיבות שלי").
+export const EMAIL_WAITS_NOTES: FieldNotes = {
+  state: "waiting, or overdue: the reminder time passed with no reply (offer manage_email_wait: send_reminder, postpone or not_waiting).",
+  url: "The task in Ankora. Give it as is.",
+};
+
+/// get_task: what the task, and each step, waits for by email.
+export const GET_TASK_NOTES: FieldNotes = {
+  waitingOnEmail:
+    'An email this task (or step) waits for a reply to: `state` waiting, overdue (its reminder passed with no reply) or replied (someone answered; Ankora lifted the wait itself), `to`, `sentAt`, `remindAt`, `replyFrom` and `replyAt`, and `followedBy` ("you" or a colleague: only whoever sent the email may send a reminder). Change it with manage_email_wait.',
 };

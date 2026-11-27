@@ -2281,3 +2281,16 @@ export async function setStepEvidenceLink(actor: User, stepId: string, link: str
   await prisma.task.update({ where: { id: step.id }, data: { evidenceLink: value } });
   await recordAudit({ actorId: actor.id, action: "task.evidence_link", entityType: "Task", entityId: step.id, clientId: step.clientId, before: { evidenceLink: step.evidenceLink }, after: { evidenceLink: value } });
 }
+
+
+/// Stage 2 of "התיבות שלי" (27.11.2026, Ariel): a reply arrived to the email
+/// a task waited for, so it stops waiting. No person did it, so it is not
+/// updateTask (which needs an actor); it only clears the block, on a task
+/// that is still open, and touches nothing a client sees closed.
+export async function liftBlockOnReply(taskId: string): Promise<boolean> {
+  const { count } = await prisma.task.updateMany({
+    where: { id: taskId, deletedAt: null, blockedOn: { not: null }, status: { notIn: ["DONE", "ARCHIVED"] } },
+    data: { blockedOn: null, blockedReason: null, blockedSince: null },
+  });
+  return count > 0;
+}

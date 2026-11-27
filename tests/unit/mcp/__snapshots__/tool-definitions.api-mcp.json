@@ -858,6 +858,68 @@
     "name": "dismiss_pdf_upload",
     "title": "Dismiss an uploaded agreement PDF"
   },
+  "follow_email_reply": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Makes a task, or a step (its title in `task`), wait for a reply to an email the user sent: it is marked as waiting on `waitingOn`, and when someone other than the sender writes in that thread, Ankora lifts the wait and tells the user. With no reply by `remindAt` (default two working days), the user is reminded. Pass `to`, an address the email went to: the newest email the user sent to it in the last 14 days is followed (list_sent_emails shows them). After an email in a task's work that needs an answer, offer to follow it; if the user asked you to follow such emails, do it without asking.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "client": {
+          "description": "Client name, to disambiguate when several tasks share a title.",
+          "type": "string"
+        },
+        "noReminder": {
+          "description": "true for no reminder at all.",
+          "type": "boolean"
+        },
+        "reason": {
+          "description": "Why it waits, in one sentence.",
+          "maxLength": 500,
+          "type": "string"
+        },
+        "remindAt": {
+          "description": "YYYY-MM-DD (09:00 Israel time), YYYY-MM-DDTHH:MM (Israel time) or an ISO time. In the future.",
+          "maxLength": 40,
+          "type": "string"
+        },
+        "task": {
+          "description": "The task's title, or enough of it to identify it. Not needed when `taskId` is given.",
+          "type": "string"
+        },
+        "taskId": {
+          "description": "The task's exact id, when you have it (an Ankora prompt or an earlier tool result gives it). Preferred over the title: titles can repeat.",
+          "type": "string"
+        },
+        "to": {
+          "description": "An address the email was sent to.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "waitingOn": {
+          "description": "Whom the task waits for.",
+          "enum": [
+            "CLIENT",
+            "SUPPLIER",
+            "INTERNAL",
+            "OTHER"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "to",
+        "waitingOn"
+      ],
+      "type": "object"
+    },
+    "name": "follow_email_reply",
+    "title": "Make a task wait for a reply to an email"
+  },
   "get_active_timer": {
     "annotations": {
       "destructiveHint": false,
@@ -1410,7 +1472,7 @@
       "openWorldHint": false,
       "readOnlyHint": true
     },
-    "description": "Reads one Ankora task with everything on it: details, owner, supervisor and approval, portal visibility and outcome, what it is waiting on, its steps with their status, recent comments, the time logged against it, and its current work plan. Use it to answer 'where does X stand'. Identify the task by its title. The result includes `url`, the task's address in the Ankora app: quote it exactly when the user wants a link (it needs an Ankora staff sign-in; clients cannot open it).",
+    "description": "Reads one Ankora task with everything on it: details, owner, supervisor and approval, portal visibility and outcome, what it is waiting on, its steps with their status, recent comments, the time logged against it, and its current work plan. Use it to answer 'where does X stand'. Identify the task by its title. The result includes `url`, the task's address in the Ankora app: quote it exactly when the user wants a link (it needs an Ankora staff sign-in; clients cannot open it). Its result explains the fields it carries in `fieldNotes`: read them before answering.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -1991,6 +2053,22 @@
     "name": "list_documents",
     "title": "List documents"
   },
+  "list_email_waits": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The emails the user follows on tasks and is still waiting for a reply to, those past their reminder first. Read-only. Its result explains the fields it carries in `fieldNotes`: read them before answering.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {},
+      "type": "object"
+    },
+    "name": "list_email_waits",
+    "title": "List the email replies you are waiting for"
+  },
   "list_my_agents": {
     "annotations": {
       "destructiveHint": false,
@@ -2122,6 +2200,28 @@
     },
     "name": "list_processes",
     "title": "List a client's processes"
+  },
+  "list_sent_emails": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The emails the user sent in the last 14 days from their mailboxes connected on \"התיבות שלי\", newest first. Call it before follow_email_reply when it is not clear which email the user means. `to` narrows the list to one address. Read-only. Its result explains the fields it carries in `fieldNotes`: read them before answering.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "to": {
+          "description": "Only emails to this address.",
+          "maxLength": 320,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "list_sent_emails",
+    "title": "List the emails you sent from your scanned mailboxes"
   },
   "list_subprocessor_notice_recipients": {
     "annotations": {
@@ -2412,6 +2512,130 @@
     },
     "name": "manage_client_mail_folders",
     "title": "Create, rename or delete folders in a client's mailbox"
+  },
+  "manage_connected_mailbox": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Does on \"התיבות שלי\" what its screens do. connect_link (a new mailbox) and reconnect_link (`mailbox`): a sign-in link to give the user as is; they open it in a browser and sign in on Google's or Microsoft's own screen, within 30 minutes. set_kind: whose mailbox it is, `kind` ANKORA or CLIENT with `client`. suggest_senders: the outside senders of the last 30 days, to ask the user which must not be read. do_not_read: an address or a domain (`value`) not to read. start_scan: turns scanning on; only after the user confirmed what not to read. Managers only: decide_do_not_read (`value`, `approve`), revoke_do_not_read (`value`), set_extraction (`allowed`), change_owner (`person`, the new owner's email). list_connected_mailboxes shows each mailbox and its list.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "action": {
+          "enum": [
+            "connect_link",
+            "reconnect_link",
+            "set_kind",
+            "suggest_senders",
+            "do_not_read",
+            "start_scan",
+            "decide_do_not_read",
+            "revoke_do_not_read",
+            "set_extraction",
+            "change_owner"
+          ],
+          "type": "string"
+        },
+        "allowed": {
+          "type": "boolean"
+        },
+        "approve": {
+          "type": "boolean"
+        },
+        "client": {
+          "description": "For set_kind CLIENT: the client's name, as the user said it.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "ANKORA",
+            "CLIENT"
+          ],
+          "type": "string"
+        },
+        "label": {
+          "description": "For do_not_read: who it is, so a manager knows.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "mailbox": {
+          "description": "The mailbox's address. May be left out when the user has one mailbox.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "person": {
+          "description": "For change_owner: the new owner's email.",
+          "maxLength": 320,
+          "type": "string"
+        },
+        "value": {
+          "description": "An address (name@example.com) or a domain (example.com).",
+          "maxLength": 320,
+          "type": "string"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "type": "object"
+    },
+    "name": "manage_connected_mailbox",
+    "title": "Connect and set up a mailbox for scanning"
+  },
+  "manage_email_wait": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "On a task (or step) that waits for an email reply (get_task shows it in `waitingOnEmail`): stop_following (it keeps waiting, the email is no longer followed), not_waiting (stops following and lifts the wait), postpone (a new reminder at `remindAt`), send_reminder (sends `text` as a reply in the same thread, from the same mailbox, to whom the email went; only on the user's explicit request after they saw the text; the next reminder is `remindAt`, or two working days).",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "action": {
+          "enum": [
+            "stop_following",
+            "not_waiting",
+            "postpone",
+            "send_reminder"
+          ],
+          "type": "string"
+        },
+        "client": {
+          "description": "Client name, to disambiguate when several tasks share a title.",
+          "type": "string"
+        },
+        "remindAt": {
+          "description": "YYYY-MM-DD (09:00 Israel time), YYYY-MM-DDTHH:MM (Israel time) or an ISO time. In the future.",
+          "maxLength": 40,
+          "type": "string"
+        },
+        "task": {
+          "description": "The task's title, or enough of it to identify it. Not needed when `taskId` is given.",
+          "type": "string"
+        },
+        "taskId": {
+          "description": "The task's exact id, when you have it (an Ankora prompt or an earlier tool result gives it). Preferred over the title: titles can repeat.",
+          "type": "string"
+        },
+        "text": {
+          "description": "For send_reminder: the reminder's text.",
+          "maxLength": 5000,
+          "type": "string"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "type": "object"
+    },
+    "name": "manage_email_wait",
+    "title": "Change or end a task's wait for an email reply"
   },
   "mark_process_reviewed": {
     "annotations": {
