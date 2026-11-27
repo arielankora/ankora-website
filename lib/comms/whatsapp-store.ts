@@ -261,6 +261,11 @@ export async function copyVoiceToDrive(channel: CommsChannel, chatId: string, me
   const folder = driveFolder();
   const unipile = unipileFor(channel);
   if (!folder || !unipile) return;
+  // 27.11.2026: a copy that fails, or takes long, says so in the log (ids,
+  // sizes and seconds only), so a voice message missing from Drive can be
+  // traced, and a slow night explained.
+  const started = Date.now();
+  const seconds = () => Math.round((Date.now() - started) / 100) / 10;
   try {
     const audio = await fetchVoiceNote(unipile, chatId, messageId);
     if (!audio) return;
@@ -272,11 +277,16 @@ export async function copyVoiceToDrive(channel: CommsChannel, chatId: string, me
     });
     if (upload.ok && upload.fileId) {
       await prisma.commsAttachment.update({ where: { id: attachmentId }, data: { driveFileId: upload.fileId } });
+      if (seconds() > 20) console.log("voice-copy: slow", { attachmentId, bytes: audio.bytes.byteLength, seconds: seconds() });
+    } else {
+      console.warn("voice-copy: Drive upload failed", { attachmentId, bytes: audio.bytes.byteLength, seconds: seconds() });
     }
   } catch (err) {
-    // The audio stays reachable through Unipile; the copy is retried by
-    // nothing, and the player falls back to Unipile.
+    // The audio stays reachable through Unipile; the nightly run tries the
+    // copy again (lib/comms/maintenance.ts), and the player falls back to
+    // Unipile.
     if (!(err instanceof UnipileError)) throw err;
+    console.warn("voice-copy: Unipile refused", { attachmentId, status: err.status, seconds: seconds() });
   }
 }
 
@@ -531,9 +541,19 @@ export async function backfillChannel(
       if (err instanceof UnipileError && err.status === 429) return { ...result, stoppedBy: "quota" as const };
       throw err;
     }
+    // 27.11.2026: the budget is checked between messages too. One chat of
+    // 90 messages, voice messages copied to Drive as it went, kept this step
+    // at 205 seconds against a 10-second share. A chat cut short is not
+    // marked loaded; the next night lists it again and skips what is stored.
+    let cut = false;
     for (const m of messages) {
+      if (now() - start > options.budgetMs) {
+        cut = true;
+        break;
+      }
       if ((await storeMessage(channel, chat.id, m, { knownChat: chat, transcribe: options.transcribe })) === "stored") result.messages += 1;
     }
+    if (cut) return { ...result, stoppedBy: "budget" as const };
     await prisma.commsConversation.updateMany({
       where: { channelId: channel.id, externalChatId: chat.id },
       data: { backfilledAt: new Date() },

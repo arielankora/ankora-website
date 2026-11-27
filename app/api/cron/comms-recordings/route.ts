@@ -16,7 +16,13 @@ import { prisma } from "@/lib/prisma";
 // 2.11.2026: the steps share one deadline (lib/comms/cron-budget.ts), and
 // the run writes a one-line summary to the log (counts and seconds per
 // step, no names or numbers), so the morning check can read what it did.
-export const maxDuration = 300;
+//
+// 27.11.2026: 800 seconds (Vercel Pro's ceiling), and the stored audio is
+// transcribed and copied before the WhatsApp history is loaded, so a heavy
+// history no longer leaves them no time (lib/comms/cron-budget.ts). A
+// literal, as Next reads it; tests/unit/comms-cron-budget.test.ts checks it
+// matches COMMS_CRON_MAX_DURATION_S.
+export const maxDuration = 800;
 
 export async function GET(request: Request) {
   const authorized = authorizeCronRequest(request);
@@ -38,8 +44,11 @@ export async function GET(request: Request) {
   try {
     const reconcile = await timed("reconcile", () => reconcileRecordings({ budgetMs: budget(COMMS_CRON_STEPS.reconcile) }));
     const lines = await timed("lines", () => repairCallLines());
+    const transcribe = await timed("transcribe", () => transcribePending({ budgetMs: budget(COMMS_CRON_STEPS.transcribe) }));
+    const driveCopies = await timed("driveCopies", () => completeDriveCopies({ budgetMs: budget(COMMS_CRON_STEPS.driveCopies) }));
     // Stage 3: the WhatsApp history of each stored number, a little each
-    // night until every chat has been read once.
+    // night until every chat has been read once. Its voice messages are
+    // transcribed the next night (the live ones by the webhook).
     // 24.11.2026: one number failing no longer stops the run; it is skipped
     // and the admins get an alert (lib/comms/cron-channels.ts).
     const channels = await prisma.commsChannel.findMany({ where: { storeEnabled: true }, include: { owner: { select: { name: true } } } });
@@ -47,8 +56,6 @@ export async function GET(request: Request) {
     const whatsapp = await timed("whatsapp", () =>
       runPerChannel(channels, (channel) => backfillChannel(channel, { budgetMs: budget(share) }), alertChannelFailure),
     );
-    const transcribe = await timed("transcribe", () => transcribePending({ budgetMs: budget(COMMS_CRON_STEPS.transcribe) }));
-    const driveCopies = await timed("driveCopies", () => completeDriveCopies({ budgetMs: budget(COMMS_CRON_STEPS.driveCopies) }));
     const retention = await timed("retention", async () => ({
       calls: await sweepCallRetention(),
       whatsapp: await sweepWhatsappRetention(),
