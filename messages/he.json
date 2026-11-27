@@ -8433,6 +8433,14 @@
       },
       "teamWhatsapp": "WhatsApp: מספרים וחסימות",
       "teamMail": "דואר: תיבות ו\"לא לקרוא\""
+    },
+    "clientFilter": {
+      "label": "לקוח",
+      "all": "כל השיחות",
+      "clients": "רק לקוחות",
+      "none": "לא משויך",
+      "withChats": "לקוחות עם שיחות",
+      "search": "חיפוש לקוח"
     }
   },
   "portal": {

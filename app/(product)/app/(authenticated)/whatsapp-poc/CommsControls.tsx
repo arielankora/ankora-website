@@ -80,11 +80,11 @@ export function ContactRail(props: { unassigned: boolean; messages: number; chil
 
 /// Remembers the list's last filters (5.11.2026, Ariel): the next visit to
 /// the screen opens with them.
-export function RememberFilters({ filter, team }: { filter: string; team: string }) {
+export function RememberFilters({ filter, team, client }: { filter: string; team: string; client: string }) {
   useEffect(() => {
-    const value = encodeURIComponent(JSON.stringify({ filter, team }));
+    const value = encodeURIComponent(JSON.stringify({ filter, team, client }));
     document.cookie = `comms_filters=${value}; path=/app/whatsapp-poc; max-age=31536000; samesite=lax`;
-  }, [filter, team]);
+  }, [filter, team, client]);
   return null;
 }
 
@@ -228,5 +228,35 @@ export function FilterMenu({ className, children }: { className: string; childre
     <details ref={ref} className={className}>
       {children}
     </details>
+  );
+}
+
+/// The search box at the top of the client menu (27.11.2026): it hides the
+/// clients whose name does not match. Without script every client shows.
+export function MenuSearch({ label }: { label: string }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const run = () => {
+    const input = ref.current;
+    const list = input?.closest("details")?.querySelectorAll<HTMLElement>("[data-menu-name]");
+    const q = (input?.value ?? "").trim().toLowerCase();
+    list?.forEach((li) => {
+      li.hidden = q !== "" && !(li.dataset.menuName ?? "").toLowerCase().includes(q);
+    });
+  };
+  return (
+    <div className="px-2 pb-1 pt-1">
+      <label className="sr-only" htmlFor="client-menu-search">
+        {label}
+      </label>
+      <input
+        ref={ref}
+        id="client-menu-search"
+        type="search"
+        placeholder={label}
+        onInput={run}
+        autoComplete="off"
+        className="min-h-10 w-full rounded-lg border border-app-border-strong px-3 text-sm"
+      />
+    </div>
   );
 }
