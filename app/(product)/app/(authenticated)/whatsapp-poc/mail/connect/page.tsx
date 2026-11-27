@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/app-auth/session";
 import { parsePageNumber } from "@/lib/url-numbers";
+import { cleanDetail } from "@/lib/mail-scan/connect-errors";
 import { Forbidden } from "@/components/app/Forbidden";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { mailScanErrorText } from "../error-text";
@@ -37,7 +38,7 @@ const RESULTS = [
 type Result = (typeof RESULTS)[number];
 const GOOD: Result[] = ["connected", "reused", "reconnected", "kindSaved", "marked", "active"];
 
-export default async function ConnectMailboxPage(props: { searchParams: Promise<{ result?: string; count?: string; err?: string }> }) {
+export default async function ConnectMailboxPage(props: { searchParams: Promise<{ result?: string; count?: string; err?: string; why?: string }> }) {
   const query = await props.searchParams;
   const result = RESULTS.find((r) => r === query.result) ?? null;
   const t = await getTranslations("comms.mail");
@@ -45,6 +46,9 @@ export default async function ConnectMailboxPage(props: { searchParams: Promise<
   const user = await requireUser();
   if (user.role === "CLIENT_USER") return <Forbidden />;
 
+  // What went wrong, from the way back (callback/route.ts), to pass on to
+  // Ariel: Unipile's own words or the check that refused.
+  const failedDetail = cleanDetail(query.why);
   const errorText =
     query.err && /^mailScan\.\w+$/.test(query.err) ? await mailScanErrorText(query.err) : null;
   const mine = await visibleMailboxes(user, { onlyOwn: true });
@@ -209,6 +213,11 @@ export default async function ConnectMailboxPage(props: { searchParams: Promise<
           className={`rounded-lg p-3 text-sm ${GOOD.includes(result) ? "bg-app-success-soft text-app-success" : "bg-app-error-soft text-app-error"}`}
         >
           {t(`result.${result}`, { count: parsePageNumber(query.count, 200) })}
+          {result === "failed" && failedDetail ? (
+            <span className="mt-1 block text-xs">
+              <bdi>{t("result.failedDetail", { detail: failedDetail })}</bdi>
+            </span>
+          ) : null}
         </p>
       ) : null}
       {errorText ? (

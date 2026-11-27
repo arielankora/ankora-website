@@ -127,7 +127,9 @@ describe("connecting a mailbox on \"התיבות שלי\"", () => {
     expect((await completeMailConnect(anna, intentFor(maor), { accountId: "acc_new", errorType: null })).result).toBe("expired");
     expect((await completeMailConnect(anna, intentFor(anna), { accountId: "acc_wa", errorType: null })).result).toBe("wrong-provider");
     expect((await completeMailConnect(anna, intentFor(anna), { accountId: "acc_old", errorType: null })).result).toBe("taken");
-    expect((await completeMailConnect(anna, intentFor(anna), { accountId: null, errorType: "cancelled" })).result).toBe("failed");
+    expect(await completeMailConnect(anna, intentFor(anna), { accountId: null, errorType: "cancelled" })).toMatchObject({ result: "failed", failure: "provider-error" });
+    expect(await completeMailConnect(anna, intentFor(anna), { accountId: null, errorType: null })).toMatchObject({ result: "failed", failure: "no-account" });
+    expect(await completeMailConnect(anna, intentFor(anna), { accountId: "123", errorType: null })).toMatchObject({ result: "failed", failure: "bad-account-id" });
 
     const done = await completeMailConnect(anna, intentFor(anna), { accountId: "acc_new", errorType: null });
     expect(done.result).toBe("connected");

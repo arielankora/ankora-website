@@ -163,6 +163,10 @@ export async function createMailConnectLink(
 
 export type MailConnectResult = "connected" | "reconnected" | "reused" | "expired" | "failed" | "wrong-provider" | "taken";
 
+/// Why the way back did not connect, for the log and the screen. Ariel's
+/// first try (27.11.2026) ended in "failed" with nothing in the logs.
+export type MailConnectFailure = "provider-error" | "no-account" | "bad-account-id" | "no-address" | "reconnect-mismatch" | "not-your-mailbox";
+
 /// Step 1, the way back. The account id in the URL counts only with this
 /// user's signed cookie, and a new mailbox must be a mail account Unipile
 /// linked after the button was pressed.
@@ -170,17 +174,19 @@ export async function completeMailConnect(
   user: Pick<User, "id" | "role" | "name" | "email">,
   intent: MailConnectIntent | null,
   query: { accountId: string | null; errorType: string | null },
-): Promise<{ result: MailConnectResult; channelId: string | null }> {
+): Promise<{ result: MailConnectResult; channelId: string | null; failure?: MailConnectFailure }> {
   if (!intent || intent.userId !== user.id) return { result: "expired", channelId: null };
-  if (query.errorType || !query.accountId || !/^acc_[A-Za-z0-9_-]+$/.test(query.accountId)) return { result: "failed", channelId: null };
+  if (query.errorType) return { result: "failed", channelId: null, failure: "provider-error" };
+  if (!query.accountId) return { result: "failed", channelId: null, failure: "no-account" };
+  if (!/^acc_[A-Za-z0-9_-]+$/.test(query.accountId)) return { result: "failed", channelId: null, failure: "bad-account-id" };
   const accountId = query.accountId;
   const account = await readMailAccount(accountId);
   if (!isMailProvider(account.provider)) return { result: "wrong-provider", channelId: null };
 
   if (intent.channelId) {
     const channel = await prisma.mailChannel.findUnique({ where: { id: intent.channelId } });
-    if (!channel || channel.accountId !== accountId) return { result: "failed", channelId: null };
-    if (channel.ownerUserId !== user.id && !isManager(user)) return { result: "failed", channelId: null };
+    if (!channel || channel.accountId !== accountId) return { result: "failed", channelId: null, failure: "reconnect-mismatch" };
+    if (channel.ownerUserId !== user.id && !isManager(user)) return { result: "failed", channelId: null, failure: "not-your-mailbox" };
     await recordAudit({ actorId: user.id, action: "mail_channel.reconnected", entityType: "MailChannel", entityId: channel.id });
     return { result: "reconnected", channelId: channel.id };
   }
@@ -190,7 +196,7 @@ export async function completeMailConnect(
   if (!account.createdAt || Date.parse(account.createdAt) < intent.issuedAt - 5 * 60_000) return { result: "taken", channelId: null };
 
   const address = (account.name ?? "").trim().toLowerCase();
-  if (!address) return { result: "failed", channelId: null };
+  if (!address) return { result: "failed", channelId: null, failure: "no-address" };
 
   // The same mailbox under another account: one connection is enough, and
   // the new account would only be billed. It is removed at Unipile.
