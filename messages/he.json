@@ -8405,7 +8405,8 @@
           "badTarget": "זו לא כתובת מייל ולא דומיין. למשל name@example.com או example.com.",
           "noneMarked": "לא סומן כלום."
         }
-      }
+      },
+      "working": "רגע, זה בעבודה"
     }
   },
   "portal": {

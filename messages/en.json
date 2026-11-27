@@ -8405,7 +8405,8 @@
           "badTarget": "That is neither an email address nor a domain. For example name@example.com or example.com.",
           "noneMarked": "Nothing was marked."
         }
-      }
+      },
+      "working": "One moment, working on it"
     }
   },
   "portal": {
