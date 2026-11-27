@@ -78,7 +78,7 @@ export async function transcribeHebrew(
     parts = await splitAudio(audio);
   } catch (err) {
     const why = err instanceof AudioSplitError ? err.message : String(err);
-    console.error("transcribe: split failed", { bytes: audio.bytes.byteLength, contentType: audio.contentType, why });
+    console.warn("transcribe: split failed", { bytes: audio.bytes.byteLength, contentType: audio.contentType, why });
     throw new TranscriptionError(`לא הצלחנו לחלק את ההקלטה הארוכה למקטעים (${why}).`, null, "comms.transcription.splitFailed");
   }
   console.log("transcribe: split", { bytes: audio.bytes.byteLength, contentType: audio.contentType, parts: parts.length });
@@ -122,7 +122,7 @@ async function transcribeOne(apiKey: string, audio: { bytes: ArrayBuffer; conten
       });
     } catch (err) {
       const timedOut = err instanceof Error && err.name === "TimeoutError";
-      console.error("transcribe: no answer", { ...meta, timedOut, seconds: secondsSince(started) });
+      console.warn("transcribe: no answer", { ...meta, timedOut, seconds: secondsSince(started) });
       throw new TranscriptionError(timedOut ? `OpenAI לא ענה תוך ${TIMEOUT_MS / 1000} שניות (${model}).` : `OpenAI לא ענה (${model}).`, null, "comms.transcription.noAnswer");
     }
     if (response.ok) {
@@ -133,7 +133,7 @@ async function transcribeOne(apiKey: string, audio: { bytes: ArrayBuffer; conten
     lastStatus = response.status;
     const error = await readOpenAiError(response);
     refused.push(describeRefusal(model, response.status, error));
-    console.error("transcribe: refused", { ...meta, status: response.status, ...error, seconds: secondsSince(started) });
+    console.warn("transcribe: refused", { ...meta, status: response.status, ...error, seconds: secondsSince(started) });
     // Only an unknown or refused model moves on to the next one. A spending
     // cap, a bad key or an overload is the same for every model.
     if (response.status !== 400 && response.status !== 404) break;

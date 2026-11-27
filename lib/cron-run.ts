@@ -33,6 +33,11 @@ export async function runCron(
 ): Promise<NextResponse> {
   const authorized = authorizeCronRequest(request);
   if (!authorized.ok) {
+    // A 500 is the deployment's own fault (no CRON_SECRET): every job answers
+    // it every night. A 401 is a stranger at the door, not ours to report.
+    if (authorized.status === 500) {
+      await reportIssue({ area: "cron", key: "cron-secret-missing", title: `CRON_SECRET חסר: משימת הלילה ${job} לא רצה`, severity: "CRITICAL" });
+    }
     return NextResponse.json({ error: authorized.error }, { status: authorized.status });
   }
   const { response } = await runCronJob(job, body);

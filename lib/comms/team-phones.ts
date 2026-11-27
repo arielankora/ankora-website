@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/contact-normalize";
 import { readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { readAccount } from "./self-connect";
+import { reportIssue } from "@/lib/system-issues";
 
 // The team's own numbers (24.11.2026, Ariel): a conversation between two of
 // them is seen only by the two people in it, not by the full viewers, the
@@ -32,7 +33,8 @@ export const teamPhones = cache(async (): Promise<Set<string>> => {
         phone = e164((await readAccount(ch.accountId)).userId);
         if (phone) await prisma.commsChannel.update({ where: { id: ch.id }, data: { phone } });
       } catch (err) {
-        console.error("team-phones: could not read a number's phone", { channelId: ch.id }, err);
+        // A number not known as ours: its calls with the team look like client calls.
+        await reportIssue({ area: "comms", key: `team-phone:${ch.id}`, title: "לא הצלחנו לקרוא את מספר הטלפון של ערוץ WhatsApp מ-Unipile", error: err, severity: "WARNING" });
       }
     }
     if (phone) phones.add(phone);

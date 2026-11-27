@@ -2,6 +2,7 @@ import "server-only";
 import crypto from "node:crypto";
 import type { MailChannel, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { reportIssue } from "@/lib/system-issues";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { DomainError } from "@/lib/domain-error";
@@ -235,7 +236,8 @@ export async function completeMailConnect(
   try {
     await addAccountToWebhook(channel.accountId);
   } catch (err) {
-    console.error("mail-scan: could not add the account to the webhook", { channelId: channel.id }, err);
+    // The admins hear of it below, in words; the log keeps the error.
+    console.warn("mail-scan: could not add the account to the webhook", { channelId: channel.id }, err);
     await alertAdmins({
       type: "webhook_account_failed",
       subjectId: channel.id,
@@ -253,7 +255,8 @@ async function dropAccount(accountId: string) {
   try {
     await removeMailAccount(accountId);
   } catch (err) {
-    console.error("mail-scan: could not remove a duplicate Unipile account", err);
+    // A second Unipile account for the same mailbox stays connected (and billed).
+    await reportIssue({ area: "comms", key: `duplicate-mail-account:${accountId}`, title: "לא הצלחנו להסיר חשבון Unipile כפול של תיבת דואר", error: err, severity: "WARNING" });
   }
 }
 

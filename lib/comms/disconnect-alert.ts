@@ -49,6 +49,7 @@ export async function alertChannelDisconnected(
   const to = channel.owner.email ? [channel.owner.email] : disconnectCc(null);
   const cc = channel.owner.email ? disconnectCc(channel.owner.email) : [];
   const sent = await sendEmail({ to, cc, subject: `Ankora - ${title}`, text: body });
-  if (!sent.ok) console.error("comms: the disconnect email was not sent", { channelId: channel.id, error: sent.error });
+  // A failed send is a system issue, reported by sendEmail itself.
+  void sent;
   return "sent";
 }
