@@ -7992,7 +7992,14 @@
       "add": "Add",
       "groupNone": "Not assigned to a client",
       "save": "Save",
-      "saved": "Saved."
+      "saved": "Saved.",
+      "suggestionNewNamed": "This looks like {name} from {client}: a proposal for a new contact is waiting for approval.",
+      "suggestionNew": "This number is in a proposal for a new contact at {client}, waiting for approval.",
+      "suggestionAddedNamed": "This looks like {name} from {client}: a proposal to add this number to them is waiting for approval.",
+      "suggestionAdded": "A proposal to add this number to a contact at {client} is waiting for approval.",
+      "suggestionApprove": "Approve and assign",
+      "suggestionReview": "Open the proposal",
+      "suggestionDone": "Approved. The conversation is assigned to {client}."
     },
     "select": {
       "barAria": "Marked messages",

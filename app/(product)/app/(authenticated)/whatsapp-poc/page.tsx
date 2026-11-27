@@ -74,7 +74,9 @@ import {
   type PocQuote,
 } from "@/lib/whatsapp-poc/unipile";
 import { SendForm } from "./SendForm";
-import { AddNumberForm, AssignToClientForm, GroupClientForm } from "./ContactForms";
+import { AddNumberForm, AssignToClientForm, GroupClientForm, NumberSuggestionForm } from "./ContactForms";
+import { pendingContactsForPhone } from "@/lib/comms/number-suggestions";
+import { proposalUrl } from "@/lib/approval-links";
 import { TaskFromConversation } from "./TaskFromConversation";
 import { HideWhileSelecting, MessageSelectionProvider, SelectModeButton, SelectToggle } from "./MessageSelection";
 import { contentFileLabel, contentText, proposeSelectedTitle, type SelectedMessage } from "@/lib/whatsapp-poc/selected-messages";
@@ -1047,6 +1049,11 @@ export default async function CommunicationsPage(props: {
 
   const accessible = isOpen || filter === "call" ? await listAccessibleClients(user) : [];
   const clientOptions = accessible.map((c) => ({ id: c.id, name: c.name }));
+  // "נראה שזה..." (27.11.2026): a number in no file may wait in a proposal.
+  const numberSuggestions =
+    isOpen && selectedPhone && isPlausiblePhone(selectedPhone) && !(owner && owner.contacts.length > 0)
+      ? await pendingContactsForPhone(user, selectedPhone)
+      : [];
   const since30 = new Date(now.getTime() - 30 * DAY_MS);
   const proposal = proposeTask({
     name: contactName,
@@ -1738,6 +1745,17 @@ export default async function CommunicationsPage(props: {
                   ) : !isPlausiblePhone(selectedPhone) ? (
                     <p className="text-xs text-app-text-secondary">{t("rail.whatsappId")}</p>
                   ) : (
+                    <>
+                    {numberSuggestions.map((sg) => (
+                      <NumberSuggestionForm
+                        key={`suggest-${sg.proposalId}`}
+                        proposalId={sg.proposalId}
+                        clientName={sg.clientName}
+                        name={sg.name}
+                        added={sg.action === "SUPERSEDE"}
+                        reviewUrl={proposalUrl("", sg.clientId, sg.proposalId)}
+                      />
+                    ))}
                     <AssignToClientForm
                       key={`assign-${openKey}`}
                       phone={selectedPhone}
@@ -1745,6 +1763,7 @@ export default async function CommunicationsPage(props: {
                       clients={clientOptions}
                       defaultOpen={searchParams.assign === "1"}
                     />
+                    </>
                   )}
                 </section>
               ) : null}

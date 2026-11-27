@@ -3,6 +3,7 @@ import { useActionState, useRef, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import {
   addNumberToContactAction,
+  approveNumberSuggestionAction,
   assignGroupToClientAction,
   assignNumberToClientAction,
   listClientPeopleForAssignAction,
@@ -202,6 +203,37 @@ export function GroupClientForm(props: { channelId: string; chatId: string; curr
       ) : state?.ok ? (
         <p role="status" className="text-sm text-app-success">
           {t("saved")}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
+/// "נראה שזה..." (27.11.2026): the open chat's number waits in a proposal
+/// for a client's file. One press approves it, and the chat is assigned.
+export function NumberSuggestionForm(props: { proposalId: string; clientName: string; name: string | null; added: boolean; reviewUrl: string }) {
+  const t = useTranslations("comms.forms");
+  const [state, action, pending] = useActionState<ContactState | undefined, FormData>(approveNumberSuggestionAction, undefined);
+  if (state?.ok) return <p className="text-sm text-app-success">{t("suggestionDone", { client: props.clientName })}</p>;
+  return (
+    <form action={action} className="space-y-2 rounded-lg border border-app-accent bg-app-accent-soft p-3">
+      <input type="hidden" name="proposalId" value={props.proposalId} />
+      <p className="text-sm text-app-text-primary">
+        {props.name
+          ? t(props.added ? "suggestionAddedNamed" : "suggestionNewNamed", { name: props.name, client: props.clientName })
+          : t(props.added ? "suggestionAdded" : "suggestionNew", { client: props.clientName })}
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="submit" disabled={pending} aria-busy={pending} className="min-h-11 rounded-lg bg-navy px-4 text-sm font-medium text-white disabled:opacity-60">
+          {pending ? t("saving") : t("suggestionApprove")}
+        </button>
+        <a href={props.reviewUrl} className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
+          {t("suggestionReview")}
+        </a>
+      </div>
+      {state?.error ? (
+        <p role="alert" className="text-sm text-app-error">
+          {state.error}
         </p>
       ) : null}
     </form>
