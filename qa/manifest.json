@@ -2527,6 +2527,22 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-27",
       "riskReason": "The failures the system recorded and the nightly runs, for SUPER_ADMIN and ANKORA_ADMIN (system_issue.manage). Shows error text, never message bodies or secrets."
+    },
+    "api:/api/cron/system-health": {
+      "kind": "api",
+      "area": "cron",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-27",
+      "riskReason": "Silent failures plan stages 2 and 3 (27.11.2026): the morning checks of what should have happened (nightly runs, WhatsApp numbers, transcripts, reports, leads), written as system issues, then the morning report emailed to the admins. Behind CRON_SECRET through runCron; reads, and writes only system_issues and cron_runs. Tested in tests/integration/system-health.test.ts."
+    },
+    "cron:/api/cron/system-health": {
+      "kind": "cron",
+      "area": "cron",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-27",
+      "riskReason": "Silent failures plan stages 2 and 3 (27.11.2026): the morning checks of what should have happened (nightly runs, WhatsApp numbers, transcripts, reports, leads), written as system issues, then the morning report emailed to the admins. Behind CRON_SECRET through runCron; reads, and writes only system_issues and cron_runs. Tested in tests/integration/system-health.test.ts."
     }
   },
   "waivers": {},
