@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { updatePortalDigest, updatePortalPreferences } from "@/lib/app-domain/client-file";
 import type { PortalDigest } from "@prisma/client";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 type FormState = { error?: string; ok?: boolean };
 
@@ -15,8 +16,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("preferencesAdminOnly");
   const text = await domainErrorText(err);
   if (text) return text;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "portal/file");
 }
 
 // Portal phase 3. The client's two writes on their own file, and both go

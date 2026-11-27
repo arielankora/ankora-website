@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { sendEmail } from "@/lib/email";
+import { reportIssue } from "@/lib/system-issues";
 import { DomainError } from "@/lib/domain-error";
 import { getCurrentHourBank } from "@/lib/app-domain/hour-banks";
 import { rebuildReportRunEmail } from "@/lib/app-domain/report-schedules";
@@ -650,6 +651,18 @@ async function resendDelivery(delivery: EmailDelivery, content: { subject: strin
   return { ok: result.ok, updated };
 }
 
+/// The last try of an email failed: it will not be sent again by itself.
+/// Before 27.11.2026 the row stayed FAILED and nobody was told.
+async function reportGaveUp(delivery: EmailDelivery) {
+  await reportIssue({
+    area: "email",
+    key: `gave-up:${delivery.template}`,
+    title: `מייל (${delivery.template}) לא נשלח אחרי ${MAX_EMAIL_ATTEMPTS} ניסיונות ולא יישלח יותר`,
+    detail: `${delivery.recipients.length} נמענים. ${delivery.error ?? ""}`.slice(0, 400),
+    severity: "CRITICAL",
+  });
+}
+
 /// Retries every FAILED EmailDelivery under the attempt cap. Coarser than
 /// spec 9.2's "exponential backoff" ideal - see ADR 11.3 - but this is the
 /// only retry mechanism available without a job queue or sub-daily
@@ -663,11 +676,24 @@ export async function retryFailedEmailDeliveries(): Promise<{ retried: number; n
   let retried = 0;
   let nowSent = 0;
   for (const delivery of failed) {
-    const content = await retryContent(delivery);
-    if (!content) continue;
-    retried += 1;
-    const { ok } = await resendDelivery(delivery, content);
-    if (ok) nowSent += 1;
+    // One row that throws no longer stops the retries of the rest
+    // (27.11.2026, silent failures audit).
+    try {
+      const content = await retryContent(delivery);
+      if (!content) continue;
+      retried += 1;
+      const { ok, updated } = await resendDelivery(delivery, content);
+      if (ok) nowSent += 1;
+      else if (updated.attempts >= MAX_EMAIL_ATTEMPTS) await reportGaveUp(updated);
+    } catch (err) {
+      await reportIssue({
+        area: "email",
+        key: `retry-threw:${delivery.template}`,
+        title: `ניסיון חוזר של מייל (${delivery.template}) נכשל בשגיאה`,
+        error: err,
+        severity: "CRITICAL",
+      });
+    }
   }
 
   return { retried, nowSent };

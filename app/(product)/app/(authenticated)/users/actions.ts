@@ -27,6 +27,7 @@ import { setUserCanApproveExceptions } from "@/lib/app-domain/rule-approvals";
 import { setCommsAccess } from "@/lib/app-domain/comms-access";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import type { UserRole, UserStatus, ClientUserRole } from "@prisma/client";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 // `ok` is what tells useActionForm the write landed, and it is the reason
 // this state carries a flag that looks redundant beside `inviteLink`.
@@ -56,8 +57,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("forbidden");
   const domain = await domainErrorText(err);
   if (domain) return domain;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "users");
 }
 
 export async function inviteUserAction(_prev: InviteState | undefined, formData: FormData): Promise<InviteState> {

@@ -9,6 +9,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
 import { isProductionBuild } from "@/lib/env";
+import { unexpectedActionError } from "@/lib/action-errors";
 import {
   updatePortalScheduleRecipients,
   PORTAL_CLIENT_COOKIE,
@@ -24,8 +25,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("forbidden");
   const text = await domainErrorText(err);
   if (text) return text;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "portal");
 }
 
 function parseEmailList(value: FormDataEntryValue | null): string[] {

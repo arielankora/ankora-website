@@ -8,6 +8,7 @@ import { approveProposal, approveWithSuggestion, attachProposalToExisting, decid
 import { assignBatch, discardAwaiting } from "@/lib/app-domain/batch-assignment";
 import { liftAutoApplyPause, markAutoReviewed, setAutoApply } from "@/lib/app-domain/auto-apply";
 import type { ProcedureAlongside } from "@/lib/app-domain/processes";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 // Org brain, phase 2: "ממתין לאישור" (spec 5.2). Approve, edit and
 // approve, reject with a reason. Nothing else writes a proposal into a
@@ -59,8 +60,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("forbidden");
   const domain = await domainErrorText(err);
   if (domain) return domain;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "knowledge");
 }
 
 /// A bulk failure as the domain reported it (BulkResult), in the reader's

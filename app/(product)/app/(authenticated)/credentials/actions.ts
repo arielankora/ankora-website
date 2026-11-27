@@ -1,4 +1,5 @@
 "use server";
+import { unexpectedActionError } from "@/lib/action-errors";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
@@ -33,7 +34,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof VaultKeyMismatchError) return t("vaultKeyMismatch");
   if (err instanceof VaultUnavailableError) return err.message === VAULT_UNSET ? t("vaultUnavailable") : err.message;
   if (err instanceof Error && /[֐-׿]/.test(err.message)) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "credentials");
 }
 
 function str(formData: FormData, key: string): string | undefined {

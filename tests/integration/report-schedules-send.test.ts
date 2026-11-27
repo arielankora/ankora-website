@@ -107,7 +107,7 @@ describe("reconcileScheduledReports() - each client's email carries only that cl
     await twoClientsWithHours();
 
     const result = await reconcileScheduledReports(CRON_NOW);
-    expect(result).toEqual({ checked: 2, sent: 2, skipped: 0 });
+    expect(result).toEqual({ checked: 2, sent: 2, skipped: 0, failed: 0 });
 
     const emails = sentEmails();
     expect(emails).toHaveLength(2);
@@ -125,6 +125,25 @@ describe("reconcileScheduledReports() - each client's email carries only that cl
     expect(toBeta.text).toContain("beta-secret-project: 120 דקות");
     expect(toBeta.text).not.toContain("alpha");
     expect(toBeta.subject).not.toContain("Client Alpha");
+  });
+
+  // Found 27.11.2026 (silent failures audit). Was: no try per schedule, so
+  // one schedule that threw cancelled the rest of the day's reports, which
+  // are due on that day only, with one line in the log.
+  it("sends the other schedules when one throws, and reports the one that failed", async () => {
+    const { scheduleA, scheduleB } = await twoClientsWithHours();
+    // The first send throws (not a failed result: an exception).
+    vi.mocked(sendEmail).mockRejectedValueOnce(new Error("socket hang up"));
+
+    const result = await reconcileScheduledReports(CRON_NOW);
+    expect(result).toMatchObject({ checked: 2, failed: 1, sent: 1 });
+    // The two report sends, then the issue's alert to the admin.
+    const toClients = sentEmails().filter((e) => e.to.some((a) => a.endsWith(".example")));
+    expect(toClients).toHaveLength(2);
+    expect(sentEmails().filter((e) => e.reportFailure === false)).toHaveLength(1);
+    const issue = await prisma.systemIssue.findFirstOrThrow({ where: { area: "reports" } });
+    expect([`schedule:${scheduleA.id}`, `schedule:${scheduleB.id}`]).toContain(issue.key);
+    expect(issue).toMatchObject({ severity: "CRITICAL", status: "OPEN" });
   });
 
   it("reports on the Israeli Sun-Sat week: 00:30 Sunday Israel time is in, 00:30 the following Sunday is out", async () => {

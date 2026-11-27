@@ -1,4 +1,5 @@
 "use server";
+import { unexpectedActionError } from "@/lib/action-errors";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
@@ -36,7 +37,7 @@ async function failure(err: unknown): Promise<SetupResult> {
   if (err instanceof ForbiddenError) return { error: t("forbidden") };
   const domain = await domainErrorText(err);
   if (domain) return { error: domain };
-  return { error: err instanceof Error ? err.message : t("generic") };
+  return { error: await unexpectedActionError(err, t("generic"), "clients/onboarding") };
 }
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();

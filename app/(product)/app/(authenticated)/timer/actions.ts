@@ -21,6 +21,7 @@ import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
 import { stoppedAcrossClosureText } from "../my-time/entry-errors";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { updateTask } from "@/lib/app-domain/tasks";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 /// ADR 0006: in the reader's language. The two refusals every time-entry
 /// write shares are worded once, under timeEntries.errors.
@@ -34,8 +35,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return shared("forbidden");
   const text = await domainErrorText(err);
   if (text) return text;
-  if (err instanceof Error) return err.message;
-  return shared("generic");
+  return unexpectedActionError(err, shared("generic"), "timer");
 }
 
 export async function startTimerAction(input: {
