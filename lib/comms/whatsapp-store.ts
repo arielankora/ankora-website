@@ -17,7 +17,7 @@ import {
   type PocReaction,
   isHiddenChat,
   listMessages,
-  loadMergedChats,
+  loadBackfillChats,
   toPocMessage,
   type PocChat,
   type PocMessage,
@@ -258,6 +258,12 @@ function quoteColumns(m: PocMessage) {
   };
 }
 
+/// A voice message whose audio Unipile answers 404 for: shown as no longer
+/// available, and left out of the nightly copy (lib/comms/maintenance.ts).
+export async function markVoiceGone(attachmentId: string) {
+  await prisma.commsAttachment.update({ where: { id: attachmentId }, data: { unavailable: true } });
+}
+
 export async function copyVoiceToDrive(channel: CommsChannel, chatId: string, messageId: string, attachmentId: string) {
   const folder = driveFolder();
   const unipile = unipileFor(channel);
@@ -288,6 +294,11 @@ export async function copyVoiceToDrive(channel: CommsChannel, chatId: string, me
     // Unipile.
     if (!(err instanceof UnipileError)) throw err;
     console.warn("voice-copy: Unipile refused", { attachmentId, status: err.status, seconds: seconds() });
+    // 27.11.2026: a 404 is a voice message Unipile no longer has (ten from
+    // September and October, loaded with the history). Tried again every
+    // night, they took 92 seconds of the run, and the transcription another
+    // 30 seconds each. Marked gone, as Unipile marks one WhatsApp lost.
+    if (err.status === 404) await markVoiceGone(attachmentId);
   }
 }
 
@@ -528,7 +539,7 @@ export async function backfillChannel(
 
   let chats: PocChat[];
   try {
-    chats = (await loadMergedChats(unipile)).chats;
+    chats = await loadBackfillChats(unipile);
   } catch (err) {
     if (err instanceof UnipileError && err.status === 429) return { ...result, stoppedBy: "quota" as const };
     throw err;
@@ -542,16 +553,18 @@ export async function backfillChannel(
       })
     ).map((c) => c.externalChatId),
   );
+  // 27.11.2026: the counts cover the whole list before any chat is read.
+  // Counted as the loop went, a run stopped by its budget reported only the
+  // chats it reached (Ariel's number: 2 loaded before, of 98 listed, when 43
+  // of its newest 100 were already loaded).
   result.listed = chats.length;
+  const pending: PocChat[] = [];
   for (const chat of chats) {
-    if (done.has(chat.id)) {
-      result.loadedBefore += 1;
-      continue;
-    }
-    if (blockStateFor(blocks, { phone: chatPhone(chat), chatId: chat.id }) === "blocked") {
-      result.blocked += 1;
-      continue;
-    }
+    if (done.has(chat.id)) result.loadedBefore += 1;
+    else if (blockStateFor(blocks, { phone: chatPhone(chat), chatId: chat.id }) === "blocked") result.blocked += 1;
+    else pending.push(chat);
+  }
+  for (const chat of pending) {
     if (now() - start > options.budgetMs) return { ...result, stoppedBy: "budget" as const };
     let messages: PocMessage[];
     try {

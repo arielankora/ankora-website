@@ -213,7 +213,7 @@ export type ClientConversationPage = {
       kind: string;
       voiceTranscript: string | null;
       fileName: string | null;
-      voiceTranscriptState?: "waiting" | "failed" | "not made (בלי AI)";
+      voiceTranscriptState?: "waiting" | "failed" | "audio gone" | "not made (בלי AI)";
       voiceTranscriptError?: string;
     }>;
   }>;
@@ -244,7 +244,7 @@ export async function readClientConversation(
     orderBy: { at: "desc" },
     take: opts.limit + 1,
     include: {
-      attachments: { select: { type: true, voiceNote: true, fileName: true, transcript: { select: { status: true, text: true, attempts: true, lastError: true } } } },
+      attachments: { select: { type: true, voiceNote: true, fileName: true, unavailable: true, transcript: { select: { status: true, text: true, attempts: true, lastError: true } } } },
     },
   });
   const hasEarlier = rows.length > opts.limit;
@@ -285,7 +285,7 @@ export async function readClientConversation(
         kind: a.voiceNote ? "voice" : a.type,
         voiceTranscript: a.voiceNote && a.transcript?.status === "DONE" ? a.transcript.text : null,
         fileName: a.fileName,
-        ...voiceTranscriptState(a.voiceNote ? a.transcript : null),
+        ...voiceTranscriptState(a.voiceNote ? a.transcript : null, a.unavailable),
       })),
     })),
     hasEarlier,
@@ -293,11 +293,15 @@ export async function readClientConversation(
 }
 
 /// Why a voice message has no transcript yet, for Claude (26.11.2026).
+/// 27.11.2026: "audio gone" when Unipile no longer has the audio (a 404),
+/// so Claude does not suggest trying again: nobody can.
 function voiceTranscriptState(
   tr: { status: string; attempts: number; lastError: string | null } | null,
-): { voiceTranscriptState?: "waiting" | "failed" | "not made (בלי AI)"; voiceTranscriptError?: string } {
+  audioGone = false,
+): { voiceTranscriptState?: "waiting" | "failed" | "audio gone" | "not made (בלי AI)"; voiceTranscriptError?: string } {
   if (!tr || tr.status === "DONE") return {};
   if (tr.status === "SKIPPED") return { voiceTranscriptState: "not made (בלי AI)" };
+  if (audioGone) return { voiceTranscriptState: "audio gone" };
   const state = tr.status === "FAILED" ? "failed" : "waiting";
   return tr.attempts > 0 && tr.lastError ? { voiceTranscriptState: state, voiceTranscriptError: tr.lastError } : { voiceTranscriptState: state };
 }

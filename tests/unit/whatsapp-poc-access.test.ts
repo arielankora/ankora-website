@@ -10,7 +10,7 @@ import {
   parseSendMode,
   MAX_MESSAGE_LENGTH,
 } from "@/lib/whatsapp-poc/access";
-import { UnipileError, parseVcard, loadMergedChats, resetChatListCache, CHAT_LIST_FRESH_MS, CHAT_LIST_MAX_AGE_MS, mergeChats, type PocChat, parseOffset, isHiddenChat, toPocChat, toPocMessage, toPocQuote, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
+import { UnipileError, parseVcard, loadMergedChats, loadBackfillChats, BACKFILL_MAX_CHATS, resetChatListCache, CHAT_LIST_FRESH_MS, CHAT_LIST_MAX_AGE_MS, mergeChats, type PocChat, parseOffset, isHiddenChat, toPocChat, toPocMessage, toPocQuote, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
 
 describe("WhatsApp POC: who may see the screen", () => {
   const viewers = parseEmailList("Ariel@Ankora.co.il, hadas@ankora.co.il");
@@ -411,5 +411,23 @@ describe("WhatsApp POC: Unipile's 429", () => {
     const { rateLimitMessage } = await import("@/lib/whatsapp-poc/unipile");
     expect(rateLimitMessage(undefined)).toBe("Unipile מגביל כרגע את קצב הבקשות. נסו שוב בעוד דקה.");
     expect(rateLimitMessage("Too many requests")).toBe("Unipile מגביל כרגע את קצב הבקשות. נסו שוב בעוד דקה.");
+  });
+});
+
+// 27.11.2026: the nightly history load reads up to 300 chats, not the
+// screen's 100, and drops the repeats Unipile's offset pages carry.
+describe("WhatsApp: the chat list for the nightly history load", () => {
+  it("asks for up to 300 chats, read now, and merges the repeats", async () => {
+    resetChatListCache();
+    const asked: number[] = [];
+    const chat = (id: string, at: string): PocChat => ({ id, name: id, type: "1to1", unreadCount: 0, lastMessageAt: at, lastMessagePreview: null, readOnly: false, phone: null } as unknown as PocChat);
+    const fetchAll = async (_c: unknown, maxChats: number) => {
+      asked.push(maxChats);
+      return [chat("a@lid", "2026-11-27T10:00:00Z"), chat("b@lid", "2026-11-26T10:00:00Z"), chat("a@lid", "2026-11-25T10:00:00Z")];
+    };
+    const chats = await loadBackfillChats({ apiKey: "k", accountId: "acc" }, fetchAll);
+    expect(asked).toEqual([BACKFILL_MAX_CHATS]);
+    expect(BACKFILL_MAX_CHATS).toBe(300);
+    expect(chats.map((c) => c.id)).toEqual(["a@lid", "b@lid"]);
   });
 });
