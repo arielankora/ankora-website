@@ -2,6 +2,7 @@ import "server-only";
 import { UnipileError } from "@/lib/whatsapp-poc/unipile";
 import { alertAdmins } from "./admin-alert";
 import { alertChannelDisconnected } from "./disconnect-alert";
+import { reportIssue } from "@/lib/system-issues";
 
 export const CHANNEL_BACKFILL_FAILED_NOTIFICATION_TYPE = "channel_backfill_failed";
 
@@ -21,13 +22,22 @@ export async function runPerChannel<C extends { id: string }, R>(
     try {
       out.push({ channelId: channel.id, failed: false, ...(await run(channel)) });
     } catch (err) {
-      console.error("comms-recordings: WhatsApp backfill failed for a channel", { channelId: channel.id }, err);
+      // onFailure tells the admins, in words.
+      console.warn("comms-recordings: WhatsApp backfill failed for a channel", { channelId: channel.id }, err);
       out.push({ channelId: channel.id, failed: true });
       try {
         await onFailure(channel, err);
       } catch (alertErr) {
-        // The alert itself failing must not stop the run either; the log keeps both.
-        console.error("comms-recordings: could not send the channel failure alert", { channelId: channel.id }, alertErr);
+        // The alert itself failing must not stop the run either; the issue
+        // table needs no email, so this one still reaches the admins.
+        await reportIssue({
+          area: "comms",
+          key: `channel-backfill:${channel.id}`,
+          title: "השמירה הלילית של מספר WhatsApp נכשלה, וההתראה עליה לא נשלחה",
+          error: err,
+          detail: `${err instanceof Error ? err.message : String(err)} | alert: ${alertErr instanceof Error ? alertErr.message : String(alertErr)}`.slice(0, 600),
+          severity: "CRITICAL",
+        });
       }
     }
   }

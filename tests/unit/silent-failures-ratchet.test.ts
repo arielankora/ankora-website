@@ -7,14 +7,13 @@ import { join } from "node:path";
 // is how failures went unseen for weeks. A failure there goes through
 // reportIssue (lib/system-issues.ts) or a nightly step (lib/cron-run.ts).
 //
-// This is a ratchet. The counts below are what is left today; stage 1c of
-// the plan converts them. A new console.error or an empty catch in these
-// folders fails here: report it instead. When you convert one, lower the
-// number, so it cannot come back.
+// Stage 1c of the plan (27.11.2026) converted every one: a fault is a
+// reportIssue, a diagnostic of a step that is retried is a console.warn.
+// A new console.error or an empty catch in these folders fails here.
 const LIMITS: Record<string, { consoleError: number; emptyCatch: number }> = {
-  "lib/comms": { consoleError: 9, emptyCatch: 0 },
-  "lib/whatsapp-poc": { consoleError: 3, emptyCatch: 0 },
-  "lib/mail-scan": { consoleError: 5, emptyCatch: 0 },
+  "lib/comms": { consoleError: 0, emptyCatch: 0 },
+  "lib/whatsapp-poc": { consoleError: 0, emptyCatch: 0 },
+  "lib/mail-scan": { consoleError: 0, emptyCatch: 0 },
   "lib/client-mailbox": { consoleError: 0, emptyCatch: 0 },
   "app/api/cron": { consoleError: 0, emptyCatch: 0 },
   "app/api/webhooks": { consoleError: 0, emptyCatch: 0 },

@@ -100,7 +100,9 @@ describe("call recordings store", () => {
   it("records a refusal in lastError and the log, without the number", async () => {
     recordingFor.set("e1", { from: CALLER, to: LINE, callAt: "2026-11-01T08:00:00.000Z" });
     await storeRecording("e1");
-    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    // A warning since 27.11.2026: one attempt's diagnostics. A transcript
+    // that fails for good is a system issue.
+    const errors = vi.spyOn(console, "warn").mockImplementation(() => {});
     const logs = vi.spyOn(console, "log").mockImplementation(() => {});
     transcribe.mockRejectedValueOnce(new TranscriptionError("OpenAI החזיר שגיאה 400. gpt-transcribe 400 unsupported_parameter language", 400));
 
@@ -115,6 +117,31 @@ describe("call recordings store", () => {
     expect(JSON.stringify([...errors.mock.calls, ...logs.mock.calls])).not.toContain(CALLER);
     errors.mockRestore();
     logs.mockRestore();
+  });
+
+  // Found 27.11.2026 (silent failures audit): the 36 minute voice message of
+  // 26.11 became FAILED after three tries and was never tried again, and
+  // nobody was told. The spending cap left the queue waiting with no end.
+  it("reports a transcript that fails for good, and the spending cap", async () => {
+    recordingFor.set("e1", { from: CALLER, to: LINE, callAt: "2026-11-01T08:00:00.000Z" });
+    await storeRecording("e1");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    transcribe.mockRejectedValue(new TranscriptionError("קובץ השמע לא נמצא.", null, "comms.transcription.audioNotFound"));
+    for (let night = 0; night < 3; night++) await transcribePending({ budgetMs: 60_000 });
+    const tr = await prisma.transcript.findFirstOrThrow();
+    expect(tr.status).toBe("FAILED");
+    const failed = await prisma.systemIssue.findFirstOrThrow({ where: { key: `transcribe:failed:${tr.id}` } });
+    expect(failed).toMatchObject({ severity: "CRITICAL", count: 1 });
+    expect(failed.detail).toContain("קובץ השמע לא נמצא");
+    expect(JSON.stringify(failed)).not.toContain(CALLER);
+
+    recordingFor.set("e2", { from: CALLER, to: LINE, callAt: "2026-11-02T08:00:00.000Z" });
+    await storeRecording("e2");
+    transcribe.mockRejectedValueOnce(new TranscriptionError("cap", 429));
+    expect(await transcribePending({ budgetMs: 60_000 })).toMatchObject({ capped: 1 });
+    expect(await prisma.systemIssue.count({ where: { key: "transcribe:capped", severity: "CRITICAL" } })).toBe(1);
+    vi.restoreAllMocks();
   });
 
   it("never sends the number of a client marked בלי AI", async () => {

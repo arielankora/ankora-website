@@ -16,6 +16,7 @@ import { importManualRecordings } from "@/lib/comms/manual-import";
 import { afterResponse } from "@/lib/after-response";
 import { CHANNEL_PERSON_WHERE, ineligibleChannelPeople, personLabel } from "@/lib/comms/channel-people";
 import { prisma } from "@/lib/prisma";
+import { addToWebhookOrReport } from "@/lib/comms/self-connect";
 
 /// `kept`: the answer to "לשמור" on a new chat, which the row can undo.
 export type SetupState = { error?: string; ok?: string; kept?: boolean };
@@ -72,6 +73,11 @@ export async function connectChannelAction(_prev: SetupState | undefined, formDa
     entityId: channel.id,
     after: { ownerUserId, excludedViewerIds: channel.excludedViewerIds },
   });
+  // 27.11.2026 (silent failures audit): a number a manager connects here was
+  // never added to the webhook's account list (only self-connect did it), so
+  // its messages arrived only through the nightly backfill, which reads each
+  // chat once. Now the same as self-connect; a failure is a system issue.
+  await addToWebhookOrReport(accountId, channel.id);
   refresh();
   return { ok: w("connected") };
 }

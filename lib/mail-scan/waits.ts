@@ -10,6 +10,7 @@ import { getTaskDetail, liftBlockOnReply, updateTask } from "@/lib/app-domain/ta
 import { getEmail, sendEmail as sendMailboxEmail } from "@/lib/client-mailbox/unipile-mail";
 import { prefixedSubject } from "@/lib/client-mailbox/shape";
 import { SENT_KEEP_DAYS, defaultRemindAt, isReply, suggestCandidate, waitState, type WaitState } from "./wait-rules";
+import { reportIssue } from "@/lib/system-issues";
 
 // Stage 2 of "התיבות שלי" (27.11.2026, Ariel): a task, or a step, waits for a
 // reply to an email someone on the team sent. The email is picked from what
@@ -230,9 +231,11 @@ async function tell(userIds: string[], type: string, task: TaskRef, render: (t: 
       const { title, body } = render(t, { link });
       await prisma.notification.create({ data: { userId: u.id, type, title, body, entityType: "Task", entityId: task.parentId ?? task.id } });
       const sent = await sendAppEmail({ to: [u.email], subject: `Ankora - ${title}`, text: body });
-      if (!sent.ok) console.error("mail-waits: email not sent", { type, error: sent.error });
+      // A failed send is a system issue, reported by the email sender itself.
+      void sent;
     } catch (err) {
-      console.error("mail-waits: notification failed", err);
+      // The wait was already claimed, so this reminder is never retried.
+      await reportIssue({ area: "comms", key: `mail-wait-notice:${type}`, title: "תזכורת או הודעה על תשובה למייל לא נמסרה", error: err, severity: "CRITICAL" });
     }
   }
 }

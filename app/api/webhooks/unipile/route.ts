@@ -10,6 +10,7 @@ import { alertChannelDisconnected } from "@/lib/comms/disconnect-alert";
 import { recordMailEvent } from "@/lib/mail-scan/channels";
 import { sweepIfDue } from "@/lib/mail-scan/waits";
 import { alertMailChannelDisconnected } from "@/lib/mail-scan/disconnect";
+import { reportIssue } from "@/lib/system-issues";
 
 // Unipile's webhook (communications storage, 1.11.2026):
 //   - email.new in the aloha@ mailbox from Aloha: a call recording (stage 2);
@@ -21,7 +22,9 @@ import { alertMailChannelDisconnected } from "@/lib/mail-scan/disconnect";
 // The delivery is signed (lib/comms/webhook-signature.ts) and refused
 // without a valid signature. Unipile wants a 2xx within five seconds, so
 // the answer goes out first and the work runs after it; a delivery whose
-// work fails is caught by the nightly reconcile.
+// work fails is a system issue (27.11.2026): CRITICAL, because what failed
+// here is a message, a recording or an email that was not stored, and the
+// nightly reconcile does not bring every one of them back.
 // 26.11.2026: a long voice message is split and transcribed after the
 // answer (afterResponse), which can take minutes; the default would cut it
 // off with no attempt recorded.
@@ -29,7 +32,17 @@ export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const secret = process.env.UNIPILE_WEBHOOK_SECRET?.trim();
-  if (!secret) return NextResponse.json({ error: "Not configured" }, { status: 503 });
+  if (!secret) {
+    // Every live WhatsApp message, recording and scanned email stops here
+    // (27.11.2026, silent failures audit: it used to be a 503 and nothing else).
+    await reportIssue({
+      area: "comms",
+      key: "webhook-secret-missing",
+      title: "UNIPILE_WEBHOOK_SECRET חסר: ה-webhook דוחה כל הודעה, הקלטה ומייל",
+      severity: "CRITICAL",
+    });
+    return NextResponse.json({ error: "Not configured" }, { status: 503 });
+  }
 
   const rawBody = await request.text();
   if (!verifyUnipileSignature({ header: request.headers.get("unipile-signature"), rawBody, secret })) {
@@ -57,21 +70,35 @@ export async function POST(request: Request) {
     email.from?.some((f) => typeof f.email === "string" && f.email.toLowerCase() === RECORDING_SENDER)
   ) {
     const emailId = email.id;
-    await afterResponse("unipile webhook: store recording", async () => {
-      if ((await storeRecording(emailId)) !== "stored") return;
-      const rec = await prisma.callRecording.findUnique({ where: { emailId }, select: { transcript: { select: { id: true, status: true } } } });
-      if (rec?.transcript?.status === "PENDING") await transcribeRecording(rec.transcript.id);
-    });
+    await afterResponse(
+      "unipile webhook: store recording",
+      async () => {
+        if ((await storeRecording(emailId)) !== "stored") return;
+        const rec = await prisma.callRecording.findUnique({ where: { emailId }, select: { transcript: { select: { id: true, status: true } } } });
+        if (rec?.transcript?.status === "PENDING") await transcribeRecording(rec.transcript.id);
+      },
+      { severity: "CRITICAL" },
+    );
   }
 
   // 24.11.2026: a connected number that Unipile disconnected; its owner is
   // told by email, with Ariel and Hadas on copy (lib/comms/disconnect-alert.ts).
-  if (event.type === "account.status.disconnected" && typeof event.account_id === "string") {
+  // 27.11.2026: also the other states in which nothing arrives (Unipile v2:
+  // errored, partial), and an account that is no channel of ours: the Aloha
+  // mailbox (every call recording stops) or a client's mailbox. Those used
+  // to end in silence.
+  const status = typeof event.type === "string" ? /^account\.status\.(disconnected|errored|partial)$/.exec(event.type)?.[1] : undefined;
+  if (status && typeof event.account_id === "string") {
     const accountId = event.account_id;
-    await afterResponse("unipile webhook: account disconnected", async () => {
-      await alertChannelDisconnected(accountId);
-      await alertMailChannelDisconnected(accountId);
-    });
+    await afterResponse(
+      "unipile webhook: account disconnected",
+      async () => {
+        const whatsapp = await alertChannelDisconnected(accountId);
+        const mail = await alertMailChannelDisconnected(accountId);
+        if (whatsapp === "no-channel" && mail === "no-channel") await reportUnknownAccountDown(accountId, status, config.mailAccountId);
+      },
+      { severity: "CRITICAL" },
+    );
   }
 
   // "התיבות שלי" (27.11.2026): a new email in a mailbox an employee
@@ -83,12 +110,16 @@ export async function POST(request: Request) {
     const accountId = event.account_id;
     const emailId = email.id;
     if (accountId !== config.mailAccountId) {
-      await afterResponse("unipile webhook: mailbox scan", async () => {
-        await recordMailEvent(accountId, emailId);
-        // Stage 2: due reminders go out close to their time on a working
-        // day, since the cron on this plan runs once a day.
-        await sweepIfDue();
-      });
+      await afterResponse(
+        "unipile webhook: mailbox scan",
+        async () => {
+          await recordMailEvent(accountId, emailId);
+          // Stage 2: due reminders go out close to their time on a working
+          // day, since the cron on this plan runs once a day.
+          await sweepIfDue();
+        },
+        { severity: "CRITICAL" },
+      );
     }
   }
 
@@ -102,6 +133,8 @@ export async function POST(request: Request) {
     const read = readMessageEvent(event.payload);
     if (read) {
       await afterResponse(`unipile webhook: ${type}`, async () => {
+        // CRITICAL below: a message that failed here is not stored, and the
+        // nightly backfill only reads a chat it has not read before.
         const channel = await prisma.commsChannel.findUnique({ where: { accountId } });
         if (!channel?.storeEnabled) return;
         if (type === "message.delete" && read.messageId) {
@@ -111,8 +144,24 @@ export async function POST(request: Request) {
         } else if (read.message) {
           await storeMessage(channel, read.chatId, read.message, { transcribe: transcribeRecording });
         }
-      });
+      }, { severity: "CRITICAL" });
     }
   }
   return NextResponse.json({ ok: true });
+}
+
+/// A Unipile account went down that is neither a WhatsApp number nor a
+/// scanned mailbox of ours: the Aloha mailbox the call recordings come
+/// from, or a client's own mailbox (ClientConnection UNIPILE_MAIL).
+async function reportUnknownAccountDown(accountId: string, status: string, alohaAccountId: string | null | undefined) {
+  const aloha = alohaAccountId === accountId;
+  await reportIssue({
+    area: "comms",
+    key: `account-down:${accountId}`,
+    title: aloha
+      ? `תיבת ההקלטות של Aloha במצב ${status}: הקלטות שיחה לא נקלטות עד שמחברים אותה מחדש ב-Unipile`
+      : `חשבון Unipile במצב ${status} (כנראה תיבת דואר של לקוח): צריך לחבר אותו מחדש`,
+    detail: `account_id ${accountId}`,
+    severity: "CRITICAL",
+  });
 }

@@ -12,6 +12,7 @@ import { loadCallBlockIndex } from "./call-blocks";
 import { storedCallLine } from "./call-lines";
 import { fetchVoiceNote } from "@/lib/whatsapp-poc/voice-notes";
 import { alertAdmins } from "./admin-alert";
+import { reportIssue } from "@/lib/system-issues";
 
 // Communications storage, stage 2 (1.11.2026, spec "שמירת שיחות, הקלטות
 // ותמלולים", approved by Ariel). The Aloha line's recordings are kept here:
@@ -63,7 +64,8 @@ export const UNRECOGNIZED_RECORDING_NOTIFICATION_TYPE = "unrecognized_recording"
 /// changed its template and the recordings were dropped in silence). One
 /// alert a day for the template, however many calls it drops.
 export async function alertUnrecognizedRecording(emailId: string): Promise<void> {
-  console.error("call-store: Aloha recording email not recognized", { emailId });
+  // The admins hear of it below, in words.
+  console.warn("call-store: Aloha recording email not recognized", { emailId });
   await alertAdmins({
     type: UNRECOGNIZED_RECORDING_NOTIFICATION_TYPE,
     subjectId: "aloha-recording-template",
@@ -106,7 +108,8 @@ export async function storeRecording(emailId: string): Promise<StoreResult> {
       folderId: driveFolder,
     });
     if (upload.ok && upload.fileId) driveFileId = upload.fileId;
-    else console.error("call-store: Drive upload failed", upload.error);
+    // The audio stays in the mailbox; completeDriveCopies copies it later.
+    else console.warn("call-store: Drive upload failed", upload.error);
   }
 
   const skip = await isAiExcludedNumber(side.other);
@@ -191,7 +194,11 @@ export async function transcribeRecording(transcriptId: string): Promise<Transcr
     },
   });
   if (!t || (!t.recording && !t.attachment) || (t.status !== "PENDING" && t.status !== "FAILED")) return "unavailable";
-  if (!process.env.OPENAI_API_KEY?.trim()) return "unavailable";
+  if (!process.env.OPENAI_API_KEY?.trim()) {
+    // Stops the whole queue (27.11.2026: it used to stop it in silence).
+    await reportIssue({ area: "comms", key: "transcribe:no-key", title: "OPENAI_API_KEY חסר: התמלול של שיחות והודעות קוליות עצר", severity: "CRITICAL" });
+    return "unavailable";
+  }
   // Stage 3: a voice message held by a block request waits for the decision.
   // 14.11.2026: "held", not "unavailable", which stopped the whole queue.
   if (t.attachment?.message.held) return "held";
@@ -240,7 +247,9 @@ export async function transcribeRecording(transcriptId: string): Promise<Transcr
     });
     return "done";
   } catch (err) {
-    console.error("transcribe: failed", {
+    // One attempt's diagnostics, for the log. A transcript that will not be
+    // tried again, a rejected key and the spending cap are system issues below.
+    console.warn("transcribe: failed", {
       transcriptId: t.id,
       source,
       durationSec,
@@ -251,6 +260,8 @@ export async function transcribeRecording(transcriptId: string): Promise<Transcr
     });
     if (err instanceof TranscriptionError && err.status === 429) {
       await prisma.transcript.update({ where: { id: t.id }, data: { status: "PENDING", lastError: err.message } });
+      // The queue waits with no end until the cap is raised (27.11.2026).
+      await reportIssue({ area: "comms", key: "transcribe:capped", title: "מכסת התמלול ב-OpenAI נגמרה: התמלול ממתין עד שמגדילים אותה", error: err, severity: "CRITICAL" });
       return "capped";
     }
     if (!(err instanceof TranscriptionError) && !(err instanceof UnipileError)) throw err;
@@ -267,12 +278,27 @@ export async function transcribeRecording(transcriptId: string): Promise<Transcr
       });
       return "failed";
     }
+    if (err instanceof TranscriptionError && err.code === "comms.transcription.keyRejected") {
+      // Every item would burn its attempts on it, three nights to FAILED for good.
+      await reportIssue({ area: "comms", key: "transcribe:key-rejected", title: "OpenAI דחה את מפתח התמלול: כל התמלולים נכשלים", error: err, severity: "CRITICAL" });
+    }
     const attempts = t.attempts + 1;
     const failed = attempts >= TRANSCRIBE_MAX_ATTEMPTS;
     await prisma.transcript.update({
       where: { id: t.id },
       data: { attempts, lastError: err.message, status: failed ? "FAILED" : "PENDING" },
     });
+    if (failed) {
+      // Never tried again (transcribePending reads PENDING only), and before
+      // 27.11.2026 nobody was told: the 36 minute voice message of 26.11.
+      await reportIssue({
+        area: "comms",
+        key: `transcribe:failed:${t.id}`,
+        title: `${source === "voice" ? "הודעה קולית" : "הקלטת שיחה"}${durationSec ? ` של ${Math.round(durationSec / 60)} דקות` : ""} לא תומללה אחרי ${TRANSCRIBE_MAX_ATTEMPTS} ניסיונות`,
+        detail: `transcript ${t.id}: ${err.message}`,
+        severity: "CRITICAL",
+      });
+    }
     return failed ? "failed" : "retry";
   }
 }

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { alertAdmins } from "./admin-alert";
+import { reportIssue } from "@/lib/system-issues";
 
 // An employee connects their own WhatsApp (24.11.2026, Ariel: "two steps,
 // connect and one button"). Until now it took four people-steps: a link made
@@ -169,7 +170,8 @@ export async function completeConnect(
   try {
     await addAccountToWebhook(accountId);
   } catch (err) {
-    console.error("self-connect: could not add the account to the webhook", { channelId: channel.id }, err);
+    // The admins hear of it below, in words; the log keeps the error.
+    console.warn("self-connect: could not add the account to the webhook", { channelId: channel.id }, err);
     await alertAdmins({
       type: "webhook_account_failed",
       subjectId: channel.id,
@@ -204,6 +206,22 @@ export async function addAccountToWebhook(accountId: string): Promise<void> {
   const ids = Array.isArray(endpoint.account_ids) ? endpoint.account_ids.filter((a): a is string => typeof a === "string") : [];
   const next = withAccount(ids, accountId);
   if (next) await unipile(`/webhooks/endpoints/${id}`, { method: "PATCH", body: { account_ids: next } });
+}
+
+/// For a number a manager connects on the setup screen (27.11.2026): add it
+/// to the webhook, and when that fails, a system issue instead of silence.
+export async function addToWebhookOrReport(accountId: string, channelId: string): Promise<void> {
+  try {
+    await addAccountToWebhook(accountId);
+  } catch (err) {
+    await reportIssue({
+      area: "comms",
+      key: `webhook-account:${channelId}`,
+      title: "מספר WhatsApp חובר, אבל לא נוסף ל-webhook ב-Unipile: הודעות ממנו לא ייקלטו בזמן אמת",
+      error: err,
+      severity: "CRITICAL",
+    });
+  }
 }
 
 /// The webhook's new account list, or null when nothing has to change.

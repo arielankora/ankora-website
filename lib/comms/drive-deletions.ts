@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { reportIssue } from "@/lib/system-issues";
 import { removeDriveFile } from "@/lib/google-drive";
 
 /// After this many tries a file stays in drive_file_deletions untried, for
@@ -18,7 +19,8 @@ export const MAX_DRIVE_DELETION_ATTEMPTS = 10;
 export async function removeDriveFileOrQueue(fileId: string, reason: string): Promise<boolean> {
   const removed = await removeDriveFile(fileId);
   if (removed.ok) return true;
-  console.error("drive deletion: Drive refused, queued for retry", { fileId, reason, error: removed.error });
+  // Retried every night (retryDriveFileDeletions); an issue only if it never goes.
+  console.warn("drive deletion: Drive refused, queued for retry", { fileId, reason, error: removed.error });
   await prisma.driveFileDeletion.upsert({
     where: { fileId },
     create: { fileId, reason, lastError: removed.error },
@@ -42,11 +44,20 @@ export async function retryDriveFileDeletions(now = new Date()): Promise<{ remov
       await prisma.driveFileDeletion.delete({ where: { fileId: row.fileId } });
       removed += 1;
     } else {
-      await prisma.driveFileDeletion.update({
+      const updated = await prisma.driveFileDeletion.update({
         where: { fileId: row.fileId },
         data: { lastError: result.error, attemptedAt: now, attempts: { increment: 1 } },
       });
       failed += 1;
+      if (updated.attempts >= MAX_DRIVE_DELETION_ATTEMPTS) {
+        await reportIssue({
+          area: "comms",
+          key: `drive-deletion:${row.fileId}`,
+          title: `קובץ שמע שצריך היה להימחק (${row.reason}) נשאר ב-Drive אחרי ${MAX_DRIVE_DELETION_ATTEMPTS} ניסיונות`,
+          detail: `Drive file ${row.fileId}: ${result.error ?? ""}`.slice(0, 400),
+          severity: "CRITICAL",
+        });
+      }
     }
   }
   return { removed, failed };

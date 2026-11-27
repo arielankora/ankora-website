@@ -1,7 +1,8 @@
 import { reconcileScheduledReports } from "@/lib/app-domain/report-schedules";
 import { sendNightlyDataExport } from "@/lib/app-domain/backup-export";
 import { backupCodeSnapshotToDrive } from "@/lib/app-domain/code-backup";
-import { runCron } from "@/lib/cron-run";
+import { isFailedStep, runCron } from "@/lib/cron-run";
+import { reportIssue, resolveIssue } from "@/lib/system-issues";
 
 // Spec 15's weekly/monthly scheduled email reports, checked hourly (finer
 // grained than Phase 4's once-daily alerts-reconcile cron, since a
@@ -54,6 +55,32 @@ export async function GET(request: Request) {
       step("nightlyExport", () => sendNightlyDataExport()),
       step("codeBackup", () => backupCodeSnapshotToDrive()),
     ]);
+    await reportBackups(nightlyExport, codeBackup);
     return { result, nightlyExport, codeBackup };
   });
+}
+
+/// The two backups never throw: they return ok: false, which used to reach
+/// only this route's JSON answer (27.11.2026, silent failures audit). A night
+/// with no backup in Drive is a system issue; a good night closes it.
+async function reportBackups(nightly: unknown, code: unknown) {
+  if (nightly && typeof nightly === "object" && !isFailedStep(nightly)) {
+    const n = nightly as { ok: boolean; error?: string; drive?: { excel?: { ok: boolean }; dbDump?: { ok: boolean } } };
+    const inDrive = n.drive ? n.drive.excel?.ok !== false && n.drive.dbDump?.ok !== false : n.ok;
+    if (n.ok && inDrive) await resolveIssue("backup", "nightly");
+    else
+      await reportIssue({
+        area: "backup",
+        key: "nightly",
+        title: n.ok ? "הגיבוי הלילי לא הועלה ל-Drive" : "הגיבוי הלילי נכשל",
+        detail: `${n.error ?? ""} excel:${n.drive?.excel?.ok ?? "?"} dbDump:${n.drive?.dbDump?.ok ?? "?"}`.slice(0, 400),
+        severity: "CRITICAL",
+      });
+  }
+  if (code && typeof code === "object" && !isFailedStep(code)) {
+    const c = code as { ok: boolean; skipped?: string; error?: string };
+    if (c.ok) {
+      if (!c.skipped) await resolveIssue("backup", "code");
+    } else await reportIssue({ area: "backup", key: "code", title: "הגיבוי השבועי של הקוד ל-Drive נכשל", detail: c.error?.slice(0, 400), severity: "CRITICAL" });
+  }
 }

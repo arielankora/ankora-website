@@ -25,6 +25,7 @@ import {
 import { fetchVoiceNote } from "@/lib/whatsapp-poc/voice-notes";
 import { isAiExcludedNumber } from "./call-store";
 import { blockStateFor } from "./visibility";
+import { reportIssue } from "@/lib/system-issues";
 
 // Communications storage, stage 3 (1.11.2026, spec "שמירת שיחות, הקלטות
 // ותמלולים", approved by Ariel). WhatsApp messages of every connected
@@ -533,6 +534,8 @@ export async function backfillChannel(
     listed: 0,
     blocked: 0,
     loadedBefore: 0,
+    // 27.11.2026: messages the webhook missed in a chat loaded before.
+    recovered: 0,
     stoppedBy: "done" as "done" | "budget" | "quota" | "not-configured",
   };
   if (!channel.storeEnabled || !unipile) return { ...result, stoppedBy: "not-configured" as const };
@@ -558,19 +561,43 @@ export async function backfillChannel(
   // chats it reached (Ariel's number: 2 loaded before, of 98 listed, when 43
   // of its newest 100 were already loaded).
   result.listed = chats.length;
+  const latestStored = await latestStoredMessageAt(channel.id);
   const pending: PocChat[] = [];
+  const missed: PocChat[] = [];
   for (const chat of chats) {
-    if (done.has(chat.id)) result.loadedBefore += 1;
-    else if (blockStateFor(blocks, { phone: chatPhone(chat), chatId: chat.id }) === "blocked") result.blocked += 1;
+    const blocked = blockStateFor(blocks, { phone: chatPhone(chat), chatId: chat.id }) === "blocked";
+    if (done.has(chat.id)) {
+      result.loadedBefore += 1;
+      // 27.11.2026 (silent failures audit): a chat was read once and then
+      // left to the webhook, so a message the webhook failed to store was
+      // lost for good. A chat whose newest message in Unipile is later than
+      // the newest one stored is read again; storeMessage skips what it has.
+      if (!blocked && missedSince(chat, latestStored.get(chat.id))) missed.push(chat);
+    } else if (blocked) result.blocked += 1;
     else pending.push(chat);
   }
+  // Missed messages first: they are recent, and the history can wait a night.
+  for (const chat of missed) {
+    if (now() - start > options.budgetMs) return await finishWithRecovered(channel, result, "budget");
+    let recent: PocMessage[];
+    try {
+      recent = await listMessages(unipile, chat.id, 100);
+    } catch (err) {
+      if (err instanceof UnipileError && err.status === 429) return await finishWithRecovered(channel, result, "quota");
+      throw err;
+    }
+    for (const m of recent) {
+      if (now() - start > options.budgetMs) return await finishWithRecovered(channel, result, "budget");
+      if ((await storeMessage(channel, chat.id, m, { knownChat: chat, transcribe: options.transcribe })) === "stored") result.recovered += 1;
+    }
+  }
   for (const chat of pending) {
-    if (now() - start > options.budgetMs) return { ...result, stoppedBy: "budget" as const };
+    if (now() - start > options.budgetMs) return await finishWithRecovered(channel, result, "budget");
     let messages: PocMessage[];
     try {
       messages = await listMessages(unipile, chat.id, 100);
     } catch (err) {
-      if (err instanceof UnipileError && err.status === 429) return { ...result, stoppedBy: "quota" as const };
+      if (err instanceof UnipileError && err.status === 429) return await finishWithRecovered(channel, result, "quota");
       throw err;
     }
     // 27.11.2026: the budget is checked between messages too. One chat of
@@ -585,7 +612,7 @@ export async function backfillChannel(
       }
       if ((await storeMessage(channel, chat.id, m, { knownChat: chat, transcribe: options.transcribe })) === "stored") result.messages += 1;
     }
-    if (cut) return { ...result, stoppedBy: "budget" as const };
+    if (cut) return await finishWithRecovered(channel, result, "budget");
     await prisma.commsConversation.updateMany({
       where: { channelId: channel.id, externalChatId: chat.id },
       data: { backfilledAt: new Date() },
@@ -595,7 +622,58 @@ export async function backfillChannel(
   // 27.11.2026: the whole list went through, so the setup screen says the
   // history is loaded instead of offering to load more.
   if (!channel.historyLoadedAt) await prisma.commsChannel.update({ where: { id: channel.id }, data: { historyLoadedAt: new Date() } });
-  return result;
+  return await finishWithRecovered(channel, result, "done");
+}
+
+/// A minute of slack: a message the webhook is storing right now is not missed.
+const MISSED_SLACK_MS = 60_000;
+
+/// Whether Unipile has a message in this chat newer than the newest stored.
+export function missedSince(chat: Pick<PocChat, "lastMessageAt">, storedLatest: Date | undefined): boolean {
+  if (!chat.lastMessageAt) return false;
+  const listed = new Date(chat.lastMessageAt).getTime();
+  if (Number.isNaN(listed)) return false;
+  return !storedLatest || listed > storedLatest.getTime() + MISSED_SLACK_MS;
+}
+
+/// The newest stored message of each of the channel's chats. Not the
+/// conversation's lastMessageAt, which starts from Unipile's own list.
+async function latestStoredMessageAt(channelId: string): Promise<Map<string, Date>> {
+  const rows = await prisma.commsMessage.groupBy({
+    by: ["conversationId"],
+    where: { conversation: { channelId } },
+    _max: { at: true },
+  });
+  const conversations = await prisma.commsConversation.findMany({
+    where: { id: { in: rows.map((r) => r.conversationId) } },
+    select: { id: true, externalChatId: true },
+  });
+  const chatOf = new Map(conversations.map((c) => [c.id, c.externalChatId]));
+  const out = new Map<string, Date>();
+  for (const r of rows) {
+    const chatId = chatOf.get(r.conversationId);
+    if (chatId && r._max.at) out.set(chatId, r._max.at);
+  }
+  return out;
+}
+
+/// Recovered messages are a sign the live path is losing them: a system
+/// issue (a notice, since they are now stored), per number.
+async function finishWithRecovered<R extends { recovered: number; stoppedBy: string }>(
+  channel: CommsChannel,
+  result: R,
+  stoppedBy: "done" | "budget" | "quota",
+): Promise<R> {
+  if (result.recovered > 0) {
+    await reportIssue({
+      area: "comms",
+      key: `whatsapp-recovered:${channel.id}`,
+      title: `ריצת הלילה השלימה ${result.recovered} הודעות WhatsApp שה-webhook לא שמר`,
+      detail: `channel ${channel.id}`,
+      severity: "WARNING",
+    });
+  }
+  return { ...result, stoppedBy };
 }
 
 /// A webhook event body, read into what storeMessage needs.

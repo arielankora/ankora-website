@@ -93,7 +93,9 @@ describe("WhatsApp POC: what a refusal leaves behind", () => {
   });
 
   it("keeps every model's refusal in the error, and logs each one", async () => {
-    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    // A warning since 27.11.2026: one attempt's diagnostics. A transcript
+    // that fails for good is a system issue (lib/comms/call-store.ts).
+    const errors = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.stubGlobal("fetch", vi.fn(async () => new Response(refusal("language"), { status: 400 })));
     const err = await transcribeHebrew(audio).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(TranscriptionError);

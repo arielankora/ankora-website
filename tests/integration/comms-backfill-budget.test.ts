@@ -8,9 +8,10 @@ import { createTestUser } from "./factories";
 // A chat cut short is not marked loaded, and the next night finishes it
 // without storing anything twice.
 
-const CHAT = { id: "dana@lid", name: "דנה", type: "1to1", phone: "+972542222222" };
-const LOADED = { id: "yossi@lid", name: "יוסי", type: "1to1", phone: "+972543333333" };
-let listed: (typeof CHAT)[] = [CHAT];
+type Chat = { id: string; name: string; type: string; phone: string; lastMessageAt?: string };
+const CHAT: Chat = { id: "dana@lid", name: "דנה", type: "1to1", phone: "+972542222222" };
+const LOADED: Chat = { id: "yossi@lid", name: "יוסי", type: "1to1", phone: "+972543333333" };
+let listed: Chat[] = [CHAT];
 const messages = Array.from({ length: 5 }, (_, i) => ({
   id: `m${i}`,
   text: `הודעה ${i}`,
@@ -42,6 +43,8 @@ import { backfillChannel } from "@/lib/comms/whatsapp-store";
 beforeEach(() => {
   process.env.UNIPILE_API_KEY = "k";
   listed = [CHAT];
+  delete CHAT.lastMessageAt;
+  messages.length = 5;
 });
 
 describe("WhatsApp history load: the budget holds inside a chat", () => {
@@ -85,5 +88,36 @@ describe("WhatsApp history load: the budget holds inside a chat", () => {
     let t = 0;
     const result = await backfillChannel(channel, { budgetMs: 5, now: () => (t += 10) });
     expect(result).toMatchObject({ stoppedBy: "budget", listed: 2, loadedBefore: 1, blocked: 0, chats: 0 });
+  });
+});
+
+// 27.11.2026 (silent failures audit): a chat was read once and then left to
+// the webhook, so a message the webhook failed to store was lost for good
+// (12 failed deliveries between 15.11 and 26.11). A loaded chat whose newest
+// message in Unipile is later than the newest stored one is read again.
+describe("WhatsApp history load: a message the webhook missed is recovered", () => {
+  it("reads a loaded chat again when Unipile has a newer message, and says so", async () => {
+    const { user } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const channel = await prisma.commsChannel.create({ data: { accountId: "acc_r", ownerUserId: user.id, storeEnabled: true } });
+    await backfillChannel(channel, { budgetMs: 600_000 });
+    expect(await prisma.commsMessage.count()).toBe(5);
+
+    // Nothing new: the chat is not read again.
+    CHAT.lastMessageAt = "2026-11-01T08:04:30.000Z";
+    const quiet = await backfillChannel(channel, { budgetMs: 600_000 });
+    expect(quiet).toMatchObject({ recovered: 0, loadedBefore: 1 });
+
+    // The webhook lost one.
+    messages.push({ ...messages[0], id: "m-lost", text: "הודעה שאבדה", timestamp: "2026-11-02T09:00:00.000Z" });
+    CHAT.lastMessageAt = "2026-11-02T09:00:00.000Z";
+    const caught = await backfillChannel(channel, { budgetMs: 600_000 });
+    expect(caught).toMatchObject({ recovered: 1, loadedBefore: 1, chats: 0, stoppedBy: "done" });
+    expect(await prisma.commsMessage.count()).toBe(6);
+    expect(await prisma.commsMessage.findFirst({ where: { externalId: "m-lost" } })).not.toBeNull();
+    const issue = await prisma.systemIssue.findFirstOrThrow({ where: { key: `whatsapp-recovered:${channel.id}` } });
+    expect(issue).toMatchObject({ severity: "WARNING" });
+
+    // Stored now: the next night leaves it.
+    expect(await backfillChannel(channel, { budgetMs: 600_000 })).toMatchObject({ recovered: 0 });
   });
 });
