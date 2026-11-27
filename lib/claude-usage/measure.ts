@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { toolCallContext } from "@/lib/mcp/tool-context";
 
 // Claude usage measurement (17.11.2026): the pure half of the MCP call log.
 //
@@ -101,15 +102,31 @@ type LooseRegister = (name: string, config: unknown, handler: Handler) => unknow
 /// of the measurement: a sink that fails is swallowed. A handler that
 /// throws (they all catch their own errors, so this is a bug) is measured
 /// as a failure and rethrown untouched.
-export function withToolMeasurement<S extends Registrar>(server: S, sink: ToolCallSink, now: () => number = Date.now): S {
+/// `onUnexpected` (27.11.2026): a handler whose error was not one the
+/// domain meant (toMcpToolError's fallback) is reported once it is done,
+/// with the tool's name. It never changes the result and never throws.
+export function withToolMeasurement<S extends Registrar>(
+  server: S,
+  sink: ToolCallSink,
+  now: () => number = Date.now,
+  onUnexpected?: (tool: string, err: unknown) => Promise<void>,
+): S {
   const register = (server.registerTool as unknown as LooseRegister).bind(server);
   const registerTool = (name: string, config: unknown, handler: Handler) =>
     register(name, config, async (args: unknown, ctx: unknown) => {
       const started = now();
       let result: ToolResult;
       let threw = false;
+      const call: { tool: string; unexpected?: unknown } = { tool: name };
       try {
-        result = (await handler(args, ctx)) as ToolResult;
+        result = (await toolCallContext.run(call, () => handler(args, ctx))) as ToolResult;
+        if (call.unexpected !== undefined && onUnexpected) {
+          try {
+            await onUnexpected(name, call.unexpected);
+          } catch {
+            // Reporting must never cost the user their answer.
+          }
+        }
         return result;
       } catch (err) {
         threw = true;

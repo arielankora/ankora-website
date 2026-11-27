@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-import { authorizeCronRequest } from "@/lib/cron-auth";
 import { sweepMailWaits } from "@/lib/mail-scan/waits";
+import { runCron } from "@/lib/cron-run";
 
 // Stage 2 of "התיבות שלי" (27.11.2026): reminders for tasks that wait for an
 // email reply and got none, and emails kept 14 days that nobody followed.
@@ -8,15 +7,5 @@ import { sweepMailWaits } from "@/lib/mail-scan/waits";
 // minutes); this is the morning run that does not depend on mail arriving.
 // Same CRON_SECRET protection as the other cron routes.
 export async function GET(request: Request) {
-  const authorized = authorizeCronRequest(request);
-  if (!authorized.ok) {
-    return NextResponse.json({ error: authorized.error }, { status: authorized.status });
-  }
-  try {
-    const result = await sweepMailWaits();
-    return NextResponse.json({ ok: true, ...result });
-  } catch (err) {
-    console.error("mail-waits cron failed:", err);
-    return NextResponse.json({ error: "Unexpected error" }, { status: 500 });
-  }
+  return runCron("mail-waits", request, async (step) => ({ ...(await step("sweep", () => sweepMailWaits())) }));
 }

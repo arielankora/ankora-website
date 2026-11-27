@@ -4,7 +4,9 @@ import { sendEmail } from "@/lib/email";
 import { outgoingOf } from "@/lib/i18n/recipients";
 import type { OutgoingT } from "@/lib/i18n/outgoing";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+/// Not 24 hours: a nightly job alerts at about the same minute each night,
+/// and a 24 hour window skipped every second night by a few seconds.
+const ALERT_EVERY_MS = 20 * 60 * 60 * 1000;
 
 /// A communications failure the admins must hear about (24.11.2026: Aloha
 /// changed its template, and a disconnected WhatsApp number stopped the
@@ -27,16 +29,26 @@ export async function alertAdmins(input: {
   const recent = new Set(
     (
       await prisma.notification.findMany({
-        where: { type: input.type, entityId: input.subjectId, createdAt: { gte: new Date(now.getTime() - DAY_MS) } },
+        // Only an alert that reached the admin counts (27.11.2026): one whose
+        // email failed used to block the next try for a whole day.
+        where: {
+          type: input.type,
+          entityId: input.subjectId,
+          createdAt: { gte: new Date(now.getTime() - ALERT_EVERY_MS) },
+          emailedAt: { not: null },
+        },
         select: { userId: true },
       })
     ).map((n) => n.userId),
   );
   for (const admin of admins.filter((a) => !recent.has(a.id))) {
     const { title, body } = input.render(outgoingOf(admin).t);
-    await prisma.notification.create({
-      data: { userId: admin.id, type: input.type, title, body, entityType: input.entityType, entityId: input.subjectId },
+    const notification = await prisma.notification.create({
+      data: { userId: admin.id, type: input.type, title, body, entityType: input.entityType, entityId: input.subjectId, createdAt: now },
     });
-    if (admin.email) await sendEmail({ to: [admin.email], subject: `Ankora - ${title}`, text: body });
+    if (!admin.email) continue;
+    // A failed send is reported by sendEmail itself, as an email issue.
+    const sent = await sendEmail({ to: [admin.email], subject: `Ankora - ${title}`, text: body });
+    if (sent.ok) await prisma.notification.update({ where: { id: notification.id }, data: { emailedAt: now } });
   }
 }

@@ -7,6 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const record = vi.hoisted(() => ({ pruneClaudeUsage: vi.fn(async () => ({ toolCalls: 3, promptCopies: 1, coworkEvents: 2, limitSamples: 0, agentRuns: 0 })) }));
 vi.mock("@/lib/claude-usage/record", () => record);
 
+// The run log and the issue table (lib/cron-run.ts) are not under test here.
+vi.mock("@/lib/prisma", () => ({ prisma: { cronRun: { create: vi.fn(async () => ({ id: "run" })), update: vi.fn(async () => ({})) } } }));
+vi.mock("@/lib/system-issues", () => ({ reportIssue: vi.fn(), resolveIssue: vi.fn(), describeError: (e: unknown) => String(e) }));
+
 const route = await import("@/app/api/cron/claude-usage-retention/route");
 
 const SECRET = "s3cr3t-cron-value-0123456789";

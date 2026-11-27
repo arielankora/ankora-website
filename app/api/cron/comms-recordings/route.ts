@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-import { authorizeCronRequest } from "@/lib/cron-auth";
+import { runCron, type CronStep } from "@/lib/cron-run";
 import { reconcileRecordings, sweepCallRetention, transcribePending } from "@/lib/comms/call-store";
 import { backfillChannel, sweepWhatsappRetention } from "@/lib/comms/whatsapp-store";
 import { completeDriveCopies, repairCallLines, sweepEndedEngagements } from "@/lib/comms/maintenance";
@@ -26,56 +25,53 @@ import { prisma } from "@/lib/prisma";
 export const maxDuration = 800;
 
 export async function GET(request: Request) {
-  const authorized = authorizeCronRequest(request);
-  if (!authorized.ok) {
-    return NextResponse.json({ error: authorized.error }, { status: authorized.status });
-  }
   const startedAt = Date.now();
   const seconds: Record<string, number> = {};
-  async function timed<T>(name: string, run: () => Promise<T>): Promise<T> {
-    const t = Date.now();
-    try {
-      return await run();
-    } finally {
-      seconds[name] = Math.round((Date.now() - t) / 100) / 10;
-    }
-  }
   const budget = (share: number) => stepBudget(share, startedAt, Date.now());
 
-  try {
-    const reconcile = await timed("reconcile", () => reconcileRecordings({ budgetMs: budget(COMMS_CRON_STEPS.reconcile) }));
-    const lines = await timed("lines", () => repairCallLines());
-    const transcribe = await timed("transcribe", () => transcribePending({ budgetMs: budget(COMMS_CRON_STEPS.transcribe) }));
-    const driveCopies = await timed("driveCopies", () => completeDriveCopies({ budgetMs: budget(COMMS_CRON_STEPS.driveCopies) }));
+  // 27.11.2026 (silent failures audit): every step is isolated. Before, a
+  // mailbox that answered 401 in the first step stopped transcription,
+  // Drive copies, the WhatsApp history and retention for the whole night,
+  // with one line in the log. #619 had isolated only the WhatsApp step.
+  return runCron("comms-recordings", request, async (rawStep) => {
+    const step: CronStep = async (name, run) => {
+      const t = Date.now();
+      try {
+        return await rawStep(name, run);
+      } finally {
+        seconds[name] = Math.round((Date.now() - t) / 100) / 10;
+      }
+    };
+    const reconcile = await step("reconcile", () => reconcileRecordings({ budgetMs: budget(COMMS_CRON_STEPS.reconcile) }));
+    const lines = await step("lines", () => repairCallLines());
+    const transcribe = await step("transcribe", () => transcribePending({ budgetMs: budget(COMMS_CRON_STEPS.transcribe) }));
+    const driveCopies = await step("driveCopies", () => completeDriveCopies({ budgetMs: budget(COMMS_CRON_STEPS.driveCopies) }));
     // Stage 3: the WhatsApp history of each stored number, a little each
     // night until every chat has been read once. Its voice messages are
     // transcribed the next night (the live ones by the webhook).
     // 24.11.2026: one number failing no longer stops the run; it is skipped
     // and the admins get an alert (lib/comms/cron-channels.ts).
-    const channels = await prisma.commsChannel.findMany({ where: { storeEnabled: true }, include: { owner: { select: { name: true } } } });
-    // 27.11.2026: the numbers whose history is still loading go first, and
-    // each takes an even part of the time left (lib/comms/cron-budget.ts).
-    channels.sort((a, b) => Number(Boolean(a.historyLoadedAt)) - Number(Boolean(b.historyLoadedAt)));
-    let channelsLeft = channels.length;
-    const whatsapp = await timed("whatsapp", () =>
-      runPerChannel(
+    const whatsapp = await step("whatsapp", async () => {
+      const channels = await prisma.commsChannel.findMany({ where: { storeEnabled: true }, include: { owner: { select: { name: true } } } });
+      // 27.11.2026: the numbers whose history is still loading go first, and
+      // each takes an even part of the time left (lib/comms/cron-budget.ts).
+      channels.sort((a, b) => Number(Boolean(a.historyLoadedAt)) - Number(Boolean(b.historyLoadedAt)));
+      let channelsLeft = channels.length;
+      return runPerChannel(
         channels,
         (channel) => backfillChannel(channel, { budgetMs: nextChannelShare(channelsLeft--, startedAt, Date.now()) }),
         alertChannelFailure,
-      ),
-    );
-    const retention = await timed("retention", async () => ({
-      calls: await sweepCallRetention(),
-      whatsapp: await sweepWhatsappRetention(),
-      endedEngagements: await sweepEndedEngagements(),
+      );
+    });
+    const retention = {
+      calls: await step("retentionCalls", () => sweepCallRetention()),
+      whatsapp: await step("retentionWhatsapp", () => sweepWhatsappRetention()),
+      endedEngagements: await step("retentionEndedEngagements", () => sweepEndedEngagements()),
       // Drive files a sweep or a block could not delete before (27.11.2026).
-      driveDeletions: await retryDriveFileDeletions(),
-    }));
-    const summary = { ok: true, reconcile, lines, whatsapp, transcribe, driveCopies, retention, seconds, totalSeconds: Math.round((Date.now() - startedAt) / 1000) };
+      driveDeletions: await step("driveDeletions", () => retryDriveFileDeletions()),
+    };
+    const summary = { reconcile, lines, whatsapp, transcribe, driveCopies, retention, seconds, totalSeconds: Math.round((Date.now() - startedAt) / 1000) };
     console.log(`comms-recordings summary ${JSON.stringify(summary)}`);
-    return NextResponse.json(summary);
-  } catch (err) {
-    console.error("comms-recordings cron failed:", err, { seconds });
-    return NextResponse.json({ error: "Unexpected error" }, { status: 500 });
-  }
+    return summary;
+  });
 }

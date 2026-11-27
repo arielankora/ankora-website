@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { afterResponse } from "@/lib/after-response";
 
+// 27.11.2026: a failure is also a system issue. The issue table is not
+// under test here.
+const issues = vi.hoisted(() => ({ reportIssue: vi.fn(async () => {}) }));
+vi.mock("@/lib/system-issues", () => issues);
+
 // afterResponse defers best-effort follow-up work past the response.
 //
 // The interesting behaviour is the FALLBACK, and it is the one these
@@ -54,6 +59,8 @@ describe("afterResponse outside a request scope", () => {
     // failed, not just that one did.
     expect(String(message)).toContain("alerts");
     expect((err as Error).message).toBe("threshold lookup exploded");
+    // And it is a system issue, keyed by the label.
+    expect(issues.reportIssue).toHaveBeenCalledWith(expect.objectContaining({ area: "after-response", key: "alerts", severity: "WARNING" }));
   });
 
   it("swallows a synchronous throw from the work function too", async () => {

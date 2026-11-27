@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { argsHash, measureResult, withToolMeasurement, type ToolCallMeasure } from "@/lib/claude-usage/measure";
 import { isPromptKind, PROMPT_KINDS } from "@/lib/claude-usage/prompt-kinds";
+import { toolFailure } from "@/lib/mcp/errors";
+import { DomainError } from "@/lib/domain-error";
 
 // Claude usage measurement (17.11.2026). What matters here is that the
 // measurement is accurate and invisible: it records the size of what went
@@ -148,6 +150,39 @@ describe("withToolMeasurement", () => {
     const server = fakeServer();
     const measured = withToolMeasurement(server, vi.fn());
     expect(measured.other()).toBe(server);
+  });
+});
+
+// 27.11.2026, silent failures plan: an unexpected error inside a tool is a
+// system issue with the tool's name; a refusal of the domain is not.
+describe("withToolMeasurement reports unexpected tool errors", () => {
+  it("reports an unexpected error once, with the tool's name, and returns the same answer", async () => {
+    const server = fakeServer();
+    const onUnexpected = vi.fn(async () => {});
+    const boom = new Error("prisma exploded");
+    withToolMeasurement(server, vi.fn(), Date.now, onUnexpected).registerTool("create_task", {}, async () => toolFailure(boom));
+    const result = (await server.handlers.get("create_task")!({}, ctxFor("u1"))) as { isError?: boolean };
+    expect(result.isError).toBe(true);
+    expect(onUnexpected).toHaveBeenCalledExactlyOnceWith("create_task", boom);
+  });
+
+  it("does not report a refusal of the domain", async () => {
+    const server = fakeServer();
+    const onUnexpected = vi.fn(async () => {});
+    withToolMeasurement(server, vi.fn(), Date.now, onUnexpected).registerTool("update_task", {}, async () =>
+      toolFailure(new DomainError("tasks.needsApproval", "המשימה הזו דורשת אישור.")),
+    );
+    await server.handlers.get("update_task")!({}, ctxFor("u1"));
+    expect(onUnexpected).not.toHaveBeenCalled();
+  });
+
+  it("returns the answer even when reporting throws", async () => {
+    const server = fakeServer();
+    withToolMeasurement(server, vi.fn(), Date.now, async () => {
+      throw new Error("db down");
+    }).registerTool("t", {}, async () => toolFailure(new Error("x")));
+    const result = (await server.handlers.get("t")!({}, ctxFor("u1"))) as { isError?: boolean };
+    expect(result.isError).toBe(true);
   });
 });
 

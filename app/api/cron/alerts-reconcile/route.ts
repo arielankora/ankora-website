@@ -1,5 +1,3 @@
-import { NextResponse } from "next/server";
-import { authorizeCronRequest } from "@/lib/cron-auth";
 import { reconcileAllClientAlerts, retryFailedEmailDeliveries } from "@/lib/app-domain/alerts";
 import { notifyLongRunningTimers } from "@/lib/app-domain/notifications";
 import { reconcileImportantDates } from "@/lib/app-domain/important-dates-job";
@@ -8,6 +6,7 @@ import { sendDailyTaskDigest } from "@/lib/app-domain/task-digest";
 import { notifyClientFileAttention } from "@/lib/app-domain/client-file-attention";
 import { sendWeeklyBrainMetrics } from "@/lib/app-domain/brain-metrics";
 import { openOverdueVendorRuns } from "@/lib/app-domain/vendor-detections";
+import { runCron } from "@/lib/cron-run";
 
 // Spec 9.2's "scheduled reconciliation" + retry-with-backoff ideal,
 // approximated here as a single once-daily Vercel Cron job (see ADR 11.3 -
@@ -18,74 +17,21 @@ import { openOverdueVendorRuns } from "@/lib/app-domain/vendor-detections";
 // anything else so the endpoint can't be triggered by an outside caller
 // who doesn't know the secret.
 export async function GET(request: Request) {
-  // Security review: constant-time comparison, shared with the other
-  // cron route - see lib/cron-auth.ts for the CWE-208 reasoning.
-  const authorized = authorizeCronRequest(request);
-  if (!authorized.ok) {
-    return NextResponse.json({ error: authorized.error }, { status: authorized.status });
-  }
-
-  try {
-    // Phase 9 gap-fix (docs/adr/0001 section 17.2): long-timer
-    // notifications reuse this same daily cron rather than a new job -
-    // see lib/app-domain/notifications.ts's own comment for why.
+  // Each its own step (27.11.2026): one that throws is a system issue and
+  // the others' results still come back. Before, any of the first six
+  // throwing turned the whole run into one "Unexpected error" in the log.
+  return runCron("alerts-reconcile", request, async (step) => {
     const [reconciled, retried, longTimers, importantDates, digest, leadRetention, clientFiles, brainMetrics, vendorRuns] = await Promise.all([
-      reconcileAllClientAlerts(),
-      retryFailedEmailDeliveries(),
-      notifyLongRunningTimers(),
-      // Phase 10 (Important Dates): reuses this same daily cron rather
-      // than a new job - see lib/app-domain/important-dates-job.ts's own
-      // header comment for why (same ADR 11.3 "no sub-daily scheduler"
-      // reasoning as reconcileAllClientAlerts/notifyLongRunningTimers
-      // above).
-      reconcileImportantDates(),
-      // The morning digest, on this same cron for the same ADR 11.3
-      // reason as everything above it, and because this one already
-      // runs at the right hour: 05:00 UTC is 08:00 in Israel through
-      // the summer. It drifts to 07:00 when the clocks go back, which
-      // is early rather than wrong - the email waits in an inbox, it
-      // does not ring. See lib/app-domain/task-digest.ts.
-      sendDailyTaskDigest(),
-      // Contact requests from the site are kept 24 months (privacy policy,
-      // section 9; Ariel 11.10.2026). See lib/website-leads.ts.
-      purgeExpiredWebsiteLeads(),
-      // The client files' weekly "still true?" (org-brain spec 5.4): past
-      // temporary information, old uncertain items, unanswered questions.
-      // Isolated like the steps above: a failure here is reported, and
-      // never stops the rest of the morning.
-      notifyClientFileAttention().catch((err) => {
-        console.error("[cron] notifyClientFileAttention failed", err);
-        return { notified: 0, unowned: 0, error: String(err) };
-      }),
-      // The org brain's measures (spec section 11), by email to the
-      // admins every Sunday. Isolated the same way.
-      sendWeeklyBrainMetrics().catch((err) => {
-        console.error("[cron] sendWeeklyBrainMetrics failed", err);
-        return { sent: 0, error: String(err) };
-      }),
-      // P8 (3.11.2026): a "new vendor?" question nobody answered for a
-      // business day opens the subprocessor run anyway. Isolated the same
-      // way. See lib/app-domain/vendor-detections.ts.
-      openOverdueVendorRuns().catch((err) => {
-        console.error("[cron] openOverdueVendorRuns failed", err);
-        return { opened: 0, failed: 0, error: String(err) };
-      }),
+      step("clientAlerts", () => reconcileAllClientAlerts()),
+      step("emailRetries", () => retryFailedEmailDeliveries()),
+      step("longTimers", () => notifyLongRunningTimers()),
+      step("importantDates", () => reconcileImportantDates()),
+      step("taskDigest", () => sendDailyTaskDigest()),
+      step("leadRetention", () => purgeExpiredWebsiteLeads()),
+      step("clientFiles", () => notifyClientFileAttention()),
+      step("brainMetrics", () => sendWeeklyBrainMetrics()),
+      step("vendorRuns", () => openOverdueVendorRuns()),
     ]);
-
-    return NextResponse.json({
-      ok: true,
-      reconciled,
-      retried,
-      longTimersNotified: longTimers.notified,
-      importantDates,
-      digest,
-      leadRetention,
-      clientFiles,
-      brainMetrics,
-      vendorRuns,
-    });
-  } catch (err) {
-    console.error("alerts-reconcile cron failed:", err);
-    return NextResponse.json({ error: "Unexpected error" }, { status: 500 });
-  }
+    return { reconciled, retried, longTimers, importantDates, digest, leadRetention, clientFiles, brainMetrics, vendorRuns };
+  });
 }

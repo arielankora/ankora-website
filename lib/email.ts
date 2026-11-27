@@ -33,6 +33,9 @@ export interface SendEmailInput {
   html?: string;
   replyTo?: string;
   attachments?: SendEmailAttachment[];
+  /// false only for the system issue alert itself (lib/system-issues.ts),
+  /// so an email outage does not report itself in a loop.
+  reportFailure?: boolean;
 }
 
 export interface SendEmailResult {
@@ -47,7 +50,44 @@ const FROM_ADDRESS = "Ankora <alerts@ankora.co.il>";
 /// alert-evaluation domain logic) always want a result object they can
 /// log into EmailDelivery, not an exception that would abort the
 /// surrounding best-effort, non-fatal evaluation call.
+/// Send one email. Never throws: the result says whether it went out.
+///
+/// 27.11.2026 (silent failures audit): six callers ignored a failed result
+/// and nothing anywhere recorded it, so an email that did not go out left
+/// no trace. A failure is now a system issue (lib/system-issues.ts), whatever
+/// the caller does with the result.
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
+  const result = await deliver(input);
+  if (!result.ok && input.reportFailure !== false) await reportEmailFailure(input, result.error ?? "");
+  return result;
+}
+
+/// The kind of failure, which is also the issue's key: one open issue per
+/// kind, not one per email.
+export function emailFailureKind(error: string): string | null {
+  if (error === "RESEND_API_KEY is not set") return isProductionDeployment() ? "missing-key" : null;
+  if (error === "No recipients") return "no-recipients";
+  if (error.startsWith("Refusing to send")) return "unreachable-link";
+  const status = /^Resend API error (\d{3})/.exec(error)?.[1];
+  if (status) return `provider-${status}`;
+  return "network";
+}
+
+async function reportEmailFailure(input: SendEmailInput, error: string): Promise<void> {
+  const kind = emailFailureKind(error);
+  if (!kind) return;
+  const { reportIssue } = await import("@/lib/system-issues");
+  await reportIssue({
+    area: "email",
+    key: kind,
+    title: "מייל לא נשלח",
+    // The subject names what kind of email it was; the body never goes here.
+    detail: `${error.slice(0, 300)} | נושא: ${input.subject.slice(0, 120)}`,
+    severity: "CRITICAL",
+  });
+}
+
+async function deliver(input: SendEmailInput): Promise<SendEmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     return { ok: false, error: "RESEND_API_KEY is not set" };

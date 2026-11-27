@@ -7,6 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const waits = vi.hoisted(() => ({ sweepMailWaits: vi.fn(async () => ({ reminded: 2, closed: 1, dropped: 4 })) }));
 vi.mock("@/lib/mail-scan/waits", () => waits);
 
+// The run log and the issue table (lib/cron-run.ts) are not under test here.
+vi.mock("@/lib/prisma", () => ({ prisma: { cronRun: { create: vi.fn(async () => ({ id: "run" })), update: vi.fn(async () => ({})) } } }));
+vi.mock("@/lib/system-issues", () => ({ reportIssue: vi.fn(), resolveIssue: vi.fn(), describeError: (e: unknown) => String(e) }));
+
 const route = await import("@/app/api/cron/mail-waits/route");
 
 const SECRET = "s3cr3t-cron-value-0123456789";

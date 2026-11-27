@@ -30,6 +30,9 @@ const TABLES = [
   "call_recordings",
   "call_recording_skips",
   "drive_file_deletions",
+  // System issues and the cron run log (27.11.2026). No foreign keys.
+  "system_issues",
+  "cron_runs",
   // Stage 3: messages before conversations before channels.
   "comms_attachments",
   "comms_messages",
