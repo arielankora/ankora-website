@@ -1,8 +1,11 @@
 import "server-only";
 import type { User } from "@prisma/client";
 import { DomainError } from "@/lib/domain-error";
-import { guarded, resolveMailbox, timeFilter, used, type MailboxRow } from "./mailbox";
+import { guarded, resolveMailbox, timeFilter, used, type MailboxNeed, type MailboxRow } from "./mailbox";
 import {
+  capabilitiesOf,
+  isMailProvider,
+  readMailAccount,
   createCalendar,
   createEvent,
   deleteCalendar,
@@ -28,16 +31,18 @@ import { calendarOf, eventOf } from "./shape";
 
 const ZONE = "Asia/Jerusalem";
 
-async function calendarMailbox(actor: User, clientId: string, mailbox?: string) {
-  const row = await resolveMailbox(actor, clientId, mailbox);
-  if (!row.scopes.includes("calendar")) {
+async function calendarMailbox(actor: User, clientId: string | null, mailbox: string | undefined, need: MailboxNeed) {
+  const row = await resolveMailbox(actor, clientId, mailbox, need);
+  // A personal mailbox records no capabilities: the provider says.
+  const scopes = row.source === "personal" ? await guarded(row, () => readMailAccount(row.unipileAccountId)).then((a) => (isMailProvider(a.provider) ? capabilitiesOf(a.provider) : ["mail"])) : row.scopes;
+  if (!scopes.includes("calendar")) {
     throw new DomainError("connections.mailbox.noCalendar", `לתיבה ${row.account} אין יומן דרך החיבור (תיבה בפרוטוקול IMAP). יומן יש רק בחשבון Google או Microsoft.`, { account: row.account });
   }
   return row;
 }
 
 /// The calendar to use: the one named, or the mailbox's default one.
-async function pickCalendar(row: MailboxRow & { unipileAccountId: string }, calendarId?: string): Promise<string> {
+async function pickCalendar(row: MailboxRow, calendarId?: string): Promise<string> {
   if (calendarId) return calendarId;
   const calendars = await guarded(row, () => listCalendars(row.unipileAccountId));
   const main = calendars.find((c) => c.is_default === true) ?? calendars[0];
@@ -60,7 +65,7 @@ export function eventTime(value: string, timezone?: string): EventTime {
 
 export async function listClientCalendar(
   actor: User,
-  clientId: string,
+  clientId: string | null,
   input: {
     mailbox?: string;
     calendarId?: string;
@@ -78,7 +83,7 @@ export async function listClientCalendar(
     limit?: number;
   },
 ) {
-  const row = await calendarMailbox(actor, clientId, input.mailbox);
+  const row = await calendarMailbox(actor, clientId, input.mailbox, "read");
   if (input.calendarsOnly) {
     const calendars = await guarded(row, () => listCalendars(row.unipileAccountId));
     await used(actor, row, "calendars", { count: calendars.length }, "calendar_read");
@@ -129,8 +134,8 @@ export type EventInput = {
   notifyGuests?: "all" | "external_only" | "none";
 };
 
-export async function saveClientEvent(actor: User, clientId: string, input: EventInput) {
-  const row = await calendarMailbox(actor, clientId, input.mailbox);
+export async function saveClientEvent(actor: User, clientId: string | null, input: EventInput) {
+  const row = await calendarMailbox(actor, clientId, input.mailbox, "write");
   const calendarId = await pickCalendar(row, input.calendarId);
   const change: EventChange = {
     ...(input.title !== undefined ? { title: input.title } : {}),
@@ -173,10 +178,10 @@ export async function saveClientEvent(actor: User, clientId: string, input: Even
 
 export async function respondClientEvent(
   actor: User,
-  clientId: string,
+  clientId: string | null,
   input: { mailbox?: string; calendarId?: string; eventId: string; action: "accept" | "maybe" | "decline" | "cancel" | "restore" | "delete"; comment?: string },
 ) {
-  const row = await calendarMailbox(actor, clientId, input.mailbox);
+  const row = await calendarMailbox(actor, clientId, input.mailbox, "write");
   const calendarId = await pickCalendar(row, input.calendarId);
   const action =
     input.action === "accept"
@@ -197,10 +202,10 @@ export async function respondClientEvent(
 
 export async function manageClientCalendars(
   actor: User,
-  clientId: string,
+  clientId: string | null,
   input: { mailbox?: string; action: "create" | "update" | "delete"; calendarId?: string; name?: string; description?: string; timezone?: string; color?: string },
 ) {
-  const row = await calendarMailbox(actor, clientId, input.mailbox);
+  const row = await calendarMailbox(actor, clientId, input.mailbox, "write");
   const change = {
     ...(input.name?.trim() ? { name: input.name.trim() } : {}),
     ...(input.description !== undefined ? { description: input.description } : {}),

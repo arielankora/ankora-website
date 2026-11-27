@@ -238,6 +238,11 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
     table: "client_connections",
     reason: "Which client accounts the procedures read from and send through, and who approved each. No secret: that is in client_credentials.",
   },
+  MailboxAccess: {
+    decision: "DUMP",
+    table: "mailbox_access",
+    reason: "Who besides the admins and the account managers may read or send from each client mailbox through the connector. Without it everyone on a list loses access after a restore.",
+  },
   // Passkeys (vault phase 1a). Public keys only; the private half never
   // left anyone's device. Kept so a restore does not force everyone to
   // enrol again before they can open a client's login.

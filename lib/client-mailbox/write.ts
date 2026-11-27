@@ -1,7 +1,7 @@
 import "server-only";
 import type { User } from "@prisma/client";
 import { DomainError } from "@/lib/domain-error";
-import { guarded, resolveMailbox, used } from "./mailbox";
+import { assertReadable, guarded, isHidden, resolveMailbox, used, type MailboxRow } from "./mailbox";
 import {
   createDraft,
   createFolder,
@@ -82,7 +82,9 @@ const lower = (a: Address) => a.email.toLowerCase();
 
 /// The message Unipile sends or saves: the people, the subject, the text in
 /// both parts, and for a reply or a forward what the original contributes.
-async function compose(accountId: string, mailboxAddress: string, input: Compose): Promise<{ email: OutgoingEmail; kind: "new" | "reply" | "forward"; original: RawEmail | null }> {
+async function compose(row: MailboxRow, input: Compose): Promise<{ email: OutgoingEmail; kind: "new" | "reply" | "forward"; original: RawEmail | null }> {
+  const accountId = row.unipileAccountId;
+  const mailboxAddress = row.account;
   if (input.replyToEmailId && input.forwardEmailId) {
     throw new DomainError("connections.mailbox.replyOrForward", "מייל הוא תשובה או העברה, לא שניהם.");
   }
@@ -99,6 +101,7 @@ async function compose(accountId: string, mailboxAddress: string, input: Compose
   if (input.replyToEmailId) {
     kind = "reply";
     original = await getEmail(accountId, input.replyToEmailId);
+    assertReadable(row, original);
     if (to.length === 0) {
       // Reply goes to Reply-To when the sender set one, as mail programs do.
       const replyTo = rawAddresses(original.reply_to);
@@ -120,6 +123,7 @@ async function compose(accountId: string, mailboxAddress: string, input: Compose
   if (input.forwardEmailId) {
     kind = "forward";
     original = await getEmail(accountId, input.forwardEmailId);
+    assertReadable(row, original);
     if (!subject) subject = prefixedSubject("Fwd", original.subject);
     text = forwardedText(text, original);
     const drop = new Set(input.dropAttachmentIds ?? []);
@@ -162,29 +166,31 @@ function who(e: OutgoingEmail) {
 
 // ---------------------------------------------------------------- drafts
 
-export async function listClientDrafts(actor: User, clientId: string, input: { mailbox?: string; draftId?: string; participant?: string; cursor?: string; limit?: number }) {
+export async function listClientDrafts(actor: User, clientId: string | null, input: { mailbox?: string; draftId?: string; participant?: string; cursor?: string; limit?: number }) {
   const row = await resolveMailbox(actor, clientId, input.mailbox);
   if (input.draftId) {
     const draft = await guarded(row, () => getDraft(row.unipileAccountId, input.draftId!));
+    assertReadable(row, draft);
     await used(actor, row, "draft", { draftId: input.draftId });
     return { mailbox: row.account, drafts: fullOf([draft]) };
   }
   const page = await guarded(row, () =>
     listDrafts(row.unipileAccountId, { any_email: input.participant?.trim() || undefined, cursor: input.cursor || undefined, limit: Math.min(Math.max(input.limit ?? 25, 1), 100) }),
   );
-  await used(actor, row, "drafts", { count: page.items.length });
-  return { mailbox: row.account, drafts: page.items.map(summaryOf).filter(Boolean), nextCursor: page.nextCursor };
+  const shown = page.items.filter((d) => !isHidden(row, d));
+  await used(actor, row, "drafts", { count: shown.length });
+  return { mailbox: row.account, drafts: shown.map(summaryOf).filter(Boolean), nextCursor: page.nextCursor };
 }
 
-export async function saveClientDraft(actor: User, clientId: string, input: Compose & { draftId?: string; delete?: boolean }) {
-  const row = await resolveMailbox(actor, clientId, input.mailbox);
+export async function saveClientDraft(actor: User, clientId: string | null, input: Compose & { draftId?: string; delete?: boolean }) {
+  const row = await resolveMailbox(actor, clientId, input.mailbox, "write");
   if (input.delete) {
     if (!input.draftId) throw new DomainError("connections.mailbox.draftIdRequired", "כדי למחוק טיוטה מעבירים את המזהה שלה ב-draftId.");
     await guarded(row, () => deleteDraft(row.unipileAccountId, input.draftId!));
     await used(actor, row, "draft_delete", { draftId: input.draftId }, "mail_write");
     return { mailbox: row.account, deleted: input.draftId };
   }
-  const { email, kind } = await guarded(row, () => compose(row.unipileAccountId, row.account, input));
+  const { email, kind } = await guarded(row, () => compose(row, input));
   const draft = input.draftId
     ? await guarded(row, () => updateDraft(row.unipileAccountId, input.draftId!, email))
     : await guarded(row, () => createDraft(row.unipileAccountId, email));
@@ -204,21 +210,21 @@ export async function saveClientDraft(actor: User, clientId: string, input: Comp
 
 // ---------------------------------------------------------------- send
 
-export async function sendClientEmail(actor: User, clientId: string, input: Compose & { draftId?: string; userAskedToSend?: boolean }) {
+export async function sendClientEmail(actor: User, clientId: string | null, input: Compose & { draftId?: string; userAskedToSend?: boolean }) {
   if (input.userAskedToSend !== true) {
     throw new DomainError(
       "connections.mailbox.sendNotAsked",
       "שליחה ישירה רק כשהמשתמש ביקש במפורש לשלוח. בלי בקשה כזו מכינים טיוטה (save_client_email_draft) ומראים אותה למשתמש.",
     );
   }
-  const row = await resolveMailbox(actor, clientId, input.mailbox);
+  const row = await resolveMailbox(actor, clientId, input.mailbox, "write");
   if (input.draftId) {
     const draft = await guarded(row, () => getDraft(row.unipileAccountId, input.draftId!));
     const sent = await guarded(row, () => sendDraft(row.unipileAccountId, input.draftId!));
     await used(actor, row, "send_draft", { draftId: input.draftId, sentId: sent.id, to: rawAddresses(draft.to).map(lower), cc: rawAddresses(draft.cc).map(lower) }, "mail_write");
     return { mailbox: row.account, sent: true, kind: "draft", emailId: sent.id, to: rawAddresses(draft.to).map((a) => a.email), subject: summaryOf(draft)?.subject ?? null };
   }
-  const { email, kind } = await guarded(row, () => compose(row.unipileAccountId, row.account, input));
+  const { email, kind } = await guarded(row, () => compose(row, input));
   const sent = await guarded(row, () => sendEmail(row.unipileAccountId, email));
   await used(actor, row, "send", { kind, sentId: sent.id, replyTo: input.replyToEmailId ?? null, forwarded: input.forwardEmailId ?? null, ...who(email) }, "mail_write");
   return {
@@ -239,10 +245,10 @@ export type OrganizeAction = "mark_read" | "mark_unread" | "set_folders" | "add_
 
 export async function organizeClientEmail(
   actor: User,
-  clientId: string,
+  clientId: string | null,
   input: { mailbox?: string; emailIds: string[]; action: OrganizeAction; folderIds?: string[]; categories?: string[] },
 ) {
-  const row = await resolveMailbox(actor, clientId, input.mailbox);
+  const row = await resolveMailbox(actor, clientId, input.mailbox, "write");
   const ids = [...new Set(input.emailIds)].slice(0, 50);
   if (ids.length === 0) throw new DomainError("connections.mailbox.idRequired", "מעבירים מזהה של מייל או של שרשור.");
   const account = await guarded(row, () => readMailAccount(row.unipileAccountId));
@@ -276,7 +282,7 @@ export async function organizeClientEmail(
 
 export async function manageClientMailFolders(
   actor: User,
-  clientId: string,
+  clientId: string | null,
   input: {
     mailbox?: string;
     action: "create_folder" | "update_folder" | "delete_folder" | "create_category" | "delete_category";
@@ -288,7 +294,7 @@ export async function manageClientMailFolders(
     color?: string;
   },
 ) {
-  const row = await resolveMailbox(actor, clientId, input.mailbox);
+  const row = await resolveMailbox(actor, clientId, input.mailbox, "write");
   const account = await guarded(row, () => readMailAccount(row.unipileAccountId));
   const a = row.unipileAccountId;
   const style = { ...(input.parentId ? { parent_id: input.parentId } : {}), ...(input.textColor ? { text_color: input.textColor } : {}), ...(input.backgroundColor ? { background_color: input.backgroundColor } : {}) };

@@ -4,6 +4,7 @@ import { useActionState, useState, useTransition } from "react";
 import type { ConnectionKind } from "@prisma/client";
 import { useFormatter, useTranslations } from "next-intl";
 import { addAppPasswordAction, disconnectAction, mailboxLinkAction, testConnectionAction } from "./actions";
+import { MailboxAccessPanel, type AccessView } from "./MailboxAccessPanel";
 
 // The connections screen as designed (artboard "חיבורים של הלקוח",
 // https://claude.ai/artifact/CjzpzkxiB8xRvpaZNBWkAr).
@@ -43,6 +44,8 @@ export function ConnectionsScreen(props: {
   mayManage: boolean;
   googleReady: boolean;
   mailboxReady: boolean;
+  mailboxAccess: Record<string, AccessView>;
+  mayEditAccess: boolean;
   userId: string;
   notice: { text: string; error: boolean } | null;
 }) {
@@ -145,6 +148,9 @@ export function ConnectionsScreen(props: {
                 </label>
               )}
               {msg?.id === c.id && <p className={`text-xs ${msg.error ? "text-app-error" : "text-app-success"}`}>{msg.text}</p>}
+              {c.kind === "UNIPILE_MAIL" && props.mailboxAccess[c.id] && (
+                <MailboxAccessPanel clientId={props.clientId} connectionId={c.id} view={props.mailboxAccess[c.id]} mayEdit={props.mayEditAccess} />
+              )}
               {props.mayManage && c.kind === "UNIPILE_MAIL" && (
                 <button
                   type="button"

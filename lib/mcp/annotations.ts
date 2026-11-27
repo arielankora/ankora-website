@@ -161,6 +161,7 @@ export const TOOL_ANNOTATIONS = {
   get_client_mailbox: READ_ONLY,
   search_client_emails: READ_ONLY,
   list_connected_mailboxes: READ_ONLY,
+  list_my_mailboxes: READ_ONLY,
   list_sent_emails: READ_ONLY,
   list_email_waits: READ_ONLY,
   list_email_threads_to_extract: READ_ONLY,
