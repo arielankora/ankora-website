@@ -150,9 +150,13 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
           ) : excludedNames.length ? (
             <p className="text-app-text-secondary">{t("excludedSome", { names: excludedNames.join(", ") })}</p>
           ) : null}
-          {channel.storeEnabled ? <p className="text-app-text-secondary">{t("history", { count: loaded })}</p> : null}
+          {/* 27.11.2026 (Ariel): once the whole history is in, it says so and
+              stops offering to load more. */}
+          {channel.storeEnabled ? (
+            <p className="text-app-text-secondary">{t(channel.historyLoadedAt ? "historyDone" : "history", { count: loaded })}</p>
+          ) : null}
         </div>
-        {channel.storeEnabled && isOwnerOrManager ? <LoadHistoryForm channelId={channel.id} /> : null}
+        {channel.storeEnabled && isOwnerOrManager && !channel.historyLoadedAt ? <LoadHistoryForm channelId={channel.id} /> : null}
         {manager ? (
           <ExtractionForm channelId={channel.id} allowed={channel.extractionAllowed} />
         ) : (
@@ -255,18 +259,32 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
         </section>
       ) : null}
 
-      <section className="space-y-3 rounded-2xl border border-app-border bg-white p-4">
-        <h2 className="text-base font-medium text-app-text-primary">{t("connectHeading")}</h2>
-        <p className="text-sm text-app-text-secondary">{t("connectIntro")}</p>
-        {accountsError ? <p className="text-sm text-app-text-secondary">{t("accountsError", { error: accountsError })}</p> : null}
-        <ConnectForm
-          accounts={accounts}
-          manualAccount={accounts.length === 0}
-          people={people.filter((p) => p.id !== user.id || manager)}
-          owners={manager ? people : null}
-          selfId={user.id}
-        />
-      </section>
+      {/* 27.11.2026 (Ariel): employees connect their own number from "חיבור
+          ה-WhatsApp שלי", so this form is needed only for a number linked in
+          Unipile directly and not in Ankora yet. Open when there is one;
+          folded away otherwise. */}
+      {accounts.length > 0 || accountsError ? (
+        <section className="space-y-3 rounded-2xl border border-app-border bg-white p-4">
+          <h2 className="text-base font-medium text-app-text-primary">{t("connectHeading")}</h2>
+          <p className="text-sm text-app-text-secondary">{t("connectIntro")}</p>
+          {accountsError ? <p className="text-sm text-app-text-secondary">{t("accountsError", { error: accountsError })}</p> : null}
+          <ConnectForm
+            accounts={accounts}
+            manualAccount={accounts.length === 0}
+            people={people.filter((p) => p.id !== user.id || manager)}
+            owners={manager ? people : null}
+            selfId={user.id}
+          />
+        </section>
+      ) : (
+        <details className="rounded-2xl border border-app-border bg-white p-4">
+          <summary className="flex min-h-11 cursor-pointer items-center text-sm text-app-text-primary underline">{t("connectFolded")}</summary>
+          <div className="space-y-3 pt-2">
+            <p className="text-sm text-app-text-secondary">{t("connectFoldedIntro")}</p>
+            <ConnectForm accounts={accounts} manualAccount people={people.filter((p) => p.id !== user.id || manager)} owners={manager ? people : null} selfId={user.id} />
+          </div>
+        </details>
+      )}
     </div>
   );
 }

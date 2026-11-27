@@ -8128,6 +8128,7 @@
       "excludedAll": "Can't see conversations from this number: everyone except its owner.",
       "excludedSome": "Can't see conversations from this number: {names}.",
       "history": "History: {count, plural, one {# conversation} other {# conversations}} loaded. The rest loads in the nightly run, or now:",
+      "historyDone": "The history is loaded: {count, plural, one {one conversation} other {# conversations}}. New conversations are saved on their own.",
       "whatNotToStore": "What not to store",
       "whatNotToStoreHint": "Tick every personal conversation that shouldn't be stored, then press \"Save selection\". The latest {count, plural, one {# conversation is} other {# conversations are}} shown.",
       "startHeading": "Start storing",
@@ -8248,7 +8249,9 @@
         "extractionOff": "The automatic extraction will not read this number's conversations."
       },
       "extractionOn": "The automatic extraction for client files reads this number's conversations.",
-      "extractionOff": "The automatic extraction does not read this number's conversations."
+      "extractionOff": "The automatic extraction does not read this number's conversations.",
+      "connectFolded": "Connect by hand a number linked directly in Unipile",
+      "connectFoldedIntro": "Each employee connects their own number on \"My WhatsApp connection\", and it shows here on its own. This form is only for a number linked directly in the Unipile dashboard and not in Ankora yet."
     },
     "connect": {
       "back": "Back to communications",

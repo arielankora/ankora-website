@@ -511,7 +511,18 @@ export async function backfillChannel(
   const now = options.now ?? Date.now;
   const start = now();
   const unipile = unipileFor(channel);
-  const result = { chats: 0, messages: 0, stoppedBy: "done" as "done" | "budget" | "quota" | "not-configured" };
+  // 27.11.2026: `listed`, `blocked` and `loadedBefore` go into the nightly
+  // summary, so a number with few loaded chats shows whether Unipile listed
+  // few, or the chats were blocked (Ariel: Hadas and Maor had 13 and 8 after
+  // a week).
+  const result = {
+    chats: 0,
+    messages: 0,
+    listed: 0,
+    blocked: 0,
+    loadedBefore: 0,
+    stoppedBy: "done" as "done" | "budget" | "quota" | "not-configured",
+  };
   if (!channel.storeEnabled || !unipile) return { ...result, stoppedBy: "not-configured" as const };
 
   let chats: PocChat[];
@@ -530,9 +541,16 @@ export async function backfillChannel(
       })
     ).map((c) => c.externalChatId),
   );
+  result.listed = chats.length;
   for (const chat of chats) {
-    if (done.has(chat.id)) continue;
-    if (blockStateFor(blocks, { phone: chatPhone(chat), chatId: chat.id }) === "blocked") continue;
+    if (done.has(chat.id)) {
+      result.loadedBefore += 1;
+      continue;
+    }
+    if (blockStateFor(blocks, { phone: chatPhone(chat), chatId: chat.id }) === "blocked") {
+      result.blocked += 1;
+      continue;
+    }
     if (now() - start > options.budgetMs) return { ...result, stoppedBy: "budget" as const };
     let messages: PocMessage[];
     try {
@@ -560,6 +578,9 @@ export async function backfillChannel(
     });
     result.chats += 1;
   }
+  // 27.11.2026: the whole list went through, so the setup screen says the
+  // history is loaded instead of offering to load more.
+  if (!channel.historyLoadedAt) await prisma.commsChannel.update({ where: { id: channel.id }, data: { historyLoadedAt: new Date() } });
   return result;
 }
 
