@@ -1801,7 +1801,8 @@
       "domainListed": "{domain} כבר ברשימה.",
       "domainNotFound": "הדומיין לא נמצא.",
       "driveFolderUnrecognized": "תיקיית הדרייב לא מזוהה. מדביקים קישור לתיקייה או את המזהה שלה.",
-      "conversationsDocUnrecognized": "המסמך המצטבר לא מזוהה. מדביקים קישור למסמך או את המזהה שלו."
+      "conversationsDocUnrecognized": "המסמך המצטבר לא מזוהה. מדביקים קישור למסמך או את המזהה שלו.",
+      "threadNotInClient": "שרשור שצוין כמקור לא שייך ללקוח."
     },
     "clientNarratives": {
       "tooLong": "הטקסט ארוך מדי.",
@@ -2096,6 +2097,11 @@
       "emptyReminder": "צריך לכתוב את נוסח התזכורת.",
       "noRecipients": "לא ידוע למי נשלח המייל, ולכן אי אפשר לשלוח תזכורת.",
       "badDate": "המועד צריך להיות תאריך ושעה בעתיד."
+    },
+    "mailExtraction": {
+      "threadNotFound": "השרשור לא נמצא, או שאין לך גישה לחלץ ממנו.",
+      "notInThread": "המייל הזה לא שייך לשרשור.",
+      "badTime": "`through` צריך להיות זמן ISO, כמו newestAt שחזר מקריאת השרשור."
     }
   },
   "auditLog": {
@@ -2423,7 +2429,9 @@
       "taskMailWaitStopped": "הפסקת מעקב אחרי תשובה למייל",
       "taskMailWaitRescheduled": "שינוי מועד התזכורת לתשובה למייל",
       "taskMailReminderSent": "שליחת תזכורת במייל",
-      "taskUnblockedByReply": "הגיעה תשובה במייל, והמשימה כבר לא ממתינה"
+      "taskUnblockedByReply": "הגיעה תשובה במייל, והמשימה כבר לא ממתינה",
+      "mailThreadExtractionRead": "קריאת שרשור מייל לחילוץ ידע",
+      "mailThreadExtractionAttachment": "קריאת קובץ מצורף ממייל לחילוץ ידע"
     },
     "kinds": {
       "failure": "כשלון",

@@ -63,6 +63,15 @@ export function idBucket(id: string): number {
   return h % 100;
 }
 
+/// Stage 3 of "התיבות שלי" (27.11.2026): items that entered on their own
+/// from an email are all looked at for the first 14 days after the first
+/// one did, as every item was when auto-apply itself began.
+function emailFirstDays(p: { decidedAt: Date; fromEmail?: boolean }, ctx: { firstEmailAutoAt?: Date | null }): boolean {
+  if (!p.fromEmail) return false;
+  if (!ctx.firstEmailAutoAt) return true;
+  return p.decidedAt.getTime() < ctx.firstEmailAutoAt.getTime() + AUTO_REVIEW_ALL_DAYS * DAY;
+}
+
 /// Whether an auto-applied proposal is in the fixed sample a person looks at.
 export function inAutoSample(id: string): boolean {
   return idBucket(id) < AUTO_REVIEW_SAMPLE_PERCENT;
@@ -73,10 +82,11 @@ export function inAutoSample(id: string): boolean {
 /// item is looked at). `guideApprovals`: when each extraction guide
 /// version was approved.
 export function needsAutoReview(
-  p: { id: string; decidedAt: Date },
-  ctx: { firstEnabledAt: Date | null; guideApprovals: Date[] }
+  p: { id: string; decidedAt: Date; fromEmail?: boolean },
+  ctx: { firstEnabledAt: Date | null; guideApprovals: Date[]; firstEmailAutoAt?: Date | null }
 ): boolean {
   const at = p.decidedAt.getTime();
+  if (emailFirstDays(p, ctx)) return true;
   if (!ctx.firstEnabledAt || at < ctx.firstEnabledAt.getTime() + AUTO_REVIEW_ALL_DAYS * DAY) return true;
   if (ctx.guideApprovals.some((g) => at >= g.getTime() && at < g.getTime() + GUIDE_REVIEW_DAYS * DAY)) return true;
   return inAutoSample(p.id);
@@ -84,10 +94,11 @@ export function needsAutoReview(
 
 /// Why a person looks at this item, in a short Hebrew line, or null.
 export function autoReviewReason(
-  p: { id: string; decidedAt: Date },
-  ctx: { firstEnabledAt: Date | null; guideApprovals: Date[] }
+  p: { id: string; decidedAt: Date; fromEmail?: boolean },
+  ctx: { firstEnabledAt: Date | null; guideApprovals: Date[]; firstEmailAutoAt?: Date | null }
 ): string | null {
   const at = p.decidedAt.getTime();
+  if (emailFirstDays(p, ctx)) return `מיילים, ${AUTO_REVIEW_ALL_DAYS} הימים הראשונים: בודקים כל פריט`;
   if (!ctx.firstEnabledAt || at < ctx.firstEnabledAt.getTime() + AUTO_REVIEW_ALL_DAYS * DAY) return `${AUTO_REVIEW_ALL_DAYS} הימים הראשונים: בודקים כל פריט`;
   if (ctx.guideApprovals.some((g) => at >= g.getTime() && at < g.getTime() + GUIDE_REVIEW_DAYS * DAY)) return "הנחיות חילוץ חדשות: בודקים כל פריט שבוע";
   if (inAutoSample(p.id)) return `מדגם של ${AUTO_REVIEW_SAMPLE_PERCENT}%`;
@@ -97,10 +108,11 @@ export function autoReviewReason(
 /// autoReviewReason as a code with its numbers, for a screen that words
 /// it in the reader's language (ADR 0006), or null.
 export function autoReviewReasonCode(
-  p: { id: string; decidedAt: Date },
-  ctx: { firstEnabledAt: Date | null; guideApprovals: Date[] }
+  p: { id: string; decidedAt: Date; fromEmail?: boolean },
+  ctx: { firstEnabledAt: Date | null; guideApprovals: Date[]; firstEmailAutoAt?: Date | null }
 ): { code: "firstDays"; days: number } | { code: "newGuide" } | { code: "sample"; percent: number } | null {
   const at = p.decidedAt.getTime();
+  if (emailFirstDays(p, ctx)) return { code: "firstDays", days: AUTO_REVIEW_ALL_DAYS };
   if (!ctx.firstEnabledAt || at < ctx.firstEnabledAt.getTime() + AUTO_REVIEW_ALL_DAYS * DAY) return { code: "firstDays", days: AUTO_REVIEW_ALL_DAYS };
   if (ctx.guideApprovals.some((g) => at >= g.getTime() && at < g.getTime() + GUIDE_REVIEW_DAYS * DAY)) return { code: "newGuide" };
   if (inAutoSample(p.id)) return { code: "sample", percent: AUTO_REVIEW_SAMPLE_PERCENT };

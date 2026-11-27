@@ -24,6 +24,8 @@ import {
   setMailExtractionAllowed,
   startScanning,
 } from "@/lib/mail-scan/channels";
+import { markThreadsExtracted, readThreadAttachment, readThreadForExtraction, threadsToExtract } from "@/lib/mail-scan/extraction";
+import { EXTRACT_THREADS_NOTES, READ_THREAD_NOTES } from "@/lib/mcp/tool-field-notes";
 import { followEmailReply, myOpenWaits, sendWaitReminder, sentEmails, setReminder, stopFollowing, threadSentTo } from "@/lib/mail-scan/waits";
 
 // "התיבות שלי" through the connector (27.11.2026, Ariel: "כל מה שיש באפליקציה
@@ -301,6 +303,97 @@ export function registerMailScanTools(server: McpServer): void {
       try {
         const actor = actorOf(ctx);
         return toolJson(withFieldNotes({ waits: await myOpenWaits(actor) }, EMAIL_WAITS_NOTES));
+      } catch (err) {
+        return toolFailure(err);
+      }
+    },
+  );
+
+  // Stage 3 (27.11.2026): knowledge extraction from scanned mailboxes.
+  server.registerTool(
+    "list_email_threads_to_extract",
+    {
+      title: "List email threads with something new to extract",
+      description: [
+        "The threads with clients in scanned mailboxes that have emails the knowledge extraction has not read yet, oldest first. For the extraction account (every mailbox whose extraction is allowed) or a mailbox's owner (their own). `client` narrows to one client. Read-only.",
+        FIELD_NOTES_SENTENCE,
+      ].join(" "),
+      inputSchema: z.object({ client: z.string().max(200).optional(), limit: z.number().int().min(1).max(100).optional() }),
+      annotations: TOOL_ANNOTATIONS.list_email_threads_to_extract,
+    },
+    async (args: { client?: string; limit?: number }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        let clientId: string | undefined;
+        if (args.client) {
+          const client = await lookupClient(actor, args.client);
+          if (!client.ok) return toolText(client.message);
+          clientId = client.value.id;
+        }
+        return toolJson(withFieldNotes({ threads: await threadsToExtract(actor, { clientId, limit: args.limit }) }, EXTRACT_THREADS_NOTES));
+      } catch (err) {
+        return toolFailure(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "read_email_thread",
+    {
+      title: "Read a thread's new emails for extraction",
+      description: [
+        "The emails of one thread from list_email_threads_to_extract that the extraction has not read, oldest first, with their text and attachments' ids. `all` adds the emails already read, for context. Read-only.",
+        FIELD_NOTES_SENTENCE,
+      ].join(" "),
+      inputSchema: z.object({ thread: z.string().max(100), all: z.boolean().optional() }),
+      annotations: TOOL_ANNOTATIONS.read_email_thread,
+    },
+    async (args: { thread: string; all?: boolean }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        return toolJson(withFieldNotes(await readThreadForExtraction(actor, args.thread, { all: args.all }), READ_THREAD_NOTES));
+      } catch (err) {
+        return toolFailure(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "read_email_thread_attachment",
+    {
+      title: "Read an attachment in a thread for extraction",
+      description: "The text of a file attached to an email in a thread from read_email_thread: PDF, Word, Excel, PowerPoint or text. Images and scans are not read. Read-only.",
+      inputSchema: z.object({ thread: z.string().max(100), emailId: z.string().max(500), attachmentId: z.string().max(500) }),
+      annotations: TOOL_ANNOTATIONS.read_email_thread_attachment,
+    },
+    async (args: { thread: string; emailId: string; attachmentId: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        return toolJson(await readThreadAttachment(actor, args));
+      } catch (err) {
+        return toolFailure(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "mark_email_threads_extracted",
+    {
+      title: "Mark email threads as read by the extraction",
+      description:
+        "Marks threads read up to `through` (`newestAt` from read_email_thread), so the next run starts after it. Call it for a thread that gave nothing to propose; propose_knowledge with newSource.mailThread marks its thread itself.",
+      inputSchema: z.object({
+        threads: z
+          .array(z.object({ thread: z.string().max(100), through: z.string().max(40) }))
+          .min(1)
+          .max(100),
+      }),
+      annotations: TOOL_ANNOTATIONS.mark_email_threads_extracted,
+    },
+    async (args: { threads: Array<{ thread: string; through: string }> }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        return toolJson({ marked: (await markThreadsExtracted(actor, args.threads)).length });
       } catch (err) {
         return toolFailure(err);
       }

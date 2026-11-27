@@ -3,6 +3,7 @@ import { FIELD_NOTES_SENTENCE, withFieldNotes } from "@/lib/mcp/field-notes";
 import { GET_PROCESS_NOTES, PROCESS_SUMMARY_NOTES } from "@/lib/mcp/tool-field-notes";
 import { readClientCall, readClientConversation } from "@/lib/comms/client-comms";
 import { whatsappRefId } from "@/lib/comms/extraction-refs";
+import { canExtractThread, markThreadsExtracted } from "@/lib/mail-scan/extraction";
 import { deniedText } from "@/lib/mcp/comms-tools";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { appUrl, batchUrl, fileItemUrl, proposalUrl } from "@/lib/approval-links";
@@ -188,6 +189,13 @@ const PROPOSE_INPUT = z.object({
         participants: z.array(z.string()).max(MAX_PARTICIPANTS).optional(),
         firefliesId: z.string().optional(),
         gmailThreadId: z.string().optional().describe("For kind EMAIL: the Gmail thread id, so the same thread is one source."),
+        mailThread: z
+          .object({
+            thread: z.string().describe("The thread's `thread` from list_email_threads_to_extract."),
+            through: z.string().describe("ISO time: the newest email read, `newestAt` from read_email_thread."),
+          })
+          .optional()
+          .describe("For kind EMAIL: a thread of a scanned mailbox. The same thread is one source, and it is marked read up to `through`."),
         documentId: z.string().optional().describe("For a document in the client's file (list_documents)."),
         taskId: z.string().optional().describe("For kind TASK: the task the knowledge came out of, such as a mapping task."),
         topicsOnly: z.boolean().optional().describe("True for a restricted meeting: topics only, no quotes."),
@@ -465,7 +473,7 @@ export function registerClientFileTools(server: McpServer): void {
       args: {
         client: string;
         sourceCode?: string;
-        newSource?: { kind: "TRANSCRIPT" | "CLIENT_DOCUMENT" | "TASK" | "PERSON" | "ANKORA_DOCUMENT" | "EMAIL"; title: string; date?: string; participants?: string[]; firefliesId?: string; gmailThreadId?: string; documentId?: string; taskId?: string; topicsOnly?: boolean; clientConversation?: boolean; whatsapp?: { conversationId: string; from: string; to: string }; callId?: string };
+        newSource?: { kind: "TRANSCRIPT" | "CLIENT_DOCUMENT" | "TASK" | "PERSON" | "ANKORA_DOCUMENT" | "EMAIL"; title: string; date?: string; participants?: string[]; firefliesId?: string; gmailThreadId?: string; documentId?: string; taskId?: string; topicsOnly?: boolean; clientConversation?: boolean; whatsapp?: { conversationId: string; from: string; to: string }; callId?: string; mailThread?: { thread: string; through: string } };
         note?: string;
         uncertain?: { candidates: string[]; reason: string };
         items: (ProposalItemInput & { client?: string })[];
@@ -483,7 +491,14 @@ export function registerClientFileTools(server: McpServer): void {
         if (ns?.taskId && (await isTaskAiExcluded(ns.taskId))) return toolText(AI_EXCLUDED_TOOL_MESSAGE);
         if (ns?.documentId && (await isDocumentAiExcluded(ns.documentId))) return toolText(AI_EXCLUDED_TOOL_MESSAGE);
         if (ns?.date && !/^\d{4}-\d{2}-\d{2}$/.test(ns.date)) return toolText("newSource.date must be YYYY-MM-DD.");
-        if (ns?.kind === "EMAIL" && !ns.gmailThreadId) return toolText("newSource of kind EMAIL needs `gmailThreadId`, so the same thread is never registered twice.");
+        if (ns?.kind === "EMAIL" && !ns.gmailThreadId && !ns.mailThread) return toolText("newSource of kind EMAIL needs `mailThread` (a scanned mailbox's thread) or `gmailThreadId`, so the same thread is never registered twice.");
+        // Stage 3 of "התיבות שלי" (27.11.2026): a thread of a scanned mailbox
+        // must be one the user may extract from, and this client's.
+        if (ns?.mailThread) {
+          if (ns.kind !== "EMAIL") return toolText("A mailbox thread is a source of kind EMAIL.");
+          if (!(await canExtractThread(actor, ns.mailThread.thread, client.value.id))) return toolText("That thread is not this client's, or you may not extract from it. list_email_threads_to_extract gives the threads.");
+          if (Number.isNaN(Date.parse(ns.mailThread.through))) return toolText("newSource.mailThread.through must be an ISO time (`newestAt` from read_email_thread).");
+        }
         // 14.11.2026: a stretch of a stored WhatsApp conversation, or a
         // recorded call, must be one the user may read for this client
         // (lib/comms/client-comms.ts), and is found again by its ref.
@@ -498,8 +513,8 @@ export function registerClientFileTools(server: McpServer): void {
               title: ns.title,
               occurredAt: ns.date ? new Date(`${ns.date}T00:00:00Z`) : null,
               participants: ns.participants,
-              externalIds: comms ? [comms.id] : [ns.firefliesId, ns.gmailThreadId, ns.documentId, ns.taskId].filter((v): v is string => !!v),
-              ...(comms ? { externalSystem: comms.system } : {}),
+              externalIds: comms ? [comms.id] : ns.mailThread ? [ns.mailThread.thread] : [ns.firefliesId, ns.gmailThreadId, ns.documentId, ns.taskId].filter((v): v is string => !!v),
+              ...(comms ? { externalSystem: comms.system } : ns.mailThread ? { externalSystem: "MAIL" as const } : {}),
               restriction: ns.topicsOnly ? ("TOPICS_ONLY" as const) : ("NONE" as const),
               ...(ns.kind === "ANKORA_DOCUMENT" && ns.clientConversation ? { weight: "PRIMARY" as const } : {}),
             }
@@ -574,6 +589,8 @@ export function registerClientFileTools(server: McpServer): void {
             reviewUrl: result.batchId ? batchUrl(base, g.id, result.batchId) : null,
           });
         }
+        // Stage 3: the thread was read up to `through`; the next run starts after it.
+        if (ns?.mailThread) await markThreadsExtracted(actor, [{ thread: ns.mailThread.thread, through: ns.mailThread.through }]);
         const entered = batches.reduce((n, b) => n + b.enteredFile.length, 0);
         const proposed = batches.reduce((n, b) => n + b.proposed, 0) - entered;
         const matched = batches.reduce((n, b) => n + b.possibleMatches.length, 0);

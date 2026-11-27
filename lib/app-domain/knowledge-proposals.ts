@@ -68,7 +68,8 @@ import { isInternalClient } from "@/lib/app-domain/internal-client-id";
 import { assertCanApproveForClient, canApproveForClient, notifyRuleApprovers, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
 import { datesInFile, isNamedTarget, listsOf, nameFieldOf, namesInFile } from "@/lib/app-domain/name-duplicates";
 import { findDateMatches, findNameMatches, nameTokens } from "@/lib/name-match";
-import { autoApplySetting, evaluateAutoPauses } from "@/lib/app-domain/auto-apply";
+import { autoApplySetting, evaluateAutoPauses, noteEmailAutoApply } from "@/lib/app-domain/auto-apply";
+import { isOwnDetailsUpdate } from "@/lib/mail-scan/own-details";
 import { proposalKindKey } from "@/lib/knowledge-review-filters";
 
 // Org brain, phase 2: proposals to the client file
@@ -604,11 +605,16 @@ async function autoApplyBatch(actor: User, batchId: string, clientId: string): P
   if (!client || client.aiExcluded) return [];
   const source = await batchSource(batchId);
   const pending = await prisma.knowledgeProposal.findMany({ where: { batchId, state: "PENDING" }, orderBy: { createdAt: "asc" } });
+  // Stage 3 of "התיבות שלי" (27.11.2026): from an email thread, a contact's
+  // own details changed in that contact's own email enter too.
+  const senders = await mailThreadSenders(batchId);
+  const contactEmails = senders.length ? await contactEmailsOf(pending.filter((p) => p.target === "CONTACT" && p.targetId).map((p) => p.targetId!)) : new Map<string, string[]>();
   const auto = pending.filter((p) => {
     const flags = (Array.isArray(p.flags) ? p.flags : []) as ProposalFlag[];
     const payload = p.payload as Record<string, unknown>;
     const level = proposalReviewLevel({ confidence: p.confidence, flags, payload }, source);
-    return approvalTier({ target: p.target as ProposalTargetLike, action: p.action, flags, payload, level }).tier === "AUTO";
+    if (approvalTier({ target: p.target as ProposalTargetLike, action: p.action, flags, payload, level }).tier === "AUTO") return true;
+    return senders.length > 0 && !!p.targetId && isOwnDetailsUpdate({ target: p.target, action: p.action, payload, flags, level }, { contactEmails: contactEmails.get(p.targetId) ?? [], threadSenders: senders });
   });
   if (auto.length === 0) return [];
   const keyOf = (p: (typeof auto)[number]) => proposalKindKey({ target: p.target as ProposalTargetLike, payload: p.payload as Record<string, unknown> });
@@ -620,6 +626,7 @@ async function autoApplyBatch(actor: User, batchId: string, clientId: string): P
     try {
       const done = await approveProposal(actor, p.id, {}, { auto: true });
       out.push({ proposalId: p.id, target: p.target as ProposalTargetLike, headline: proposalHeadline(p.target as ProposalTargetLike, done.payload as Record<string, unknown>), resultId: done.resultId });
+      if (source?.kind === "EMAIL") await noteEmailAutoApply();
     } catch (err) {
       console.warn("[knowledge] auto-apply left a proposal for a person", p.id, err instanceof Error ? err.message : err);
     }
@@ -1409,6 +1416,30 @@ export async function decideProposals(
 }
 
 /// The source of a proposal's batch, as reviewConfidence reads it.
+/// Who wrote in the mailbox thread a batch came from (stage 3 of "התיבות
+/// שלי"), or nothing when its source is not one.
+async function mailThreadSenders(batchId: string): Promise<string[]> {
+  const batch = await prisma.knowledgeBatch.findUnique({ where: { id: batchId }, select: { sourceId: true } });
+  if (!batch?.sourceId) return [];
+  const src = await prisma.clientSource.findUnique({ where: { id: batch.sourceId }, select: { kind: true, externalRefs: true } });
+  if (src?.kind !== "EMAIL") return [];
+  const ids = readExternalRefs(src.externalRefs).filter((r) => r.system === "MAIL").map((r) => r.id);
+  if (!ids.length) return [];
+  const threads = await prisma.mailThread.findMany({ where: { id: { in: ids } }, select: { senders: true } });
+  return [...new Set(threads.flatMap((t) => t.senders))];
+}
+
+/// Each contact's addresses in the file.
+async function contactEmailsOf(contactIds: string[]): Promise<Map<string, string[]>> {
+  if (!contactIds.length) return new Map();
+  const rows = await prisma.clientContact.findMany({ where: { id: { in: contactIds } }, select: { id: true, person: { select: { emails: true } } } });
+  return new Map(rows.map((r) => [r.id, r.person.emails]));
+}
+
+function readExternalRefs(v: unknown): Array<{ system: string; id: string }> {
+  return Array.isArray(v) ? (v as Array<{ system?: unknown; id?: unknown }>).filter((r) => typeof r?.system === "string" && typeof r?.id === "string").map((r) => ({ system: r.system as string, id: r.id as string })) : [];
+}
+
 export async function batchSource(batchId: string): Promise<{ kind: SourceKind; restriction: SourceRestriction } | null> {
   const batch = await prisma.knowledgeBatch.findUnique({ where: { id: batchId }, select: { sourceId: true } });
   if (!batch?.sourceId) return null;

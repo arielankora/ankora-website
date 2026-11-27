@@ -163,6 +163,10 @@ export const TOOL_ANNOTATIONS = {
   list_connected_mailboxes: READ_ONLY,
   list_sent_emails: READ_ONLY,
   list_email_waits: READ_ONLY,
+  list_email_threads_to_extract: READ_ONLY,
+  read_email_thread: READ_ONLY,
+  read_email_thread_attachment: READ_ONLY,
+  mark_email_threads_extracted: WRITES,
   manage_connected_mailbox: WRITES,
   follow_email_reply: WRITES,
   manage_email_wait: WRITES,
@@ -324,6 +328,7 @@ export const WRITE_TOOLS = [
   "manage_connected_mailbox",
   "follow_email_reply",
   "manage_email_wait",
+  "mark_email_threads_extracted",
 ] as const;
 
 /// Phase 16: task tools are NOT in TEAM_TOOLS.

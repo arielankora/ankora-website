@@ -1801,7 +1801,8 @@
       "domainListed": "{domain} is already on the list.",
       "domainNotFound": "Domain not found.",
       "driveFolderUnrecognized": "The Drive folder was not recognized. Paste a link to the folder or its ID.",
-      "conversationsDocUnrecognized": "The running document was not recognized. Paste a link to the document or its ID."
+      "conversationsDocUnrecognized": "The running document was not recognized. Paste a link to the document or its ID.",
+      "threadNotInClient": "A thread named as a source is not this client's."
     },
     "clientNarratives": {
       "tooLong": "The text is too long.",
@@ -2096,6 +2097,11 @@
       "emptyReminder": "Write the text of the reminder.",
       "noRecipients": "It is not known whom the email went to, so no reminder can be sent.",
       "badDate": "The time must be a date and time in the future."
+    },
+    "mailExtraction": {
+      "threadNotFound": "The thread was not found, or you may not extract from it.",
+      "notInThread": "That email is not in the thread.",
+      "badTime": "`through` must be an ISO time, like the newestAt the thread's reading returned."
     }
   },
   "auditLog": {
@@ -2423,7 +2429,9 @@
       "taskMailWaitStopped": "Stopped following an email reply",
       "taskMailWaitRescheduled": "Email reply reminder rescheduled",
       "taskMailReminderSent": "Email reminder sent",
-      "taskUnblockedByReply": "An email reply arrived, and the task stopped waiting"
+      "taskUnblockedByReply": "An email reply arrived, and the task stopped waiting",
+      "mailThreadExtractionRead": "Email thread read for knowledge extraction",
+      "mailThreadExtractionAttachment": "Email attachment read for knowledge extraction"
     },
     "kinds": {
       "failure": "Failure",

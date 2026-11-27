@@ -1539,6 +1539,24 @@ exports[`propose_knowledge payloads, as tools/list publishes them > matches the 
           ],
           "type": "string",
         },
+        "mailThread": {
+          "description": "For kind EMAIL: a thread of a scanned mailbox. The same thread is one source, and it is marked read up to \`through\`.",
+          "properties": {
+            "thread": {
+              "description": "The thread's \`thread\` from list_email_threads_to_extract.",
+              "type": "string",
+            },
+            "through": {
+              "description": "ISO time: the newest email read, \`newestAt\` from read_email_thread.",
+              "type": "string",
+            },
+          },
+          "required": [
+            "thread",
+            "through",
+          ],
+          "type": "object",
+        },
         "participants": {
           "items": {
             "type": "string",
