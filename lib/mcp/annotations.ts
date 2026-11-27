@@ -160,6 +160,7 @@ export const TOOL_ANNOTATIONS = {
   // stage. Every read is audited on the connection.
   get_client_mailbox: READ_ONLY,
   search_client_emails: READ_ONLY,
+  list_connected_mailboxes: READ_ONLY,
   get_client_email: READ_ONLY,
   read_client_email_attachment: READ_ONLY,
   list_client_mail_folders: READ_ONLY,

@@ -115,6 +115,7 @@
     "QA_TRACE": null,
     "RESEND_API_KEY": "Resend",
     "UNIPILE_API_KEY": "Unipile",
+    "UNIPILE_WEBHOOK_ENDPOINT_ID": "Unipile",
     "UNIPILE_WEBHOOK_SECRET": "Unipile",
     "UNIPILE_WHATSAPP_ACCOUNT_ID": "Unipile",
     "UPSTASH_REDIS_REST_TOKEN": "Upstash",

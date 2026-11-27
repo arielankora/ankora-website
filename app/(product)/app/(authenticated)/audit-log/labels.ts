@@ -99,6 +99,9 @@ export const ENTITY_TYPES = [
   "CommsChannel",
   "CommsBlock",
   "CommsConversation",
+  // "התיבות שלי" (27.11.2026).
+  "MailChannel",
+  "MailBlock",
 ];
 
 export const ACTION_LABEL: Record<string, string> = {
@@ -439,6 +442,17 @@ export const ACTION_LABEL: Record<string, string> = {
   "comms_block.approved": "חסימת מספר משמירה, ומחיקת מה שנשמר ממנו",
   "comms_block.rejected": "דחיית בקשת חסימה",
   "comms_block.revoked": "ביטול חסימת מספר",
+  "mail_channel.connected": "חיבור תיבת דואר לסריקה",
+  "mail_channel.reused": "חיבור תיבת דואר של לקוח לסריקה דרך החיבור הקיים",
+  "mail_channel.reconnected": "חיבור מחדש של תיבת דואר",
+  "mail_channel.kind_chosen": "בחירה של מי תיבת הדואר",
+  "mail_channel.scan_started": "הפעלת סריקה של תיבת דואר",
+  "mail_channel.extraction_updated": "שינוי חילוץ הידע מתיבת דואר",
+  "mail_channel.owner_changed": "שינוי הבעלים של תיבת דואר",
+  "mail_block.requested": "בקשה לא לקרוא כתובת בתיבת דואר",
+  "mail_block.approved": "\"לא לקרוא\" בתיבת דואר, ומחיקת מה שנרשם",
+  "mail_block.rejected": "דחיית בקשת \"לא לקרוא\"",
+  "mail_block.revoked": "ביטול \"לא לקרוא\" בתיבת דואר",
   "comms_whatsapp.retention_sweep": "מחיקת שיחות WhatsApp לפי זמן השמירה",
   "comms_group.assigned": "שיוך קבוצת WhatsApp ללקוח",
   "comms_engagement_end.sweep": "מחיקת שיחות והקלטות של לקוח שההתקשרות איתו הסתיימה",

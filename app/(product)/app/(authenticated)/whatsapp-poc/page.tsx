@@ -1159,6 +1159,13 @@ export default async function CommunicationsPage(props: {
             <Link prefetch={false} href="/app/whatsapp-poc/connect" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
               {t("page.connectLink")}
             </Link>
+            {/* "התיבות שלי" (27.11.2026): mailboxes, next to WhatsApp. */}
+            <Link prefetch={false} href="/app/whatsapp-poc/mail/setup" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
+              {t("page.mailSetupLink")}
+            </Link>
+            <Link prefetch={false} href="/app/whatsapp-poc/mail/connect" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
+              {t("page.mailConnectLink")}
+            </Link>
             {toReview > 0 ? (
               <Link
                 prefetch={false}
