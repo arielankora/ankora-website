@@ -21,6 +21,7 @@ import { timed } from "@/lib/slow-log";
 import { describeOverlapConflictIn } from "@/lib/time-entry-format";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 type FormState = { error?: string; ok?: boolean; closedBank?: ClosedBankNoticeState };
 
@@ -48,8 +49,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("forbidden");
   const text = await domainErrorText(err);
   if (text) return text;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "time-entries");
 }
 
 /// Spec 6.3: "אם אדמין מזין עבור עובד אחר, actor שונה מ-user_id ונרשם

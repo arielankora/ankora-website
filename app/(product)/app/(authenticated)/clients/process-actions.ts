@@ -36,6 +36,7 @@ import type { KnowledgeStatus, ProcedureClassification, ProcessTransition, Proce
 import { readControlRefs } from "@/lib/procedure-document";
 import { approveProcedureTranslation } from "@/lib/app-domain/procedure-documents";
 import { itemExtrasFrom } from "./item-extras";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 // Org brain, phase 1: processes and their procedures on the client screen
 // (claude/org-brain-spec-2026-10-12.md, 3.8, 3.9).
@@ -55,8 +56,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("forbidden");
   const domain = await domainErrorText(err);
   if (domain) return domain;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "clients");
 }
 
 async function errors() {

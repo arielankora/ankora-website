@@ -11,6 +11,7 @@ import {
 import type { ClientReportType, ReportFrequency } from "@prisma/client";
 import { getTranslations } from "next-intl/server";
 import { domainErrorText } from "@/lib/i18n/domain-errors";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 type FormState = { error?: string; ok?: boolean };
 
@@ -20,8 +21,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("forbidden");
   const text = await domainErrorText(err);
   if (text) return text;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "report-schedules");
 }
 
 function parseEmailList(value: FormDataEntryValue | null): string[] {

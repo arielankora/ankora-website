@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { createCategory, updateCategory, archiveCategory } from "@/lib/app-domain/categories";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import type { CategoryVisibility } from "@prisma/client";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 type FormState = { error?: string; ok?: boolean };
 
@@ -23,8 +24,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("forbidden");
   const domain = await domainErrorText(err);
   if (domain) return domain;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "categories");
 }
 
 export async function createCategoryAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {

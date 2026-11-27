@@ -10,6 +10,7 @@ import { pickCategoryForTask } from "@/lib/app-domain/auto-category";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import type { SupplierExperience, TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 type FormState = { error?: string; ok?: boolean; created?: CreatedTaskRow };
 
@@ -74,8 +75,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("forbidden");
   const text = await domainErrorText(err);
   if (text) return text;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "tasks");
 }
 
 export async function createTaskAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {

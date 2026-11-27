@@ -5,6 +5,7 @@ import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { respondToDecision } from "@/lib/app-domain/decisions";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 type FormState = { error?: string; ok?: boolean };
 
@@ -15,8 +16,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("decisionsAdminOnly");
   const text = await domainErrorText(err);
   if (text) return text;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "portal/decisions");
 }
 
 // Portal phase 2. The client's one write.

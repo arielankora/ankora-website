@@ -1,3 +1,4 @@
+import { unexpectedActionError } from "@/lib/action-errors";
 import "server-only";
 import { getTranslations } from "next-intl/server";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
@@ -11,8 +12,7 @@ export async function knowledgeErrorText(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("forbidden");
   const domain = await domainErrorText(err);
   if (domain) return domain;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "clients/knowledge");
 }
 
 /// The same keys, for the actions' own checks before the domain runs.

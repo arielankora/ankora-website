@@ -17,6 +17,7 @@ import { RunningTimersOnClientError } from "@/lib/app-domain/closed-bank-guard";
 import { getFormatter, getTranslations } from "next-intl/server";
 import type messages from "@/messages/he.json";
 import { domainErrorText, domainText } from "@/lib/i18n/domain-errors";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 type FormState = { error?: string; ok?: boolean };
 
@@ -40,8 +41,7 @@ async function friendlyError(err: unknown): Promise<string> {
   }
   const text = await domainErrorText(err);
   if (text) return text;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "hour-banks");
 }
 
 async function errorText(key: keyof (typeof messages)["hourBanks"]["errors"]): Promise<string> {

@@ -30,6 +30,7 @@ import { approveClientAddition, discardClientAddition, isClientAddition, rejectC
 import { parseBlocks } from "@/lib/agents/model";
 import { createAgentCategory, moveAgentCategory, renameAgentCategory, setAgentCategories, setAgentCategoryArchived } from "@/lib/app-domain/agent-categories";
 import { approveSharedVersion, decideLesson, proposeSharedBlock, rejectSharedVersion, sharedBlockForAgent } from "@/lib/app-domain/agent-library";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 // Agents, phase 1: the screens' writes. Every one goes through
 // lib/app-domain/agents.ts, the same functions the MCP tools call.
@@ -41,8 +42,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("forbidden");
   const domain = await domainErrorText(err);
   if (domain) return domain;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "agents");
 }
 
 async function run(fn: () => Promise<FormState | void>): Promise<FormState> {

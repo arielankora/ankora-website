@@ -17,6 +17,7 @@ import {
   openWorkTaskForImportantDate,
 } from "@/lib/app-domain/important-dates";
 import type { ImportantDateCategory, ImportantDateSensitivity, ImportantDateStatus, CalendarType, RecurrenceType } from "@prisma/client";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 type FormState = { error?: string; ok?: boolean };
 
@@ -26,8 +27,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ConflictError) return t("conflict");
   const text = await domainErrorText(err);
   if (text) return text;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "important-dates");
 }
 
 function parseImportantDateFormData(formData: FormData) {

@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { reportIssue } from "@/lib/system-issues";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { sendEmail } from "@/lib/email";
@@ -558,19 +559,34 @@ export async function reconcileScheduledReports(now: Date = new Date()) {
   const schedules = await prisma.reportSchedule.findMany({ where: { enabled: true } });
   let sent = 0;
   let skipped = 0;
+  let failed = 0;
 
   for (const schedule of schedules) {
     if (!isScheduleDue(schedule, now)) {
       skipped++;
       continue;
     }
-    const period = computeReportingPeriod(schedule.frequency, now, schedule.timezone);
-    const result = await sendReportSchedule(schedule, period, true);
-    if (result.sent) sent++;
-    else skipped++;
+    // One schedule that throws no longer cancels the rest of the day's
+    // reports, which are due on this day only (27.11.2026, silent failures
+    // audit). The failure is a system issue, per schedule.
+    try {
+      const period = computeReportingPeriod(schedule.frequency, now, schedule.timezone);
+      const result = await sendReportSchedule(schedule, period, true);
+      if (result.sent) sent++;
+      else skipped++;
+    } catch (err) {
+      failed++;
+      await reportIssue({
+        area: "reports",
+        key: `schedule:${schedule.id}`,
+        title: "דוח מתוזמן לא נשלח היום",
+        error: err,
+        severity: "CRITICAL",
+      });
+    }
   }
 
-  return { checked: schedules.length, sent, skipped };
+  return { checked: schedules.length, sent, skipped, failed };
 }
 
 /// Spec 15: "אפשר Send now מתוך Admin לצורך בדיקה." Sends the most recent

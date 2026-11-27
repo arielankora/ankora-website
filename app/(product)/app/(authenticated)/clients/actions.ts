@@ -23,6 +23,7 @@ import {
   generatePortalSummary,
 } from "@/lib/app-domain/portal-summary";
 import type { ClientDocumentKind } from "@prisma/client";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 type FormState = { error?: string; ok?: boolean };
 
@@ -33,8 +34,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("forbidden");
   const domain = await domainErrorText(err);
   if (domain) return domain;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "clients");
 }
 
 async function errorText() {

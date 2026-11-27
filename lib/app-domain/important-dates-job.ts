@@ -5,6 +5,8 @@ import type { OutgoingT } from "@/lib/i18n/outgoing";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { sendEmail } from "@/lib/email";
+import { reportIssue } from "@/lib/system-issues";
+import { Prisma } from "@prisma/client";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { computeNextOccurrence, recurrenceInputFromRow, runOpensOn } from "@/lib/app-domain/important-dates-recurrence";
 import { computeHolidayOccurrencesForYear, type HolidayCalendarKey } from "@/lib/app-domain/important-dates-holidays";
@@ -212,8 +214,9 @@ export async function seedHolidayOccurrences(
             entityId: created_.id,
             clientId: sub.clientId,
           });
-        } catch {
+        } catch (err) {
           // Unique-constraint race (two overlapping cron runs) - fine, skip.
+          await reportUnlessDuplicate(err, "holidaySeed");
           continue;
         }
       }
@@ -346,8 +349,10 @@ export async function createDueReminderOccurrences(now = new Date()): Promise<{ 
             },
           });
           created++;
-        } catch {
-          continue; // Unique idempotencyKey violation - already created this run or a prior one.
+        } catch (err) {
+          // Unique idempotencyKey violation - already created this run or a prior one.
+          await reportUnlessDuplicate(err, "reminderCreate");
+          continue;
         }
       }
     }
@@ -555,8 +560,9 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
           actorId: null,
         });
         if (run) created++;
-      } catch {
+      } catch (err) {
         // Unique (importantDateId, importantDateOccurrenceKey): already opened.
+        await reportUnlessDuplicate(err, "processRunOpen");
       }
       continue;
     }
@@ -581,8 +587,10 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
         entityId: task.id,
         clientId: date.clientId,
       });
-    } catch {
-      continue; // Unique (importantDateId, importantDateOccurrenceKey) violation - already created.
+    } catch (err) {
+      // Unique (importantDateId, importantDateOccurrenceKey) violation - already created.
+      await reportUnlessDuplicate(err, "autoTaskCreate");
+      continue;
     }
   }
 
@@ -766,8 +774,32 @@ export async function reconcileImportantDates(now = new Date()) {
     } catch (err: any) {
       console.error(`important-dates-job step "${name}" failed:`, err);
       results.errors.push(`${name}: ${err?.message ?? "Unknown error"}`);
+      // 27.11.2026: the error list only reached the cron's JSON answer.
+      await reportIssue({
+        area: "cron",
+        key: `important-dates:${name}`,
+        title: `משימת המועדים: השלב ${name} נכשל, ולכל הלקוחות היום`,
+        error: err,
+        severity: "CRITICAL",
+      });
     }
   }
 
   return results;
+}
+
+/// The bare catches above were written for one expected failure, a
+/// duplicate (P2002), and swallowed every other one with it: a reminder, a
+/// process run or an automatic task could be dropped with no trace
+/// (27.11.2026, silent failures audit). A duplicate is still skipped
+/// quietly; anything else is a system issue.
+async function reportUnlessDuplicate(err: unknown, where: string): Promise<void> {
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return;
+  await reportIssue({
+    area: "cron",
+    key: `important-dates:${where}`,
+    title: `משימת המועדים: פריט לא נוצר (${where})`,
+    error: err,
+    severity: "CRITICAL",
+  });
 }

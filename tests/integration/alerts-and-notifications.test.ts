@@ -262,11 +262,17 @@ describe("retryFailedEmailDeliveries() - failed alert emails are retried to the 
 
     for (let day = 0; day < 6; day++) await retryFailedEmailDeliveries();
 
-    expect(sendEmail).toHaveBeenCalledTimes(4); // attempts 2..5
+    // Attempts 2..5. Any other call is the admins' alert that it gave up.
+    const retries = vi.mocked(sendEmail).mock.calls.filter(([input]) => !input.subject.startsWith("Ankora - "));
+    expect(retries).toHaveLength(4);
     const delivery = await prisma.emailDelivery.findFirstOrThrow();
     expect(delivery.attempts).toBe(5);
     expect(delivery.status).toBe("FAILED");
     expect(delivery.error).toBe("bounced");
+    // 27.11.2026: it will not be tried again, so the admins hear of it once.
+    const gaveUp = await prisma.systemIssue.findMany({ where: { area: "email", key: { startsWith: "gave-up:" } } });
+    expect(gaveUp).toHaveLength(1);
+    expect(gaveUp[0]).toMatchObject({ severity: "CRITICAL", count: 1 });
   });
 });
 

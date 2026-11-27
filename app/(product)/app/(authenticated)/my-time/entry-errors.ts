@@ -16,6 +16,7 @@ import {
 } from "@/lib/app-domain/closed-bank-guard";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { domainErrorText, domainText } from "@/lib/i18n/domain-errors";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 // What a manual-entry write answers with, shared by "הזמן שלי" and the
 // task screen (28.10.2026). Outside actions.ts because a "use server"
@@ -95,8 +96,7 @@ export async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("forbidden");
   const text = await domainErrorText(err);
   if (text) return text;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "my-time");
 }
 
 /// The entry an overlap ran into, named by its client, category and time

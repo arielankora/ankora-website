@@ -109,6 +109,22 @@ describe("POST /api/contact", () => {
     const rows = await prisma.websiteLead.findMany();
     expect(rows).toHaveLength(1);
     expect(rows[0].emailStatus).toBe("FAILED");
+    // 27.11.2026: and the admins hear of it, without the lead's details.
+    const issue = await prisma.systemIssue.findFirstOrThrow({ where: { area: "contact" } });
+    expect(issue).toMatchObject({ key: "lead-not-delivered", severity: "CRITICAL" });
+    expect(issue.detail).not.toContain("x@example.com");
+  });
+
+  // Found 27.11.2026 (silent failures audit). Was: the key was checked
+  // before the save, so a missing key lost the lead with one log line.
+  it("keeps the lead and reports it when the email key is missing", async () => {
+    delete process.env.RESEND_API_KEY;
+    const res = await POST(request({ name: "y", email: "y@example.com" }));
+    expect(res.status).toBe(500);
+    const rows = await prisma.websiteLead.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].emailStatus).toBe("FAILED");
+    expect(await prisma.systemIssue.count({ where: { area: "contact", key: "lead-not-delivered" } })).toBe(1);
   });
 
   it("accepts a request with no history, or a broken one, like before", async () => {

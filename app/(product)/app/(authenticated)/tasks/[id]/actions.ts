@@ -39,6 +39,7 @@ import {
 } from "../../my-time/entry-errors";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 import type { AdvanceTimerOutcome } from "@/lib/advance-timer";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 // Tasks phase 1, the writes behind /app/tasks/[id].
 //
@@ -59,8 +60,7 @@ async function friendlyError(err: unknown): Promise<string> {
   if (err instanceof ForbiddenError) return t("forbidden");
   const domain = await domainErrorText(err);
   if (domain) return domain;
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "tasks/[id]");
 }
 
 async function errorText() {

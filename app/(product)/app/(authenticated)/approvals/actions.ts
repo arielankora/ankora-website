@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { decideApproval, type DecideInput } from "@/lib/app-domain/decide-approval";
 import { approveRulesTogether } from "@/lib/app-domain/process-next-steps";
+import { unexpectedActionError } from "@/lib/action-errors";
 
 // The buttons on "אישורים" (lib/approvals.ts). Nothing here decides on
 // its own: lib/app-domain/decide-approval.ts sends each kind through the
@@ -20,8 +21,7 @@ async function friendlyError(err: unknown): Promise<string> {
   const coded = await domainErrorText(err);
   if (coded) return coded;
   // Refusals from domains not yet given codes keep their own sentence.
-  if (err instanceof Error) return err.message;
-  return t("generic");
+  return unexpectedActionError(err, t("generic"), "approvals");
 }
 
 export async function decideApprovalAction(input: DecideInput): Promise<{ error?: string; ok?: boolean }> {
