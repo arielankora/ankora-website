@@ -14,6 +14,7 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { addClientContact, listClientPeople, updateClientContact } from "@/lib/app-domain/client-contacts";
 import { addClientSource } from "@/lib/app-domain/client-sources";
 import { normalizePhone } from "@/lib/contact-normalize";
+import { approveProposal } from "@/lib/app-domain/knowledge-proposals";
 import { prisma } from "@/lib/prisma";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 
@@ -310,6 +311,25 @@ export async function markChatsReadAction(input: { chats: Array<{ chatId: string
     throw err;
   }
   if (done === 0) return { error: t("markOnlyYours") };
+  revalidatePath("/app/whatsapp-poc");
+  return { ok: true };
+}
+
+/// "נראה שזה..." (27.11.2026): approves the pending proposal that holds the
+/// open chat's number, as on the knowledge review. That puts the number in
+/// the client's file, and the chat is matched to the client from then on.
+/// approveProposal checks who may approve it.
+export async function approveNumberSuggestionAction(_prev: ContactState | undefined, formData: FormData): Promise<ContactState> {
+  const t = await errors();
+  const user = await requireUser();
+  if (!(await commsAccess(user)).allowed) return { error: t("forbidden") };
+  const proposalId = String(formData.get("proposalId") || "");
+  if (!proposalId || proposalId.length > 64) return { error: t("contactNotFound") };
+  try {
+    await approveProposal(user, proposalId);
+  } catch (err) {
+    return { error: await contactError(err) };
+  }
   revalidatePath("/app/whatsapp-poc");
   return { ok: true };
 }

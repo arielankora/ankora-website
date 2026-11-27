@@ -7992,7 +7992,14 @@
       "add": "הוספה",
       "groupNone": "לא משויכת ללקוח",
       "save": "שמירה",
-      "saved": "נשמר."
+      "saved": "נשמר.",
+      "suggestionNewNamed": "נראה שזה {name} מ-{client}: הצעה לאיש קשר חדש ממתינה לאישור.",
+      "suggestionNew": "המספר הזה מופיע בהצעה לאיש קשר חדש ב-{client}, שממתינה לאישור.",
+      "suggestionAddedNamed": "נראה שזה {name} מ-{client}: הצעה להוסיף לו את המספר ממתינה לאישור.",
+      "suggestionAdded": "הצעה להוסיף את המספר הזה לאיש קשר ב-{client} ממתינה לאישור.",
+      "suggestionApprove": "לאשר ולשייך",
+      "suggestionReview": "לפתוח את ההצעה",
+      "suggestionDone": "אושר. השיחה משויכת ל-{client}."
     },
     "select": {
       "barAria": "הודעות שסומנו",
