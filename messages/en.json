@@ -8430,6 +8430,14 @@
       },
       "teamWhatsapp": "WhatsApp: numbers and blocks",
       "teamMail": "Email: mailboxes and \"do not read\""
+    },
+    "clientFilter": {
+      "label": "Client",
+      "all": "All conversations",
+      "clients": "Only clients",
+      "none": "Not assigned",
+      "withChats": "Clients with conversations",
+      "search": "Find a client"
     }
   },
   "portal": {

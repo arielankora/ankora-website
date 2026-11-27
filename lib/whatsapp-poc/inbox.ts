@@ -13,8 +13,27 @@ import { normalizePhone } from "@/lib/contact-normalize";
 export type InboxFilter = "all" | "wa" | "call" | "none";
 
 /// The type menu's choices, in order. Their labels are the screen's
-/// (messages/*.json, comms.filters).
-export const INBOX_FILTERS: InboxFilter[] = ["all", "wa", "call", "none"];
+/// (messages/*.json, comms.filters). "none" (not assigned to a client) moved
+/// to the client menu on 27.11.2026; an old link with filter=none still
+/// works (clientFilterOf).
+export const INBOX_FILTERS: InboxFilter[] = ["all", "wa", "call"];
+
+/// The client menu (27.11.2026, Ariel): every conversation, only those with
+/// a client, those with none, or one client's (its id).
+export type ClientFilter = "all" | "clients" | "none" | { id: string };
+
+/// The client menu's value from the URL, or from an old filter=none.
+export function clientFilterOf(raw: string | undefined | null, legacyFilter?: string | null): ClientFilter {
+  const value = (raw ?? "").slice(0, 60);
+  if (value === "clients" || value === "none") return value;
+  if (value && value !== "all" && /^[A-Za-z0-9_-]+$/.test(value)) return { id: value };
+  return legacyFilter === "none" && !raw ? "none" : "all";
+}
+
+/// The client menu's value as it goes into a link.
+export function clientParam(filter: ClientFilter): string {
+  return typeof filter === "string" ? filter : filter.id;
+}
 
 /// The row of recordings Aloha sent by hand for one of our lines, with no
 /// other side (page.tsx). Like NO_NAME, the screen shows its own word.
@@ -278,14 +297,23 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
 }
 
 /// The list under the filter chips and the search box.
-export function filterInbox(rows: InboxRow[], filter: InboxFilter, query: string, team: string | null = null): InboxRow[] {
+export function filterInbox(
+  rows: InboxRow[],
+  filter: InboxFilter,
+  query: string,
+  team: string | null = null,
+  client: ClientFilter = "all",
+): InboxRow[] {
   const q = query.trim().toLowerCase();
   const digits = q.replace(/\D/g, "");
+  const notAssigned = filter === "none" || client === "none";
   return rows.filter((row) => {
     if (team && !row.teamIds.includes(team)) return false;
     if (filter === "wa" && !row.hasWhatsapp) return false;
     if (filter === "call" && !row.hasCalls) return false;
-    if (filter === "none" && (row.clients.length > 0 || !row.phone)) return false;
+    if (notAssigned && (row.clients.length > 0 || !row.phone)) return false;
+    if (client === "clients" && row.clients.length === 0) return false;
+    if (typeof client === "object" && !row.clients.some((c) => c.id === client.id)) return false;
     if (!q) return true;
     if (row.name.toLowerCase().includes(q)) return true;
     if (row.clients.some((c) => c.name.toLowerCase().includes(q))) return true;

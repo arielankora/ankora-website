@@ -6,6 +6,8 @@ import {
   buildInbox,
   buildTimeline,
   countSince,
+  clientFilterOf,
+  clientParam,
   filterInbox,
   formatDuration,
   isUnread,
@@ -160,6 +162,23 @@ describe("filterInbox", () => {
     expect(filterInbox(rows, "wa", "").map((r) => r.key)).toEqual([`p:${A}`, "c:g@g.us"]);
     expect(filterInbox(rows, "call", "").map((r) => r.key)).toEqual([`p:${B}`]);
     expect(filterInbox(rows, "none", "").map((r) => r.key)).toEqual([`p:${B}`]);
+  });
+
+  it("filters by client: only clients, not assigned, or one client (27.11.2026)", () => {
+    expect(filterInbox(rows, "all", "", null, "clients").map((r) => r.key)).toEqual([`p:${A}`]);
+    expect(filterInbox(rows, "all", "", null, "none").map((r) => r.key)).toEqual([`p:${B}`]);
+    expect(filterInbox(rows, "all", "", null, { id: "c1" }).map((r) => r.key)).toEqual([`p:${A}`]);
+    expect(filterInbox(rows, "all", "", null, { id: "c2" })).toEqual([]);
+  });
+
+  it("reads the client menu from the link, and an old filter=none", () => {
+    expect(clientFilterOf("clients")).toBe("clients");
+    expect(clientFilterOf("none")).toBe("none");
+    expect(clientFilterOf("c1")).toEqual({ id: "c1" });
+    expect(clientFilterOf(undefined, "none")).toBe("none");
+    expect(clientFilterOf(undefined, "wa")).toBe("all");
+    expect(clientFilterOf("bad id!")).toBe("all");
+    expect(clientParam({ id: "c1" })).toBe("c1");
   });
 
   it("searches names, client names and local numbers", () => {

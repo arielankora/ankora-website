@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Fragment, Suspense } from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { getFormatter, getTranslations } from "next-intl/server";
@@ -8,7 +8,7 @@ import { ArrowRight, ChevronDown, Eye, Forward, MessageCircle, MoreHorizontal, P
 import { parseWhatsappText, phoneDigits, type RichNode } from "@/lib/whatsapp-poc/rich-text";
 import { CALL_EVENTS } from "@/lib/whatsapp-poc/unipile";
 import { ConnectionsMenu, ConnectionsMenuButton } from "./ConnectionsMenu";
-import { ContactRail, FilterMenu, ReadToggle, RememberFilters, RowPending, TimelineScroller } from "./CommsControls";
+import { ContactRail, FilterMenu, MenuSearch, ReadToggle, RememberFilters, RowPending, TimelineScroller } from "./CommsControls";
 import { ScrollToActive } from "./ScrollToActive";
 import { BlockButton } from "./setup/SetupForms";
 import { searchStoredMessages, type MessageHit, type StoredTranscript } from "@/lib/comms/stored-chats";
@@ -47,6 +47,8 @@ import {
   chatPhone,
   countSince,
   dayKey,
+  clientFilterOf,
+  clientParam,
   filterInbox,
   formatDuration,
   parseFilter,
@@ -112,6 +114,7 @@ type Href = {
   c?: string | null;
   filter?: InboxFilter;
   team?: string;
+  client?: string;
   q?: string;
   inMessages?: boolean;
   m?: string;
@@ -126,6 +129,7 @@ function href(params: Href) {
   const q = new URLSearchParams();
   if (params.filter) q.set("filter", params.filter);
   if (params.team) q.set("team", params.team);
+  if (params.client && params.client !== "all") q.set("client", params.client);
   if (params.q) q.set("q", params.q);
   if (params.inMessages) q.set("in", "msg");
   if (params.m) q.set("m", params.m);
@@ -743,6 +747,7 @@ export default async function CommunicationsPage(props: {
     c?: string;
     filter?: string;
     team?: string;
+    client?: string;
     q?: string;
     in?: string;
     m?: string;
@@ -764,8 +769,8 @@ export default async function CommunicationsPage(props: {
   if (!access.allowed) return <Forbidden />;
 
   // The last filters come back on a bare visit (5.11.2026, Ariel).
-  let remembered: { filter?: string; team?: string } = {};
-  if (searchParams.filter === undefined && searchParams.team === undefined) {
+  let remembered: { filter?: string; team?: string; client?: string } = {};
+  if (searchParams.filter === undefined && searchParams.team === undefined && searchParams.client === undefined) {
     try {
       const raw = (await cookies()).get("comms_filters")?.value;
       if (raw) remembered = JSON.parse(decodeURIComponent(raw)) as typeof remembered;
@@ -773,7 +778,12 @@ export default async function CommunicationsPage(props: {
       remembered = {};
     }
   }
-  const filter = parseFilter(searchParams.filter ?? remembered.filter);
+  const rawFilter = searchParams.filter ?? remembered.filter;
+  // "לא משויך" moved to the client menu (27.11.2026): an old filter=none
+  // becomes client=none.
+  const clientFilter = clientFilterOf(searchParams.client ?? remembered.client, rawFilter);
+  const parsedFilter = parseFilter(rawFilter);
+  const filter = parsedFilter === "none" ? "all" : parsedFilter;
   const teamParam = String(searchParams.team ?? remembered.team ?? "all").slice(0, 40);
   const query = (searchParams.q ?? "").slice(0, 80);
   const inMessages = searchParams.in === "msg";
@@ -959,7 +969,14 @@ export default async function CommunicationsPage(props: {
     .map(([id, name]) => ({ id, name: name || t("noName"), count: rows.filter((r) => r.teamIds.includes(id)).length }))
     .sort((a, b) => a.name.localeCompare(b.name, "he"));
   const teamLabel = teamValue === "me" ? t("team.me") : team ? (teamNames.get(team) || t("noName")) : t("team.all");
-  const visible = filterInbox(rows, filter, inMessages ? "" : query, team);
+  // The client menu (27.11.2026): the clients that have conversations here,
+  // by how many. A client chosen earlier that has none now falls back to all.
+  const clientCounts = new Map<string, { id: string; name: string; count: number }>();
+  for (const r of rows) for (const c of r.clients) clientCounts.set(c.id, { id: c.id, name: c.name, count: (clientCounts.get(c.id)?.count ?? 0) + 1 });
+  const clientsWithChats = [...clientCounts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "he"));
+  const client = typeof clientFilter === "object" && !clientCounts.has(clientFilter.id) ? "all" : clientFilter;
+  const clientValue = clientParam(client);
+  const visible = filterInbox(rows, filter, inMessages ? "" : query, team, client);
 
   // "חיפוש בתוך ההודעות" (5.11.2026): stored conversations only.
   // Each number with its own chats (12.11.2026): see searchStoredMessages.
@@ -1060,6 +1077,9 @@ export default async function CommunicationsPage(props: {
     active: boolean;
     align: "start" | "end";
     items: Array<{ id: string; name: string; count?: number; href: string; current: boolean }>;
+    /// The client menu: a search box, and a title over the items from this
+    /// index on (the clients), which the search filters.
+    search?: { label: string; from: number; title: string };
   }) => (
     <FilterMenu className="relative min-w-0 flex-1">
       <summary
@@ -1073,9 +1093,20 @@ export default async function CommunicationsPage(props: {
         <ChevronDown className="size-3.5 flex-none" aria-hidden="true" />
       </summary>
       {/* Opens toward the inside of the list, so nothing is cut off. */}
-      <ul className={`absolute ${props.align === "start" ? "start-0" : "end-0"} z-20 mt-1 w-52 max-w-[calc(100vw-2rem)] rounded-xl border border-app-border bg-white py-1 shadow-lg`}>
-        {props.items.map((m) => (
-          <li key={m.id}>
+      <ul
+        className={`absolute ${props.align === "start" ? "start-0" : "end-0"} z-20 mt-1 ${props.search ? "max-h-96 w-64 overflow-y-auto" : "w-52"} max-w-[calc(100vw-2rem)] rounded-xl border border-app-border bg-white py-1 shadow-lg`}
+      >
+        {props.search ? (
+          <li>
+            <MenuSearch label={props.search.label} />
+          </li>
+        ) : null}
+        {props.items.map((m, i) => (
+          <Fragment key={m.id}>
+          {props.search && i === props.search.from ? (
+            <li className="mx-3 mt-1 border-t border-app-border px-0 pb-1 pt-2 text-xs font-semibold text-app-text-tertiary">{props.search.title}</li>
+          ) : null}
+          <li data-menu-name={props.search && i >= props.search.from ? m.name : undefined}>
             <Link
               prefetch={false}
               href={m.href}
@@ -1088,6 +1119,7 @@ export default async function CommunicationsPage(props: {
               {m.count !== undefined ? <span className="text-xs text-app-text-secondary">{m.count}</span> : null}
             </Link>
           </li>
+          </Fragment>
         ))}
       </ul>
     </FilterMenu>
@@ -1101,7 +1133,7 @@ export default async function CommunicationsPage(props: {
     items: INBOX_FILTERS.map((f) => ({
       id: f,
       name: t(`filters.${f}`),
-      href: href({ filter: f, team: teamValue, q: query, inMessages, c: callsTable || f === "call" ? null : openKey }),
+      href: href({ filter: f, team: teamValue, client: clientValue, q: query, inMessages, c: callsTable || f === "call" ? null : openKey }),
       current: filter === f,
     })),
   });
@@ -1119,16 +1151,36 @@ export default async function CommunicationsPage(props: {
             ...teamMembers.filter((m) => m.id !== user.id || !teamNames.has(user.id)),
           ].map((m) => ({
             ...m,
-            href: href({ filter, team: m.id, q: query, inMessages, c: callsTable ? null : openKey }),
+            href: href({ filter, team: m.id, client: clientValue, q: query, inMessages, c: callsTable ? null : openKey }),
             current: teamValue === m.id,
           })),
         })
       : null;
 
+  // "לקוח" (27.11.2026, Ariel, from the design on Claude Design): every
+  // conversation, only clients', not assigned, or one client's.
+  const clientLabel =
+    client === "all" ? t("clientFilter.all") : client === "clients" ? t("clientFilter.clients") : client === "none" ? t("clientFilter.none") : (clientCounts.get(client.id)?.name ?? "");
+  const clientLink = (value: string) => href({ filter, team: teamValue, client: value, q: query, inMessages, c: callsTable ? null : openKey });
+  const clientMenu = menu({
+    label: t("clientFilter.label"),
+    value: clientLabel,
+    active: client !== "all",
+    align: "end",
+    search: clientsWithChats.length > 6 ? { label: t("clientFilter.search"), from: 3, title: t("clientFilter.withChats") } : undefined,
+    items: [
+      { id: "all", name: t("clientFilter.all"), count: rows.length, href: clientLink("all"), current: client === "all" },
+      { id: "clients", name: t("clientFilter.clients"), count: rows.filter((r) => r.clients.length > 0).length, href: clientLink("clients"), current: client === "clients" },
+      { id: "none", name: t("clientFilter.none"), count: rows.filter((r) => r.clients.length === 0 && r.phone).length, href: clientLink("none"), current: client === "none" },
+      ...clientsWithChats.map((c) => ({ id: c.id, name: c.name, count: c.count, href: clientLink(c.id), current: clientValue === c.id })),
+    ],
+  });
+
   const filterRow = (
     <div className="flex gap-2" role="group" aria-label={t("list.filtersAria")}>
       {typeMenu}
       {teamMenu}
+      {clientMenu}
     </div>
   );
 
@@ -1137,7 +1189,7 @@ export default async function CommunicationsPage(props: {
   const searchScope = (
     <Link
       prefetch={false}
-      href={href({ filter, team: teamValue, q: query, inMessages: !inMessages, c: openKey })}
+      href={href({ filter, team: teamValue, client: clientValue, q: query, inMessages: !inMessages, c: openKey })}
       aria-pressed={inMessages}
       className={`flex min-h-9 flex-none items-center whitespace-nowrap rounded-md border px-2 text-xs ${
         inMessages ? "border-navy bg-navy font-medium text-white" : "border-app-border-strong bg-app-surface-sunken text-app-text-primary"
@@ -1149,7 +1201,7 @@ export default async function CommunicationsPage(props: {
 
   return (
     <div className="space-y-4">
-      <RememberFilters filter={filter} team={teamValue} />
+      <RememberFilters filter={filter} team={teamValue} client={clientValue} />
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div>
           <h1 className="text-xl font-medium text-app-text-primary">{t("page.title")}</h1>
@@ -1237,7 +1289,7 @@ export default async function CommunicationsPage(props: {
                     <div className="flex min-w-0 items-center gap-3">
                       <ChannelIcon channel="call" />
                       <div className="min-w-0">
-                        <Link prefetch={false} href={href({ c: phoneKey(call.other), filter: "call", team: teamValue })} className="font-medium text-app-text-primary underline-offset-2 hover:underline">
+                        <Link prefetch={false} href={href({ c: phoneKey(call.other), filter: "call", team: teamValue, client: clientValue })} className="font-medium text-app-text-primary underline-offset-2 hover:underline">
                           <bdi>{name === call.other ? shownPhone(t, call.other) : shownName(t, name)}</bdi>
                         </Link>
                         <p className="text-xs text-app-text-secondary">
@@ -1257,7 +1309,7 @@ export default async function CommunicationsPage(props: {
                         <ClientTag clients={o.clients} />
                       ) : (
                         <Link prefetch={false}
-                          href={href({ c: phoneKey(call.other), filter: "call", team: teamValue, assign: true })}
+                          href={href({ c: phoneKey(call.other), filter: "call", team: teamValue, client: clientValue, assign: true })}
                           className="inline-flex min-h-11 items-center rounded-full border border-dashed border-app-warning px-3 text-xs text-app-warning"
                         >
                           {t("calls.assign")}
@@ -1297,6 +1349,7 @@ export default async function CommunicationsPage(props: {
               <form method="get" action={BASE} className="flex gap-2">
                 <input type="hidden" name="filter" value={filter} />
                 <input type="hidden" name="team" value={teamValue} />
+                {clientValue !== "all" ? <input type="hidden" name="client" value={clientValue} /> : null}
                 {inMessages ? <input type="hidden" name="in" value="msg" /> : null}
                 <label htmlFor="inbox-q" className="sr-only">
                   {t("list.search")}
@@ -1336,7 +1389,7 @@ export default async function CommunicationsPage(props: {
                         href={href({
                           c: key,
                           filter,
-                          team: teamValue,
+                          team: teamValue, client: clientValue,
                           q: query,
                           inMessages: true,
                           m: h.messageId,
@@ -1374,7 +1427,7 @@ export default async function CommunicationsPage(props: {
                 return (
                   <li key={row.key} className="group relative">
                     <Link prefetch={false}
-                      href={href({ c: row.key, filter, team: teamValue, q: query })}
+                      href={href({ c: row.key, filter, team: teamValue, client: clientValue, q: query })}
                       aria-current={active ? "page" : undefined}
                       data-inbox-row=""
                       className={`flex gap-3 px-3 py-3 ${targets.length > 0 ? "pe-16" : ""} ${active ? "bg-app-accent-soft" : "hover:bg-app-surface-sunken"}`}
@@ -1454,7 +1507,7 @@ export default async function CommunicationsPage(props: {
                 <header className="flex flex-wrap items-center justify-between gap-3 border-b border-app-border bg-white px-4 py-3">
                   <div className="flex min-w-0 items-center gap-2">
                     <Link prefetch={false}
-                      href={href({ filter, team: teamValue, q: query, inMessages })}
+                      href={href({ filter, team: teamValue, client: clientValue, q: query, inMessages })}
                       aria-label={t("timeline.back")}
                       className="flex size-11 flex-none items-center justify-center rounded-lg text-app-text-primary lg:hidden"
                     >
@@ -1532,7 +1585,7 @@ export default async function CommunicationsPage(props: {
                     <li className="flex justify-center">
                       <Link
                         prefetch={false}
-                        href={href({ c: openKey, filter, team: teamValue, q: query, inMessages, before: messages[0].timestamp })}
+                        href={href({ c: openKey, filter, team: teamValue, client: clientValue, q: query, inMessages, before: messages[0].timestamp })}
                         className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline"
                       >
                         {t("timeline.older")}
@@ -1576,7 +1629,7 @@ export default async function CommunicationsPage(props: {
                   {timeline.length === 0 ? <li className="text-sm text-app-text-secondary">{t("timeline.empty")}</li> : null}
                   {beforeParam ? (
                     <li className="flex justify-center">
-                      <Link prefetch={false} href={href({ c: openKey, filter, team: teamValue, q: query, inMessages })} className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
+                      <Link prefetch={false} href={href({ c: openKey, filter, team: teamValue, client: clientValue, q: query, inMessages })} className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
                         {t("timeline.latest")}
                       </Link>
                     </li>
@@ -1602,7 +1655,7 @@ export default async function CommunicationsPage(props: {
                     ) : lookedUp ? (
                       t("timeline.notFound")
                     ) : (
-                      <Link prefetch={false} href={href({ c: phoneKey(selectedPhone), filter, team: teamValue, q: query, wa: true })} className="inline-flex min-h-11 items-center text-app-text-primary underline">
+                      <Link prefetch={false} href={href({ c: phoneKey(selectedPhone), filter, team: teamValue, client: clientValue, q: query, wa: true })} className="inline-flex min-h-11 items-center text-app-text-primary underline">
                         {t("timeline.lookup")}
                       </Link>
                     )}
