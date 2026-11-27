@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { getFormatter, getTranslations } from "next-intl/server";
@@ -6,6 +7,7 @@ import { domainErrorText } from "@/lib/i18n/domain-errors";
 import { ArrowRight, ChevronDown, Eye, Forward, MessageCircle, MoreHorizontal, Phone, PhoneMissed, Search, Timer, Trash2, UserRound, Users } from "lucide-react";
 import { parseWhatsappText, phoneDigits, type RichNode } from "@/lib/whatsapp-poc/rich-text";
 import { CALL_EVENTS } from "@/lib/whatsapp-poc/unipile";
+import { ConnectionsMenu, ConnectionsMenuButton } from "./ConnectionsMenu";
 import { ContactRail, FilterMenu, ReadToggle, RememberFilters, RowPending, TimelineScroller } from "./CommsControls";
 import { ScrollToActive } from "./ScrollToActive";
 import { BlockButton } from "./setup/SetupForms";
@@ -1152,30 +1154,22 @@ export default async function CommunicationsPage(props: {
         <div>
           <h1 className="text-xl font-medium text-app-text-primary">{t("page.title")}</h1>
           <p className="mt-0.5 hidden text-sm text-app-text-secondary sm:block">{t("page.subtitle")}</p>
-          <div className="flex flex-wrap items-center gap-x-3">
-            <Link prefetch={false} href="/app/whatsapp-poc/setup" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
-              {t("page.setupLink")}
+        </div>
+        {/* "חיבורים והגדרות" (27.11.2026, option B of the design): one menu
+            instead of four links, and what needs the employee first. */}
+        <div className="flex flex-wrap items-center gap-2">
+          {toReview > 0 ? (
+            <Link
+              prefetch={false}
+              href="/app/whatsapp-poc/setup"
+              className="inline-flex min-h-11 items-center rounded-full border border-app-warning bg-app-warning-soft px-4 text-sm font-medium text-app-warning"
+            >
+              {t("page.toReview", { count: toReview })}
             </Link>
-            <Link prefetch={false} href="/app/whatsapp-poc/connect" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
-              {t("page.connectLink")}
-            </Link>
-            {/* "התיבות שלי" (27.11.2026): mailboxes, next to WhatsApp. */}
-            <Link prefetch={false} href="/app/whatsapp-poc/mail/setup" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
-              {t("page.mailSetupLink")}
-            </Link>
-            <Link prefetch={false} href="/app/whatsapp-poc/mail/connect" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
-              {t("page.mailConnectLink")}
-            </Link>
-            {toReview > 0 ? (
-              <Link
-                prefetch={false}
-                href="/app/whatsapp-poc/setup"
-                className="inline-flex min-h-9 items-center rounded-full border border-app-warning bg-app-warning-soft px-3 text-[13px] font-medium text-app-warning"
-              >
-                {t("page.toReview", { count: toReview })}
-              </Link>
-            ) : null}
-          </div>
+          ) : null}
+          <Suspense fallback={<ConnectionsMenuButton />}>
+            <ConnectionsMenu user={user} />
+          </Suspense>
         </div>
         {/* On a phone the box folds away, so the list starts near the top. */}
         <details className="w-full sm:hidden" open={badPhone || undefined}>

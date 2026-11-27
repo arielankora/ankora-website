@@ -8407,6 +8407,29 @@
         }
       },
       "working": "One moment, working on it"
+    },
+    "connections": {
+      "button": "Connections and settings",
+      "needsYou": "Something needs you",
+      "allConnected": "Everything is connected",
+      "mine": "Mine",
+      "team": "Team settings",
+      "myWhatsapp": "My WhatsApp connection",
+      "myMailboxes": "My mailboxes",
+      "wa": {
+        "ok": "Connected",
+        "attention": "Disconnected, reconnect",
+        "missing": "Not connected"
+      },
+      "mail": {
+        "none": "No mailbox connected",
+        "disconnected": "A mailbox is disconnected",
+        "unfinished": "A step is left",
+        "unknown": "{count, plural, one {One mailbox} other {# mailboxes}}",
+        "scanning": "{count, plural, one {Scanning now} other {# mailboxes scanning}}"
+      },
+      "teamWhatsapp": "WhatsApp: numbers and blocks",
+      "teamMail": "Email: mailboxes and \"do not read\""
     }
   },
   "portal": {
