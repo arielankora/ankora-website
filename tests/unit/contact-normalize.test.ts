@@ -74,6 +74,19 @@ describe("a number however it is written (27.11.2026)", () => {
     expect(normalizePhone("*2345")).toBeNull();
   });
 
+  // 27.11.2026: four contacts of one client stored as "0974 4422 ....":
+  // Qatar written with one 0 instead of 00.
+  it("reads one 0 before a code from 970 to 979 as the international prefix", () => {
+    expect(normalizePhone("0974 4422 1234")).toBe("+97444221234");
+    expect(normalizePhone("097444221234")).toBe("+97444221234");
+    expect(normalizePhone("0971 50 123 4567")).toBe("+971501234567");
+    expect(normalizePhone("0972 52 123 4567")).toBe("+972521234567");
+    expect(normalizePhone("0972 052 123 4567")).toBe("+972521234567");
+    // An Israeli number from 09-7 is left Israeli, with or without the zero.
+    expect(normalizePhone("09-7123456")).toBe("+97297123456");
+    expect(normalizePhone("097123456")).toBe("+97297123456");
+  });
+
   it("splits a field with several numbers, and stores each once", () => {
     expect(splitPhones("052-1234567 / 03-1234567")).toEqual(["052-1234567", "03-1234567"]);
     expect(splitPhones("052-1234567\n03-1234567; 054-7654321")).toEqual(["052-1234567", "03-1234567", "054-7654321"]);

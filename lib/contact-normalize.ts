@@ -57,6 +57,8 @@ export function splitPhones(raw: string): string[] {
 ///   written).
 /// - Only the first number of a field that holds several, and without its
 ///   extension ("ext. 12", "שלוחה 12").
+/// - An international number from 970 to 979 written with one 0 instead of
+///   00 ("0974 4422 1234") gives "+97444221234" (27.11.2026).
 /// - Anything shorter than 7 digits is not a phone number. Null.
 export function normalizePhone(raw: string): string | null {
   let text = splitPhones(raw)[0] ?? "";
@@ -66,6 +68,15 @@ export function normalizePhone(raw: string): string | null {
   let digits = text.replace(/\D/g, "");
   if (digits.startsWith("00")) {
     digits = digits.slice(2);
+    plus = true;
+  }
+  // 27.11.2026: an international number written with one 0 instead of 00
+  // ("0974 4422 1234", four contacts of one client, Qatar). Too long to be
+  // Israeli. Only a code from 970 to 979 after it. An Israeli number from
+  // 09-7 with an extension run into it ("09-7123456 123") reads the same
+  // way; it was not a number WhatsApp could match before either.
+  if (!plus && /^097\d{9,11}$/.test(digits)) {
+    digits = digits.slice(1);
     plus = true;
   }
   if (digits.startsWith("9720")) digits = `972${digits.slice(4)}`;
