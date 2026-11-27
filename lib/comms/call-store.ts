@@ -254,6 +254,19 @@ export async function transcribeRecording(transcriptId: string): Promise<Transcr
       return "capped";
     }
     if (!(err instanceof TranscriptionError) && !(err instanceof UnipileError)) throw err;
+    // 27.11.2026: a voice message Unipile answers 404 for is gone, and each
+    // try took 30 seconds: ten of them used the whole transcription budget
+    // of the nightly run, and three were transcribed. Failed at once, and
+    // marked gone like whatsapp-store.ts's markVoiceGone (not imported:
+    // that module imports this one).
+    if (err instanceof UnipileError && err.status === 404 && t.attachment) {
+      await prisma.commsAttachment.update({ where: { id: t.attachment.id }, data: { unavailable: true } });
+      await prisma.transcript.update({
+        where: { id: t.id },
+        data: { attempts: Math.max(t.attempts + 1, TRANSCRIBE_MAX_ATTEMPTS), lastError: err.message, status: "FAILED" },
+      });
+      return "failed";
+    }
     const attempts = t.attempts + 1;
     const failed = attempts >= TRANSCRIBE_MAX_ATTEMPTS;
     await prisma.transcript.update({

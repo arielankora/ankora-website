@@ -82,7 +82,8 @@ export async function completeDriveCopies(options: { budgetMs: number; now?: () 
   }
 
   const voice = await prisma.commsAttachment.findMany({
-    where: { type: "audio", driveFileId: null, message: { held: false } },
+    // 27.11.2026: not one Unipile no longer has (whatsapp-store.ts, markVoiceGone).
+    where: { type: "audio", driveFileId: null, unavailable: false, message: { held: false } },
     orderBy: { createdAt: "desc" },
     take: 30,
     select: { id: true, message: { select: { externalId: true, conversation: { select: { externalChatId: true, channel: true } } } } },

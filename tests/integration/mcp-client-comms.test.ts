@@ -139,6 +139,13 @@ describe("client communications through the connector", () => {
     const v = read.json.messages.find((m: { attachments?: unknown[] }) => m.attachments?.length);
     expect(v.attachments[0]).toMatchObject({ kind: "voice", voiceTranscript: null, voiceTranscriptState: "failed", voiceTranscriptError: "קובץ השמע לא נמצא." });
 
+    // 27.11.2026: Unipile no longer has the audio (a 404): Claude reads
+    // that nobody can try again, not the error of the last try.
+    await prisma.commsAttachment.update({ where: { id: voice.attachments[0].id }, data: { unavailable: true } });
+    const gone = await call(hadas, "get_client_communication", { client: "לוי", id: chat.id });
+    const g = gone.json.messages.find((m: { attachments?: unknown[] }) => m.attachments?.length);
+    expect(g.attachments[0]).toEqual({ kind: "voice", voiceTranscript: null, fileName: null, voiceTranscriptState: "audio gone" });
+
     const heard = await call(hadas, "get_client_communication", { client: "לוי", id: rec.id });
     expect(heard.json.transcriptStatus).toBe("waiting for the nightly run; the last try failed: OpenAI החזיר שגיאה 400.");
   });

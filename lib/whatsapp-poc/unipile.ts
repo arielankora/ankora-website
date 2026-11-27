@@ -556,9 +556,16 @@ export function mergeChats(raw: PocChat[]): PocChat[] {
   return [...byId.values()].sort((a, b) => time(b.lastMessageAt) - time(a.lastMessageAt));
 }
 
-async function fetchAllChats(config: { apiKey: string; accountId: string }): Promise<PocChat[]> {
+/// The nightly history load reads further back than the screen (27.11.2026):
+/// Hadas's and Ariel's lists came back at the screen's 100, so their older
+/// chats were never loaded. Offset pages overlap a little (7 of 100 on
+/// Ariel's second page, read once on 27.11.2026); mergeChats drops the
+/// repeats. Three requests a night per number, once, with no memory kept.
+export const BACKFILL_MAX_CHATS = 300;
+
+async function fetchAllChats(config: { apiKey: string; accountId: string }, maxChats = MAX_CHATS): Promise<PocChat[]> {
   const all: PocChat[] = [];
-  for (let offset = 0; offset < MAX_CHATS; offset += FETCH_PAGE_SIZE) {
+  for (let offset = 0; offset < maxChats; offset += FETCH_PAGE_SIZE) {
     const query: Record<string, string> = { limit: String(FETCH_PAGE_SIZE) };
     if (offset > 0) query.offset = String(offset);
     const raw = dataArray(await call(config, "/chats", { query }));
@@ -643,6 +650,15 @@ export async function loadMergedChats(
   }
 
   return { chats: await readAndRemember(config, fetchAll, now), refreshing: false };
+}
+
+/// Every chat the nightly history load should look at: up to
+/// BACKFILL_MAX_CHATS, read now (not the screen's remembered list), merged.
+export async function loadBackfillChats(
+  config: Config,
+  fetchAll: (config: Config, maxChats: number) => Promise<PocChat[]> = fetchAllChats,
+): Promise<PocChat[]> {
+  return mergeChats(await fetchAll(config, BACKFILL_MAX_CHATS));
 }
 
 export async function listChats(

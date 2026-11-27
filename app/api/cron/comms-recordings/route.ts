@@ -4,7 +4,7 @@ import { reconcileRecordings, sweepCallRetention, transcribePending } from "@/li
 import { backfillChannel, sweepWhatsappRetention } from "@/lib/comms/whatsapp-store";
 import { completeDriveCopies, repairCallLines, sweepEndedEngagements } from "@/lib/comms/maintenance";
 import { retryDriveFileDeletions } from "@/lib/comms/drive-deletions";
-import { COMMS_CRON_STEPS, perChannelShare, stepBudget } from "@/lib/comms/cron-budget";
+import { COMMS_CRON_STEPS, nextChannelShare, stepBudget } from "@/lib/comms/cron-budget";
 import { alertChannelFailure, runPerChannel } from "@/lib/comms/cron-channels";
 import { prisma } from "@/lib/prisma";
 
@@ -53,9 +53,16 @@ export async function GET(request: Request) {
     // 24.11.2026: one number failing no longer stops the run; it is skipped
     // and the admins get an alert (lib/comms/cron-channels.ts).
     const channels = await prisma.commsChannel.findMany({ where: { storeEnabled: true }, include: { owner: { select: { name: true } } } });
-    const share = perChannelShare(channels.length);
+    // 27.11.2026: the numbers whose history is still loading go first, and
+    // each takes an even part of the time left (lib/comms/cron-budget.ts).
+    channels.sort((a, b) => Number(Boolean(a.historyLoadedAt)) - Number(Boolean(b.historyLoadedAt)));
+    let channelsLeft = channels.length;
     const whatsapp = await timed("whatsapp", () =>
-      runPerChannel(channels, (channel) => backfillChannel(channel, { budgetMs: budget(share) }), alertChannelFailure),
+      runPerChannel(
+        channels,
+        (channel) => backfillChannel(channel, { budgetMs: nextChannelShare(channelsLeft--, startedAt, Date.now()) }),
+        alertChannelFailure,
+      ),
     );
     const retention = await timed("retention", async () => ({
       calls: await sweepCallRetention(),

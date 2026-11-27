@@ -38,7 +38,17 @@ export function stepBudget(share: number, startedAt: number, now: number, deadli
   return Math.max(0, Math.min(share, startedAt + deadlineMs - now));
 }
 
-/// The WhatsApp step's share for each stored number.
-export function perChannelShare(channels: number): number {
-  return channels > 0 ? Math.floor(COMMS_CRON_STEPS.whatsapp / channels) : 0;
+/// The WhatsApp step's share for the next stored number (27.11.2026).
+///
+/// Until then each number got a fixed fifth of 120 seconds: 24 seconds,
+/// one or two chats a night, while the numbers whose history was already
+/// loaded used none of theirs, and the run ended 120 seconds before its
+/// deadline. Hadas had 15 chats loaded after three nights. Now the step has
+/// what is left before the deadline (at least COMMS_CRON_STEPS.whatsapp,
+/// since the steps before it fit inside it), and each number takes an even
+/// part of what is still left, so what one number does not use goes to the
+/// numbers after it.
+export function nextChannelShare(channelsLeft: number, startedAt: number, now: number, deadlineMs = COMMS_CRON_DEADLINE_MS): number {
+  if (channelsLeft <= 0) return 0;
+  return Math.floor(stepBudget(deadlineMs, startedAt, now, deadlineMs) / channelsLeft);
 }

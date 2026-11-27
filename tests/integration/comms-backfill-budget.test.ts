@@ -9,6 +9,8 @@ import { createTestUser } from "./factories";
 // without storing anything twice.
 
 const CHAT = { id: "dana@lid", name: "דנה", type: "1to1", phone: "+972542222222" };
+const LOADED = { id: "yossi@lid", name: "יוסי", type: "1to1", phone: "+972543333333" };
+let listed: (typeof CHAT)[] = [CHAT];
 const messages = Array.from({ length: 5 }, (_, i) => ({
   id: `m${i}`,
   text: `הודעה ${i}`,
@@ -24,7 +26,7 @@ vi.mock("@/lib/whatsapp-poc/unipile", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/whatsapp-poc/unipile")>();
   return {
     ...real,
-    loadMergedChats: async () => ({ chats: [CHAT] }),
+    loadBackfillChats: async () => listed,
     listMessages: async () => messages,
     getChat: async () => CHAT,
   };
@@ -39,6 +41,7 @@ import { backfillChannel } from "@/lib/comms/whatsapp-store";
 
 beforeEach(() => {
   process.env.UNIPILE_API_KEY = "k";
+  listed = [CHAT];
 });
 
 describe("WhatsApp history load: the budget holds inside a chat", () => {
@@ -68,5 +71,19 @@ describe("WhatsApp history load: the budget holds inside a chat", () => {
     expect((await prisma.commsChannel.findUniqueOrThrow({ where: { id: channel.id } })).historyLoadedAt).not.toBeNull();
     const third = await backfillChannel({ ...channel, historyLoadedAt: new Date() }, { budgetMs: 600_000 });
     expect(third).toMatchObject({ stoppedBy: "done", chats: 0, listed: 1, loadedBefore: 1 });
+  });
+
+  // 27.11.2026: counted as the loop went, a run stopped by its budget said
+  // only what it reached (Ariel's number: 2 loaded before, when 43 were).
+  it("counts the whole list even when the budget stops it at the first chat", async () => {
+    const { user } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const channel = await prisma.commsChannel.create({ data: { accountId: "acc_c", ownerUserId: user.id, storeEnabled: true } });
+    await prisma.commsConversation.create({
+      data: { channelId: channel.id, externalChatId: LOADED.id, name: LOADED.name, backfilledAt: new Date() },
+    });
+    listed = [CHAT, LOADED];
+    let t = 0;
+    const result = await backfillChannel(channel, { budgetMs: 5, now: () => (t += 10) });
+    expect(result).toMatchObject({ stoppedBy: "budget", listed: 2, loadedBefore: 1, blocked: 0, chats: 0 });
   });
 });
