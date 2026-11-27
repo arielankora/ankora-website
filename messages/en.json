@@ -8949,6 +8949,34 @@
       "title": "An Aloha recording email was not recognized",
       "body": "An email with an audio file came from Aloha, but the numbers and time could not be read from it, so the recording was not stored. Aloha probably changed the email template. The parsing needs updating (lib/whatsapp-poc/recordings.ts). Email id: {emailId}"
     },
+    "systemDigest": {
+      "subject": "Morning report: system issues, {date}, {count, plural, =0 {all is well} one {# open} other {# open}}",
+      "allGood": "All is well: no open issues.",
+      "lead": "{count, plural, one {# open issue} other {# open issues}}, {critical} of them critical.",
+      "issuesHeading": "Issues",
+      "jobsHeading": "Nightly runs",
+      "open": "Open the system issues screen",
+      "col": {
+        "area": "Area",
+        "what": "What happened",
+        "since": "Since",
+        "count": "Times",
+        "state": "State",
+        "job": "Job",
+        "lastRun": "Last run"
+      },
+      "state": {
+        "new": "New",
+        "recurring": "Recurring",
+        "closed": "Closed by itself"
+      },
+      "job": {
+        "never": "Never ran",
+        "cutOff": "Cut off",
+        "ok": "OK",
+        "failed": "Failed: {steps}"
+      }
+    },
     "systemIssue": {
       "title": "System issue: {title}",
       "body": "The system hit a failure and recorded it.\n\nWhat happened: {title}\nDetails: {detail}\nTimes so far: {count}\n\nThe same issue sends at most one alert every 20 hours. Close it once it is fixed, on the system issues screen: {link}"

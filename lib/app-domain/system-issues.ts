@@ -17,7 +17,7 @@ import { EMAIL_SUBJECT_MARK } from "@/lib/email";
 
 /// The nightly jobs vercel.json schedules, in the order they run, so the
 /// screen can show a job that has no run at all.
-export const CRON_JOBS = ["scheduled-reports", "comms-recordings", "vault-rewrap", "claude-usage-retention", "alerts-reconcile", "mail-waits"] as const;
+export const CRON_JOBS = ["scheduled-reports", "comms-recordings", "vault-rewrap", "claude-usage-retention", "system-health", "alerts-reconcile", "mail-waits"] as const;
 
 const RESOLVED_SHOWN_DAYS = 14;
 const DAY_MS = 24 * 60 * 60 * 1000;
