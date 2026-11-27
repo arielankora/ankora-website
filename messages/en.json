@@ -8356,6 +8356,7 @@
         "expired": "The connection expired or was started by another user. Press the button again.",
         "failed": "The connection did not complete. Press the button again, and if it happens again, ask Ariel.",
         "failedDetail": "Detail from the connection: {detail}",
+        "limit": "No more mailboxes can be connected right now: Ankora's Unipile plan has reached its number of accounts. The mailbox was not connected, and nothing was read. Contact Ariel, and once the limit is raised, press the button again.",
         "wrong-provider": "The account connected is not a mailbox. Press again and choose Google or Microsoft.",
         "taken": "This mailbox is already connected by another employee. Ask Ariel.",
         "link-failed": "Could not open the connection screen. Try again in a minute.",

@@ -20,6 +20,7 @@ import {
   removeMailAccount,
 } from "@/lib/client-mailbox/unipile-mail";
 import { onThreadEmail } from "./waits";
+import { isAccountLimit } from "./connect-errors";
 import { SENT_KEEP_DAYS, recipientsOf } from "./wait-rules";
 import {
   TEAM_DOMAINS,
@@ -161,7 +162,7 @@ export async function createMailConnectLink(
   return { link, cookie };
 }
 
-export type MailConnectResult = "connected" | "reconnected" | "reused" | "expired" | "failed" | "wrong-provider" | "taken";
+export type MailConnectResult = "connected" | "reconnected" | "reused" | "expired" | "failed" | "limit" | "wrong-provider" | "taken";
 
 /// Why the way back did not connect, for the log and the screen. Ariel's
 /// first try (27.11.2026) ended in "failed" with nothing in the logs.
@@ -176,6 +177,10 @@ export async function completeMailConnect(
   query: { accountId: string | null; errorType: string | null },
 ): Promise<{ result: MailConnectResult; channelId: string | null; failure?: MailConnectFailure }> {
   if (!intent || intent.userId !== user.id) return { result: "expired", channelId: null };
+  // Unipile refuses a new account when Ankora's plan is full (27.11.2026,
+  // "api/account_limit_reached"): only Ariel can fix it, so it gets its own
+  // message instead of "press again".
+  if (query.errorType && isAccountLimit(query.errorType)) return { result: "limit", channelId: null, failure: "provider-error" };
   if (query.errorType) return { result: "failed", channelId: null, failure: "provider-error" };
   if (!query.accountId) return { result: "failed", channelId: null, failure: "no-account" };
   if (!/^acc_[A-Za-z0-9_-]+$/.test(query.accountId)) return { result: "failed", channelId: null, failure: "bad-account-id" };

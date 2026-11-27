@@ -25,3 +25,8 @@ export function cleanDetail(value: string | null | undefined): string | null {
     .slice(0, 120);
   return clean || null;
 }
+
+/// Unipile's refusal when the plan has no room for another account.
+export function isAccountLimit(providerError: string | null | undefined): boolean {
+  return /account_limit_reached/i.test(providerError ?? "");
+}

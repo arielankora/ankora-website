@@ -31,6 +31,7 @@ const RESULTS = [
   "active",
   "expired",
   "failed",
+  "limit",
   "wrong-provider",
   "taken",
   "link-failed",
@@ -149,10 +150,16 @@ export default async function ConnectMailboxPage(props: { searchParams: Promise<
                 return (
                   <li key={s.address} className="flex flex-wrap items-center justify-between gap-2 py-2">
                     <span className="min-w-0 text-sm text-app-text-primary">
-                      {s.name ? <bdi>{s.name} </bdi> : null}
-                      <span dir="ltr" className="text-xs text-app-text-secondary">
+                      {/* The space sits between the two isolates, not inside the name's,
+                          so a name in English does not run into the address. */}
+                      {s.name ? (
+                        <>
+                          <bdi>{s.name}</bdi>{" "}
+                        </>
+                      ) : null}
+                      <bdi dir="ltr" className="text-xs text-app-text-secondary">
                         {s.address}
-                      </span>{" "}
+                      </bdi>{" "}
                       <span className="text-xs text-app-text-secondary">· {t("step2.emails", { count: s.count })}</span>
                     </span>
                     {s.blocked ? (
