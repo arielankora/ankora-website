@@ -149,3 +149,17 @@ export const GET_TASK_NOTES: FieldNotes = {
   waitingOnEmail:
     'An email this task (or step) waits for a reply to: `state` waiting, overdue (its reminder passed with no reply) or replied (someone answered; Ankora lifted the wait itself), `to`, `sentAt`, `remindAt`, `replyFrom` and `replyAt`, and `followedBy` ("you" or a colleague: only whoever sent the email may send a reminder). Change it with manage_email_wait.',
 };
+
+/// list_email_threads_to_extract (27.11.2026, stage 3 of "התיבות שלי").
+export const EXTRACT_THREADS_NOTES: FieldNotes = {
+  thread: "The thread's id: pass it to read_email_thread, and as newSource.mailThread.thread to propose_knowledge.",
+  clients: "The clients the thread was matched to: in a client's own mailbox, that client; otherwise by the participants' domains and contacts. Two clients: decide from the content, as for a meeting.",
+  readThrough: "Where the extraction stopped last time (null: never read). Only later emails are new.",
+};
+
+/// read_email_thread (27.11.2026, stage 3 of "התיבות שלי").
+export const READ_THREAD_NOTES: FieldNotes = {
+  emails:
+    "Oldest first. `fromTeam` true: written by Ankora's team, which is never a source of knowledge about the client (only what the client or their supplier wrote). `text` is the body, cut when long (`textTruncated`). `attachments` gives ids for read_email_thread_attachment.",
+  newestAt: "The newest email returned: pass it as `through` (to propose_knowledge's newSource.mailThread, or to mark_email_threads_extracted).",
+};

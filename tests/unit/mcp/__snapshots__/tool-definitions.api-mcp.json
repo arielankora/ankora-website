@@ -2053,6 +2053,32 @@
     "name": "list_documents",
     "title": "List documents"
   },
+  "list_email_threads_to_extract": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The threads with clients in scanned mailboxes that have emails the knowledge extraction has not read yet, oldest first. For the extraction account (every mailbox whose extraction is allowed) or a mailbox's owner (their own). `client` narrows to one client. Read-only. Its result explains the fields it carries in `fieldNotes`: read them before answering.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "client": {
+          "maxLength": 200,
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "list_email_threads_to_extract",
+    "title": "List email threads with something new to extract"
+  },
   "list_email_waits": {
     "annotations": {
       "destructiveHint": false,
@@ -2636,6 +2662,48 @@
     },
     "name": "manage_email_wait",
     "title": "Change or end a task's wait for an email reply"
+  },
+  "mark_email_threads_extracted": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Marks threads read up to `through` (`newestAt` from read_email_thread), so the next run starts after it. Call it for a thread that gave nothing to propose; propose_knowledge with newSource.mailThread marks its thread itself.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "threads": {
+          "items": {
+            "properties": {
+              "thread": {
+                "maxLength": 100,
+                "type": "string"
+              },
+              "through": {
+                "maxLength": 40,
+                "type": "string"
+              }
+            },
+            "required": [
+              "thread",
+              "through"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "threads"
+      ],
+      "type": "object"
+    },
+    "name": "mark_email_threads_extracted",
+    "title": "Mark email threads as read by the extraction"
   },
   "mark_process_reviewed": {
     "annotations": {
@@ -4396,6 +4464,24 @@
               ],
               "type": "string"
             },
+            "mailThread": {
+              "description": "For kind EMAIL: a thread of a scanned mailbox. The same thread is one source, and it is marked read up to `through`.",
+              "properties": {
+                "thread": {
+                  "description": "The thread's `thread` from list_email_threads_to_extract.",
+                  "type": "string"
+                },
+                "through": {
+                  "description": "ISO time: the newest email read, `newestAt` from read_email_thread.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "thread",
+                "through"
+              ],
+              "type": "object"
+            },
             "participants": {
               "items": {
                 "type": "string"
@@ -4561,6 +4647,67 @@
     },
     "name": "read_document",
     "title": "Read a document"
+  },
+  "read_email_thread": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The emails of one thread from list_email_threads_to_extract that the extraction has not read, oldest first, with their text and attachments' ids. `all` adds the emails already read, for context. Read-only. Its result explains the fields it carries in `fieldNotes`: read them before answering.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "all": {
+          "type": "boolean"
+        },
+        "thread": {
+          "maxLength": 100,
+          "type": "string"
+        }
+      },
+      "required": [
+        "thread"
+      ],
+      "type": "object"
+    },
+    "name": "read_email_thread",
+    "title": "Read a thread's new emails for extraction"
+  },
+  "read_email_thread_attachment": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The text of a file attached to an email in a thread from read_email_thread: PDF, Word, Excel, PowerPoint or text. Images and scans are not read. Read-only.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "attachmentId": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "emailId": {
+          "maxLength": 500,
+          "type": "string"
+        },
+        "thread": {
+          "maxLength": 100,
+          "type": "string"
+        }
+      },
+      "required": [
+        "thread",
+        "emailId",
+        "attachmentId"
+      ],
+      "type": "object"
+    },
+    "name": "read_email_thread_attachment",
+    "title": "Read an attachment in a thread for extraction"
   },
   "record_agent_run": {
     "annotations": {

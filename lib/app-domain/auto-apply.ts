@@ -442,17 +442,21 @@ export async function listAutoReview(actor: User, filter: { clientId?: string | 
       where: { clientId: { in: [...nameOf.keys()] }, autoApplied: true, state: "APPROVED", revertedAt: null, autoReviewedAt: null },
       orderBy: { decidedAt: "desc" },
       take: 500,
-      select: { id: true, clientId: true, target: true, payload: true, resultId: true, decidedAt: true, state: true, action: true, attached: true, revertedAt: true },
+      select: { id: true, clientId: true, target: true, payload: true, resultId: true, decidedAt: true, state: true, action: true, attached: true, revertedAt: true, batchId: true },
     }),
     autoApplySetting(),
     guideApprovals(),
   ]);
+  // Stage 3 of "התיבות שלי" (27.11.2026): what came from an email.
+  const fromEmail = await emailBatches(rows.map((r) => r.batchId));
+  const firstEmailAutoAt = await firstEmailAutoApply();
   const out: AutoReviewItem[] = [];
   for (const r of rows) {
     if (!r.decidedAt) continue;
-    const ctx = { firstEnabledAt: setting.firstEnabledAt, guideApprovals: guides };
-    const why = autoReviewReason({ id: r.id, decidedAt: r.decidedAt }, ctx);
-    const whyCode = autoReviewReasonCode({ id: r.id, decidedAt: r.decidedAt }, ctx);
+    const ctx = { firstEnabledAt: setting.firstEnabledAt, guideApprovals: guides, firstEmailAutoAt };
+    const p = { id: r.id, decidedAt: r.decidedAt, fromEmail: fromEmail.has(r.batchId) };
+    const why = autoReviewReason(p, ctx);
+    const whyCode = autoReviewReasonCode(p, ctx);
     if (!why || !whyCode) continue;
     const payload = (r.payload ?? {}) as Record<string, unknown>;
     const target = r.target as ProposalTargetLike;
@@ -503,4 +507,30 @@ export async function markAutoReviewed(actor: User, id: string) {
   const done = await prisma.knowledgeProposal.updateMany({ where: { id, autoReviewedAt: null }, data: { autoReviewedAt: new Date(), autoReviewedById: actor.id } });
   if (done.count === 0) throw new DomainError("autoApply.alreadyMarked", "כבר סומן כתקין.");
   await recordAudit({ actorId: actor.id, action: "knowledge_proposal.auto_review", entityType: "KnowledgeProposal", entityId: id, clientId: p.clientId });
+}
+
+
+// ---------------------------------------------------------------- stage 3 of "התיבות שלי"
+
+export const FIRST_EMAIL_AUTO_KEY = "mailExtraction.firstAutoAt";
+
+/// When an item from an email first entered a file on its own, or null.
+export async function firstEmailAutoApply(): Promise<Date | null> {
+  const row = await prisma.appSetting.findUnique({ where: { key: FIRST_EMAIL_AUTO_KEY } });
+  const at = row && typeof row.value === "string" ? new Date(row.value) : null;
+  return at && !Number.isNaN(at.getTime()) ? at : null;
+}
+
+/// Written once, the first time an item from an email enters on its own.
+export async function noteEmailAutoApply(now = new Date()): Promise<void> {
+  await prisma.appSetting.upsert({ where: { key: FIRST_EMAIL_AUTO_KEY }, create: { key: FIRST_EMAIL_AUTO_KEY, value: now.toISOString() }, update: {} });
+}
+
+/// Which of these batches came from an email thread.
+async function emailBatches(batchIds: string[]): Promise<Set<string>> {
+  if (!batchIds.length) return new Set();
+  const batches = await prisma.knowledgeBatch.findMany({ where: { id: { in: [...new Set(batchIds)] }, sourceId: { not: null } }, select: { id: true, sourceId: true } });
+  const sources = await prisma.clientSource.findMany({ where: { id: { in: batches.map((b) => b.sourceId!) }, kind: "EMAIL" }, select: { id: true } });
+  const email = new Set(sources.map((x) => x.id));
+  return new Set(batches.filter((b) => email.has(b.sourceId!)).map((b) => b.id));
 }

@@ -468,6 +468,7 @@ export async function recordMailEvent(accountId: string, emailId: string): Promi
       data: {
         clientIds: [...new Set([...existing.clientIds, ...clientIds])].sort(),
         participants: [...new Set([...existing.participants, ...participants])],
+        senders: from && !existing.senders.includes(from) ? [...existing.senders, from] : existing.senders,
         emailCount: { increment: 1 },
         held: existing.held || held,
         keepUntil: stillTemporary ? keepUntil : null,
@@ -484,6 +485,7 @@ export async function recordMailEvent(accountId: string, emailId: string): Promi
         lastEmailId: emailId,
         lastEmailAt: at,
         lastFromAddress: from,
+        senders: from ? [from] : [],
         held,
         keepUntil,
         ...sent,

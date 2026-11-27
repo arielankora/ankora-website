@@ -5009,6 +5009,12 @@ model MailThread {
   /// colleague, anyone who is no client's): deleted after this, unless a
   /// task follows it. Null on a thread with a client.
   keepUntil        DateTime?
+  /// Stage 3 (27.11.2026): everyone who wrote an email in it, lower case,
+  /// so a contact's own details from their own email can be told apart.
+  senders          String[] @default([])
+  /// Stage 3: the extraction read the thread up to the email of this time;
+  /// the next run reads only what came after.
+  extractedThroughAt DateTime?
   firstSeenAt      DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

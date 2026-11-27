@@ -102,6 +102,7 @@ export const ENTITY_TYPES = [
   // "התיבות שלי" (27.11.2026).
   "MailChannel",
   "MailBlock",
+  "MailThread",
 ];
 
 export const ACTION_LABEL: Record<string, string> = {
@@ -458,6 +459,8 @@ export const ACTION_LABEL: Record<string, string> = {
   "task.mail_wait_rescheduled": "שינוי מועד התזכורת לתשובה למייל",
   "task.mail_reminder_sent": "שליחת תזכורת במייל",
   "task.unblocked_by_reply": "הגיעה תשובה במייל, והמשימה כבר לא ממתינה",
+  "mail_thread.extraction_read": "קריאת שרשור מייל לחילוץ ידע",
+  "mail_thread.extraction_attachment": "קריאת קובץ מצורף ממייל לחילוץ ידע",
   "comms_whatsapp.retention_sweep": "מחיקת שיחות WhatsApp לפי זמן השמירה",
   "comms_group.assigned": "שיוך קבוצת WhatsApp ללקוח",
   "comms_engagement_end.sweep": "מחיקת שיחות והקלטות של לקוח שההתקשרות איתו הסתיימה",

@@ -54,7 +54,7 @@ export async function assertClientAccess(actor: User, clientId: string) {
 /// WHATSAPP and CALL (14.11.2026): a stretch of a stored WhatsApp
 /// conversation ("<conversation id>:<from day>:<to day>") and a recorded call
 /// (its id). They tell the extraction what was already read.
-export type ExternalRef = { system: "FIREFLIES" | "DOCUMENT" | "TASK" | "GMAIL" | "WHATSAPP" | "CALL" | "OTHER"; id: string };
+export type ExternalRef = { system: "FIREFLIES" | "DOCUMENT" | "TASK" | "GMAIL" | "WHATSAPP" | "CALL" | "MAIL" | "OTHER"; id: string };
 
 /// What an external id on a source of this kind points at.
 export function externalSystemFor(kind: SourceKind): ExternalRef["system"] {
@@ -85,6 +85,12 @@ async function assertRefsBelong(clientId: string, refs: ExternalRef[]) {
   if (taskIds.length > 0) {
     const found = await prisma.task.count({ where: { id: { in: taskIds }, clientId, deletedAt: null } });
     if (found !== new Set(taskIds).size) throw new DomainError("clientSources.taskNotInClient", "משימה שצוינה כמקור לא נמצאה אצל הלקוח.");
+  }
+  // Stage 3 of "התיבות שלי" (27.11.2026): a thread of a scanned mailbox.
+  const mailIds = refs.filter((r) => r.system === "MAIL").map((r) => r.id);
+  if (mailIds.length > 0) {
+    const found = await prisma.mailThread.count({ where: { id: { in: mailIds }, clientIds: { has: clientId } } });
+    if (found !== new Set(mailIds).size) throw new DomainError("clientSources.threadNotInClient", "שרשור שצוין כמקור לא שייך ללקוח.");
   }
 }
 
