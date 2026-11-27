@@ -8407,6 +8407,29 @@
         }
       },
       "working": "רגע, זה בעבודה"
+    },
+    "connections": {
+      "button": "חיבורים והגדרות",
+      "needsYou": "משהו מחכה לך",
+      "allConnected": "הכול מחובר",
+      "mine": "שלי",
+      "team": "הגדרות הצוות",
+      "myWhatsapp": "חיבור ה-WhatsApp שלי",
+      "myMailboxes": "התיבות שלי",
+      "wa": {
+        "ok": "מחובר",
+        "attention": "מנותק, לחבר מחדש",
+        "missing": "לא חובר"
+      },
+      "mail": {
+        "none": "אין תיבה מחוברת",
+        "disconnected": "תיבה מנותקת",
+        "unfinished": "נשאר שלב",
+        "unknown": "{count, plural, one {תיבה אחת} other {# תיבות}}",
+        "scanning": "{count, plural, one {נסרקת} other {# תיבות נסרקות}}"
+      },
+      "teamWhatsapp": "WhatsApp: מספרים וחסימות",
+      "teamMail": "דואר: תיבות ו\"לא לקרוא\""
     }
   },
   "portal": {
