@@ -101,8 +101,13 @@ function NewAgentForm() {
   const router = useRouter();
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(createAgentAction, (r) => {
-    close();
+    // 28.11.2026: no close() before leaving. close() makes the drawer
+    // re-read the screen it sits on (router.replace with ?w=), and that
+    // replace ran after this push and won: the person stayed on the old
+    // screen (after a new address, an address that no longer exists).
+    // Leaving the screen unmounts the drawer anyway.
     if (r.slug) router.push(`/app/agents/${r.slug}/instructions`);
+    else close();
   });
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
@@ -584,9 +589,8 @@ export function DraftButtons({ versionId, canDiscard }: { versionId: string; can
 function ArchiveForm({ agentId }: { agentId: string }) {
   const t = useTranslations("agents.forms");
   const router = useRouter();
-  const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(archiveAgentAction, () => {
-    close();
+    // No close() before leaving: see NewAgentForm.
     router.push("/app/agents");
   });
   return (
@@ -641,8 +645,9 @@ function SlugForm({ agentId, slug }: { agentId: string; slug: string }) {
   const router = useRouter();
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(setAgentSlugAction, (r) => {
-    close();
+    // No close() before leaving: see NewAgentForm.
     if (r.slug) router.push(`/app/agents/${r.slug}`);
+    else close();
   });
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">

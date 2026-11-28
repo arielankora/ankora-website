@@ -484,6 +484,9 @@ describe("going back to an earlier version", () => {
 });
 
 describe("what the spec asked for on 23.11", () => {
+  // The skill check below runs through get_agent, which calls skillGaps;
+  // this file names the connector tool, not the module, so it is declared:
+  // @covers domain:agent-skills
   it("tells get_agent when a required Ankora skill is older than its minimum version", async () => {
     const { hadas, nux } = await setup();
     const skill = await prisma.agent.create({ data: { slug: "gmail-labels", name: "Gmail labels", purpose: "תוויות", kind: "SKILL", versions: { create: [{ version: 1, state: "APPROVED", blocks: BLOCKS.slice(0, 1) }, { version: 2, state: "APPROVED", blocks: BLOCKS.slice(0, 1) }] } } });
