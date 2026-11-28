@@ -153,6 +153,12 @@ describe("following a reply through the connector", () => {
     await recordMailEvent("acc_anna", "e2");
     expect(await prisma.taskMailWait.findFirstOrThrow()).toMatchObject({ endedAt: null, lastEmailId: "e2" });
 
+    // 28.11.2026: an "out of office" answer is no reply.
+    email("e_ooo", "t_print", "yossi@acme-print.co.il", ["anna@ankora.co.il"], "2026-11-27T10:00:00.000Z");
+    emails.e_ooo.headers = [{ name: "Auto-Submitted", value: "auto-replied" }];
+    expect(await recordMailEvent("acc_anna", "e_ooo")).toBe("automated");
+    expect(await prisma.taskMailWait.findFirstOrThrow()).toMatchObject({ endedAt: null, lastEmailId: "e2" });
+
     email("e3", "t_print", "yossi@acme-print.co.il", ["anna@ankora.co.il"], "2026-11-27T11:05:00.000Z");
     expect(await recordMailEvent("acc_anna", "e3")).toBe("updated");
     expect(await prisma.taskMailWait.findFirstOrThrow()).toMatchObject({ endedHow: "REPLY", replyFrom: "yossi@acme-print.co.il" });

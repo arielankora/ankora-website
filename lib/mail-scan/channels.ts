@@ -25,6 +25,7 @@ import { isAccountLimit } from "./connect-errors";
 import { SENT_KEEP_DAYS, recipientsOf } from "./wait-rules";
 import {
   TEAM_DOMAINS,
+  automatedReason,
   decideEmail,
   fromOf,
   participantsOf,
@@ -439,7 +440,7 @@ export async function changeMailOwner(actor: Actor, channelId: string, ownerUser
 
 // ---------------------------------------------------------------- the webhook
 
-export type RecordResult = "recorded" | "updated" | "same" | "not-scanning" | "team" | "blocked" | "no-client" | "no-thread";
+export type RecordResult = "recorded" | "updated" | "same" | "not-scanning" | "team" | "blocked" | "no-client" | "no-thread" | "automated";
 
 /// email.new from Unipile, for a mailbox that scans: the thread is recorded
 /// if it is with a client, with who and when, never what was written.
@@ -457,6 +458,11 @@ export async function recordMailEvent(accountId: string, emailId: string): Promi
 
   // Stage 2: a reply in a thread a task follows ends the wait, whatever
   // else is decided below; and a followed thread is always recorded.
+  // 28.11.2026: newsletters, notifications, marketing and automatic replies
+  // ("out of office") are not recorded, and do not end a task's wait for a
+  // reply: no person answered (automatedReason, lib/mail-scan/rules.ts).
+  // What the owner sent is never automatic.
+  if (from !== channel.address && automatedReason({ headers: email.headers, from, folders: email.folders })) return "automated";
   const followed = await onThreadEmail(channel, { externalThreadId: threadId, emailId, from, at });
   const team = await loadTeam();
   const lookup: ClientLookup = { byDomain: await domainsOfClients(), byAddress: await contactsOf(participants) };

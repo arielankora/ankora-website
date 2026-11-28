@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  automatedReason,
   blockStateOf,
   decideEmail,
   isTeamAddress,
@@ -184,5 +185,29 @@ describe("mail-scan: the senders offered for \"do not read\"", () => {
       { address: "service@bank.co.il", name: "Bank", count: 1 },
     ]);
     expect(topSenders(emails, { address: "anna@ankora.co.il", team }, 1)).toHaveLength(1);
+  });
+});
+
+describe("automatic mail (28.11.2026)", () => {
+  const h = (name: string, value: string) => ({ headers: [{ name, value }] });
+  it("is told by its headers", () => {
+    expect(automatedReason(h("List-Unsubscribe", "<https://x.co/u>"))).toBe("list");
+    expect(automatedReason(h("list-id", "<news.x.co>"))).toBe("list");
+    expect(automatedReason(h("Auto-Submitted", "auto-replied"))).toBe("auto-submitted");
+    expect(automatedReason(h("Auto-Submitted", "no"))).toBeNull();
+    expect(automatedReason(h("Precedence", "Bulk"))).toBe("bulk");
+    expect(automatedReason(h("Precedence", "urgent"))).toBeNull();
+  });
+  it("is told by a no-reply sender, and not by an ordinary one", () => {
+    for (const from of ["no-reply@accounts.google.com", "noreply@x.co", "do_not_reply@bank.co.il", "MAILER-DAEMON@x.co", "bounces+123@x.co", "no-reply.updates@x.co"]) {
+      expect(automatedReason({ from })).toBe("no-reply");
+    }
+    for (const from of ["info@grantor.co.il", "office@client.co.il", "replyall@x.co", "nora@x.co"]) expect(automatedReason({ from })).toBeNull();
+  });
+  it("is told by Gmail's Promotions, Social and Forums tabs, not Updates", () => {
+    expect(automatedReason({ folders: ["CATEGORY_PROMOTIONS"] })).toBe("gmail-category");
+    expect(automatedReason({ folders: ["CATEGORY_SOCIAL"] })).toBe("gmail-category");
+    expect(automatedReason({ folders: ["INBOX", "CATEGORY_UPDATES"] })).toBeNull();
+    expect(automatedReason({})).toBeNull();
   });
 });
