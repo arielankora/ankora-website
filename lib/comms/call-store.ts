@@ -230,6 +230,20 @@ export async function transcribeRecording(transcriptId: string): Promise<Transcr
     }
   }
 
+  // 28.11.2026 (system issue transcripts-stuck): a voice message already
+  // marked gone (the Drive copy got a 404, or Unipile said WhatsApp lost it)
+  // and with no copy in Drive has no audio left anywhere. It was still
+  // fetched, and each 404 took 30 seconds of the nightly budget. Failed at
+  // once instead, like a 404 below.
+  if (t.attachment?.unavailable && !t.attachment.driveFileId) {
+    await prisma.transcript.update({
+      where: { id: t.id },
+      data: { attempts: Math.max(t.attempts, TRANSCRIBE_MAX_ATTEMPTS), lastError: "ההודעה הקולית כבר לא קיימת ב-Unipile ואין לה עותק ב-Drive.", status: "FAILED" },
+    });
+    console.log("transcribe: gone", { transcriptId: t.id });
+    return "failed";
+  }
+
   // 25.11.2026: what was tried, and why it failed, goes to the log (ids,
   // sizes and codes only: no number, no audio, no text). A start line with
   // no end line means the function was cut off mid-way.
