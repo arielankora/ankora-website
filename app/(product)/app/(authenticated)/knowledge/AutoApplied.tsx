@@ -7,6 +7,8 @@ import { useToast } from "@/components/app/toast/ToastProvider";
 import { kindKeyLabel } from "./labels";
 import { pauseErrorsLine, type AutoErrorType } from "@/lib/auto-apply";
 import { revertWords } from "./revert-words";
+import { ProposalChanges } from "./ProposalChanges";
+import type { ProposalChange } from "@/lib/proposal-changes";
 import { liftAutoApplyPauseAction, markAutoReviewedAction, revertProposalAction, setAutoApplyAction } from "./actions";
 
 // "נכנס אוטומטית" (3.11.2026, approval tiers part 2): the items that
@@ -22,6 +24,8 @@ export type AutoReviewRow = {
   headline: string;
   /// CREATE, or a change that "ביטול" puts back as it was (revertWords).
   action?: string;
+  /// An update (SUPERSEDE, 28.11.2026): what it changed, before and after.
+  changes?: ProposalChange[] | null;
   /// The item in the client's file.
   itemHref: string | null;
   enteredAt: Date | null;
@@ -93,7 +97,8 @@ function ReviewRow({ row }: { row: AutoReviewRow }) {
           {row.headline}
         </p>
         <p className="mt-0.5 text-xs text-app-text-tertiary">
-          <bdi>{row.clientName}</bdi> · {kindKeyLabel(tk, row.kindKey)} · {t("entered", { date: row.enteredAt ? format.dateTime(row.enteredAt, DAY_FORMAT) : "" })} · {why}
+          <bdi>{row.clientName}</bdi> · {kindKeyLabel(tk, row.kindKey)}
+          {row.action === "SUPERSEDE" && <> · {t("updated")}</>} · {t("entered", { date: row.enteredAt ? format.dateTime(row.enteredAt, DAY_FORMAT) : "" })} · {why}
           {row.itemHref && (
             <>
               {" · "}
@@ -103,6 +108,7 @@ function ReviewRow({ row }: { row: AutoReviewRow }) {
             </>
           )}
         </p>
+        {row.action === "SUPERSEDE" && row.changes && row.changes.length > 0 && <ProposalChanges changes={row.changes} applied />}
       </div>
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {asking ? (

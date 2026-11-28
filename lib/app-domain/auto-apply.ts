@@ -9,7 +9,9 @@ import { DomainError } from "@/lib/domain-error";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { proposalHeadline, revertBlocker, type ProposalTargetLike } from "@/lib/knowledge-proposals";
-import { proposalKindKey, proposalKindLabel } from "@/lib/knowledge-review-filters";
+import { proposalKindKey, proposalKindLabel, splitPauseKey } from "@/lib/knowledge-review-filters";
+import { currentItem } from "@/lib/app-domain/proposal-updates";
+import type { ProposalChange } from "@/lib/proposal-changes";
 import {
   CHANGE_ACTIONS,
   CLIENT_WINDOW_DAYS,
@@ -43,12 +45,24 @@ export const AUTO_APPLY_PAUSED = "knowledge.auto_apply_paused";
 
 const DAY = 86_400_000;
 
-export type AutoApplySetting = { enabled: boolean; firstEnabledAt: Date | null };
+/// `supersedeEnabledAt` (28.11.2026): when updates (SUPERSEDE) began to
+/// enter on their own, written by the migration of that day at deploy.
+/// Their first 14 days count from it (lib/auto-apply.ts). Null: every
+/// update that entered on its own is looked at.
+export type AutoApplySetting = { enabled: boolean; firstEnabledAt: Date | null; supersedeEnabledAt: Date | null };
+
+function readDate(v: unknown): Date | null {
+  const d = typeof v === "string" ? new Date(v) : null;
+  return d && !Number.isNaN(d.getTime()) ? d : null;
+}
 
 function readSetting(value: Prisma.JsonValue): AutoApplySetting {
   const v = (value && typeof value === "object" && !Array.isArray(value) ? value : {}) as Record<string, unknown>;
-  const first = typeof v.firstEnabledAt === "string" ? new Date(v.firstEnabledAt) : null;
-  return { enabled: v.enabled !== false, firstEnabledAt: first && !Number.isNaN(first.getTime()) ? first : null };
+  return { enabled: v.enabled !== false, firstEnabledAt: readDate(v.firstEnabledAt), supersedeEnabledAt: readDate(v.supersedeEnabledAt) };
+}
+
+function writeSetting(s: AutoApplySetting): Prisma.InputJsonValue {
+  return { enabled: s.enabled, firstEnabledAt: s.firstEnabledAt?.toISOString() ?? null, supersedeEnabledAt: s.supersedeEnabledAt?.toISOString() ?? null };
 }
 
 /// The switch for all clients. On by default: a database that never had
@@ -57,9 +71,10 @@ function readSetting(value: Prisma.JsonValue): AutoApplySetting {
 export async function autoApplySetting(): Promise<AutoApplySetting> {
   const row = await prisma.appSetting.findUnique({ where: { key: AUTO_APPLY_KEY } });
   if (row) return readSetting(row.value);
+  const now = new Date();
   const created = await prisma.appSetting.upsert({
     where: { key: AUTO_APPLY_KEY },
-    create: { key: AUTO_APPLY_KEY, value: { enabled: true, firstEnabledAt: new Date().toISOString() } },
+    create: { key: AUTO_APPLY_KEY, value: writeSetting({ enabled: true, firstEnabledAt: now, supersedeEnabledAt: now }) },
     update: {},
   });
   return readSetting(created.value);
@@ -70,10 +85,11 @@ export async function autoApplySetting(): Promise<AutoApplySetting> {
 export async function setAutoApply(actor: User, enabled: boolean): Promise<AutoApplySetting> {
   if (!canManageClients(actor.role)) throw new ForbiddenError("רק מנהל מפעיל או מכבה כניסה אוטומטית.");
   const before = await autoApplySetting();
-  const after: AutoApplySetting = { enabled, firstEnabledAt: before.firstEnabledAt ?? (enabled ? new Date() : null) };
+  // When updates began to enter on their own is kept as it was.
+  const after: AutoApplySetting = { enabled, firstEnabledAt: before.firstEnabledAt ?? (enabled ? new Date() : null), supersedeEnabledAt: before.supersedeEnabledAt };
   await prisma.appSetting.update({
     where: { key: AUTO_APPLY_KEY },
-    data: { value: { enabled, firstEnabledAt: after.firstEnabledAt?.toISOString() ?? null }, updatedById: actor.id },
+    data: { value: writeSetting(after), updatedById: actor.id },
   });
   await recordAudit({ actorId: actor.id, action: "knowledge.auto_apply_switch", entityType: "AppSetting", entityId: AUTO_APPLY_KEY, before: { enabled: before.enabled }, after: { enabled } });
   return after;
@@ -114,7 +130,18 @@ async function batchSources(batchIds: string[]): Promise<Map<string, ProposalSou
   return new Map(batches.map((b) => [b.id, proposalSource(b, b.sourceId ? sourceOf.get(b.sourceId) ?? null : null)]));
 }
 
-const BY_PROPOSAL = { "client_fact.supersede": "SUPERSEDE", "client_fact.contradict": "CONTRADICT" } as const;
+/// The audit actions an approved proposal writes on the item it changes:
+/// a fact's new version or contradiction, and (28.11.2026) an update in
+/// place of any other item, which an update (SUPERSEDE) writes.
+const BY_PROPOSAL = {
+  "client_fact.supersede": "SUPERSEDE",
+  "client_fact.contradict": "CONTRADICT",
+  "client_contact.update": "SUPERSEDE",
+  "client_organization.update": "SUPERSEDE",
+  "client_entity.update": "SUPERSEDE",
+  "system_access.update": "SUPERSEDE",
+  "request_type.update": "SUPERSEDE",
+} as const;
 
 /// The outcome of each auto-applied proposal (lib/auto-apply.ts,
 /// autoOutcome): its error, or null, and the changes not counted (a
@@ -247,11 +274,14 @@ export async function pauseBreakdown(p: { scope: AutoApplyScope; key: string; cr
   return summarizeAutoErrors(await pauseErrors(p, opts));
 }
 
-/// The auto-applied proposals of one kind, by its key (a target, or
-/// FACT.<kind>).
+/// The proposals of one kind, by its pause key (a target, or
+/// FACT.<kind>; with ":SUPERSEDE", its updates, 28.11.2026). A key without
+/// it is the kind's new items: its updates count apart
+/// (knowledge-review-filters.ts, autoPauseKey).
 function kindWhere(key: string): Prisma.KnowledgeProposalWhereInput {
-  const [target, factKind] = key.split(".");
-  return { target: target as ProposalTargetLike, ...(factKind ? { payload: { path: ["kind"], equals: factKind } } : {}) };
+  const { kind, supersede } = splitPauseKey(key);
+  const [target, factKind] = kind.split(".");
+  return { target: target as ProposalTargetLike, action: supersede ? "SUPERSEDE" : "CREATE", ...(factKind ? { payload: { path: ["kind"], equals: factKind } } : {}) };
 }
 
 async function managers() {
@@ -263,10 +293,11 @@ async function managers() {
 /// proposalKindLabel (lib/knowledge-review-filters.ts) in the reader's
 /// language: a target, or FACT.<kind> for a kind of fact.
 function kindLabelIn(t: OutgoingT, key: string): string {
-  const [target, factKind] = key.split(".");
-  if (factKind && factKind in FACT_KINDS) return t(`labels.factKinds.${factKind as keyof typeof FACT_KINDS}`);
-  if (target in TARGETS) return t(`labels.targets.${target as keyof typeof TARGETS}`);
-  return key;
+  const { kind, supersede } = splitPauseKey(key);
+  const [target, factKind] = kind.split(".");
+  const label =
+    factKind && factKind in FACT_KINDS ? t(`labels.factKinds.${factKind as keyof typeof FACT_KINDS}`) : target in TARGETS ? t(`labels.targets.${target as keyof typeof TARGETS}`) : kind;
+  return supersede ? t("autoApply.supersedeKind", { kind: label }) : label;
 }
 const TARGETS = { FACT: 1, CONTACT: 1, ORGANIZATION: 1, SYSTEM: 1, REQUEST_TYPE: 1, POLICY: 1, ENTITY: 1, NARRATIVE: 1, PROCESS: 1, DOMAIN: 1, TASK: 1, DATE: 1 } as const;
 const FACT_KINDS = { SCOPE_IN: 1, SCOPE_OUT: 1, PREFERENCE: 1, REQUIREMENT: 1, LOCATION: 1, FINANCE: 1, TEMPORARY: 1, ONE_OFF_DECISION: 1, QUESTION: 1, NOTE: 1 } as const;
@@ -425,6 +456,11 @@ export type AutoReviewItem = {
   revertible: boolean;
   /// CREATE, or a change (SUPERSEDE, CONTRADICT) that "ביטול" puts back.
   action: string;
+  /// An update (SUPERSEDE, 28.11.2026): the fields it changed, what the
+  /// item said before and what it says since, as the review card showed
+  /// them (lib/proposal-changes.ts), kept when it entered. Null for a new
+  /// item, or an update that entered before they were kept.
+  changes: ProposalChange[] | null;
 };
 
 /// "נכנס אוטומטית": auto-applied items a person still looks at, newest
@@ -450,11 +486,12 @@ export async function listAutoReview(actor: User, filter: { clientId?: string | 
   // Stage 3 of "התיבות שלי" (27.11.2026): what came from an email.
   const fromEmail = await emailBatches(rows.map((r) => r.batchId));
   const firstEmailAutoAt = await firstEmailAutoApply();
+  const changesOf = await appliedChanges(rows.filter((r) => r.action === "SUPERSEDE").map((r) => r.id));
   const out: AutoReviewItem[] = [];
   for (const r of rows) {
     if (!r.decidedAt) continue;
-    const ctx = { firstEnabledAt: setting.firstEnabledAt, guideApprovals: guides, firstEmailAutoAt };
-    const p = { id: r.id, decidedAt: r.decidedAt, fromEmail: fromEmail.has(r.batchId) };
+    const ctx = { firstEnabledAt: setting.firstEnabledAt, guideApprovals: guides, firstEmailAutoAt, supersedeEnabledAt: setting.supersedeEnabledAt };
+    const p = { id: r.id, decidedAt: r.decidedAt, fromEmail: fromEmail.has(r.batchId), action: r.action };
     const why = autoReviewReason(p, ctx);
     const whyCode = autoReviewReasonCode(p, ctx);
     if (!why || !whyCode) continue;
@@ -467,14 +504,33 @@ export async function listAutoReview(actor: User, filter: { clientId?: string | 
       target,
       kindLabel: proposalKindLabel(proposalKindKey({ target, payload })),
       kindKey: proposalKindKey({ target, payload }),
-      headline: proposalHeadline(target, payload),
+      // An update names only what it changed: called by its item.
+      headline: proposalHeadline(target, payload) || (r.action !== "CREATE" && r.resultId ? ((await currentItem(r.clientId, target, r.resultId))?.body ?? "") : ""),
       resultId: r.resultId,
       decidedAt: r.decidedAt,
       why,
       whyCode,
       revertible: revertBlocker(r) === null,
       action: r.action,
+      changes: changesOf.get(r.id) ?? null,
     });
+  }
+  return out;
+}
+
+/// What each approved update changed, as approveProposal kept it in its
+/// own audit row (`after.changes`) when it entered.
+async function appliedChanges(ids: string[]): Promise<Map<string, ProposalChange[]>> {
+  if (!ids.length) return new Map();
+  const rows = await prisma.auditEvent.findMany({
+    where: { entityType: "KnowledgeProposal", entityId: { in: ids }, action: { in: ["knowledge_proposal.auto_apply", "knowledge_proposal.approve"] } },
+    orderBy: { createdAt: "asc" },
+    select: { entityId: true, afterJson: true },
+  });
+  const out = new Map<string, ProposalChange[]>();
+  for (const r of rows) {
+    const changes = (r.afterJson as { changes?: unknown } | null)?.changes;
+    if (r.entityId && Array.isArray(changes)) out.set(r.entityId, changes as ProposalChange[]);
   }
   return out;
 }

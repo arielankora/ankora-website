@@ -29,8 +29,13 @@ function useValueText() {
   };
 }
 
-export function ProposalChanges({ changes }: { changes: ProposalChange[] }) {
+/// `applied`: a change already made (an update that entered on its own,
+/// 28.11.2026), worded as what was and what is now.
+export function ProposalChanges({ changes, applied = false }: { changes: ProposalChange[]; applied?: boolean }) {
   const t = useTranslations("knowledge");
+  const head = applied
+    ? { before: t("changes.applied.before"), after: t("changes.applied.after"), removed: t("changes.applied.removed"), rest: t("changes.applied.rest") }
+    : { before: t("changes.before"), after: t("changes.after"), removed: t("changes.removed"), rest: t("changes.rest") };
   const text = useValueText();
   const label = (field: string) => (t.has(`changes.fields.${field}` as Key) ? t(`changes.fields.${field}` as Key) : field);
   const before = (c: ProposalChange) => (c.beforeKnown ? text(c.field, c.before) : null);
@@ -47,10 +52,10 @@ export function ProposalChanges({ changes }: { changes: ProposalChange[] }) {
               {t("changes.field")}
             </th>
             <th scope="col" className="w-1/3 px-2 py-1.5 text-start font-medium">
-              {t("changes.before")}
+              {head.before}
             </th>
             <th scope="col" className="px-2 py-1.5 text-start font-medium">
-              {t("changes.after")}
+              {head.after}
             </th>
           </tr>
         </thead>
@@ -64,7 +69,7 @@ export function ProposalChanges({ changes }: { changes: ProposalChange[] }) {
                 {before(c) ?? <span className="whitespace-nowrap">{beforeEmpty(c)}</span>}
               </td>
               <td className="whitespace-pre-line bg-app-accent-soft px-2 py-2 font-medium text-app-text-primary" dir="auto">
-                {after(c) ?? <span className="font-normal text-app-text-secondary">{t("changes.removed")}</span>}
+                {after(c) ?? <span className="font-normal text-app-text-secondary">{head.removed}</span>}
               </td>
             </tr>
           ))}
@@ -85,13 +90,13 @@ export function ProposalChanges({ changes }: { changes: ProposalChange[] }) {
               </span>
               <span className="sr-only">{t("changes.becomes")}</span>
               <span className="rounded-md bg-app-accent-soft px-2 py-0.5 font-medium text-app-text-primary" dir="auto">
-                {after(c) ?? t("changes.removed")}
+                {after(c) ?? head.removed}
               </span>
             </p>
           </li>
         ))}
       </ul>
-      <p className="mt-1.5 text-xs text-app-text-tertiary">{t("changes.rest")}</p>
+      <p className="mt-1.5 text-xs text-app-text-tertiary">{head.rest}</p>
     </div>
   );
 }

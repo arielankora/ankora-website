@@ -70,7 +70,7 @@ import { datesInFile, isNamedTarget, listsOf, nameFieldOf, namesInFile } from "@
 import { findDateMatches, findNameMatches, nameTokens } from "@/lib/name-match";
 import { autoApplySetting, evaluateAutoPauses, noteEmailAutoApply } from "@/lib/app-domain/auto-apply";
 import { isOwnDetailsUpdate } from "@/lib/mail-scan/own-details";
-import { proposalKindKey } from "@/lib/knowledge-review-filters";
+import { autoPauseKey } from "@/lib/knowledge-review-filters";
 
 // Org brain, phase 2: proposals to the client file
 // (claude/org-brain-spec-2026-10-12.md, 4, 5.1, 5.2; decisions 1 and 3).
@@ -617,7 +617,8 @@ async function autoApplyBatch(actor: User, batchId: string, clientId: string): P
     return senders.length > 0 && !!p.targetId && isOwnDetailsUpdate({ target: p.target, action: p.action, payload, flags, level }, { contactEmails: contactEmails.get(p.targetId) ?? [], threadSenders: senders });
   });
   if (auto.length === 0) return [];
-  const keyOf = (p: (typeof auto)[number]) => proposalKindKey({ target: p.target as ProposalTargetLike, payload: p.payload as Record<string, unknown> });
+  // 28.11.2026: an update counts in its own bucket (autoPauseKey).
+  const keyOf = (p: (typeof auto)[number]) => autoPauseKey({ target: p.target as ProposalTargetLike, action: p.action, payload: p.payload as Record<string, unknown> });
   const paused = await evaluateAutoPauses({ clientId, kindKeys: auto.map(keyOf) });
   if (paused.clientPaused) return [];
   const out: AutoAppliedItem[] = [];
@@ -1137,6 +1138,11 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
     proposal.target === "PROCESS" && proposal.action === "SUPERSEDE" && proposal.targetId
       ? ((await prisma.processVersion.findFirst({ where: { processId: proposal.targetId }, orderBy: { version: "desc" }, select: { version: true } }))?.version ?? 0)
       : 0;
+  // An update (28.11.2026): what it changes, field by field, as the card
+  // shows it, read before it is written and kept in the approval's audit
+  // row, so "נכנס אוטומטית" and list_approvals show it after.
+  const fieldsBefore = proposal.action === "SUPERSEDE" && proposal.targetId ? await currentFields(proposal.clientId, proposal.target, proposal.targetId) : null;
+  const changes = fieldsBefore ? proposalChanges(payload, fieldsBefore) : null;
   const resultId = await apply(actor, proposal, payload);
   // Which fields changed, and whether in wording or in fact
   // (lib/proposal-edits.ts). A change of spaces only is no edit. The names
@@ -1170,6 +1176,7 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
       headline: proposalHeadline(proposal.target, payload),
       ...(edited ? { editedFields: edit.editedFields, editKind: edit.editKind, fieldKinds: edit.fieldKinds, fields: edit.after } : {}),
       ...(options.bulk ? { bulk: true } : {}),
+      ...(changes ? { changes } : {}),
     },
   });
   // The other proposals on the fact this one replaced move to the new
@@ -1510,7 +1517,7 @@ export async function revertProposal(actor: User, id: string) {
   // the next arrival of the same client or kind checks again.
   if (proposal.autoApplied) {
     try {
-      await evaluateAutoPauses({ clientId: proposal.clientId, kindKeys: [proposalKindKey({ target: proposal.target as ProposalTargetLike, payload: proposal.payload as Record<string, unknown> })] });
+      await evaluateAutoPauses({ clientId: proposal.clientId, kindKeys: [autoPauseKey({ target: proposal.target as ProposalTargetLike, action: proposal.action, payload: proposal.payload as Record<string, unknown> })] });
     } catch (err) {
       console.error("[knowledge] auto-apply pause check after a revert failed", err);
     }

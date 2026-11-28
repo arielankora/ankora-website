@@ -3,6 +3,7 @@ import { FACT_KIND_LABELS, type FactKindLike } from "@/lib/client-facts";
 import { POLICY_KIND_LABELS, type PolicyKindLike } from "@/lib/client-policies";
 import { SOURCE_KIND_LABELS, type SourceKindLike } from "@/lib/knowledge-sources";
 import { NARRATIVE_KIND_LABELS, TARGET_LABELS, type DetailPart, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { SUPERSEDE_PAUSE_SUFFIX } from "@/lib/knowledge-review-filters";
 
 // ADR 0006: the review screen's words for the codes the domain keeps
 // (kinds, sources, details), in the reader's language. The Hebrew maps in
@@ -29,6 +30,8 @@ export function targetLabel(t: KnowledgeT, p: { target: ProposalTargetLike; payl
 /// A filter's kind key (lib/knowledge-review-filters.ts, proposalKindKey):
 /// "FACT.FINANCE" or a target. Unknown keys read as themselves.
 export function kindKeyLabel(t: KnowledgeT, key: string): string {
+  // A pause key of a kind's updates (autoPauseKey, 28.11.2026).
+  if (key.endsWith(SUPERSEDE_PAUSE_SUFFIX)) return t("supersedeKind", { kind: kindKeyLabel(t, key.slice(0, -SUPERSEDE_PAUSE_SUFFIX.length)) });
   if (key.startsWith("FACT.")) {
     const kind = key.slice(5);
     return isFactKind(kind) ? t(`factKinds.${kind}`) : t("targets.FACT");

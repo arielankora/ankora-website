@@ -37,7 +37,8 @@ describe("the card's order", () => {
   const base = { target: "FACT" as const, action: "CREATE" as const, flags: [], payload: { kind: "NOTE" } };
   it("blocked, then one at a time (a low level among them), then medium, then high", () => {
     expect(reviewRank({ ...base, flags: [{ code: "R17", message: "", block: true }], level: "HIGH" })).toBe(0);
-    expect(reviewRank({ ...base, action: "SUPERSEDE", level: "HIGH" })).toBe(1);
+    expect(reviewRank({ ...base, action: "CONTRADICT", level: "HIGH" })).toBe(1);
+    expect(reviewRank({ ...base, action: "SUPERSEDE", level: "MEDIUM" })).toBe(1);
     // 19.11.2026: sensitive goes together, by its level.
     expect(reviewRank({ ...base, payload: { sensitivity: "SENSITIVE" }, level: "HIGH" })).toBe(4);
     // 3.11.2026, the approval tiers: low is decided one at a time.

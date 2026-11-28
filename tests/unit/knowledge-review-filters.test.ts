@@ -8,6 +8,8 @@ import {
   parseReviewFilters,
   proposalKindKey,
   proposalKindLabel,
+  autoPauseKey,
+  splitPauseKey,
   proposalMatches,
   reviewFiltersHref,
 } from "@/lib/knowledge-review-filters";
@@ -54,9 +56,20 @@ describe("review filters", () => {
     expect(proposalKindKey(p({ payload: { kind: "NOPE" } }))).toBe("FACT");
   });
 
+  it("28.11.2026: an update counts in a pause bucket of its own, named as such", () => {
+    expect(autoPauseKey(p())).toBe("FACT.FINANCE");
+    expect(autoPauseKey(p({ action: "SUPERSEDE" }))).toBe("FACT.FINANCE:SUPERSEDE");
+    expect(autoPauseKey(p({ target: "CONTACT", action: "SUPERSEDE", payload: {} }))).toBe("CONTACT:SUPERSEDE");
+    expect(autoPauseKey(p({ target: "CONTACT", action: "CONTRADICT", payload: {} }))).toBe("CONTACT");
+    expect(splitPauseKey("CONTACT:SUPERSEDE")).toEqual({ kind: "CONTACT", supersede: true });
+    expect(splitPauseKey("FACT.FINANCE")).toEqual({ kind: "FACT.FINANCE", supersede: false });
+    expect(proposalKindLabel("CONTACT:SUPERSEDE")).toBe("עדכון של איש קשר");
+    expect(proposalKindLabel("FACT.FINANCE:SUPERSEDE")).toBe("עדכון של כספים");
+  });
+
   it("needs attention: sensitive (even approved together), a change, a possible duplicate, any flag, or hidden from me", () => {
     expect(needsAttention(p())).toBe(false);
-    expect(needsAttention(p({ action: "SUPERSEDE" }))).toBe(true);
+    expect(needsAttention(p({ action: "CONTRADICT" }))).toBe(true);
     expect(needsAttention(p({ flags: [{ code: "DUPLICATE", message: "" }] }))).toBe(true);
     expect(needsAttention(p({ flags: [{ code: "R14", message: "" }] }))).toBe(true);
     expect(needsAttention(p({ payload: { kind: "NOTE", sensitivity: "SENSITIVE" } }))).toBe(true);
@@ -105,7 +118,7 @@ describe("review filters", () => {
     const at = new Date("2026-10-16T12:00:00Z");
     const items = [
       { batch: { clientId: "a", sourceKind: "TRANSCRIPT", createdById: "u1", createdAt: at }, proposals: [p(), p(), p({ target: "CONTACT", payload: {} }), p({ state: "APPROVED" })] },
-      { batch: { clientId: "b", sourceKind: "CLIENT_DOCUMENT", createdById: "u2", createdAt: at }, proposals: [p(), p({ action: "SUPERSEDE" })] },
+      { batch: { clientId: "b", sourceKind: "CLIENT_DOCUMENT", createdById: "u2", createdAt: at }, proposals: [p(), p({ action: "CONTRADICT" })] },
     ];
     const byClient = facetCounts(items, parseReviewFilters({ clientId: "a" }), now);
     expect(byClient.kinds.get("FACT.FINANCE")).toBe(2);

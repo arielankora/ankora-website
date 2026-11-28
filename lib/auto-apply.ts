@@ -6,7 +6,9 @@
 // - which auto-applied items a person still looks at after the fact
 //   ("נכנס אוטומטית"): all of them in the first 14 days after auto-apply
 //   was first switched on and in the 7 days after a new extraction guide
-//   version was approved, and a fixed 20% sample otherwise;
+//   version was approved, and a fixed 20% sample otherwise; an update
+//   (SUPERSEDE, 28.11.2026) is looked at for the first 14 days after
+//   updates began to enter on their own;
 // - what an error is: an auto-applied item taken out again ("ביטול"), or
 //   changed, removed or replaced in the file within 30 days (autoError,
 //   with its type and the names of the fields that were fixed), except a
@@ -50,6 +52,12 @@ export const CHANGE_ACTIONS = [
   "client_organization.remove",
   "client_entity.update",
   "client_entity.remove",
+  // 28.11.2026: an update of a system or a request type enters on its own
+  // too (approvalTier, isAutoSupersede), so a change after it is counted.
+  "system_access.update",
+  "system_access.remove",
+  "request_type.update",
+  "request_type.remove",
 ] as const;
 
 /// FNV-1a, 32 bits: the same id always lands in the same bucket, on every
@@ -72,6 +80,22 @@ function emailFirstDays(p: { decidedAt: Date; fromEmail?: boolean }, ctx: { firs
   return p.decidedAt.getTime() < ctx.firstEmailAutoAt.getTime() + AUTO_REVIEW_ALL_DAYS * DAY;
 }
 
+/// 28.11.2026: an update (SUPERSEDE) that entered on its own is looked at
+/// for the first 14 days after updates began to enter on their own
+/// (`supersedeEnabledAt`, written at deploy; null: every update is), as
+/// every item was when auto-apply itself began.
+function supersedeFirstDays(p: { decidedAt: Date; action?: string }, ctx: { supersedeEnabledAt?: Date | null }): boolean {
+  if (p.action !== "SUPERSEDE") return false;
+  if (!ctx.supersedeEnabledAt) return true;
+  return p.decidedAt.getTime() < ctx.supersedeEnabledAt.getTime() + AUTO_REVIEW_ALL_DAYS * DAY;
+}
+
+/// What the review window reads beside the proposal itself.
+export type AutoReviewContext = { firstEnabledAt: Date | null; guideApprovals: Date[]; firstEmailAutoAt?: Date | null; supersedeEnabledAt?: Date | null };
+/// An auto-applied proposal as the review window reads it. `action`:
+/// CREATE, or SUPERSEDE for an update (supersedeFirstDays).
+export type AutoReviewProposal = { id: string; decidedAt: Date; fromEmail?: boolean; action?: string };
+
 /// Whether an auto-applied proposal is in the fixed sample a person looks at.
 export function inAutoSample(id: string): boolean {
   return idBucket(id) < AUTO_REVIEW_SAMPLE_PERCENT;
@@ -82,11 +106,12 @@ export function inAutoSample(id: string): boolean {
 /// item is looked at). `guideApprovals`: when each extraction guide
 /// version was approved.
 export function needsAutoReview(
-  p: { id: string; decidedAt: Date; fromEmail?: boolean },
-  ctx: { firstEnabledAt: Date | null; guideApprovals: Date[]; firstEmailAutoAt?: Date | null }
+  p: AutoReviewProposal,
+  ctx: AutoReviewContext
 ): boolean {
   const at = p.decidedAt.getTime();
   if (emailFirstDays(p, ctx)) return true;
+  if (supersedeFirstDays(p, ctx)) return true;
   if (!ctx.firstEnabledAt || at < ctx.firstEnabledAt.getTime() + AUTO_REVIEW_ALL_DAYS * DAY) return true;
   if (ctx.guideApprovals.some((g) => at >= g.getTime() && at < g.getTime() + GUIDE_REVIEW_DAYS * DAY)) return true;
   return inAutoSample(p.id);
@@ -94,11 +119,12 @@ export function needsAutoReview(
 
 /// Why a person looks at this item, in a short Hebrew line, or null.
 export function autoReviewReason(
-  p: { id: string; decidedAt: Date; fromEmail?: boolean },
-  ctx: { firstEnabledAt: Date | null; guideApprovals: Date[]; firstEmailAutoAt?: Date | null }
+  p: AutoReviewProposal,
+  ctx: AutoReviewContext
 ): string | null {
   const at = p.decidedAt.getTime();
   if (emailFirstDays(p, ctx)) return `מיילים, ${AUTO_REVIEW_ALL_DAYS} הימים הראשונים: בודקים כל פריט`;
+  if (supersedeFirstDays(p, ctx)) return `עדכונים, ${AUTO_REVIEW_ALL_DAYS} הימים הראשונים: בודקים כל עדכון`;
   if (!ctx.firstEnabledAt || at < ctx.firstEnabledAt.getTime() + AUTO_REVIEW_ALL_DAYS * DAY) return `${AUTO_REVIEW_ALL_DAYS} הימים הראשונים: בודקים כל פריט`;
   if (ctx.guideApprovals.some((g) => at >= g.getTime() && at < g.getTime() + GUIDE_REVIEW_DAYS * DAY)) return "הנחיות חילוץ חדשות: בודקים כל פריט שבוע";
   if (inAutoSample(p.id)) return `מדגם של ${AUTO_REVIEW_SAMPLE_PERCENT}%`;
@@ -108,11 +134,12 @@ export function autoReviewReason(
 /// autoReviewReason as a code with its numbers, for a screen that words
 /// it in the reader's language (ADR 0006), or null.
 export function autoReviewReasonCode(
-  p: { id: string; decidedAt: Date; fromEmail?: boolean },
-  ctx: { firstEnabledAt: Date | null; guideApprovals: Date[]; firstEmailAutoAt?: Date | null }
+  p: AutoReviewProposal,
+  ctx: AutoReviewContext
 ): { code: "firstDays"; days: number } | { code: "newGuide" } | { code: "sample"; percent: number } | null {
   const at = p.decidedAt.getTime();
   if (emailFirstDays(p, ctx)) return { code: "firstDays", days: AUTO_REVIEW_ALL_DAYS };
+  if (supersedeFirstDays(p, ctx)) return { code: "firstDays", days: AUTO_REVIEW_ALL_DAYS };
   if (!ctx.firstEnabledAt || at < ctx.firstEnabledAt.getTime() + AUTO_REVIEW_ALL_DAYS * DAY) return { code: "firstDays", days: AUTO_REVIEW_ALL_DAYS };
   if (ctx.guideApprovals.some((g) => at >= g.getTime() && at < g.getTime() + GUIDE_REVIEW_DAYS * DAY)) return { code: "newGuide" };
   if (inAutoSample(p.id)) return { code: "sample", percent: AUTO_REVIEW_SAMPLE_PERCENT };
@@ -159,6 +186,8 @@ export function isNewerSource(own: ProposalSource | null | undefined, by: Propos
 /// before and after, as recordAudit stored them. `by`: for a replacement
 /// or a contradiction that came from an approved proposal, that
 /// proposal's source; absent for a person's direct change on the screen.
+/// An update in place (a contact, a provider, an entity, a system, a
+/// request type) with `by` is that item's replacement (SUPERSEDED).
 export type ItemChange = { action: string; at: Date; before?: unknown; after?: unknown; by?: ProposalSource | null };
 
 /// A change that is not counted as an error, and why: a replacement or a
@@ -175,6 +204,10 @@ const TYPE_OF: Record<(typeof CHANGE_ACTIONS)[number], AutoErrorType> = {
   "client_organization.remove": "REMOVED",
   "client_entity.update": "UPDATED",
   "client_entity.remove": "REMOVED",
+  "system_access.update": "UPDATED",
+  "system_access.remove": "REMOVED",
+  "request_type.update": "UPDATED",
+  "request_type.remove": "REMOVED",
 };
 
 /// "ביטול" takes the item out through the file's own removal, which
@@ -247,8 +280,12 @@ export function autoOutcome(
   const found: AutoError[] = p.revertedAt ? [{ type: "REVERTED", at: p.revertedAt, fields: [] }] : [];
   const notCounted: AutoChange[] = [];
   for (const c of changes) {
-    const type = TYPE_OF[c.action as keyof typeof TYPE_OF];
-    if (!type) continue;
+    const own = TYPE_OF[c.action as keyof typeof TYPE_OF];
+    if (!own) continue;
+    // An item changed in place (a contact, a system...) by an approved
+    // update (SUPERSEDE) of a proposal: a replacement, by the same rule as
+    // a fact's new version (28.11.2026).
+    const type: AutoErrorType = own === "UPDATED" && c.by ? "SUPERSEDED" : own;
     const t = c.at.getTime();
     if (t < from || t > until) continue;
     if (type === "REMOVED" && p.revertedAt && t >= p.revertedAt.getTime() - REVERT_SLACK_MS) continue;

@@ -6809,6 +6809,7 @@
       "domain": "a domain changes which meetings belong to the client",
       "lowLevel": "low review level",
       "simpleHigh": "a new, simple item with a high review level",
+      "simpleUpdateHigh": "a simple update to an item in the file, with a high review level",
       "medium": "medium review level",
       "openQuestion": "open question",
       "temporary": "temporary information",
@@ -7110,6 +7111,12 @@
         "MONTHLY": "Monthly",
         "ANNUAL": "Annual",
         "OTHER": "Other"
+      },
+      "applied": {
+        "before": "Was",
+        "after": "Now",
+        "removed": "Cleared",
+        "rest": "Everything else stayed as it was."
       }
     },
     "batch": {
@@ -7159,7 +7166,7 @@
     "auto": {
       "title": "Added automatically",
       "titleCount": "Added automatically ({count})",
-      "intro": "New, simple items with a high review level go into the file without waiting. In the first two weeks, and in the week after new extraction guidelines, each one is checked here; after that, a 20% sample. \"Undo\" takes the item out of the file and counts as an error.",
+      "intro": "New, simple items with a high review level go into the file without waiting. In the first two weeks, and in the week after new extraction guidelines, each one is checked here; after that, a 20% sample. \"Undo\" takes the item out of the file and counts as an error. A simple update to an item in the file goes in the same way; in its first two weeks every update is checked here, and \"Undo\" puts the item back as it was.",
       "empty": "No automatically added items are waiting for a check right now.",
       "pausesTitle": "Back to approval by a person",
       "why": {
@@ -7249,7 +7256,8 @@
       "lift": "Return to automatic adding",
       "lifting": "Returning...",
       "liftFailed": "Returning failed",
-      "lifted": "{label}: back to automatic adding"
+      "lifted": "{label}: back to automatic adding",
+      "updated": "Update to an item in the file"
     },
     "filters": {
       "ariaLabel": "Filter proposals",
@@ -7367,7 +7375,8 @@
       "ownerDate": "No single staff member is named \"{name}\". Whoever approves will be responsible, unless the name is fixed.",
       "link": "Not found in the file: {refs}. If it enters the file before approval, it will be linked. Otherwise the item enters without this link.",
       "taskTitle": "The title is a question. On approval the task will open as \"{title}\". You can word it differently in the edit."
-    }
+    },
+    "supersedeKind": "{kind} update"
   },
   "calendar": {
     "title": "Calendar",
@@ -9064,7 +9073,8 @@
       "clientTitle": "Auto-apply paused for {client}",
       "clientBody": "{errors} of this client's items that entered the file automatically were undone or corrected within {days} days. From now on, the client's proposals wait for a person to approve them. To turn auto-apply back on, use the \"Extracted knowledge\" tab on the approvals screen.",
       "kindTitle": "Auto-apply paused: {kind}",
-      "kindBody": "{errors} of the last {counted} items of the kind {kind} that entered client files automatically were undone or corrected. From now on, proposals of this kind wait for a person to approve them. To turn auto-apply back on, use the \"Extracted knowledge\" tab on the approvals screen."
+      "kindBody": "{errors} of the last {counted} items of the kind {kind} that entered client files automatically were undone or corrected. From now on, proposals of this kind wait for a person to approve them. To turn auto-apply back on, use the \"Extracted knowledge\" tab on the approvals screen.",
+      "supersedeKind": "{kind} update"
     },
     "labels": {
       "targets": {

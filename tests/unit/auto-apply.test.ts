@@ -10,6 +10,7 @@ import {
   summarizeAutoErrors,
   REVERT_SLACK_MS,
   autoReviewReason,
+  autoReviewReasonCode,
   clientPauseDue,
   idBucket,
   inAutoSample,
@@ -64,6 +65,22 @@ describe("which auto-applied items a person looks at", () => {
     expect(needsAutoReview({ id: sampled, decidedAt: later }, ctx)).toBe(true);
     expect(autoReviewReason({ id: sampled, decidedAt: later }, ctx)).toBe("מדגם של 20%");
     expect(autoReviewReason({ id: notSampled, decidedAt: later }, ctx)).toBeNull();
+  });
+
+  it("28.11.2026: every update (SUPERSEDE) in the 14 days after updates began to enter, then the sample", () => {
+    const start = new Date(first.getTime() + 25 * DAY);
+    const c = { ...ctx, supersedeEnabledAt: start };
+    const inside = new Date(start.getTime() + 13 * DAY);
+    const after = new Date(start.getTime() + 15 * DAY);
+    expect(needsAutoReview({ id: notSampled, decidedAt: inside, action: "SUPERSEDE" }, c)).toBe(true);
+    expect(autoReviewReason({ id: notSampled, decidedAt: inside, action: "SUPERSEDE" }, c)).toBe("עדכונים, 14 הימים הראשונים: בודקים כל עדכון");
+    expect(autoReviewReasonCode({ id: notSampled, decidedAt: inside, action: "SUPERSEDE" }, c)).toEqual({ code: "firstDays", days: 14 });
+    // A new item at the same moment: only the sample, as before.
+    expect(needsAutoReview({ id: notSampled, decidedAt: inside, action: "CREATE" }, c)).toBe(false);
+    expect(needsAutoReview({ id: notSampled, decidedAt: after, action: "SUPERSEDE" }, c)).toBe(false);
+    expect(needsAutoReview({ id: sampled, decidedAt: after, action: "SUPERSEDE" }, c)).toBe(true);
+    // No start kept: every update is looked at.
+    expect(needsAutoReview({ id: notSampled, decidedAt: after, action: "SUPERSEDE" }, { ...ctx, supersedeEnabledAt: null })).toBe(true);
   });
 
   it("every one again for 7 days after a new guide version is approved", () => {
@@ -144,10 +161,22 @@ describe("a replacement or a contradiction from a later source (17.11.2026)", ()
     expect(autoError({ decidedAt, revertedAt: null, source: own }, [change("client_fact.contradict", null)])).toMatchObject({ type: "CONTRADICTED" });
   });
 
-  it("leaves a revert, an update and a removal as they were", () => {
+  it("leaves a revert, a person's update and a removal as they were", () => {
     expect(autoError({ decidedAt, revertedAt: at, source: own }, [change("client_fact.supersede", later)])).toMatchObject({ type: "REVERTED" });
-    expect(autoError({ decidedAt, revertedAt: null, source: own }, [change("client_contact.update", later)])).toMatchObject({ type: "UPDATED" });
+    expect(autoError({ decidedAt, revertedAt: null, source: own }, [change("client_contact.update", null)])).toMatchObject({ type: "UPDATED" });
     expect(autoError({ decidedAt, revertedAt: null, source: own }, [change("client_fact.remove", later)])).toMatchObject({ type: "REMOVED" });
+  });
+
+  it("28.11.2026: an update in place by an approved proposal is a replacement, by the same rule", () => {
+    for (const action of ["client_contact.update", "client_organization.update", "client_entity.update", "system_access.update", "request_type.update"]) {
+      const newer = autoOutcome({ decidedAt, revertedAt: null, source: own }, [change(action, later)]);
+      expect(newer.error, action).toBeNull();
+      expect(newer.notCounted, action).toEqual([expect.objectContaining({ type: "SUPERSEDED", reason: "NEWER_SOURCE" })]);
+      expect(autoError({ decidedAt, revertedAt: null, source: own }, [change(action, { key: "S:s1", day: "2026-11-05" })]), action).toMatchObject({ type: "SUPERSEDED" });
+    }
+    // A person's change of a system or a request type counts too.
+    expect(autoError({ decidedAt, revertedAt: null, source: own }, [change("system_access.update", null)])).toMatchObject({ type: "UPDATED" });
+    expect(autoError({ decidedAt, revertedAt: null, source: own }, [change("request_type.remove", null)])).toMatchObject({ type: "REMOVED" });
   });
 
   it("an error after a later-source replacement still counts", () => {
