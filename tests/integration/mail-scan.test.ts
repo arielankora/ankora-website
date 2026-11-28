@@ -215,6 +215,36 @@ describe("recording emails with clients", () => {
     expect((await prisma.mailChannel.findUniqueOrThrow({ where: { id: box.id } })).lastEmailAt?.toISOString()).toBe("2026-11-27T09:00:00.000Z");
   });
 
+  it("two emails of one new thread at once: the second updates the thread the first created", async () => {
+    // 28.11.2026 (system issue, P2002 on mailThread.create): both webhooks
+    // found no thread, the second create failed and its email was lost.
+    const { anna, grantor } = await world();
+    const box = await scanningBox(anna);
+    email("em_r1", "th_r", "nadav@grantor.co.il", ["anna@ankora.co.il"], "2026-11-27T08:00:00.000Z");
+    email("em_r2", "th_r", "anna@ankora.co.il", ["nadav@grantor.co.il"], "2026-11-27T09:00:00.000Z");
+    expect(await recordMailEvent("acc_anna", "em_r1")).toBe("recorded");
+
+    // The second webhook read the thread before the first one created it.
+    const { prisma: appPrisma } = await import("@/lib/prisma");
+    const spy = vi.spyOn(appPrisma.mailThread, "findUnique").mockResolvedValueOnce(null);
+    try {
+      expect(await recordMailEvent("acc_anna", "em_r2")).toBe("updated");
+    } finally {
+      spy.mockRestore();
+    }
+    const thread = await prisma.mailThread.findFirstOrThrow({ where: { channelId: box.id, externalThreadId: "th_r" } });
+    expect(thread).toMatchObject({ emailCount: 2, lastEmailId: "em_r2", lastFromAddress: "anna@ankora.co.il", clientIds: [grantor.id] });
+
+    // Unipile sending the same email twice at once: nothing is counted twice.
+    const again = vi.spyOn(appPrisma.mailThread, "findUnique").mockResolvedValueOnce(null);
+    try {
+      expect(await recordMailEvent("acc_anna", "em_r2")).toBe("same");
+    } finally {
+      again.mockRestore();
+    }
+    expect((await prisma.mailThread.findFirstOrThrow({ where: { id: thread.id } })).emailCount).toBe(2);
+  });
+
   it("records nothing before the switch", async () => {
     const { anna } = await world();
     await prisma.mailChannel.create({ data: { accountId: "acc_anna", address: "anna@ankora.co.il", ownerUserId: anna.id, kindChosenAt: new Date() } });
