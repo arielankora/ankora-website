@@ -19,7 +19,9 @@ import { resolveLesson } from "@/lib/app-domain/process-lessons";
 import { markProcessReviewed } from "@/lib/app-domain/process-review";
 import { updateClientContact } from "@/lib/app-domain/client-contacts";
 import { readStartInput, type StartInput } from "@/lib/process-rhythm";
-import type { User } from "@prisma/client";
+import type { User, UserRole } from "@prisma/client";
+import { canManageClients } from "@/lib/app-auth/permissions";
+import { runBlockers } from "@/lib/process-readiness";
 
 // 14.11.2026 (processes redesign, MCP): what a person does to a process on
 // its page, for Claude. Every tool here writes what the user said, after
@@ -58,8 +60,13 @@ const START = z.object({
 
 /// A person at Ankora on the client, by name.
 async function staffOf(clientId: string, name: string): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  const managing: UserRole[] = (["SUPER_ADMIN", "ANKORA_ADMIN", "ANKORA_EMPLOYEE"] as const).filter((r) => canManageClients(r));
   const users = await prisma.user.findMany({
-    where: { deletedAt: null, status: "ACTIVE", role: { not: "CLIENT_USER" }, OR: [{ clientAccess: { some: { clientId } } }, { role: "ANKORA_ADMIN" }] },
+    // 28.11.2026: by role, as the task's assignees are (tasks.ts): a
+    // manager reaches every client and holds no access row, so Ariel
+    // (SUPER_ADMIN) read as "no person at Ankora" on a client nobody was
+    // given access to.
+    where: { deletedAt: null, status: "ACTIVE", role: { not: "CLIENT_USER" }, OR: [{ clientAccess: { some: { clientId } } }, { role: { in: managing } }] },
     select: { id: true, name: true },
   });
   const r = resolveByName(name, users);
@@ -207,12 +214,35 @@ export function registerProcessTools(server: McpServer): void {
         if (!client.ok) return toolText(client.message);
         const input = await processInput(actor, client.value.id, args);
         if (!input.ok) return toolText(input.message);
+        // 28.11.2026 (P1 of Tal Ron): a process created with no owner read
+        // "לא ירוץ: אין אחראי" and nothing told Claude. No owner named: the
+        // client's account manager keeps it, as a proposal does
+        // (knowledge-proposals.ts, spec 3.1). An owner set to null stays null.
+        let ownerDefaulted = false;
+        if (args.owner === undefined) {
+          const manager = (await prisma.client.findUnique({ where: { id: client.value.id }, select: { accountManagerId: true } }))?.accountManagerId ?? null;
+          if (manager) {
+            input.value.ownerId = manager;
+            ownerDefaulted = true;
+          }
+        }
         const sourced = args.sources?.length
           ? { sources: args.sources.map((code) => ({ code: code.trim() })) }
           : { knowledgeStatus: "UNCERTAIN" as const, toResolve: args.toResolve?.trim() || "מקור לתהליך" };
         const row = await addProcess(actor, { ...(input.value as object), ...sourced, clientId: client.value.id, title: args.title });
         if (args.kind === "GUIDE") await setProcessKind(actor, row.id, "GUIDE");
-        return toolJson({ created: true, code: row.code, title: row.title, kind: args.kind ?? "PROCESS", url: processUrl(appBaseUrl(), client.value.id, row.id) });
+        // A process just created has no dates yet: set_process_rhythm adds them.
+        const owner = row.ownerId ? ((await prisma.user.findUnique({ where: { id: row.ownerId }, select: { name: true } }))?.name ?? null) : null;
+        return toolJson({
+          created: true,
+          code: row.code,
+          title: row.title,
+          kind: args.kind ?? "PROCESS",
+          owner,
+          ...(ownerDefaulted ? { ownerNote: "No owner was named: the client's account manager was set. Tell the user, so they can change it." } : {}),
+          notRunningBecause: runBlockers({ kind: args.kind ?? row.kind, status: row.status, ownerId: row.ownerId, triggerKinds: row.triggerKinds, triggerText: row.triggerText, nextDate: null, checkEveryDays: row.checkEveryDays }),
+          url: processUrl(appBaseUrl(), client.value.id, row.id),
+        });
       } catch (err) {
         console.error("[mcp] create_process failed", err);
         return toolFailure(err);
