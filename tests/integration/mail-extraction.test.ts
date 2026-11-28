@@ -158,8 +158,12 @@ describe("proposing from a thread", () => {
       items: [
         // Nadav's own phone, in Nadav's own email: enters on its own.
         { target: "CONTACT", action: "SUPERSEDE", targetId: nadav.id, reason: "בחתימה של נדב", confidence: "HIGH", payload: { knowledgeStatus: "CONFIRMED", phones: ["+972542222222"] } },
-        // Dana's role, written by Nadav: waits for a person.
-        { target: "CONTACT", action: "SUPERSEDE", targetId: dana.id, reason: "נדב כתב", confidence: "HIGH", payload: { knowledgeStatus: "CONFIRMED", role: "סמנכ\"לית כספים" } },
+        // Dana's role, written by Nadav, read as less than sure: waits for a
+        // person. Since 28.11.2026 a HIGH update of a contact enters by the
+        // approval tier whoever wrote it (approvalTier, isAutoSupersede), so
+        // a third party's change that still waits is one below HIGH; the
+        // own-details path needs HIGH too.
+        { target: "CONTACT", action: "SUPERSEDE", targetId: dana.id, reason: "נדב כתב", confidence: "MEDIUM", payload: { knowledgeStatus: "CONFIRMED", role: "סמנכ\"לית כספים" } },
       ],
     });
     expect(r.isError).toBe(false);
