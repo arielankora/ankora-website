@@ -2543,8 +2543,130 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-27",
       "riskReason": "Silent failures plan stages 2 and 3 (27.11.2026): the morning checks of what should have happened (nightly runs, WhatsApp numbers, transcripts, reports, leads), written as system issues, then the morning report emailed to the admins. Behind CRON_SECRET through runCron; reads, and writes only system_issues and cron_runs. Tested in tests/integration/system-health.test.ts."
+    },
+    "action:(product)/app/(authenticated)/agents/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-28"
+    },
+    "action:(product)/app/(authenticated)/whatsapp-poc/connect/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "WhatsApp self-connect (24.11.2026): an employee connects their own number through Unipile's Hosted Auth with a signed cookie, then turns on storing, which starts the first history load. Critical like the other product actions: it decides whose conversations are stored. Logic in tests/unit/comms-self-connect.test.ts; the browser flow in qa/e2e/flows-whatsapp-connect.app.spec.ts drives the first step to its refusal, since QA has no Unipile key."
+    },
+    "api:/api/agents/[slug]/export": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-28"
+    },
+    "api:/app/whatsapp-poc/connect/callback": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "WhatsApp self-connect: the way back from Unipile. Accepts only the signed cookie of the same person (lib/comms/self-connect.ts), tested in tests/unit/comms-self-connect.test.ts."
+    },
+    "domain:agent-categories": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-28"
+    },
+    "domain:agent-client-additions": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-28"
+    },
+    "domain:agent-library": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-28"
+    },
+    "domain:agent-skills": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-28"
+    },
+    "domain:agents": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-28"
+    },
+    "screen:/app/agents": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-28"
+    },
+    "screen:/app/agents/[slug]": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-28"
+    },
+    "screen:/app/agents/[slug]/installations": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-28"
+    },
+    "screen:/app/agents/[slug]/instructions": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-28"
+    },
+    "screen:/app/agents/[slug]/params": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-28"
+    },
+    "screen:/app/agents/[slug]/versions": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-28"
+    },
+    "screen:/app/agents/library": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-28"
+    },
+    "screen:/app/whatsapp-poc/connect": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "WhatsApp self-connect: the employee's two steps. Swept by the screens sweep, and driven in qa/e2e/flows-whatsapp-connect.app.spec.ts."
     }
   },
   "waivers": {},
-  "lastScan": "2026-11-20"
+  "lastScan": "2026-11-28"
 }
