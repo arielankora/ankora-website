@@ -64,7 +64,10 @@ async function harvest(page: import("@playwright/test").Page): Promise<string[]>
     // A creation screen ("/app/clients/new", 26.11.2026) sits where an id
     // would, and is no record: taking it for one opened
     // "/app/clients/new/handover" and friends.
-    .filter((p) => !p.endsWith("/new"));
+    .filter((p) => !p.endsWith("/new"))
+    // The agents' library sits where an agent's address would (28.11.2026),
+    // and is no agent: taking it for one opened "/app/agents/library/params".
+    .filter((p) => p !== "/app/agents/library");
 }
 
 /**

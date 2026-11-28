@@ -272,6 +272,28 @@ export const DYNAMIC_SWEEP: { route: string; optional?: string }[] = [
     route: "/app/important-dates/[id]",
     optional: "the demo seed creates no important dates; inventing one here would make this a creation test wearing a sweep's name",
   },
+  // Agents (22.11.2026): an agent's instructions and parameter values are
+  // text a person typed, so they are swept like the client screens.
+  {
+    route: "/app/agents/[slug]",
+    optional: "the demo seed creates no agents; flows-agents.app.spec.ts writes one, and spec order is not guaranteed",
+  },
+  {
+    route: "/app/agents/[slug]/instructions",
+    optional: "the demo seed creates no agents; flows-agents.app.spec.ts writes one, and spec order is not guaranteed",
+  },
+  {
+    route: "/app/agents/[slug]/params",
+    optional: "the demo seed creates no agents; flows-agents.app.spec.ts writes one, and spec order is not guaranteed",
+  },
+  {
+    route: "/app/agents/[slug]/versions",
+    optional: "the demo seed creates no agents; flows-agents.app.spec.ts writes one, and spec order is not guaranteed",
+  },
+  {
+    route: "/app/agents/[slug]/installations",
+    optional: "the demo seed creates no agents; flows-agents.app.spec.ts writes one, and spec order is not guaranteed",
+  },
 ];
 
 /**
