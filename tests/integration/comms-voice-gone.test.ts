@@ -83,6 +83,26 @@ describe("a voice message Unipile no longer has", () => {
     expect(fetchVoiceNote).not.toHaveBeenCalled();
   });
 
+  it("a voice message already marked gone, with no Drive copy, fails without asking Unipile", async () => {
+    // 28.11.2026: the Drive copy marked it gone, and the next night's
+    // transcription still spent 30 seconds on the same 404.
+    const { user } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const gone = await voiceMessage(user.id, "3EB0GONE");
+    await prisma.commsAttachment.update({ where: { id: gone.attachment.id }, data: { unavailable: true } });
+    const copied = await voiceMessage(user.id, "3EB0COPY");
+    await prisma.commsAttachment.update({ where: { id: copied.attachment.id }, data: { unavailable: true, driveFileId: "drive-1" } });
+    fetchVoiceNote.mockResolvedValue({ bytes: new ArrayBuffer(8), contentType: "audio/ogg" });
+    transcribe.mockResolvedValue({ text: "שלום", model: "gpt-transcribe" });
+
+    await transcribePending({ budgetMs: 60_000 });
+    expect(await prisma.transcript.findUniqueOrThrow({ where: { id: gone.transcript.id } })).toMatchObject({ status: "FAILED", attempts: TRANSCRIBE_MAX_ATTEMPTS });
+    // Only the one with a Drive copy reached the audio (Drive is stubbed to
+    // fail here, so it falls back to Unipile once).
+    expect(fetchVoiceNote).toHaveBeenCalledTimes(1);
+    expect(fetchVoiceNote.mock.calls[0][2]).toBe("3EB0COPY");
+    expect((await prisma.transcript.findUniqueOrThrow({ where: { id: copied.transcript.id } })).status).toBe("DONE");
+  });
+
   it("a different refusal still retries, as before", async () => {
     const { user } = await createTestUser({ role: "ANKORA_ADMIN" });
     const v = await voiceMessage(user.id, "3EB0BUSY");
