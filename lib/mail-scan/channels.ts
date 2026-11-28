@@ -1,6 +1,6 @@
 import "server-only";
 import crypto from "node:crypto";
-import type { MailChannel, User } from "@prisma/client";
+import { Prisma, type MailChannel, type MailThread, type User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { reportIssue } from "@/lib/system-issues";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -474,40 +474,57 @@ export async function recordMailEvent(accountId: string, emailId: string): Promi
   const held = decision.record ? decision.held : false;
   const sent = sentByOwner ? { lastSentAt: at, lastSentTo: recipientsOf(participants, channel.address) } : {};
 
-  if (existing) {
-    const newer = at >= existing.lastEmailAt;
-    const stillTemporary = keepUntil !== null && existing.keepUntil !== null;
-    await prisma.mailThread.update({
-      where: { id: existing.id },
-      data: {
-        clientIds: [...new Set([...existing.clientIds, ...clientIds])].sort(),
-        participants: [...new Set([...existing.participants, ...participants])],
-        senders: from && !existing.senders.includes(from) ? [...existing.senders, from] : existing.senders,
-        emailCount: { increment: 1 },
-        held: existing.held || held,
-        keepUntil: stillTemporary ? keepUntil : null,
-        ...(newer ? { lastEmailId: emailId, lastEmailAt: at, lastFromAddress: from, ...sent } : {}),
-      },
-    });
-  } else {
-    await prisma.mailThread.create({
-      data: {
-        channelId: channel.id,
-        externalThreadId: threadId,
-        clientIds,
-        participants,
-        lastEmailId: emailId,
-        lastEmailAt: at,
-        lastFromAddress: from,
-        senders: from ? [from] : [],
-        held,
-        keepUntil,
-        ...sent,
-      },
-    });
+  const write = async (current: MailThread | null) => {
+    if (current) {
+      const newer = at >= current.lastEmailAt;
+      const stillTemporary = keepUntil !== null && current.keepUntil !== null;
+      await prisma.mailThread.update({
+        where: { id: current.id },
+        data: {
+          clientIds: [...new Set([...current.clientIds, ...clientIds])].sort(),
+          participants: [...new Set([...current.participants, ...participants])],
+          senders: from && !current.senders.includes(from) ? [...current.senders, from] : current.senders,
+          emailCount: { increment: 1 },
+          held: current.held || held,
+          keepUntil: stillTemporary ? keepUntil : null,
+          ...(newer ? { lastEmailId: emailId, lastEmailAt: at, lastFromAddress: from, ...sent } : {}),
+        },
+      });
+    } else {
+      await prisma.mailThread.create({
+        data: {
+          channelId: channel.id,
+          externalThreadId: threadId,
+          clientIds,
+          participants,
+          lastEmailId: emailId,
+          lastEmailAt: at,
+          lastFromAddress: from,
+          senders: from ? [from] : [],
+          held,
+          keepUntil,
+          ...sent,
+        },
+      });
+    }
+  };
+  let result: RecordResult = existing ? "updated" : "recorded";
+  try {
+    await write(existing);
+  } catch (err) {
+    // 28.11.2026 (system issue, P2002): two webhooks of one thread at the
+    // same moment (or Unipile sending one email twice) both found no thread
+    // and both created it; the second failed and its email was lost. The
+    // thread the other one created is read and updated instead.
+    if (existing || !(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) throw err;
+    const current = await prisma.mailThread.findUnique({ where: { channelId_externalThreadId: { channelId: channel.id, externalThreadId: threadId } } });
+    if (!current) throw err;
+    if (current.lastEmailId === emailId) return "same";
+    await write(current);
+    result = "updated";
   }
   if (decision.record && (!channel.lastEmailAt || at > channel.lastEmailAt)) await prisma.mailChannel.update({ where: { id: channel.id }, data: { lastEmailAt: at } });
-  return existing ? "updated" : "recorded";
+  return result;
 }
 
 // ---------------------------------------------------------------- what the screens and the connector show
