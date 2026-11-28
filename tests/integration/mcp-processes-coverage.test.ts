@@ -167,4 +167,28 @@ describe("get_process and the new process tools", () => {
     expect(off.json).toMatchObject({ saved: true, auditRequirements: false });
     expect((await prisma.client.findUniqueOrThrow({ where: { id: client.id } })).auditRequirements).toBe(false);
   });
+
+  // 28.11.2026 (P1 of Tal Ron): a process created with no owner read
+  // "לא ירוץ: אין אחראי" and Claude was not told; and the owner could not be
+  // set to Ariel, a SUPER_ADMIN with no access row on the client.
+  it("creates a process kept by the account manager, says why it will not run, and takes a manager as owner", async () => {
+    const { client, hadas } = await setup();
+    const { user: s } = await createTestUser({ role: "SUPER_ADMIN" });
+    const boss = await prisma.user.update({ where: { id: s.id }, data: { name: "Boss Manager" } });
+    await prisma.client.update({ where: { id: client.id }, data: { accountManagerId: hadas.id } });
+
+    const made = await call(hadas, "create_process", { client: "NUX", title: "סיכום בוקר", sources: ["S1"] });
+    expect(made.json).toMatchObject({ created: true, owner: "Hadas Vinogura" });
+    expect(made.json.ownerNote).toContain("account manager");
+    expect(made.json.notRunningBecause).toEqual(["לא ירוץ: לא כתוב מה מפעיל אותו", "לא ירוץ: אין נוהל מאושר"]);
+
+    const none = await call(hadas, "create_process", { client: "NUX", title: "בלי בעלים", owner: null, sources: ["S1"] });
+    expect(none.json.owner).toBeNull();
+    expect(none.json.ownerNote).toBeUndefined();
+    expect(none.json.notRunningBecause[0]).toBe("לא ירוץ: אין אחראי");
+
+    const set = await call(hadas, "update_process", { client: "NUX", process: none.json.code, owner: "Boss Manager" });
+    expect(set.json.changed).toContain("ownerId");
+    expect((await prisma.process.findFirstOrThrow({ where: { clientId: client.id, code: none.json.code } })).ownerId).toBe(boss.id);
+  });
 });
