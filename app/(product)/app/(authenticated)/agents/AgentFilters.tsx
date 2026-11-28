@@ -48,8 +48,11 @@ export function AgentFilters({ categories, clients }: { categories: { id: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
+  // 28.11.2026: capped at the screen's width. The client list is as wide
+  // as its longest client name, and on a 320px phone it pushed the whole
+  // page sideways (QA, phone layout).
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex min-w-0 max-w-full flex-col gap-2">
     <input
       type="search"
       value={query}
@@ -74,7 +77,7 @@ export function AgentFilters({ categories, clients }: { categories: { id: string
         </button>
       )}
       <span className="mx-1 h-5 w-px bg-app-border" aria-hidden />
-      <select value={client} onChange={(e) => set("client", e.target.value)} aria-label={t("client")} className="rounded-full border border-app-border bg-white px-3 py-1 text-[13px] text-app-text-primary">
+      <select value={client} onChange={(e) => set("client", e.target.value)} aria-label={t("client")} className="max-w-full rounded-full border border-app-border bg-white px-3 py-1 text-[13px] text-app-text-primary">
         <option value="">{t("allClients")}</option>
         {clients.map((c) => (
           <option key={c.id} value={c.id}>{c.name}</option>
