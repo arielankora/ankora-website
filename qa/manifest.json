@@ -2548,8 +2548,9 @@
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-28"
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "Agents (22.11.2026): every write of the agents screens, including approving a version that installations then run in team members' Claude accounts. Critical like the other product actions. Logic in tests/integration/agents-actions.test.ts, browser flow in qa/e2e/flows-agents.app.spec.ts."
     },
     "action:(product)/app/(authenticated)/whatsapp-poc/connect/actions": {
       "kind": "server-action",
@@ -2563,8 +2564,9 @@
       "kind": "api",
       "area": "api",
       "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-28"
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "Agents: downloads an approved agent as SKILL.md. Read only, behind the session."
     },
     "api:/app/whatsapp-poc/connect/callback": {
       "kind": "api",
@@ -2578,85 +2580,97 @@
       "kind": "domain",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-28"
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "Agents: categories of the agents list. Tested in tests/integration/agent-categories.test.ts."
     },
     "domain:agent-client-additions": {
       "kind": "domain",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-28"
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "Agents: per-client additions and their approval. Tested in tests/integration/agent-client-additions.test.ts."
     },
     "domain:agent-library": {
       "kind": "domain",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-28"
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "Agents: shared library blocks and lessons. Tested through the agents tests."
     },
     "domain:agent-skills": {
       "kind": "domain",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-28"
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "Agents: which required Ankora skills are missing or too old for the person running an agent. Read only. Tested through get_agent in tests/integration/mcp-agents.test.ts."
     },
     "domain:agents": {
       "kind": "domain",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-28"
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "Agents: agents, versions, approval and installations. Tested in tests/integration/agents-actions.test.ts and mcp-agents.test.ts."
     },
     "screen:/app/agents": {
       "kind": "screen",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-28"
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "Agents (22.11.2026): a screen of an agent, read through the session. Browser flow in qa/e2e/flows-agents.app.spec.ts and the screens sweep."
     },
     "screen:/app/agents/[slug]": {
       "kind": "screen",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-28"
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "Agents (22.11.2026): a screen of an agent, read through the session. Browser flow in qa/e2e/flows-agents.app.spec.ts and the screens sweep."
     },
     "screen:/app/agents/[slug]/installations": {
       "kind": "screen",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-28"
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "Agents (22.11.2026): a screen of an agent, read through the session. Browser flow in qa/e2e/flows-agents.app.spec.ts and the screens sweep."
     },
     "screen:/app/agents/[slug]/instructions": {
       "kind": "screen",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-28"
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "Agents (22.11.2026): a screen of an agent, read through the session. Browser flow in qa/e2e/flows-agents.app.spec.ts and the screens sweep."
     },
     "screen:/app/agents/[slug]/params": {
       "kind": "screen",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-28"
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "Agents (22.11.2026): a screen of an agent, read through the session. Browser flow in qa/e2e/flows-agents.app.spec.ts and the screens sweep."
     },
     "screen:/app/agents/[slug]/versions": {
       "kind": "screen",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-28"
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "Agents (22.11.2026): a screen of an agent, read through the session. Browser flow in qa/e2e/flows-agents.app.spec.ts and the screens sweep."
     },
     "screen:/app/agents/library": {
       "kind": "screen",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-28"
+      "riskAssigned": true,
+      "firstSeen": "2026-11-28",
+      "riskReason": "Agents (22.11.2026): a screen of an agent, read through the session. Browser flow in qa/e2e/flows-agents.app.spec.ts and the screens sweep."
     },
     "screen:/app/whatsapp-poc/connect": {
       "kind": "screen",
