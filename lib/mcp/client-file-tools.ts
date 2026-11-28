@@ -290,7 +290,7 @@ export const PROPOSE_KNOWLEDGE_DESCRIPTION = [
   "Fill interimStatement (APPROVAL_REQUIRED/THRESHOLD rules) and verification (AUTOMATED steps).",
   "Never include passwords, keys or card numbers: such an item is dropped and a task to change the secret opens. sensitivity SENSITIVE for medical, political or personal information. Leave out small talk, guesses and Ankora's own commercial terms.",
   "WHOSE MEETING: a participant from a client's domain decides. A meeting about several clients: each item its own `client`, with newSource. Not clear and nobody decides: pass the likely `client` and `uncertain` with all candidates; nothing enters a file until a person picks.",
-  "AUTO: a new plain fact, contact, provider or entity read as HIGH, not sensitive or flagged, may enter on arrival (`enteredFile`): tell the user which, with the `result` links.",
+  "AUTO: a new plain fact, contact, provider or entity read as HIGH, not sensitive or flagged, may enter on arrival (`enteredFile`), and so may a SUPERSEDE of such a fact, contact, provider, entity, system or request type: tell the user which, with the `result` links. Send confidence HIGH on a SUPERSEDE only when the source says the new value outright.",
 ].join(" ");
 
 export function registerClientFileTools(server: McpServer): void {
@@ -614,7 +614,7 @@ export function registerClientFileTools(server: McpServer): void {
             ? ` ${unmapped} system name(s) a process uses are not in the client's system map (missingSystems), so the process would enter without linking them. Before telling the user you are done, call propose_knowledge again with the same source and a SYSTEM item for each (systemName exactly as the process wrote it, purpose, accessStatus, confidence). Where \`similar\` lists a system already in the map that is the same one, do not add it: tell the user, so the name is corrected on the process's card before it is approved. The process links when its systems are approved before it.`
             : "") +
           (entered > 0
-            ? ` ${entered} entered the client's file automatically (\`enteredFile\`): tell the user which, with each \`result\` link. A person may still look at them on the approvals screen, and "ביטול" there takes one out again.`
+            ? ` ${entered} entered the client's file automatically (\`enteredFile\`): tell the user which, with each \`result\` link. A person may still look at them on the approvals screen, and "ביטול" there takes one out again (an update: puts the item back as it was).`
             : "") +
           (matched > 0 ? ` ${matched} of them may be items already in the file under another spelling (possibleMatches): if they are, propose a SUPERSEDE of the existing id instead.` : "") +
           (incomplete > 0

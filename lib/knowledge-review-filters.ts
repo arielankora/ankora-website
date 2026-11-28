@@ -72,8 +72,28 @@ export function proposalKindKey(p: KindLike): string {
 }
 
 export function proposalKindLabel(key: string): string {
-  if (key.startsWith("FACT.")) return FACT_KIND_LABELS[key.slice(5) as FactKindLike] ?? TARGET_LABELS.FACT;
-  return TARGET_LABELS[key as ProposalTargetLike] ?? key;
+  const { kind, supersede } = splitPauseKey(key);
+  const label = kind.startsWith("FACT.") ? (FACT_KIND_LABELS[kind.slice(5) as FactKindLike] ?? TARGET_LABELS.FACT) : (TARGET_LABELS[kind as ProposalTargetLike] ?? kind);
+  return supersede ? `עדכון של ${label}` : label;
+}
+
+/// The end of a pause key for updates of a kind (autoPauseKey).
+export const SUPERSEDE_PAUSE_SUFFIX = ":SUPERSEDE";
+
+/// The bucket an auto-applied proposal counts in for a kind's pause
+/// (lib/auto-apply.ts, kindPauseDue): its kind (proposalKindKey), and for
+/// an update (SUPERSEDE, 28.11.2026) the kind with ":SUPERSEDE", so a bad
+/// stretch of updates sends back only updates, and the history of new
+/// items of the same kind does not hold them back.
+export function autoPauseKey(p: KindLike & { action: string }): string {
+  const key = proposalKindKey(p);
+  return p.action === "SUPERSEDE" ? `${key}${SUPERSEDE_PAUSE_SUFFIX}` : key;
+}
+
+/// A pause key read back: the kind (proposalKindKey) and whether it is the
+/// bucket of its updates.
+export function splitPauseKey(key: string): { kind: string; supersede: boolean } {
+  return key.endsWith(SUPERSEDE_PAUSE_SUFFIX) ? { kind: key.slice(0, -SUPERSEDE_PAUSE_SUFFIX.length), supersede: true } : { kind: key, supersede: false };
 }
 
 type AttentionLike = KindLike & { action: ProposalActionLike; flags: ProposalFlag[]; hiddenFor: string | null; confidence: { level: ConfidenceLike } };

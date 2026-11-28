@@ -18,6 +18,7 @@ import { APPROVAL_TABS, KIND_LABELS, type ApprovalItem, type ApprovalKind } from
 import { appUrl, approvalRowUrl, autoReviewUrl, batchUrl, fileItemUrl, pauseUrl, proposalUrl } from "@/lib/approval-links";
 import { autoApplyOverview, listAutoReview } from "@/lib/app-domain/auto-apply";
 import { pauseErrorsLine, type AutoErrorSummary } from "@/lib/auto-apply";
+import { changesForAi } from "@/lib/proposal-changes";
 import { HEBREW } from "@/lib/i18n/outgoing";
 import he from "@/messages/he.json";
 
@@ -165,6 +166,7 @@ export function registerApprovalTools(server: McpServer): void {
                 kind: a.kindLabel,
                 says: a.headline,
                 action: a.action,
+                changes: a.changes?.length ? changesForAi(a.changes) : undefined,
                 enteredOn: localDateKey(a.decidedAt, actor.timezone),
                 why: a.why,
                 url: autoReviewUrl(base, a.clientId, a.id),

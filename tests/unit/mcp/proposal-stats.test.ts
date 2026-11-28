@@ -20,6 +20,7 @@ const prisma = vi.hoisted(() => ({
   knowledgeProposal: { findMany: vi.fn(), count: vi.fn() },
   extractionGuide: { findMany: vi.fn() },
   clientSource: { findMany: vi.fn() },
+  knowledgeBatch: { findMany: vi.fn() },
   auditEvent: { findMany: vi.fn() },
   appSetting: { findUnique: vi.fn(), upsert: vi.fn() },
   autoApplyPause: { findMany: vi.fn(), findFirst: vi.fn() },
@@ -63,6 +64,7 @@ beforeEach(() => {
   prisma.appSetting.findUnique.mockResolvedValue({ key: "knowledge.auto_apply", value: { enabled: true, firstEnabledAt: "2026-11-03T12:00:00.000Z" } });
   prisma.autoApplyPause.findMany.mockResolvedValue([]);
   prisma.autoApplyPause.findFirst.mockResolvedValue(null);
+  prisma.knowledgeBatch.findMany.mockResolvedValue([]);
 });
 
 describe("proposalStatsForAi", () => {

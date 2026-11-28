@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AUTO_FACT_KINDS, approvalTier, bulkApproveBlocker, revertBlocker, revertBlockerOf, type TierInput } from "@/lib/knowledge-proposals";
+import { AUTO_FACT_KINDS, approvalTier, bulkApproveBlocker, isAutoSupersede, revertBlocker, revertBlockerOf, type TierInput } from "@/lib/knowledge-proposals";
 
 // "ממתין לאישור" (spec 5.2): which proposals may be approved together, and
 // the approval tiers (3.11.2026): what may enter on its own (AUTO), what
@@ -16,7 +16,7 @@ describe("bulkApproveBlocker", () => {
     expect(bulkApproveBlocker({ ...p, flags: [{ code: "R14", message: "" }, { code: "POLICY", message: "" }] })).toBeNull();
   });
   it("what changes an existing item or may already be there, one at a time", () => {
-    expect(bulkApproveBlocker({ ...p, action: "SUPERSEDE" })).toContain("בתיק");
+    expect(bulkApproveBlocker({ ...p, action: "SUPERSEDE", level: "MEDIUM" })).toContain("בתיק");
     expect(bulkApproveBlocker({ ...p, action: "CONTRADICT" })).toContain("בתיק");
     expect(bulkApproveBlocker({ ...p, flags: [{ code: "DUPLICATE", message: "" }] })).toContain("כבר");
   });
@@ -60,7 +60,7 @@ describe("approvalTier", () => {
 
   it("INDIVIDUAL: a change, a task, a domain, not to tell, client-visible, blocked, maybe in the file, or low", () => {
     const one = (over: Partial<TierInput>) => approvalTier({ ...p, ...over });
-    expect(one({ action: "SUPERSEDE" })).toEqual({ tier: "INDIVIDUAL", reason: "משנה פריט שכבר בתיק" });
+    expect(one({ action: "SUPERSEDE", level: "MEDIUM" })).toEqual({ tier: "INDIVIDUAL", reason: "משנה פריט שכבר בתיק" });
     expect(one({ action: "CONTRADICT" }).tier).toBe("INDIVIDUAL");
     expect(one({ target: "TASK", payload: { title: "x" } })).toEqual({ tier: "INDIVIDUAL", reason: "משימה נפתחת לאדם אחר" });
     expect(one({ target: "DOMAIN", payload: { domain: "nux.ai", kind: "CLIENT" } }).tier).toBe("INDIVIDUAL");
@@ -84,8 +84,59 @@ describe("approvalTier", () => {
   });
 
   it("is what bulk approval reads: INDIVIDUAL and only INDIVIDUAL waits", () => {
-    const cases: TierInput[] = [p, { ...p, level: "MEDIUM" }, { ...p, level: "LOW" }, { ...p, target: "TASK" }, { ...p, target: "DATE", payload: {} }, { ...p, action: "SUPERSEDE" }];
+    const cases: TierInput[] = [p, { ...p, level: "MEDIUM" }, { ...p, level: "LOW" }, { ...p, target: "TASK" }, { ...p, target: "DATE", payload: {} }, { ...p, action: "SUPERSEDE" }, { ...p, action: "SUPERSEDE", level: "MEDIUM" }];
     for (const c of cases) expect(bulkApproveBlocker(c) !== null).toBe(approvalTier(c).tier === "INDIVIDUAL");
+  });
+});
+
+describe("approvalTier: an update (SUPERSEDE), 28.11.2026", () => {
+  const up: TierInput = { target: "CONTACT", action: "SUPERSEDE", flags: [], payload: { role: "CFO" }, level: "HIGH" };
+  const auto = { tier: "AUTO", reason: "עדכון פשוט לפריט שבתיק, ברמת בדיקה גבוהה" };
+  const individual = { tier: "INDIVIDUAL", reason: "משנה פריט שכבר בתיק" };
+
+  it("AUTO: an update of a contact, provider, entity, system, request type or simple fact at a high level", () => {
+    for (const target of ["CONTACT", "ORGANIZATION", "ENTITY", "SYSTEM", "REQUEST_TYPE"] as const) {
+      expect(approvalTier({ ...up, target }), target).toEqual(auto);
+      expect(isAutoSupersede({ ...up, target }), target).toBe(true);
+    }
+    for (const kind of AUTO_FACT_KINDS) expect(approvalTier({ ...up, target: "FACT", payload: { kind, body: "x" } }), kind).toEqual(auto);
+    // Information on a flag, and fields that are empty or false, are no reason to wait.
+    expect(approvalTier({ ...up, flags: [{ code: "R14", message: "" }], payload: { role: "CFO", doNotDisclose: " ", clientVisible: false } })).toEqual(auto);
+    // Approved together like any AUTO: it is no longer one at a time.
+    expect(bulkApproveBlocker(up)).toBeNull();
+  });
+
+  it("INDIVIDUAL: a question or temporary fact, a process or a rule, and a contradiction", () => {
+    expect(approvalTier({ ...up, target: "FACT", payload: { kind: "QUESTION", body: "x" } })).toEqual(individual);
+    expect(approvalTier({ ...up, target: "FACT", payload: { kind: "TEMPORARY", body: "x" } })).toEqual(individual);
+    expect(approvalTier({ ...up, target: "FACT", payload: { body: "x" } })).toEqual(individual);
+    for (const target of ["PROCESS", "POLICY", "NARRATIVE", "DATE", "DOMAIN", "TASK"] as const) expect(approvalTier({ ...up, target }), target).toEqual(individual);
+    expect(approvalTier({ ...up, action: "CONTRADICT" })).toEqual(individual);
+    expect(approvalTier({ ...up, target: "FACT", action: "CONTRADICT", payload: { kind: "NOTE", body: "x" } })).toEqual(individual);
+  });
+
+  it("INDIVIDUAL: medium or low, sensitive, not to tell, client-visible", () => {
+    expect(approvalTier({ ...up, level: "MEDIUM" })).toEqual(individual);
+    expect(approvalTier({ ...up, level: "LOW" })).toEqual(individual);
+    expect(approvalTier({ ...up, payload: { role: "CFO", sensitivity: "SENSITIVE" } })).toEqual(individual);
+    expect(approvalTier({ ...up, flags: [{ code: "R6", message: "" }] })).toEqual(individual);
+    expect(approvalTier({ ...up, payload: { role: "CFO", doNotDisclose: "לא לספר לאורן" } })).toEqual(individual);
+    expect(approvalTier({ ...up, payload: { role: "CFO", clientVisible: true } })).toEqual(individual);
+  });
+
+  it("INDIVIDUAL: a blocking flag, or maybe already in the file", () => {
+    expect(approvalTier({ ...up, flags: [{ code: "R17", message: "", block: true }] })).toEqual({ tier: "INDIVIDUAL", reason: "יש בה משהו שחוסם אישור" });
+    expect(approvalTier({ ...up, flags: [{ code: "DUPLICATE", message: "" }] })).toEqual(individual);
+    expect(approvalTier({ ...up, flags: [{ code: "SIMILAR", message: "" }] })).toEqual(individual);
+  });
+
+  it("enters on its own only where \"ביטול\" would put it back once approved", () => {
+    for (const target of ["FACT", "CONTACT", "ORGANIZATION", "ENTITY", "SYSTEM", "REQUEST_TYPE", "PROCESS", "POLICY"] as const) {
+      const input: TierInput = { ...up, target, payload: target === "FACT" ? { kind: "NOTE", body: "x" } : { role: "x" } };
+      const revertible = revertBlocker({ state: "APPROVED", action: "SUPERSEDE", target, attached: false, resultId: "r", revertedAt: null }) === null;
+      if (!revertible) expect(approvalTier(input).tier, target).toBe("INDIVIDUAL");
+      if (approvalTier(input).tier === "AUTO") expect(revertible, target).toBe(true);
+    }
   });
 });
 

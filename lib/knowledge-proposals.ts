@@ -544,7 +544,8 @@ export const MAX_BULK = 60;
 /// null when it may be. Approving together is still a person approving on
 /// the screen (decision 1); what stays one at a time is what the approval
 /// tiers put there (approvalTier, INDIVIDUAL): what changes an item
-/// already in the file, what may already be there, what is shown to the
+/// already in the file (but a simple update at a high level, AUTO since
+/// 28.11.2026), what may already be there, what is shown to the
 /// client or carries a "do not tell" (sensitive goes together since
 /// 19.11.2026: only its approvers see it), a task (it opens work for someone), a domain, and
 /// anything the review reads as low. Rejecting together is always
@@ -608,6 +609,7 @@ export type TierReasonCode =
   | "domain"
   | "lowLevel"
   | "simpleHigh"
+  | "simpleUpdateHigh"
   | "medium"
   | "openQuestion"
   | "temporary"
@@ -616,7 +618,12 @@ export type TierReasonCode =
 function tierOf(p: TierInput): { tier: ApprovalTier; reason: string; code: TierReasonCode } {
   const one = (code: TierReasonCode, reason: string) => ({ tier: "INDIVIDUAL" as const, reason, code });
   if (p.flags.some((f) => f.block)) return one("blocked", "יש בה משהו שחוסם אישור");
-  if (p.action !== "CREATE") return one("changesExisting", "משנה פריט שכבר בתיק");
+  if (p.action !== "CREATE") {
+    // 28.11.2026 (Ariel): a simple update at a high review level enters on
+    // its own, as a new simple item does (isAutoSupersede).
+    if (isAutoSupersede(p)) return { tier: "AUTO", reason: "עדכון פשוט לפריט שבתיק, ברמת בדיקה גבוהה", code: "simpleUpdateHigh" };
+    return one("changesExisting", "משנה פריט שכבר בתיק");
+  }
   if (p.flags.some((f) => f.code === "DUPLICATE" || f.code === "SIMILAR")) return one("maybeInFile", "ייתכן שכבר בתיק");
   if (typeof p.payload.doNotDisclose === "string" && p.payload.doNotDisclose.trim()) return one("doNotDisclose", "יש בה מה לא לספר");
   if (p.payload.clientVisible === true) return one("clientVisible", "גלוי ללקוח");
@@ -635,6 +642,32 @@ function tierOf(p: TierInput): { tier: ApprovalTier; reason: string; code: TierR
   if (p.target === "FACT" && p.payload.kind === "QUESTION") return { tier: "QUICK", reason: "שאלה פתוחה", code: "openQuestion" };
   if (p.target === "FACT" && p.payload.kind === "TEMPORARY") return { tier: "QUICK", reason: "מידע זמני", code: "temporary" };
   return { tier: "QUICK", reason: `${TARGET_LABELS[p.target]}: לא נכנס בלי אדם`, code: "needsPerson" };
+}
+
+/// The kinds whose update (SUPERSEDE) may enter on its own: a fact of one
+/// of AUTO_FACT_KINDS, a contact, a provider, an entity, a system or a
+/// request type. A process and a rule never do: "ביטול" does not put them
+/// back (revertBlocker, MANUAL_UNDO_TARGETS).
+export const AUTO_SUPERSEDE_TARGETS: readonly ProposalTargetLike[] = ["FACT", "CONTACT", "ORGANIZATION", "ENTITY", "SYSTEM", "REQUEST_TYPE"] as const;
+
+/// An update (SUPERSEDE) that enters on its own (28.11.2026, Ariel: of 66
+/// such updates at a high review level, 62 were approved as they came,
+/// lower bound 85%). All of: a kind of AUTO_SUPERSEDE_TARGETS, a high
+/// review level, not sensitive, nothing not to tell, not shown to the
+/// client, no flag that blocks it or says it may already be there, and
+/// "ביטול" would put it back once approved (revertBlocker, the same rule
+/// the button reads). A contradiction never does: it is a person's call.
+export function isAutoSupersede(p: TierInput): boolean {
+  if (p.action !== "SUPERSEDE") return false;
+  if (!AUTO_SUPERSEDE_TARGETS.includes(p.target)) return false;
+  if (p.target === "FACT" && !(AUTO_FACT_KINDS as readonly string[]).includes(String(p.payload.kind))) return false;
+  if (p.level !== "HIGH") return false;
+  if (p.flags.some((f) => f.block || f.code === "DUPLICATE" || f.code === "SIMILAR" || f.code === "R6")) return false;
+  if (p.payload.sensitivity === "SENSITIVE") return false;
+  if (typeof p.payload.doNotDisclose === "string" && p.payload.doNotDisclose.trim()) return false;
+  if (p.payload.clientVisible === true) return false;
+  // As it will stand once approved: a change the approval made itself.
+  return revertBlocker({ state: "APPROVED", action: p.action, target: p.target, attached: false, resultId: "approved", revertedAt: null }) === null;
 }
 
 /// bulkApproveBlocker as a code (ADR 0006), or null when it may be
