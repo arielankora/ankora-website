@@ -177,3 +177,38 @@ export function topSenders(
     .sort((a, b) => b.count - a.count || a.address.localeCompare(b.address))
     .slice(0, limit);
 }
+
+// ---------------------------------------------------------------- automatic mail
+
+/// Senders whose name says no person reads the answer.
+const NO_REPLY_LOCAL = /^(no[-_.]?reply|do[-_.]?not[-_.]?reply|mailer[-_.]?daemon|postmaster|bounces?)([-_.+].*)?$/i;
+
+/// Gmail's own tabs for mail sent in bulk. "Updates" is left out: a
+/// person's email lands there too.
+const BULK_GMAIL_LABELS = new Set(["CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL", "CATEGORY_FORUMS"]);
+
+export type AutomatedReason = "list" | "auto-submitted" | "bulk" | "no-reply" | "gmail-category";
+
+/// 28.11.2026 (Ariel): newsletters, notifications and marketing are never
+/// work with a client, and a client's own mailbox would otherwise record
+/// every one of them as that client's. An email is automatic when its
+/// headers say so (a mailing list, an automatic reply, bulk precedence),
+/// when its sender is a no-reply address, or when Gmail filed it under
+/// Promotions, Social or Forums. A sender who writes from a CRM with an
+/// unsubscribe link is left out with them: that is the price of not
+/// recording every newsletter.
+export function automatedReason(email: { headers?: unknown; from?: string | null; folders?: unknown }): AutomatedReason | null {
+  const headers = Array.isArray(email.headers) ? (email.headers as { name?: unknown; value?: unknown }[]) : [];
+  const value = (name: string) =>
+    headers
+      .filter((h) => typeof h?.name === "string" && h.name.toLowerCase() === name)
+      .map((h) => (typeof h.value === "string" ? h.value.trim().toLowerCase() : ""));
+  if (value("list-unsubscribe").length || value("list-id").length) return "list";
+  if (value("auto-submitted").some((v) => v && v !== "no")) return "auto-submitted";
+  if (value("precedence").some((v) => v === "bulk" || v === "list" || v === "junk")) return "bulk";
+  const local = email.from?.split("@")[0] ?? "";
+  if (local && NO_REPLY_LOCAL.test(local)) return "no-reply";
+  const folders = Array.isArray(email.folders) ? email.folders : [];
+  if (folders.some((f) => typeof f === "string" && BULK_GMAIL_LABELS.has(f))) return "gmail-category";
+  return null;
+}

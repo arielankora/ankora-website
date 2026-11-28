@@ -124,7 +124,7 @@ export const CONNECTED_MAILBOXES_NOTES: FieldNotes = {
   clientAiExcluded: 'The mailbox is a client\'s marked "בלי AI": its name is not given, and nothing from it is for you.',
   state:
     'choose-kind (connected, whose it is not chosen), not-scanning (the owner has not pressed "הפעלת סריקה"), scanning, disconnected (nothing new comes in until the owner reconnects at `connectUrl`), or unknown (Unipile did not answer now).',
-  lastEmailAt: "The newest email recorded from it with a client. Emails that are not with a client, and the team writing to itself, are never recorded.",
+  lastEmailAt: "The newest email recorded from it with a client. Emails that are not with a client, the team writing to itself, and automatic mail (newsletters, notifications, marketing, no-reply senders, \"out of office\" answers) are never recorded.",
   threadsRecorded: "How many threads with clients were recorded: who and when only, never the content.",
   extractionAllowed: "Whether a manager allows knowledge extraction from this mailbox.",
   pendingDoNotRead: 'Requests by the owner not to read an address or a domain, waiting for a manager on the settings screen. Threads they cover are held meanwhile.',

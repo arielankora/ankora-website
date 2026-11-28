@@ -185,6 +185,28 @@ describe("connecting a mailbox on \"התיבות שלי\"", () => {
 });
 
 describe("recording emails with clients", () => {
+  it("records no newsletter, notification or marketing, even in a client's own mailbox", async () => {
+    const { anna, grantor } = await world();
+    const box = await scanningBox(anna, "acc_anna", "anna.private@gmail.com", grantor.id);
+    email("em_news", "th_news", "info@email.meetup.com", ["anna.private@gmail.com"]);
+    emails.em_news.headers = [{ name: "List-Unsubscribe", value: "<mailto:u@meetup.com>" }];
+    email("em_google", "th_google", "no-reply@accounts.google.com", ["anna.private@gmail.com"]);
+    email("em_promo", "th_promo", "deals@shop.com", ["anna.private@gmail.com"]);
+    emails.em_promo.folders = ["INBOX", "CATEGORY_PROMOTIONS"];
+    email("em_person", "th_person", "nadav@grantor.co.il", ["anna.private@gmail.com"]);
+    email("em_mine", "th_mine", "anna.private@gmail.com", ["list@club.org"]);
+    emails.em_mine.headers = [{ name: "Precedence", value: "bulk" }];
+
+    expect(await recordMailEvent("acc_anna", "em_news")).toBe("automated");
+    expect(await recordMailEvent("acc_anna", "em_google")).toBe("automated");
+    expect(await recordMailEvent("acc_anna", "em_promo")).toBe("automated");
+    expect(await recordMailEvent("acc_anna", "em_person")).toBe("recorded");
+    // What the owner sent is never automatic.
+    expect(await recordMailEvent("acc_anna", "em_mine")).toBe("recorded");
+    const threads = await prisma.mailThread.findMany({ where: { channelId: box.id } });
+    expect(threads.map((t) => t.externalThreadId).sort()).toEqual(["th_mine", "th_person"]);
+  });
+
   it("records a thread with a client, who and when only, and leaves the rest alone", async () => {
     const { anna, grantor, levi } = await world();
     const box = await scanningBox(anna);
